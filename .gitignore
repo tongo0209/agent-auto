@@ -1,0 +1,44 @@
+# Build output + dependency của console
+console/node_modules/
+console/dist/
+
+# Backup quay vòng do console/skill ghi (state, board) — lưới an toàn, không phải lịch sử
+.backups/
+
+# Ảnh chụp tạm của browserpilot
+.browserpilot/shots/
+
+# Design KHÔNG vào git: 5.1GB kể cả _raw, 112MB ảnh đã cắt (đo 1/8).
+# Đây là bản tải về, nguồn thật nằm trên SharePoint của designer — tải lại được.
+designs/
+
+# Credential Jira của console (JIRA_EMAIL / JIRA_TOKEN) — KHÔNG BAO GIỜ vào git
+console/.env
+
+# Config RIÊNG TỪNG MÁY: đường dẫn tuyệt đối tới các repo + cloudId + email git.
+# Bản mẫu để commit là config.example.json; tools/install-skills.sh copy ra config.json.
+config.json
+
+# ── DỮ LIỆU VẬN HÀNH: riêng từng người, KHÔNG vào git ────────────────────────
+# Repo này là CÔNG CỤ dùng chung; board/task/state là việc của riêng từng dev.
+# Track chúng thì mỗi lần ai chạy /daily là 2 người đụng nhau trên cùng file.
+# Thư mục vẫn còn sau khi clone nhờ .gitkeep.
+state.json
+dashboard.html
+boards/*
+!boards/.gitkeep
+tasks/*
+!tasks/.gitkeep
+history/*
+!history/.gitkeep
+knowledge/gates/*
+!knowledge/gates/.gitkeep
+knowledge/metrics.jsonl
+# knowledge/lessons.md thì NGƯỢC LẠI — bài học chung cả team, phải vào git.
+
+# Rác hệ thống
+.DS_Store
+*.tmp-*
+
+# Lock của radar nền (tools/radar-tick.mjs) — runtime, không versioned
+.locks/

@@ -1,0 +1,118 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 13px/1.5 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Icon (lucide, xem @core/icons) ----
+   Cỡ theo 1em của chỗ đặt, màu theo currentColor → không truyền màu vào icon. */
+.ic {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  vertical-align: -0.135em;
+  stroke-width: 1.75;
+}
+.ic.big {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+/* Nhãn chỉ dành cho screen reader */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+h1,
+h2,
+p {
+  margin: 0;
+}
+code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--raise);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+button {
+  font-family: inherit;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.empty-note {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Scrollbar mảnh — dải tuần / list commit / cột trái */
+.left,
+.week,
+.ttabs,
+.commits,
+#modal-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.left::-webkit-scrollbar,
+.week::-webkit-scrollbar,
+.ttabs::-webkit-scrollbar,
+.commits::-webkit-scrollbar,
+#modal-body::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+.left::-webkit-scrollbar-thumb,
+.week::-webkit-scrollbar-thumb,
+.ttabs::-webkit-scrollbar-thumb,
+.commits::-webkit-scrollbar-thumb,
+#modal-body::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+.left::-webkit-scrollbar-track,
+.week::-webkit-scrollbar-track,
+.commits::-webkit-scrollbar-track {
+  background: transparent;
+}
+.count {
+  color: var(--accent);
+}
+.spacer {
+  flex: 1;
+}
+.sep {
+  width: 1px;
+  height: 17px;
+  background: var(--line);
+  margin: 0 3px;
+  display: inline-block;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

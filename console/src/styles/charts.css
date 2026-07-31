@@ -1,0 +1,151 @@
+/* Chart thuần HTML/CSS. Series lấy từ [data-series] để JS không nhúng màu inline. */
+.chartbox {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 12px 13px 10px;
+}
+
+[data-series='1'] {
+  background: var(--s1);
+}
+[data-series='2'] {
+  background: var(--s2);
+}
+
+/* ---- Stacked bar theo tháng ---- */
+.mchart {
+  display: flex;
+  align-items: stretch; /* cần stretch để .mstack có chiều cao thật cho height:% của segment */
+  gap: 12px;
+  height: 118px; /* chart 3-8 cột không cần cao: trước chiếm nửa khung mà nửa dưới trống */
+}
+.mcol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.mstack {
+  width: 100%;
+  max-width: 46px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px; /* khe 2px giữa segment — không dính liền */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.mval,
+.mlab {
+  flex: 0 0 auto;
+}
+.mseg {
+  border-radius: 3px;
+  min-height: 3px;
+}
+.mseg.top {
+  border-radius: 4px 4px 3px 3px; /* bo 4px ở đầu dữ liệu */
+}
+.mlab {
+  font: 10.5px/1.2 var(--font-mono);
+  color: var(--muted);
+  text-align: center;
+}
+.mlab.left {
+  text-align: left;
+}
+.mval {
+  font: 700 12px/1 var(--font-mono);
+  color: var(--ink2);
+}
+
+.legend {
+  display: flex;
+  gap: 13px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.lg i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* ---- Bar commit theo ngày (1 series) ---- */
+.gchart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 74px;
+}
+.gbar {
+  flex: 1;
+  background: var(--s1);
+  border-radius: 3px 3px 2px 2px;
+  min-height: 2px;
+  opacity: 0.92;
+}
+.gbar:hover {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.gbar.zero {
+  background: var(--line);
+}
+.axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font: 10.5px var(--font-mono);
+  color: var(--muted);
+}
+.repostat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.rchip {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--raise);
+  border: 1px solid var(--line);
+  color: var(--ink2);
+}
+.rchip b {
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+
+/* ---- Metrics: ước lượng vs thực tế ---- */
+.mrow-metric {
+  margin-bottom: 10px;
+}
+.mbar-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 3px;
+}
+.mseg.bar {
+  height: 9px;
+  min-width: 3px;
+  border-radius: 3px 4px 4px 3px;
+}

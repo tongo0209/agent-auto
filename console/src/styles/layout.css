@@ -1,0 +1,138 @@
+.shell {
+  display: grid;
+  grid-template-columns: var(--left-w, 46%) 5px 1fr;
+  height: 100vh;
+}
+
+/* Thanh kéo giữa 2 cột */
+.gutter {
+  background: var(--line);
+  cursor: col-resize;
+  position: relative;
+}
+.gutter::after {
+  content: '';
+  position: absolute;
+  inset: 0 -3px;
+  cursor: col-resize;
+}
+.gutter:hover,
+.gutter:focus-visible,
+body.dragging .gutter {
+  background: var(--accent);
+}
+body.dragging {
+  cursor: col-resize;
+  -webkit-user-select: none;
+  user-select: none;
+}
+body.dragging .terms {
+  pointer-events: none;
+}
+
+/* ---- Cột trái ---- */
+.left {
+  background: var(--panel);
+  overflow-y: auto;
+  padding: var(--pad) var(--pad) 10px;
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size; /* để responsive.css dàn nội dung theo bề rộng cột */
+}
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.brand {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+}
+.mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex: 0 0 auto;
+  background: linear-gradient(145deg, var(--accent), var(--s1) 70%);
+  box-shadow: 0 0 0 1px rgba(58, 205, 185, 0.25), 0 3px 12px rgba(39, 154, 139, 0.28);
+}
+h1 {
+  font-size: 16.5px;
+  letter-spacing: -0.015em;
+}
+.sub {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 1px;
+}
+.conn.ok {
+  color: var(--ok);
+}
+.conn.bad {
+  color: var(--crit);
+}
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: right;
+}
+.links a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+}
+.links a:hover {
+  text-decoration: underline;
+}
+
+h2 {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin: var(--pad) 0 8px;
+}
+.rowline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.rowline h2 {
+  margin: var(--pad) 0 8px;
+}
+
+.foot {
+  margin-top: auto;
+  padding-top: 13px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ---- Cột phải ---- */
+.right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    height: auto;
+  }
+  .gutter {
+    display: none;
+  }
+  .left {
+    max-height: 48vh;
+  }
+  .right {
+    height: 52vh;
+  }
+}

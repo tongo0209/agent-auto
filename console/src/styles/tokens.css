@@ -1,0 +1,53 @@
+/* ===========================================================
+   Design tokens — sửa màu/khoảng cách ở ĐÂY, không sửa rải rác
+   Series chart (--s1/--s2) đã qua validator dataviz trên nền tối:
+   lightness band · chroma floor · CVD ΔE 11.6 · normal-vision ΔE 19.9 · contrast → ALL PASS
+   =========================================================== */
+:root {
+  /* Surfaces */
+  --bg: #0c1312;
+  --panel: #111917;
+  --surface: #172120;
+  --raise: #1e2a28;
+  --term-bg: #0a100f;
+  --line: #263431;
+
+  /* Ink */
+  --ink: #e6efec;
+  --ink2: #b9c9c4;
+  --muted: #869994;
+
+  /* Accent */
+  --accent: #3acdb9;
+  --accent-ink: #08110f;
+
+  /* Status (dành riêng, không dùng làm series) */
+  --crit: #f0857a;
+  --warn: #e3ae5c;
+  --ok: #6fcb96;
+  --wait: #9fb0c9;
+  --crit-bg: #33201d;
+  --warn-bg: #302716;
+  --ok-bg: #1a2e23;
+  --wait-bg: #202836;
+
+  /* Series chart — thứ tự cố định, không bao giờ hoán vị theo rank */
+  --s1: #279a8b;
+  --s2: #b67f35;
+
+  /* Hình dạng & nhịp */
+  --r: 8px;
+  --r-sm: 6px;
+  --gap: 9px;
+  --pad: 16px;
+
+  /* Nhịp chữ — mật độ "gọn-pro": nhiều dữ liệu trong 1 màn, cỡ chữ vẫn đọc được */
+  --fs: 12.5px;
+  --fs-sm: 11px;
+  --fs-xs: 10.5px;
+  --row-h: 30px;
+
+  /* Font */
+  --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+}

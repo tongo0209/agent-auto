@@ -1,0 +1,57 @@
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+  margin: 13px 0 11px;
+}
+
+/**
+ * Mặc định KPI KHÔNG có màu: chỉ ô đang cần chú ý (.tone) mới lên màu + dải trái.
+ * Trước đây cả 4 ô đều viền màu riêng → màn hình đọc như toàn báo động.
+ */
+.kpi {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 8px 10px 7px;
+  overflow: hidden;
+}
+.kpi .n {
+  font: 700 21px/1.1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.kpi .l {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpi.tone::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--sev);
+}
+.kpi.tone .n {
+  color: var(--sev);
+}
+.kpi.warn {
+  --sev: var(--warn);
+}
+.kpi.crit {
+  --sev: var(--crit);
+}
+
+@media (max-width: 980px) {
+  .kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

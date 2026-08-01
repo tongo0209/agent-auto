@@ -1,0 +1,16 @@
+/* Điểm vào CSS — thứ tự import là thứ tự cascade, giữ nguyên khi thêm file mới */
+@import './tokens.css';
+@import './base.css';
+@import './layout.css';
+@import './kpi.css';
+@import './tabs.css';
+@import './cards.css';
+@import './table.css';
+@import './alerts.css';
+@import './drawer.css';
+@import './review.css'; /* sau cards/table: ghi đè ô tick của .need + .ttable.small */
+@import './gantt.css';
+@import './charts.css';
+@import './terminal.css';
+@import './modal.css';
+@import './responsive.css'; /* CUỐI: container query cần thắng display của cards.css */

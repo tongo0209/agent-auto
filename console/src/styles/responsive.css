@@ -1,0 +1,117 @@
+/* ===========================================================
+   Dàn nội dung theo BỀ RỘNG CỘT TRÁI (container query, không phải viewport).
+   File này import CUỐI trong index.css để thắng display của cards.css.
+   =========================================================== */
+
+@container (min-width: 620px) {
+  .commits,
+  #month-list,
+  #promo-box {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--gap);
+    align-content: start;
+  }
+  .need {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .mrow {
+    margin-bottom: 0;
+  }
+  .mchart {
+    height: 140px;
+  }
+  .gchart {
+    height: 96px;
+  }
+  .kpi .n {
+    font-size: 23px;
+  }
+}
+
+/* Vùng trung gian 620–819px: đủ rộng để không vào nhánh "hẹp" nhưng CHƯA đủ chỗ cho 7 cột
+   (đo thật ở 760px: tên task còn 146px, 4/4 tên bị cắt) → thu Design + Effort về 0, giữ Phase.
+   Cùng lý do như nhánh hẹp: table-layout fixed nên phải thu width, không dùng display:none. */
+@container (min-width: 620px) and (max-width: 819px) {
+  .ttable .c-effort {
+    width: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+  }
+  .ttable .c-effort > * {
+    display: none;
+  }
+}
+
+/* Hẹp hơn 820px: bỏ các nút PHỤ (design OneDrive/local, questions, buglist, gt-promotion) và
+   ép cột Actions về 2 nút. Giữ đủ 6-7 nút ở khổ hẹp thì tên task chỉ còn vài chục px.
+   Mọi hành động bỏ ở đây đều còn đường khác: mở folder task rồi vào bằng Finder/VS Code. */
+@container (max-width: 819px) {
+  .ttable .c-act {
+    width: 62px;
+  }
+  .ttable .c-act .abtn2 {
+    display: none;
+  }
+}
+
+/* Gate + Push chỉ sống ở cột trái ≥1000px (mặc định mới 57% ⇒ 1100px ở màn 1920).
+   Hẹp hơn thì thu về 0 — tên task quý hơn, và cả 2 thông tin đều có đủ ở tab Review.
+   Vẫn phải thu WIDTH chứ không `display:none`: table-layout fixed giữ nguyên width cột ẩn. */
+@container (max-width: 999px) {
+  .ttable .c-gate,
+  .ttable .c-push {
+    width: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+  }
+  .ttable .c-gate > *,
+  .ttable .c-push > * {
+    display: none;
+  }
+}
+
+@container (min-width: 920px) {
+  .commits,
+  #month-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .need {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Cột hẹp: bảng bỏ 3 cột phụ, gantt bỏ nhãn mốc cho gọn.
+   Bỏ cả cột Phase vì DÒNG NHÓM đã nói phase — giữ lại chỉ ăn 112px của tên task
+   (đo thật ở cột trái 600px: tên task còn 61px → sau khi bỏ Phase còn ~173px). */
+@container (max-width: 619px) {
+  /* KHÔNG dùng `display:none`: với table-layout fixed, cột ẩn kiểu đó VẪN giữ phần width đã
+     khai báo (đo thật: ẩn 3 cột mà tên task chỉ nhận thêm 11px). Thu width về 0 mới trả chỗ. */
+  .ttable .c-effort,
+  .ttable .c-phase {
+    width: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+  }
+  .ttable .c-effort > *,
+  .ttable .c-phase > * {
+    display: none;
+  }
+  .ttable .c-due {
+    width: 112px;
+  }
+  .rownote {
+    display: none;
+  }
+  .grow {
+    grid-template-columns: 96px 1fr;
+  }
+  .gmark b {
+    display: none;
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "name": "daily-console",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Web local: cockpit theo dõi task/Jira/git + terminal claude thật (webpack + jQuery)",
+  "main": "server/index.js",
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development --watch",
+    "serve": "node server/index.js",
+    "start": "npm run build && node server/index.js",
+    "lint": "eslint .",
+    "test": "node --test \"server/**/*.test.mjs\" \"src/**/*.test.mjs\"",
+    "test:tools": "node --test \"../tools/*.test.mjs\"",
+    "doctor": "node ../tools/state-doctor.mjs",
+    "dashboard": "node ../tools/build-dashboard.mjs",
+    "check": "npm run lint && npm test && npm run test:tools && npm run build && npm run doctor"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "express": "^4.21.2",
+    "jquery": "^4.0.0",
+    "lucide-static": "^1.28.0",
+    "node-pty": "^1.2.0-beta.14",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "css-loader": "^7.1.4",
+    "eslint": "^10.8.0",
+    "html-webpack-plugin": "^5.6.8",
+    "mini-css-extract-plugin": "^2.10.2",
+    "style-loader": "^4.0.0",
+    "webpack": "^5.109.2",
+    "webpack-cli": "^7.2.2"
+  }
+}

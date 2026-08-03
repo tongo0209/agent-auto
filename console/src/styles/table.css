@@ -1,0 +1,423 @@
+/* ===========================================================
+   Bảng task (thay kanban). Vì sao bảng: 8 cột kanban trong cột trái ~880px làm mỗi cột
+   còn ~200px → note bị cắt giữa câu, hàng nút wrap 2 dòng, cột cuối bị cắt + tràn ngang.
+   Bảng đọc được ở mọi bề rộng và so mốc/effort giữa các task dễ hơn (cùng trục dọc).
+   =========================================================== */
+.ttable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs);
+  table-layout: fixed;
+}
+.ttable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+  text-align: left;
+  font: 700 var(--fs-xs) / 1 var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  padding: 0 8px 7px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.ttable td {
+  padding: 0 8px;
+  height: var(--row-h);
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+/* Bề rộng cột: chỉ "Việc" co giãn, các cột dữ liệu giữ cố định để mắt quét theo cột.
+   Giữ các cột này CHẶT: mỗi px tiết kiệm được là px cho tên task (cột trái mặc định 46%
+   màn hình nên tên task là chỗ dễ bị cắt nhất). */
+.c-key {
+  width: 64px;
+}
+.c-phase {
+  /* pill "chờ design" (icon + chữ + padding) cần trọn 112px, hụt là cắt chữ */
+  width: 112px;
+}
+.c-due {
+  /* phải chứa được nhãn dài nhất "Design 08/10 · 10d" — hụt 1 px là mất số ngày còn lại */
+  width: 132px;
+}
+/* Gate + Push: 2 cột "chỉ hiện khi rộng" — nội dung mới đi kèm việc nới cột trái lên 57%
+   (2026-08-01). Dưới 1000px chúng thu về 0 (xem responsive.css) vì tên task quý hơn. */
+.c-gate {
+  width: 82px;
+}
+.c-push {
+  width: 66px;
+}
+.c-effort {
+  width: 90px;
+}
+.c-act {
+  /* Bề rộng do JS tính theo số nút THẬT (`--actw`): cột nowrap nên hụt chỗ là cắt mất nút,
+     mà đặt cứng cho trường-hợp-xấu-nhất thì lấy oan chỗ của tên task ở mọi hàng khác. */
+  width: var(--actw, 104px);
+  white-space: nowrap; /* nút icon phải nằm 1 hàng, wrap là dòng cao gấp đôi */
+}
+
+/* Dòng nhóm theo phase — thay cho tiêu đề cột kanban.
+   Nhóm phải NHÌN LÀ THẤY ranh giới: nền đậm hơn dòng task + dải màu phase bên trái. */
+.grouprow th {
+  position: static;
+  background: var(--raise);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid var(--sev, var(--muted));
+  padding: 6px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+.grouprow .gicon {
+  display: inline-flex;
+  margin-right: 6px;
+  font-size: 12px;
+  color: var(--sev, var(--muted));
+  vertical-align: -0.1em;
+}
+.grouprow .gname {
+  font: 700 var(--fs-sm) / 1.2 var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink2);
+}
+.grouprow .gcount {
+  margin-left: 7px;
+  font: 700 var(--fs-xs) var(--font-mono);
+  color: var(--muted);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+/* Nhóm thu gọn được ("Đã xong / ra khỏi tay"): cả dòng nhóm là 1 nút, bấm đâu cũng mở.
+   Nút trong suốt + inherit font để trông y như dòng nhóm thường — chỉ thêm caret. */
+.grouprow .gfold {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.grouprow .gcaret {
+  display: inline-flex;
+  margin-right: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  transition: transform 0.12s ease;
+}
+/* Mở = caret quay xuống. Nhóm ĐANG THU GỌN thì caret giữ nguyên hướng phải. */
+.grouprow.foldable:not(.folded) .gcaret {
+  transform: rotate(90deg);
+}
+.grouprow.foldable.folded .gname,
+.grouprow.foldable.folded .gicon {
+  color: var(--muted);
+}
+.grouprow .gfold:hover .gname {
+  color: var(--ink);
+}
+
+/* Dòng task: dải màu độ GẤP bên trái (đỏ ≤4 ngày · vàng ≤8 · xanh xa) + zebra trong nhóm */
+.trow > td:first-child {
+  position: relative;
+}
+.trow > td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--sev, var(--line));
+  opacity: 0.85;
+}
+.trow.odd {
+  background: rgba(255, 255, 255, 0.016);
+}
+.trow:hover,
+.trow.odd:hover {
+  background: var(--surface);
+}
+.trow.late .c-due {
+  font-weight: 700;
+}
+.trow.late > td:first-child::before {
+  opacity: 1;
+  width: 4px;
+}
+
+.ttable .key {
+  font: 700 var(--fs) / 1 var(--font-mono);
+  color: var(--accent);
+  text-decoration: none;
+}
+.ttable .key:hover {
+  text-decoration: underline;
+}
+
+/* Ô "Việc": tên ticket bấm được (mở brief) + icon design + ghi chú 1 dòng.
+   Design KHÔNG có cột riêng: nó là thuộc tính của task, để cạnh tên thì tiết kiệm 68px cho
+   tên task — chỗ đó quý hơn (đo thật: cột trái mặc định chỉ đủ cho 1 trong 2 thứ). */
+.c-title {
+  min-width: 0;
+}
+.titlerow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.titlerow .dsg {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+.titlebtn {
+  display: block;
+  min-width: 0;
+  flex: 0 1 auto; /* 0 1: icon design nằm NGAY SAU tên, không bị đẩy ra cuối ô */
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+  font: 600 var(--fs) / 1.35 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.titlebtn:hover {
+  color: var(--accent);
+}
+.rownote {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trow:has(.rownote) td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/* Phase · design · mốc — icon + chữ, cùng một khuôn */
+.ph,
+.dsg,
+.due,
+.eff {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.ph,
+.dsg {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  overflow: hidden;
+}
+/* Phase là pill nền mờ theo chính màu chữ → phân biệt nhanh mà không thêm màu mới */
+.ph {
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 13%, transparent);
+}
+.due {
+  font: var(--fs-xs) / 1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+/* Dòng phụ dự báo (từ lead time thật, /api/learn): nhỏ + xám, không được tranh sự chú ý
+   với mốc thật — chỉ đỏ lên khi dự báo VƯỢT mốc, vì lúc đó mới là tin cần biết ngay. */
+.c-due .fc {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.c-due .fc.late {
+  color: var(--crit);
+}
+.dash {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+/* Gợi ý nhỏ trong <thead> để không ai phải đoán icon cạnh tên task là gì */
+.thhint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--line);
+}
+
+/* Ô Effort — bấm ra modal toàn bộ commit của ticket */
+.eff {
+  font: var(--fs-sm) / 1 var(--font-mono);
+  color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.eff b {
+  color: var(--ink2);
+}
+.eff .plus {
+  color: var(--s1);
+}
+.eff .minus {
+  color: var(--s2);
+}
+.eff:hover b,
+.eff:hover {
+  color: var(--ink);
+}
+.eff.bad {
+  color: var(--warn);
+  cursor: default;
+}
+
+/* Ô Gate / Push — cùng một khuôn: icon + số, màu theo mức độ, bấm được thì sang tab Review */
+.gt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 600 var(--fs-sm) / 1 var(--font-ui);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+button.gt {
+  cursor: pointer;
+}
+.gt.ok {
+  color: var(--ok);
+}
+.gt.warn {
+  color: var(--warn);
+}
+.gt.crit {
+  color: var(--crit);
+}
+.gt i {
+  font-style: normal;
+  font: var(--fs-xs) var(--font-mono);
+  color: var(--muted);
+}
+button.gt:hover {
+  text-decoration: underline;
+}
+.cell-none {
+  color: var(--line);
+  font-size: var(--fs-sm);
+}
+
+/* Nút nhỏ có chữ (vd "gắn") + nút chỉ-icon trong cột Actions */
+.minibtn,
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: none;
+}
+.minibtn {
+  font-size: var(--fs-sm);
+  padding: 2px 7px;
+}
+.iconbtn {
+  font-size: 12.5px;
+  padding: 3px;
+  margin-right: 2px;
+}
+.minibtn:hover,
+.iconbtn:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+  background: var(--raise);
+}
+
+/* ---- Ô lọc ---- */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.searchbox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+}
+.searchicon {
+  position: absolute;
+  left: 8px;
+  display: inline-flex;
+  font-size: 12px;
+  pointer-events: none;
+}
+.searchbox input {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  font: var(--fs-sm) var(--font-ui);
+  padding: 5px 24px 5px 26px;
+  width: 208px;
+}
+.searchbox input::placeholder {
+  color: var(--muted);
+}
+.searchbox input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.clearx {
+  position: absolute;
+  right: 5px;
+  display: none;
+  align-items: center;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px;
+}
+.clearx:hover {
+  color: var(--crit);
+}
+
+/* Trạng thái đang tải của panel (git log có thể mất vài giây) */
+.pane.is-loading .chartbox,
+.pane.is-loading .commits {
+  opacity: 0.55;
+}
+.pane.is-loading .boardlist button {
+  pointer-events: none;
+  opacity: 0.6;
+}

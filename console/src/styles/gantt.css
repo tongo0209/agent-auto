@@ -1,0 +1,191 @@
+/* Timeline mốc — mỗi task 1 hàng, mốc đặt theo % trên trục 28 ngày.
+   Nhãn trục, vạch tuần và chấm mốc đều absolute theo CÙNG một % (xem components/gantt.js)
+   nên thẳng cột với nhau. Bản trước vẽ trục bằng 28 ô flex → nhãn nằm giữa ô, lệch với vạch. */
+.gantt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.grow {
+  display: grid;
+  grid-template-columns: 152px 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 26px;
+}
+/* Hàng MỜ = FE đã xong, mốc còn lại của BE/QC (xem DIM_PHASES).
+   Làm mờ CẢ HÀNG bằng opacity thay vì đổi màu từng phần: mọi chấm mốc đều ăn màu severity
+   riêng, đổi màu từng cái là 6 chỗ phải nhớ; opacity thì tự đúng và vẫn hover đọc được. */
+.grow.dim {
+  opacity: 0.42;
+}
+.grow.dim:hover {
+  opacity: 1;
+}
+.glabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.gkey {
+  font: 700 var(--fs-sm) var(--font-mono);
+  color: var(--accent);
+}
+.gphase {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Trục ngày (hàng đầu) ---- */
+.gaxis {
+  position: relative;
+  height: 15px;
+}
+.gtick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font: var(--fs-xs) var(--font-mono);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.gtick.now {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ---- Track ---- */
+.gtrack {
+  position: relative;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--raise);
+  border: 1px solid var(--line);
+  /* KHÔNG dùng overflow:hidden — nhãn mốc cuối (đã flip sang trái) vẫn cần nhô ra
+     khỏi track vài px; bật hidden là cắt mất chữ (mất "1" của "Review 1"). */
+}
+/* Vùng đã qua (trước hôm nay) tối hơn — để đoạn đầu track trông là CHỦ Ý, không phải ô lệch */
+.gpast {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 4px 0 0 4px;
+}
+/* Vạch tuần xuyên mọi hàng — mắt lần theo cột để đối chiếu mốc giữa các task */
+.ggrid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+  opacity: 0.75;
+}
+.ggrid.now {
+  display: none; /* vạch hôm nay đã có .gnow đậm hơn, không vẽ 2 lần */
+}
+
+/* Dải phủ từ mốc đầu → mốc cuối */
+.gspan {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--s1) 45%, transparent);
+}
+
+/* Vạch hôm nay — vẽ DƯỚI mốc: nó render sau markHtml trong DOM nên nếu không hạ z-index
+   thì vạch cắt ngang chữ của mốc trùng ngày hôm nay (đã thấy thật: "HTML" của GW-660 bị xuyên). */
+.gnow {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0.8;
+  z-index: 1;
+}
+
+/* Mốc: chấm + nhãn nhỏ */
+.gmark {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  z-index: 2;
+}
+/* Nhãn có nền mờ để chữ không lẫn vào dải .gspan/gridline chạy phía sau */
+.gmark b {
+  background: color-mix(in srgb, var(--raise) 82%, transparent);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.gmark i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sev, var(--muted));
+  box-shadow: 0 0 0 2px var(--raise);
+  display: inline-block;
+  flex: 0 0 auto;
+}
+.gmark b {
+  font: 600 var(--fs-xs) var(--font-mono);
+  color: var(--muted);
+}
+.gmark.key i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.gmark.key b {
+  color: var(--sev, var(--ink2));
+}
+.gmark:hover b {
+  color: var(--ink);
+}
+
+/* Mốc nằm cuối trục: nhãn đổ về BÊN TRÁI chấm, không thì bị cắt ở mép track
+   (đã thấy thật: nhãn "Review 1" của mốc cuối bị cắt mất chữ). */
+.gmark.flip {
+  flex-direction: row-reverse;
+}
+.gmark.flip i {
+  margin-left: 3px;
+}
+
+/* Mốc quá gần mốc trước → chỉ giữ chấm, tên xem bằng tooltip (hết chữ chồng chữ) */
+.gmark.nolabel b {
+  display: none;
+}
+
+/* Mốc NGOÀI khung 28 ngày (hay gặp nhất: Release của task đã xong FE) — ghim mép phải, chấm
+   rỗng + nhãn kèm ngày và mũi tên, để không đọc nhầm thành mốc rơi đúng ngày cuối trục.
+   Nhãn luôn đổ về trái vì chấm nằm sát mép. */
+.gmark.off {
+  flex-direction: row-reverse;
+  /* Ghim TRỌN span vào trong track: mốc thường căn giữa theo % (translateX(-50%)) nên một nửa
+     nhãn tràn qua mép phải và bị cắt (đã thấy thật: "Review 2 08/31 +1 →" của GW-525 mất đuôi). */
+  transform: translate(-100%, -50%);
+}
+.gmark.off i {
+  margin-left: 3px;
+  background: transparent;
+  border: 2px dashed var(--sev, var(--muted));
+  box-shadow: none;
+}
+.gmark.off b {
+  color: var(--sev, var(--muted));
+  opacity: 0.9;
+}

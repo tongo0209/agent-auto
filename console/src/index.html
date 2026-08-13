@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daily Console — tont</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233acdb9' stroke-width='2' stroke-linecap='round'><rect width='18' height='18' x='3' y='4' rx='2'/><path d='M3 10h18M8 2v4M16 2v4'/><path d='m9 15 2 2 4-4'/></svg>">
+</head>
+<body>
+<div class="shell">
+  <!-- ==================== CỘT TRÁI: cockpit ==================== -->
+  <aside class="left">
+    <header class="head">
+      <div class="brand">
+        <span class="mark"></span>
+        <div>
+          <h1>Daily Console</h1>
+          <p class="sub"><span id="today" class="mono"></span> · <span id="conn" class="conn">đang nối…</span></p>
+        </div>
+      </div>
+      <nav class="links">
+        <a id="dash-link" href="#" target="_blank" rel="noopener">Dashboard</a>
+        <a id="jira-link" href="#" target="_blank" rel="noopener">Jira</a>
+      </nav>
+    </header>
+
+    <!-- "Có gì mới từ lần bạn xem" (Task 8) — đọc history/issues.jsonl + phases.jsonl,
+         KHÔNG trộn vào #alerts bên dưới: đây là tin tức, không phải báo động -->
+    <div id="delta-bar"></div>
+    <div id="radar-bar"></div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <!-- Cảnh báo chủ động: mốc gấp · quá mốc · đứng yên · design chưa tải -->
+    <div class="alerts" id="alerts"></div>
+
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab active" data-tab="today" role="tab">Hôm nay</button>
+      <button type="button" class="tab" data-tab="review" role="tab">Review <span class="count" id="review-count"></span></button>
+      <button type="button" class="tab" data-tab="months" role="tab">Theo tháng</button>
+      <button type="button" class="tab" data-tab="git" role="tab">Git của tôi</button>
+    </div>
+
+    <!-- Tab: Hôm nay -->
+    <section class="pane active" id="pane-today">
+      <div class="rowline">
+        <h2>Mốc 14 ngày tới</h2>
+        <div class="tools">
+          <span class="srcnote" id="fresh"></span>
+          <button type="button" class="btn" id="reload-now"
+                  title="Quét lại Jira + gt-promotion (gõ hộ /daily delta vào tab terminal) rồi vẽ lại ngay — khỏi tự gõ /daily">
+            Cập nhật
+          </button>
+        </div>
+      </div>
+      <div class="week" id="week"></div>
+      <div id="weekwarn"></div>
+
+      <h2>Timeline mốc <span class="srcnote">4 tuần · vạch xanh = hôm nay · mốc HTML tô đậm</span></h2>
+      <div class="chartbox" id="gantt-box"></div>
+
+      <div class="rowline">
+        <h2>Task đang theo dõi <span class="count" id="task-count"></span></h2>
+        <div class="tools">
+          <span class="searchbox">
+            <span class="searchicon" id="search-icon"></span>
+            <input type="search" id="task-filter" placeholder="lọc theo key / tên / ghi chú…" aria-label="Lọc task">
+            <button type="button" class="clearx" id="filter-clear" title="Xoá lọc" aria-label="Xoá lọc"></button>
+          </span>
+        </div>
+      </div>
+      <div id="tasks"></div>
+
+      <div class="rowline">
+        <h2>Cần bạn <span class="count" id="need-count"></span>
+          <span class="srcnote">việc chỉ bạn làm được · nguồn: mục "Cần bạn" của board</span></h2>
+        <button type="button" class="bchip" id="need-toggle" style="display:none"></button>
+      </div>
+      <ul class="need" id="need"></ul>
+      <form class="addline" id="need-add">
+        <input type="text" id="need-input" maxlength="500" placeholder="thêm việc vào &quot;Cần bạn&quot; của board hôm nay…" aria-label="Thêm việc Cần bạn">
+        <button type="submit" class="btn small">thêm</button>
+      </form>
+
+      <!-- Nợ đọng: việc chưa tick ở board CŨ mà hôm nay không ai nhắc lại. Board là sổ theo
+           ngày nên việc cũ rụng khỏi radar (ca 12/8: 5 việc GW-627 từ board 10/8 mất 2 ngày,
+           mà GW-627 release 15/8). Tick ở đây ghi thẳng vào board GỐC. -->
+      <details class="foldbox" id="debt-box" open style="display:none">
+        <summary>Nợ đọng từ board cũ <span class="count" id="debt-count"></span>
+          <span class="srcnote">chưa tick ở board cũ · hôm nay không ai nhắc lại</span></summary>
+        <div id="debt"></div>
+      </details>
+
+      <details class="foldbox">
+        <summary>Log board <span class="mono" id="board-date"></span></summary>
+        <div id="log-warn"></div>
+        <ul class="log" id="log"></ul>
+        <form class="addline" id="log-add">
+          <input type="text" id="log-input" maxlength="500" placeholder="ghi 1 dòng log — giờ do server lấy, không gõ tay…" aria-label="Thêm dòng log">
+          <button type="submit" class="btn small">ghi log</button>
+        </form>
+      </details>
+    </section>
+
+    <!-- Tab: Review — xem diff / commit chưa push, rồi gõ hộ lệnh (không tự commit/push) -->
+    <section class="pane" id="pane-review">
+      <h2>Việc chờ bạn đẩy lên <span class="srcnote">console chỉ gõ hộ lệnh · Enter là bạn bấm</span></h2>
+      <div class="flashbar" id="review-flash"></div>
+      <div id="review"></div>
+    </section>
+
+    <!-- Tab: Theo tháng (gồm cả phần lịch sử: board cũ · gt-promotion · metrics) -->
+    <section class="pane" id="pane-months">
+      <h2>Khối lượng task theo tháng <span class="srcnote" id="month-src"></span></h2>
+      <div class="chartbox">
+        <div id="month-chart" class="mchart"></div>
+        <div class="legend">
+          <span class="lg"><i data-series="1"></i>Đã xong</span>
+          <span class="lg"><i data-series="2"></i>Đang làm / chờ</span>
+        </div>
+      </div>
+
+      <div class="rowline">
+        <h2>Chi tiết từng tháng <span class="srcnote">nhóm theo due date · dấu tick = đã chuyển Done</span></h2>
+        <button type="button" class="bchip" id="month-toggle" title="Đổi số tháng hiển thị">Xem tất cả</button>
+      </div>
+      <div id="month-list"></div>
+
+      <h2>Board các ngày trước</h2>
+      <div id="board-list" class="boardlist"></div>
+
+      <h2>gt-promotion <span class="srcnote">commit mới nhất theo task</span></h2>
+      <div id="promo-box" class="commits"></div>
+
+      <h2>Metrics <span class="srcnote">ước lượng vs thực tế</span></h2>
+      <div id="metrics-box"></div>
+
+      <h2>Lead time từng phase <span class="srcnote">đo từ phase đổi thật · dưới ngưỡng mẫu thì KHÔNG dự báo</span></h2>
+      <div id="learn-box"></div>
+
+      <h2>Bài học <span class="srcnote">gate fail · wrap · gõ tay</span></h2>
+      <div id="lessons-box"></div>
+    </section>
+
+    <!-- Tab: Git của tôi -->
+    <section class="pane" id="pane-git">
+      <h2>Commit của <span id="git-author" class="mono"></span> — theo tháng <span class="srcnote" id="git-cached"></span></h2>
+      <div class="boardlist" id="git-months"></div>
+      <div class="chartbox">
+        <div id="git-chart" class="gchart"></div>
+        <div class="axis" id="git-axis"></div>
+        <div id="git-repos" class="repostat"></div>
+      </div>
+
+      <h2>Commit gần nhất <span class="count" id="git-count"></span></h2>
+      <div id="git-list" class="commits"></div>
+    </section>
+
+    <footer class="foot">
+      <span id="metrics-foot"></span> · nguồn <span class="mono">~/VNG/agent-auto</span> (chỉ đọc)
+    </footer>
+  </aside>
+
+  <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" aria-valuenow="46" aria-valuemin="0" aria-valuemax="100" aria-label="Kéo để đổi tỉ lệ 2 cột" tabindex="0" title="Kéo để đổi tỉ lệ · double-click để về mặc định"></div>
+
+  <!-- ==================== CỘT PHẢI: terminal ==================== -->
+  <main class="right">
+    <div class="termtabs">
+      <div class="ttabs" id="ttabs"></div>
+      <button type="button" class="btn ghost small" id="tab-add" title="Mở terminal mới">+ tab</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn ghost small mono" id="ctrlc" title="Gửi Ctrl+C">^C</button>
+      <button type="button" class="btn ghost small" id="clear" title="Xoá màn hình">clear</button>
+    </div>
+    <div class="toolbar">
+      <div class="cmds" id="toolbar-cmds"></div>
+      <span class="hint">nút = gõ hộ lệnh vào tab đang mở</span>
+    </div>
+    <div class="terms" id="terms"></div>
+  </main>
+</div>
+
+<!-- ==================== Drawer: mọi thứ của MỘT ticket ==================== -->
+<div class="dwrap" id="dwrap" style="display:none">
+  <div class="dbg" data-drawer-close></div>
+  <div class="drawer" role="dialog" aria-modal="true" aria-label="Chi tiết ticket">
+    <header class="dhead">
+      <a class="dkey mono" id="drawer-key" href="#" target="_blank" rel="noopener" title="Mở trên Jira"></a>
+      <a class="dlink" id="drawer-jira" href="#" target="_blank" rel="noopener">Jira ↗</a>
+      <div class="dtitle" id="drawer-title"></div>
+      <button type="button" class="btn ghost small" data-drawer-close title="Đóng (Esc)">Đóng</button>
+    </header>
+    <div class="flashbar" id="drawer-flash"></div>
+    <div class="dbody" id="drawer-body"></div>
+  </div>
+</div>
+
+<!-- Lightbox ảnh design + chế độ so với dist -->
+<div class="lbox" id="lbox" style="display:none">
+  <header class="lhead">
+    <strong id="lbox-title" class="mono"></strong>
+    <span class="dnote mono" id="lbox-scale"></span>
+    <span class="spacer"></span>
+    <button type="button" class="btn small ghost" data-lbox-sync aria-pressed="true" title="Cuộn đồng bộ 2 bên theo tỉ lệ">cuộn đồng bộ</button>
+    <button type="button" class="btn small ghost" data-lbox-compare aria-pressed="false"></button>
+    <button type="button" class="btn small ghost" data-lbox-prev title="Ảnh trước (←)">←</button>
+    <button type="button" class="btn small ghost" data-lbox-next title="Ảnh sau (→)">→</button>
+    <button type="button" class="btn small" data-lbox-close title="Đóng (Esc)">Đóng</button>
+  </header>
+  <div class="lstage" id="lbox-stage"></div>
+</div>
+
+<dialog id="done-modal">
+  <div class="modal-head">
+    <strong id="done-title">Đánh Done trên Jira</strong>
+    <button type="button" class="btn ghost small" id="done-cancel" title="Đóng">Thôi</button>
+  </div>
+  <div id="done-body"></div>
+  <div class="modal-foot">
+    <button type="button" class="btn small" id="done-confirm">Đánh Done</button>
+  </div>
+</dialog>
+
+<dialog id="text-modal">
+  <div class="modal-head">
+    <strong id="modal-title"></strong>
+    <button type="button" class="btn ghost small" id="modal-close" title="Đóng">Đóng</button>
+  </div>
+  <pre id="modal-body"></pre>
+</dialog>
+</body>
+</html>

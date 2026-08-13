@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "phases": [
+    {"id": "waiting-design", "label": "chờ design", "icon": "wait", "sev": "wait", "group": "Chờ design", "htmlTodo": true},
+    {"id": "ready", "label": "sẵn sàng", "icon": "ready", "sev": "ok", "group": "Sẵn sàng", "htmlTodo": true},
+    {"id": "coding", "label": "đang code", "icon": "coding", "sev": "warn", "group": "Đang code", "htmlTodo": true, "active": true},
+    {"id": "deliver", "label": "giao HTML", "icon": "deliver", "sev": "warn", "group": "Giao HTML", "active": true},
+    {"id": "wait-test", "label": "chờ test", "icon": "test", "sev": "wait", "group": "Chờ test", "lateExempt": true},
+    {"id": "bugfix", "label": "fix bug", "icon": "bug", "sev": "crit", "group": "Fix bug", "active": true, "lateExempt": true},
+    {"id": "done-fe", "label": "xong FE", "icon": "done", "sev": "ok", "group": "Đã xong / ra khỏi tay", "lateExempt": true, "dim": true, "folded": true},
+    {"id": "reassigned", "label": "đã chuyển người", "icon": "handoff", "sev": "wait", "group": "Đã xong / ra khỏi tay", "offMyPlate": true, "gone": true, "lateExempt": true, "folded": true, "needsHandoff": true},
+    {"id": "closed", "label": "đóng", "icon": "closed", "sev": "wait", "group": "Đã xong / ra khỏi tay", "offMyPlate": true, "doneMine": true, "lateExempt": true, "dim": true, "folded": true}
+  ],
+  "milestones": [
+    {"id": "design", "label": "Design", "mustDeliver": true},
+    {"id": "html", "label": "HTML", "mustDeliver": true, "key": true},
+    {"id": "deliver", "label": "Giao HTML", "mustDeliver": true, "key": true},
+    {"id": "dev", "label": "Dev BE", "mustDeliver": true},
+    {"id": "test", "label": "Test", "mustDeliver": true},
+    {"id": "bugfix", "label": "Fix bug", "mustDeliver": true},
+    {"id": "release", "label": "Release", "mustDeliver": true},
+    {"id": "review1", "label": "Review 1", "mustDeliver": true},
+    {"id": "review2", "label": "Review 2", "mustDeliver": true},
+    {"id": "duedate", "label": "Due Jira", "mustDeliver": false}
+  ],
+  "doneStatuses": ["done", "completed", "canceled", "cancelled", "closed", "resolved"],
+  "designStatus": [
+    {"id": "đã-giao-đã-tải", "label": "design đã có local", "short": "local", "icon": "design-local", "sev": "ok"},
+    {"id": "đã-giao-tải-một-phần", "label": "design đã giao · tải một phần, còn thiếu file", "short": "thiếu file", "icon": "design-download", "sev": "warn"},
+    {"id": "đã-giao-chưa-tải", "label": "design đã giao · cần bấm Download", "short": "cần tải", "icon": "design-download", "sev": "warn"},
+    {"id": "đã-giao-chờ-link", "label": "design đã giao (subtask Done) · chưa thấy link, hỏi PM", "short": "hỏi link", "icon": "design-download", "sev": "warn"},
+    {"id": "chưa-có-link", "label": null}
+  ]
+}

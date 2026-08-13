@@ -1,0 +1,121 @@
+/* ---- Dải cảnh báo chủ động (mốc gấp · quá mốc · đứng yên · design chưa tải) ----
+   Đặt NGAY dưới KPI, ngoài mọi tab: cảnh báo phải thấy được kể cả khi đang ở tab khác.
+   Không có cảnh báo thì container rỗng và KHÔNG chiếm chỗ (không margin mồ côi). */
+.alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.alerts:not(:empty) {
+  margin: 0 var(--pad) 10px;
+}
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  font-size: var(--fs);
+  line-height: 1.4;
+}
+.alert.crit {
+  background: var(--crit-bg);
+  color: var(--crit);
+}
+.alert.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.alert .ic {
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+.alert .akey {
+  font: 700 var(--fs) var(--font-mono);
+  flex: 0 0 auto;
+}
+.alert .atext {
+  color: var(--ink2);
+}
+
+/* ---- Dòng "có gì mới" (Task 8) — thông tin, không phải báo động, nên dùng tone accent
+   chứ không đỏ/vàng như .alert. Đặt NGAY TRÊN #kpis (xem index.html), khối RIÊNG khỏi
+   #alerts — không trộn tin tức với báo động. ---- */
+.deltabar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  padding: 6px 12px;
+  margin: 0 var(--pad) 8px;
+  border-radius: var(--r-sm);
+  background: var(--raise);
+  border: 1px solid var(--line);
+  color: var(--ink2);
+  font-size: var(--fs-sm);
+}
+.deltabar:hover {
+  border-color: var(--accent);
+}
+/* ---- Dòng trạng thái radar nền. Mờ hơn .deltabar vì bình thường nó là tin "mọi thứ vẫn
+   chạy" — chỉ khi CHẾT mới được phép giành mắt user. Trạng thái tắt/ngoài giờ KHÔNG đỏ:
+   radar im ngoài khung 08-18h là đúng thiết kế. ---- */
+.radarbar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  margin: 0 var(--pad) 8px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.radarbar .btn {
+  margin-left: auto;
+}
+.radarbar.dead {
+  color: var(--crit);
+  font-weight: 600;
+}
+.deltalist {
+  padding: 8px 12px;
+  margin: 0 var(--pad) 8px;
+  border-radius: var(--r-sm);
+  background: var(--raise);
+  border: 1px dashed var(--line);
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--muted);
+}
+.deltalist .btn {
+  margin-top: 6px;
+}
+
+/* ---- Log board: dòng còn placeholder HH:MM ---- */
+.log li.notime {
+  color: var(--warn);
+}
+.log li.notime code,
+.warnbar code {
+  font: var(--fs-sm) var(--font-mono);
+  background: var(--raise);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.warnbar.small {
+  font-size: var(--fs-sm);
+  padding: 5px 9px;
+  margin: 0 0 7px;
+}
+
+/* ---- Thanh thông báo tạm trong tab Review ---- */
+.flashbar {
+  display: none;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  background: var(--ok-bg);
+  color: var(--ok);
+  border: 1px solid var(--line);
+  font-size: var(--fs);
+}

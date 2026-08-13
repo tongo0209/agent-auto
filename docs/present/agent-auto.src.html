@@ -1,0 +1,1172 @@
+<title>agent-auto</title>
+
+<style>
+  /* Vốn font lấy đúng bộ VNGGames đang dùng thật trong cdn-source (community/skin-2026-auturm).
+     Druk khóa unicode-range về Latin + số: nếu bản Druk này thiếu dấu tiếng Việt thì chữ tự rơi
+     về Gilroy chứ không bao giờ ra ô vuông. */
+  @font-face {
+    font-family: 'Gilroy';
+    src: url('__GILROY_BOLD__') format('woff2');
+    font-weight: 700;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Gilroy';
+    src: url('__GILROY_REGULAR__') format('woff2');
+    font-weight: 400;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Druk';
+    src: url('__DRUK_MEDIUM__') format('woff2');
+    font-weight: 500;
+    font-display: block;
+    unicode-range: U+0020-007E, U+2013, U+2014;
+  }
+
+  :root {
+    --void: #05070e;
+    --deep: #0b1020;
+    --line: #1a2338;
+    --ink: #e9eefb;
+    --muted: #7e8aab;
+    --pulse: #3c7dff;
+    --signal: #ffb33c;
+
+    --rail: 96px;
+    --pad: clamp(24px, 6vw, 96px);
+    --step: clamp(2.6rem, 9vw, 8rem);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background: var(--void);
+    color: var(--ink);
+    font-family: 'Gilroy', system-ui, sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Nền vũ trụ — ẩn dụ thị giác của VNGGames. Đứng sau mọi thứ, không bao giờ giành mắt. */
+  #sky {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .deck {
+    position: relative;
+    z-index: 1;
+    height: 100dvh;
+    overflow-y: auto;
+    /* proximity chứ không mandatory: slide có mockup dày vẫn có thể cao hơn màn ở khổ nhỏ,
+       mandatory sẽ giật ngược khiến phần cuối slide gần như không đọc được. */
+    scroll-snap-type: y proximity;
+  }
+
+  .slide {
+    min-height: 100dvh;
+    scroll-snap-align: start;
+    display: grid;
+    /* minmax(0,1fr) chứ KHÔNG để `auto`: cột grid mặc định nong theo max-content của con, nên
+       lưới .kit (3×280px) và svg (min-width 720px) kéo cả cột rộng hơn màn hình — tiêu đề thôi
+       xuống dòng và nội dung lòi ra ngoài. `overflow-x: hidden` ở body che mất triệu chứng,
+       đo scrollWidth vẫn sạch trong khi mắt thấy chữ bị cắt (đo thật ở 768×1024). */
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    gap: clamp(14px, 2vh, 28px);
+    padding: clamp(64px, 12vh, 140px) var(--pad) clamp(64px, 12vh, 140px)
+      calc(var(--pad) + var(--rail));
+    border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+  }
+
+  /* Số slide mang thông tin thật: deck có thứ tự, xem tới đâu biết tới đó. */
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: clamp(0.66rem, 1.1vw, 0.78rem);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .eyebrow b {
+    font-family: 'Druk', 'Gilroy', sans-serif;
+    font-weight: 500;
+    font-size: 1.15em;
+    letter-spacing: 0.04em;
+    color: var(--pulse);
+  }
+
+  .eyebrow::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    max-width: 180px;
+    background: linear-gradient(90deg, var(--line), transparent);
+  }
+
+  h1,
+  h2 {
+    margin: 0;
+    font-weight: 700;
+    line-height: 0.94;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+    font-size: var(--step);
+  }
+
+  .lede {
+    margin: 0;
+    max-width: 46ch;
+    font-size: clamp(1rem, 1.8vw, 1.4rem);
+    line-height: 1.45;
+    color: var(--muted);
+  }
+
+  .lede em {
+    font-style: normal;
+    color: var(--ink);
+  }
+
+  /* --- Slide mở --- */
+  .hero .mark {
+    font-family: 'Druk', 'Gilroy', sans-serif;
+    font-weight: 500;
+    font-size: clamp(3.4rem, 16vw, 17rem);
+    line-height: 0.82;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+
+  .hero .mark span {
+    color: var(--pulse);
+  }
+
+  .hero h1 {
+    font-size: clamp(1.5rem, 3.4vw, 2.9rem);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    max-width: 20ch;
+  }
+
+  /* --- Sơ đồ quy trình --- */
+  figure {
+    margin: 6px 0 0;
+    display: grid;
+    gap: 16px;
+    max-width: 1180px;
+    overflow-x: auto;
+  }
+
+  figure svg {
+    width: 100%;
+    height: auto;
+    min-width: 720px; /* hẹp hơn nữa thì chữ trong sơ đồ không đọc được — cho cuộn ngang */
+  }
+
+  figcaption {
+    max-width: 56ch;
+    font-size: clamp(0.95rem, 1.6vw, 1.25rem);
+    line-height: 1.45;
+    color: var(--muted);
+  }
+
+  figcaption em {
+    font-style: normal;
+    color: var(--ink);
+  }
+
+  .node {
+    fill: color-mix(in oklab, var(--deep) 90%, transparent);
+    stroke: var(--line);
+    stroke-width: 1.2;
+  }
+
+  /* Ô người thật phải chạm vào — cả sơ đồ tồn tại để chỉ ra đúng ô này */
+  .node.you {
+    stroke: var(--pulse);
+    fill: color-mix(in oklab, var(--pulse) 14%, transparent);
+  }
+
+  .nlabel {
+    fill: var(--ink);
+    font-size: 19px;
+    font-weight: 700;
+  }
+
+  .elabel {
+    fill: var(--muted);
+    font-size: 15px;
+    letter-spacing: 0.04em;
+  }
+
+  /* Chữ thường, giãn nhẹ: viết HOA ở 14px làm dấu nặng của "BẠN" gần như mất hẳn — đo thật
+     trên ảnh chụp 1920. Nhãn nhỏ mang dấu tiếng Việt thì đừng viết hoa. */
+  .lanelabel {
+    fill: var(--muted);
+    font-size: 15px;
+    letter-spacing: 0.08em;
+  }
+
+  /* Dòng phụ trong hộp: nói hộp đó khớp bằng CÁCH nào — đưa ra nhãn cạnh thì rối dây */
+  .nsub {
+    fill: var(--muted);
+    font-size: 14px;
+  }
+
+  .lane {
+    stroke: var(--line);
+    stroke-dasharray: 2 7;
+  }
+
+  .edge {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.6;
+  }
+
+  .edge.acc {
+    stroke: var(--pulse);
+  }
+
+  .edge.warn {
+    stroke: var(--signal);
+    stroke-dasharray: 6 5;
+  }
+
+  /* --- Lịch: thanh việc, mốc, vạch hôm nay --- */
+  .bar {
+    fill: color-mix(in oklab, var(--pulse) 40%, var(--deep));
+    stroke: color-mix(in oklab, var(--pulse) 55%, transparent);
+  }
+
+  /* Việc đã xong thì rút màu đi — dòng còn sống mới đáng nhìn */
+  .bar.done {
+    fill: color-mix(in oklab, var(--line) 80%, transparent);
+    stroke: var(--line);
+  }
+
+  .ms {
+    fill: var(--ink);
+  }
+
+  .today {
+    stroke: var(--pulse);
+    stroke-width: 1.4;
+    stroke-dasharray: 3 4;
+  }
+
+  .acclabel {
+    fill: var(--pulse);
+  }
+
+  .warnlabel {
+    fill: var(--signal);
+  }
+
+  /* --- Bản đồ nấc → skill → việc. Cột chứ không phải thẻ rời: người đọc cần dóng được
+     "đang ở nấc này thì gõ cái gì", mà dóng hàng thì phải cùng một trục. --- */
+  .kit {
+    display: grid;
+    max-width: 1120px;
+    margin-top: 4px;
+  }
+
+  .kit div {
+    display: grid;
+    grid-template-columns: 200px 260px 1fr;
+    align-items: baseline;
+    gap: 2px 28px;
+    padding: 13px 0;
+    border-top: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+  }
+
+  .kit div:last-child {
+    border-bottom: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+  }
+
+  .kit i {
+    font-style: normal;
+    font-size: clamp(0.8rem, 1.3vw, 0.98rem);
+    color: var(--muted);
+  }
+
+  .kit b {
+    font-family: 'Druk', 'Gilroy', sans-serif;
+    font-weight: 500;
+    font-size: clamp(1.05rem, 1.8vw, 1.45rem);
+    letter-spacing: 0.01em;
+    color: var(--pulse);
+  }
+
+  .kit span {
+    font-size: clamp(0.85rem, 1.4vw, 1.08rem);
+    color: var(--ink);
+  }
+
+  @media (max-width: 900px) {
+    .kit div {
+      grid-template-columns: 1fr;
+      gap: 1px;
+      padding: 11px 0;
+    }
+  }
+
+  /* --- SDLC: giai đoạn chuẩn ↔ tên trong nhà ↔ ai giữ ↔ gõ gì.
+     Cột "ai giữ" tô hổ phách khi việc KHÔNG nằm trong tay mình — đó là 2 giai đoạn task hay
+     biến mất, và cũng là lý do cả hệ này tồn tại. --- */
+  .sdlc {
+    display: grid;
+    max-width: 1180px;
+    margin-top: 4px;
+  }
+
+  .sdlc div {
+    display: grid;
+    grid-template-columns: 168px 1fr 132px 232px;
+    align-items: baseline;
+    gap: 3px 26px;
+    padding: 12px 0;
+    border-top: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+  }
+
+  .sdlc div:last-child {
+    border-bottom: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+  }
+
+  .sdlc div:first-child {
+    border-top: 0;
+  }
+
+  .sdlc .head {
+    padding-bottom: 7px;
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--muted) 80%, transparent);
+  }
+
+  .sdlc u {
+    text-decoration: none;
+    font-family: 'Druk', 'Gilroy', sans-serif;
+    font-weight: 500;
+    font-size: clamp(0.95rem, 1.5vw, 1.2rem);
+    color: var(--ink);
+  }
+
+  .sdlc span {
+    font-size: clamp(0.84rem, 1.35vw, 1.02rem);
+    color: var(--muted);
+  }
+
+  .sdlc em {
+    font-style: normal;
+    font-size: clamp(0.78rem, 1.2vw, 0.92rem);
+    color: var(--muted);
+  }
+
+  .sdlc em.out {
+    color: var(--signal);
+  }
+
+  .sdlc b {
+    font-family: 'Druk', 'Gilroy', sans-serif;
+    font-weight: 500;
+    font-size: clamp(0.9rem, 1.4vw, 1.1rem);
+    color: var(--pulse);
+  }
+
+  /* --- Mockup console: vẽ lại bố cục thật để chỉ đúng nút nào làm gì.
+     Dữ liệu trong khung là ví dụ trung tính, không phải ticket thật. --- */
+  .uiwrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(250px, 0.85fr);
+    gap: 34px;
+    align-items: start;
+    max-width: 1180px;
+    margin-top: 4px;
+  }
+
+  .ui {
+    display: grid;
+    gap: 7px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: color-mix(in oklab, var(--deep) 80%, var(--void));
+    font-size: 12px;
+  }
+
+  .ui-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+    color: var(--muted);
+  }
+
+  .ui-top s {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--pulse);
+    text-decoration: none;
+  }
+
+  .ui-top b {
+    color: var(--ink);
+  }
+
+  .ui-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 9px;
+    border-radius: 7px;
+    background: color-mix(in oklab, var(--line) 45%, transparent);
+    color: var(--muted);
+  }
+
+  .ui-kpi {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 7px;
+  }
+
+  .ui-kpi div {
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    line-height: 1.25;
+  }
+
+  .ui-kpi u {
+    display: block;
+    text-decoration: none;
+    font-family: 'Druk', 'Gilroy', sans-serif;
+    font-size: 20px;
+    color: var(--ink);
+  }
+
+  /* `.hot` nằm trên ô con, không phải trên `.ui-kpi` — viết `.ui-kpi.hot u` là chọn hụt,
+     ô "mốc sắp tới" mất màu cảnh báo mà không ai thấy sai ở đâu. */
+  .ui-kpi .hot u {
+    color: var(--signal);
+  }
+
+  .ui-kpi span {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .ui-alert {
+    padding: 7px 10px;
+    border-radius: 7px;
+    border-left: 3px solid var(--crit, #f0857a);
+    background: color-mix(in oklab, #f0857a 10%, transparent);
+    color: var(--ink);
+  }
+
+  .ui-alert.w {
+    border-left-color: var(--signal);
+    background: color-mix(in oklab, var(--signal) 9%, transparent);
+  }
+
+  .ui-tabs {
+    display: flex;
+    gap: 16px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+    color: var(--muted);
+  }
+
+  .ui-tabs b {
+    color: var(--ink);
+    box-shadow: inset 0 -2px 0 var(--pulse);
+  }
+
+  .ui-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .ui-chips div {
+    padding: 5px 8px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    line-height: 1.35;
+  }
+
+  .ui-chips u {
+    display: block;
+    text-decoration: none;
+    font-size: 10px;
+    color: var(--signal);
+  }
+
+  .ui-row {
+    display: grid;
+    grid-template-columns: 62px 1fr 78px 62px 54px;
+    gap: 10px;
+    padding: 7px 4px;
+    border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+    color: var(--muted);
+  }
+
+  .ui-row.h {
+    border: 0;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .ui-row b {
+    color: var(--ink);
+    font-weight: 400;
+  }
+
+  .ui-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .ui-btns u {
+    text-decoration: none;
+    padding: 5px 9px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    color: var(--ink);
+  }
+
+  .ui-btns u.on {
+    border-color: color-mix(in oklab, var(--pulse) 60%, transparent);
+    background: color-mix(in oklab, var(--pulse) 14%, transparent);
+  }
+
+  /* Số neo: gắn NGAY cạnh thứ nó chỉ, không phải pin bay lơ lửng theo toạ độ tuyệt đối —
+     đổi cỡ màn là pin lệch khỏi mục tiêu, mà deck này phải chạy cả 1920 lẫn 768. */
+  .pin {
+    display: inline-grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background: var(--pulse);
+    color: #05070e;
+    font-size: 10px;
+    font-weight: 700;
+    vertical-align: middle;
+  }
+
+  .callouts {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .callouts li {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 10px;
+    align-items: baseline;
+  }
+
+  .callouts b {
+    font-size: clamp(0.9rem, 1.4vw, 1.05rem);
+    color: var(--ink);
+  }
+
+  /* PHẢI khoanh vào `li div span`: viết `.callouts span` thì nó cũng trúng luôn `span.pin`
+     (cùng 1 hạng ưu tiên nhưng đứng sau nên thắng) — số thứ tự bị đổi màu mờ, cỡ chữ sai và
+     display:block phá luôn căn giữa, ra một chấm tròn rỗng. Đã trả giá đúng ca này. */
+  .callouts li div span {
+    display: block;
+    font-size: clamp(0.8rem, 1.25vw, 0.95rem);
+    line-height: 1.45;
+    color: var(--muted);
+  }
+
+  @media (max-width: 1000px) {
+    .uiwrap {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 22px;
+    }
+    .sdlc div {
+      grid-template-columns: 1fr;
+      gap: 2px;
+    }
+    .sdlc .head {
+      display: none;
+    }
+  }
+
+  /* --- Lưới vớt việc tồn đọng. Viền hổ phách vì đây là dạng CẢNH BÁO, cùng bảng màu với
+     mốc dồn ở slide lịch — người đọc gặp lại màu là biết ngay "chỗ này cần chú ý". --- */
+  /* Trần 960px để 4 mục rơi thành 2×2 — để rộng hơn thì thành 3+1, hàng cuối trơ một mục lệch */
+  .catch {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 6px 44px;
+    max-width: 960px;
+    margin-top: 6px;
+  }
+
+  .catch div {
+    display: grid;
+    gap: 4px;
+    padding: 14px 0 14px 18px;
+    border-left: 2px solid color-mix(in oklab, var(--signal) 70%, transparent);
+  }
+
+  .catch b {
+    font-size: clamp(1rem, 1.6vw, 1.25rem);
+    color: var(--ink);
+  }
+
+  .catch span {
+    font-size: clamp(0.85rem, 1.35vw, 1.02rem);
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  /* --- Ba điều không bao giờ: hàng rào, nên dùng vạch dọc --- */
+  .rules {
+    display: grid;
+    gap: 2px;
+    margin-top: 10px;
+    max-width: 42ch;
+  }
+
+  .rules div {
+    padding: 12px 0 12px 18px;
+    border-left: 2px solid var(--signal);
+    font-size: clamp(0.95rem, 1.6vw, 1.25rem);
+  }
+
+  /* --- Rail trái: vệt radar quét theo tiến độ deck --- */
+  .rail {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--rail);
+    z-index: 2;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 12px;
+    pointer-events: none;
+  }
+
+  .rail b {
+    position: absolute;
+    top: clamp(20px, 4vh, 40px);
+    font-family: 'Druk', 'Gilroy', sans-serif;
+    font-weight: 500;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    writing-mode: vertical-rl;
+    text-transform: uppercase;
+  }
+
+  .rail i {
+    display: block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--line);
+    transition: background 0.35s ease, transform 0.35s ease;
+  }
+
+  .rail i.on {
+    background: var(--pulse);
+    transform: scale(1.5);
+  }
+
+  .foot {
+    position: fixed;
+    right: var(--pad);
+    bottom: clamp(18px, 3vh, 34px);
+    z-index: 2;
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--muted) 70%, transparent);
+  }
+
+  .cmd {
+    font-family: 'Druk', ui-monospace, monospace;
+    font-weight: 500;
+    color: var(--signal);
+    letter-spacing: 0.02em;
+  }
+
+  /* Khổ nhỏ: thu chiều cao lại để slide dày nhất (mockup console) vừa một màn — đo thật ở
+     768×1024 nó cao 1176px, tức lố 152px và callout cuối bị cắt. */
+  @media (max-width: 900px) {
+    .slide {
+      padding-block: clamp(44px, 6vh, 84px);
+    }
+    .ui {
+      gap: 6px;
+      padding: 10px;
+      font-size: 11px;
+    }
+    .callouts {
+      gap: 9px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    :root {
+      --rail: 46px;
+    }
+    .rail b {
+      display: none;
+    }
+    .foot {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    .rail i {
+      transition: none;
+    }
+  }
+</style>
+
+<canvas id="sky"></canvas>
+
+<nav class="rail" aria-hidden="true">
+  <b>agent-auto</b>
+  <i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+</nav>
+
+<div class="deck" id="deck">
+  <section class="slide hero">
+    <p class="eyebrow"><b>01</b> VNGGames · Frontend Ops</p>
+    <p class="mark">agent<span>-</span>auto</p>
+    <h1>Bộ điều phối công việc hàng ngày</h1>
+    <p class="lede">Jira · design · code · giao HTML · bug — <em>một đường ray duy nhất</em>.</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow"><b>02</b> Vấn đề</p>
+    <h2>Việc rơi khỏi radar</h2>
+    <p class="lede">Cái không ai nhìn thấy thì không ai làm.</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow"><b>03</b> Lệnh</p>
+    <h2>Một lệnh cho trọn ngày</h2>
+    <p class="lede"><span class="cmd">/daily</span> — quét, phân loại, duyệt một lần, rồi chạy hết.</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow"><b>04</b> SDLC</p>
+    <h2>Sáu giai đoạn, ai giữ nấc nào</h2>
+    <div class="sdlc">
+      <div class="head"><span>Giai đoạn</span><span>Việc thật ở đây</span><span>Ai giữ</span><span>Gõ gì</span></div>
+      <div><u>Requirement</u><span>nhận ticket, bóc mốc + link design, gắn folder làm việc</span><em>mình</em><b>/daily</b></div>
+      <div><u>Design</u><span>chờ bản vẽ, soát đủ màn — thiếu thì đòi ngay, đừng đợi tới hạn</span><em class="out">ngoài mình</em><b>/check-design</b></div>
+      <div><u>Develop</u><span>dựng UI theo design, lint &amp; build thật, tự đối chiếu lại</span><em>mình</em><b>/code-developer</b></div>
+      <div><u>Test</u><span>soi bản build bằng browser trước khi giao, rồi chờ QC chạy</span><em class="out">ngoài mình</em><b>/ui-check</b></div>
+      <div><u>Deploy</u><span>giao HTML, soát popup, dọn ảnh · font · SEO trước khi lên</span><em>mình</em><b>/website-audit</b></div>
+      <div><u>Maintain</u><span>buglist quay về, sửa và giao lại; theo tới mốc release cuối</span><em>mình</em><b>/bug-fixer-lite</b></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow"><b>05</b> Console · màn chính</p>
+    <h2>Mở ra là thấy phải làm gì</h2>
+    <div class="uiwrap">
+      <div class="ui">
+        <div class="ui-top"><s></s><b>Daily Console</b><span>2026-08-13</span></div>
+        <div class="ui-bar">Radar 13:08 · OK · 0 thay đổi<span class="pin">1</span></div>
+        <div class="ui-kpi">
+          <div><u>5</u><span>task mở</span></div>
+          <div><u>1</u><span>đang chạy</span></div>
+          <div class="hot"><u>0d</u><span>mốc sắp tới</span></div>
+          <div><u>4</u><span>cần bạn</span></div>
+        </div>
+        <div class="ui-alert">GW-101 · mốc giao còn 1 ngày mà phase vẫn “đang code”<span class="pin">2</span></div>
+        <div class="ui-alert w">GW-102 · design đã giao nhưng máy chưa tải về</div>
+        <div class="ui-tabs"><b>Hôm nay</b><span>Review</span><span>Theo tháng</span><span>Git của tôi</span></div>
+        <div class="ui-chips">
+          <div><u>08/15 · còn 2d</u>Release · GW-101</div>
+          <div><u>08/20 · còn 7d</u>Giao HTML · GW-102</div>
+          <div><u>08/24 · còn 11d</u>Test · GW-103<span class="pin">3</span></div>
+        </div>
+        <div class="ui-row h"><span>Ticket</span><span>Việc</span><span>Phase</span><span>Mốc kế</span><span>Effort</span></div>
+        <div class="ui-row"><b>GW-101</b><b>Landing sự kiện A</b><span>đang code</span><span>08/15</span><span>2d</span></div>
+        <div class="ui-row"><b>GW-102</b><b>Trang đăng ký B</b><span>chờ design</span><span>08/20</span><span>—</span></div>
+        <div class="ui-row"><b>GW-103</b><b>H5 mini game C</b><span>chờ test</span><span>08/24</span><span>5d</span></div>
+        <div class="ui-btns">
+          <u class="on">▶ claude</u><u>/daily</u><u>plan</u><u>week</u><u>wrap</u><u>quét ngay<span class="pin">4</span></u>
+        </div>
+      </div>
+      <ol class="callouts">
+        <li><span class="pin">1</span><div><b>Radar nền</b><span>lượt quét gần nhất và có gì đổi không. Đỏ lên khi radar chết — im vì yên với im vì hỏng phải khác nhau.</span></div></li>
+        <li><span class="pin">2</span><div><b>Dải cảnh báo</b><span>mốc gấp, task đứng yên, design chưa tải, nợ ở board cũ. Đứng trên mọi tab vì nó không được phép bị giấu sau một cú bấm.</span></div></li>
+        <li><span class="pin">3</span><div><b>Mốc 14 ngày tới</b><span>đếm ngược từng mốc, hai mốc sát nhau thì cảnh báo dồn.</span></div></li>
+        <li><span class="pin">4</span><div><b>Nút gõ hộ lệnh</b><span>bấm là lệnh được gõ vào terminal thật đang mở — không tự chạy, bạn vẫn là người bấm Enter.</span></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow"><b>06</b> Console · một ticket</p>
+    <h2>Mọi thứ về một task, một chỗ</h2>
+    <div class="uiwrap">
+      <div class="ui">
+        <div class="ui-top"><b>GW-101</b><span>Landing sự kiện A</span><span>· đang code</span></div>
+        <div class="ui-chips">
+          <div>Design 08/10</div><div>Giao HTML 08/15</div><div>Test 08/24</div><div>Release 09/19</div>
+        </div>
+        <div class="ui-btns">
+          <u class="on">dev full</u><u>dev fix</u><u>check</u><u>chạy gate<span class="pin">2</span></u><u>mở preview<span class="pin">3</span></u><u>prep</u>
+        </div>
+        <div class="ui-bar">Ảnh design · 12 file trong kho<span class="pin">4</span></div>
+        <div class="ui-bar">Gate chất lượng · <b>PASS</b> · 0 lỗi · 1 cảnh báo</div>
+        <div class="ui-row h"><span>Commit</span><span>Nội dung</span><span>Ngày</span><span></span><span>Dòng</span></div>
+        <div class="ui-row"><b>2ab7d42</b><b>dựng frame 1–5 theo ảnh cắt</b><span>08/12</span><span></span><span>+319</span></div>
+        <div class="ui-row"><b>b223618</b><b>nối nút nhận thưởng, dọn asset</b><span>08/12</span><span></span><span>+198</span></div>
+        <div class="ui-bar">products/lan/landing/2026-su-kien-a<span class="pin">5</span></div>
+      </div>
+      <ol class="callouts">
+        <li><span class="pin">1</span><div><b>Mốc của riêng ticket</b><span>design · giao HTML · test · release nằm cạnh nhau, khỏi mở Jira đối chiếu.</span></div></li>
+        <li><span class="pin">2</span><div><b>Chạy gate chất lượng</b><span>console tự chạy, không gõ hộ: soát font thiếu, ảnh 404, ref hỏng trong bản build.</span></div></li>
+        <li><span class="pin">3</span><div><b>Mở preview bản build</b><span>xem đúng thứ sắp giao, và so cạnh nhau với ảnh design ở khổ 1920 hoặc 768.</span></div></li>
+        <li><span class="pin">4</span><div><b>Kho ảnh design</b><span>bản vẽ đã tải về nằm ngay đây, không phải lục OneDrive lại từ đầu.</span></div></li>
+        <li><span class="pin">5</span><div><b>Folder đã gắn</b><span>commit trong folder này là căn cứ để suy phase và đo effort.</span></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow"><b>07</b> Quy trình · một ngày</p>
+    <h2>Bạn chạm vào đúng một chỗ</h2>
+    <figure>
+      <svg viewBox="0 0 1230 250" role="img"
+        aria-label="Vòng một ngày: radar phát hiện thay đổi, /daily trình kế hoạch, bạn duyệt một lần, agent chạy, /daily wrap chốt ngày rồi quay lại radar hôm sau">
+        <defs>
+          <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#7e8aab" />
+          </marker>
+          <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#3c7dff" />
+          </marker>
+        </defs>
+
+        <rect class="node" x="20" y="60" width="190" height="52" rx="10" />
+        <text class="nlabel" x="115" y="92" text-anchor="middle">Radar 60′</text>
+
+        <rect class="node" x="280" y="60" width="190" height="52" rx="10" />
+        <text class="nlabel" x="375" y="92" text-anchor="middle">/daily quét</text>
+
+        <rect class="node you" x="540" y="60" width="190" height="52" rx="10" />
+        <text class="nlabel" x="635" y="92" text-anchor="middle">BẠN duyệt</text>
+
+        <rect class="node" x="800" y="60" width="190" height="52" rx="10" />
+        <text class="nlabel" x="895" y="92" text-anchor="middle">agent chạy</text>
+
+        <rect class="node" x="1030" y="60" width="180" height="52" rx="10" />
+        <text class="nlabel" x="1120" y="92" text-anchor="middle">chốt ngày</text>
+
+        <path class="edge" d="M210 86 H272" marker-end="url(#a)" />
+        <text class="elabel" x="241" y="44" text-anchor="middle">thấy đổi</text>
+
+        <path class="edge acc" d="M470 86 H532" marker-end="url(#ab)" />
+        <text class="elabel" x="501" y="44" text-anchor="middle">kế hoạch</text>
+
+        <path class="edge acc" d="M730 86 H792" marker-end="url(#ab)" />
+        <text class="elabel" x="761" y="44" text-anchor="middle">1 lần</text>
+
+        <path class="edge" d="M990 86 H1022" marker-end="url(#a)" />
+
+        <path class="edge" d="M1120 112 V178 H115 V118" marker-end="url(#a)" />
+        <text class="elabel" x="617" y="200" text-anchor="middle">board · metrics · bài học — rồi hôm sau lại chạy</text>
+      </svg>
+      <figcaption>Radar tự thấy, agent tự chạy, sổ tự ghi. <em>Chỗ duy nhất cần bạn là ô xanh</em> — duyệt kế hoạch, đúng một lần mỗi ngày.</figcaption>
+    </figure>
+  </section>
+
+  
+
+  <section class="slide">
+    <p class="eyebrow"><b>08</b> Task mới</p>
+    <h2>Gắn một lần, nhớ mãi</h2>
+    <figure>
+      <svg viewBox="0 0 1230 330" role="img"
+        aria-label="Ticket mới được nối với folder làm việc: dò nexusId trong tên folder gt-promotion và khớp mờ tên campaign trong cdn-source, bạn xác nhận một lần, ghi vào state.json, từ đó đọc git log của folder để suy phase thật và đo effort">
+        <defs>
+          <marker id="d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#7e8aab" />
+          </marker>
+          <marker id="db" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#3c7dff" />
+          </marker>
+        </defs>
+
+        <rect class="node" x="20" y="132" width="180" height="66" rx="10" />
+        <text class="nlabel" x="110" y="160" text-anchor="middle">ticket mới</text>
+        <text class="nsub" x="110" y="182" text-anchor="middle">chỉ có tên + mô tả</text>
+
+        <rect class="node" x="320" y="40" width="330" height="66" rx="10" />
+        <text class="nlabel" x="485" y="68" text-anchor="middle">gt-promotion</text>
+        <text class="nsub" x="485" y="90" text-anchor="middle">khớp nexusId nằm trong tên folder</text>
+
+        <rect class="node" x="320" y="224" width="330" height="66" rx="10" />
+        <text class="nlabel" x="485" y="252" text-anchor="middle">cdn-source</text>
+        <text class="nsub" x="485" y="274" text-anchor="middle">khớp mờ tên campaign</text>
+
+        <rect class="node you" x="700" y="132" width="240" height="66" rx="10" />
+        <text class="nlabel" x="820" y="160" text-anchor="middle">bạn chốt 1 lần</text>
+        <text class="nsub" x="820" y="182" text-anchor="middle">ghi vào state, khỏi hỏi lại</text>
+
+        <rect class="node" x="1020" y="132" width="190" height="66" rx="10" />
+        <text class="nlabel" x="1115" y="160" text-anchor="middle">phase thật</text>
+        <text class="nsub" x="1115" y="182" text-anchor="middle">+ effort mỗi ngày</text>
+
+        <path class="edge" d="M200 165 H260 V73 H312" marker-end="url(#d)" />
+        <path class="edge" d="M200 165 H260 V257 H312" marker-end="url(#d)" />
+        <text class="elabel" x="212" y="128">tự dò 2 repo</text>
+
+        <path class="edge" d="M650 73 H668 V165 H692" marker-end="url(#d)" />
+        <path class="edge" d="M650 257 H668 V165 H692" marker-end="url(#d)" />
+
+        <path class="edge acc" d="M940 165 H1012" marker-end="url(#db)" />
+        <text class="elabel" x="980" y="118" text-anchor="middle">đọc git log</text>
+      </svg>
+      <figcaption>Không khai báo, không điền form. Agent tự dò, bạn chỉ gật — <em>từ đó mọi commit trong folder tự thành phase và effort</em>.</figcaption>
+    </figure>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow"><b>09</b> Định tuyến</p>
+    <h2>Nhìn tín hiệu, chọn đường ray</h2>
+    <div class="kit">
+      <div><i>có ảnh design, màn hoàn toàn mới</i><b>/code-developer full</b><span>bóc ảnh thành spec → code → tự đối chiếu lại spec</span></div>
+      <div><i>UI đã có, đang lệch so với design</i><b>/code-developer fix</b><span>chỉ sửa đúng chỗ lệch, không dựng lại</span></div>
+      <div><i>không có ảnh, thêm hoặc sửa tính năng</i><b>/code-developer code</b><span>làm theo mô tả, verify bằng build thật</span></div>
+      <div><i>comment Jira có link Google Sheet</i><b>/bug-fixer-lite</b><span>đọc buglist, lọc bug của mình, fix, ghi ngược sheet</span></div>
+      <div><i>≤ 2 file, chỗ sửa đã rõ</i><b>làm thẳng</b><span>không gọi skill nào — gọi chỉ tổ chậm</span></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow"><b>10</b> Việc tồn đọng</p>
+    <h2>Việc cũ không được phép chìm</h2>
+    <div class="catch">
+      <div><b>Nợ ở board cũ mà hôm nay không ai nhắc</b><span>mục “Cần bạn” chưa tick ở board hôm trước, ticket vắng mặt hôm nay → kéo ngược lên đầu bảng</span></div>
+      <div><b>Ticket đã đóng nhưng chưa xong</b><span>Jira Done ở mốc HTML trong khi mốc test và release còn phía sau → vẫn giữ trong radar tới mốc cuối</span></div>
+      <div><b>Task đứng yên</b><span>phase “đang code” mà hai ngày không có commit nào trong folder đã gắn → hỏi lại</span></div>
+      <div><b>Design đã giao mà máy chưa có</b><span>link nằm sẵn trong ticket nhưng chưa tải về kho → nhắc tải, đừng để tưởng là chưa gửi</span></div>
+    </div>
+  </section>
+
+  
+
+  <section class="slide">
+    <p class="eyebrow"><b>11</b> Lịch</p>
+    <h2>Mốc nằm trên một dòng thời gian</h2>
+    <figure>
+      <svg viewBox="0 0 1230 330" role="img"
+        aria-label="Lịch bốn tuần: mỗi ticket một dòng, hình thoi là mốc phải giao, vạch dọc là hôm nay; hai mốc sát nhau dưới ba ngày được đánh dấu dồn mốc">
+        <defs>
+          <marker id="c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#7e8aab" />
+          </marker>
+        </defs>
+
+        <line class="lane" x1="200" y1="60" x2="1210" y2="60" />
+        <text class="elabel" x="200" y="44">tuần 1</text>
+        <text class="elabel" x="452" y="44">tuần 2</text>
+        <text class="elabel" x="704" y="44">tuần 3</text>
+        <text class="elabel" x="956" y="44">tuần 4</text>
+
+        <text class="lanelabel" x="0" y="112">GW-720</text>
+        <rect class="bar done" x="200" y="94" width="180" height="22" rx="6" />
+        <text class="elabel" x="392" y="112">xong</text>
+
+        <text class="lanelabel" x="0" y="182">GW-477</text>
+        <rect class="bar" x="272" y="164" width="428" height="22" rx="6" />
+        <path class="ms" d="M700 158 l14 17 -14 17 -14 -17 z" />
+
+        <text class="lanelabel" x="0" y="252">GW-525</text>
+        <rect class="bar" x="380" y="234" width="392" height="22" rx="6" />
+        <path class="ms" d="M772 228 l14 17 -14 17 -14 -17 z" />
+
+        <!-- Ngoặc nối 2 mốc phải dừng TRƯỚC hình thoi: kéo trùm qua thì nét đứt xuyên giữa mốc,
+             mà mốc mới là thứ người ta tìm trên lịch. -->
+        <path class="edge warn" d="M700 152 V128 H786 V222" />
+        <text class="elabel warnlabel" x="743" y="118" text-anchor="middle">2 mốc cách nhau 2 ngày</text>
+
+        <line class="today" x1="344" y1="70" x2="344" y2="290" />
+        <text class="elabel acclabel" x="344" y="308" text-anchor="middle">hôm nay</text>
+      </svg>
+      <figcaption>Mọi mốc của mọi ticket nằm chung một lịch. Hai mốc sát nhau thì <em>báo từ lúc còn kịp xoay</em>, không đợi tới hôm hết hạn.</figcaption>
+    </figure>
+  </section>
+
+  
+
+  <section class="slide">
+    <p class="eyebrow"><b>12</b> Radar</p>
+    <h2>Tự quét mỗi 60 phút</h2>
+    <p class="lede">Không mở gì, không bấm gì. Chỉ lên tiếng khi <em>thật sự có chuyện</em>.</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow"><b>13</b> Vòng học</p>
+    <h2>Mỗi lần trả giá thành một luật</h2>
+    <p class="lede">Sai một lần được ghi lại, để không sai lần thứ hai.</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow"><b>14</b> Ranh giới</p>
+    <h2>Ba điều không bao giờ</h2>
+    <div class="rules">
+      <div>Không ghi ngược vào Jira</div>
+      <div>Không tự commit, không tự push</div>
+      <div>Không nói xong khi chưa verify</div>
+    </div>
+  </section>
+
+  <section class="slide hero">
+    <p class="eyebrow"><b>15</b> Bắt đầu</p>
+    <p class="mark">agent<span>-</span>auto</p>
+    <p class="lede">Mở máy là radar đã chạy. Việc của bạn chỉ còn <span class="cmd">/daily</span>.</p>
+  </section>
+</div>
+
+<p class="foot">cuộn để xem tiếp</p>
+
+<script>
+  // Nền sao + vệt radar quét: ẩn dụ vũ trụ của VNGGames, và cũng là hình ảnh của chính
+  // tính năng radar. Vẽ bằng canvas thay vì hàng trăm phần tử DOM.
+  (function () {
+    const c = document.getElementById('sky');
+    const g = c.getContext('2d');
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Lớp vẽ phụ cho vệt quét — cần vì mask radial phải composite riêng, không đè lên sao.
+    // Trình duyệt không có createConicGradient thì bỏ hẳn vệt, sao vẫn chạy (không vẽ nửa vời).
+    const off = document.createElement('canvas');
+    let og = off.getContext('2d');
+    if (!og || typeof og.createConicGradient !== 'function') og = null;
+    let w, h, stars, dpr;
+
+    function seed() {
+      dpr = Math.min(devicePixelRatio || 1, 2);
+      w = c.width = innerWidth * dpr;
+      h = c.height = innerHeight * dpr;
+      c.style.width = innerWidth + 'px';
+      c.style.height = innerHeight + 'px';
+      off.width = w;
+      off.height = h;
+      const n = Math.round((innerWidth * innerHeight) / 9000);
+      stars = Array.from({ length: n }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: (Math.random() * 1.1 + 0.25) * dpr,
+        a: Math.random() * 0.5 + 0.12,
+        t: Math.random() * Math.PI * 2,
+      }));
+    }
+
+    function frame(ms) {
+      g.clearRect(0, 0, w, h);
+      const t = ms / 1000;
+
+      // Vệt quét, neo ở mép trái nơi có rail.
+      // Nhạt dần theo GÓC bằng conic-gradient vẽ MỘT lần, rồi mask bằng radial để nhạt dần theo
+      // BÁN KÍNH. Hai cách làm trước đều hỏng: hình quạt đặc lộ 2 cạnh cắt thẳng như lỗi render;
+      // xếp nhiều nan mỏng thì mép các nan chồng nhau thành vệt sọc còn xấu hơn.
+      if (og) {
+        const cx = -h * 0.15;
+        const cy = h * 0.5;
+        const R = h * 1.5;
+        const SPAN = 0.7;
+        const lead = still ? -0.42 : (t * 0.13) % (Math.PI * 2);
+        const frac = SPAN / (Math.PI * 2);
+
+        og.clearRect(0, 0, w, h);
+        // Mép dẫn cũng phải có dốc (≈0.03 vòng): dựng đứng thì nó thành một đường chéo cứng
+        // cắt ngang giữa slide, giành mắt với tiêu đề — thứ nền không bao giờ được phép làm.
+        const cone = og.createConicGradient(lead - SPAN, cx, cy);
+        cone.addColorStop(0, 'rgba(60,125,255,0)'); // cuối đuôi
+        cone.addColorStop(frac * 0.92, 'rgba(60,125,255,0.13)'); // thân vệt
+        cone.addColorStop(Math.min(frac + 0.03, 0.999), 'rgba(60,125,255,0)');
+        cone.addColorStop(1, 'rgba(60,125,255,0)');
+        og.fillStyle = cone;
+        og.fillRect(0, 0, w, h);
+
+        og.globalCompositeOperation = 'destination-in';
+        const rad = og.createRadialGradient(cx, cy, 0, cx, cy, R);
+        rad.addColorStop(0, 'rgba(0,0,0,1)');
+        rad.addColorStop(1, 'rgba(0,0,0,0)');
+        og.fillStyle = rad;
+        og.fillRect(0, 0, w, h);
+        og.globalCompositeOperation = 'source-over';
+
+        g.drawImage(off, 0, 0);
+      }
+
+      for (const s of stars) {
+        const tw = still ? s.a : s.a * (0.62 + 0.38 * Math.sin(t * 0.9 + s.t));
+        g.beginPath();
+        g.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        g.fillStyle = 'rgba(233,238,251,' + tw.toFixed(3) + ')';
+        g.fill();
+      }
+      if (!still) requestAnimationFrame(frame);
+    }
+
+    seed();
+    requestAnimationFrame(frame);
+    addEventListener('resize', () => {
+      seed();
+      if (still) requestAnimationFrame(frame);
+    });
+
+    // Chấm rail sáng theo slide đang xem — người đọc luôn biết mình ở đâu trong deck.
+    const dots = [...document.querySelectorAll('.rail i')];
+    const slides = [...document.querySelectorAll('.slide')];
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const i = slides.indexOf(e.target);
+          dots.forEach((d, k) => d.classList.toggle('on', k === i));
+        }
+      },
+      { root: document.getElementById('deck'), threshold: 0.55 }
+    );
+    slides.forEach((s) => io.observe(s));
+  })();
+</script>

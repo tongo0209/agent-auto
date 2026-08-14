@@ -9,14 +9,31 @@ Skill **và** dữ liệu vận hành của `/daily`. Skill nằm ngay trong rep
 |---|---|---|
 | **Claude Code** (CLI, không phải VS Code panel) | skill + hook đều là cơ chế của Claude Code | panel không nạp toolset Chrome ⇒ bước ghi sheet của `/bug-fixer-lite` fail |
 | **Node.js** | console, `state-doctor`, script SharePoint | installer báo ngay dòng "chưa có node" |
-| **Kết nối Atlassian MCP** — gõ `/mcp` trong Claude Code rồi authenticate | `/daily` quét Jira qua MCP, không qua API token | `/daily` chết ở bước quét, không có thông báo gợi ý |
+| **Python 3 + `pip install psd-tools`** | `/check-design` bắt buộc dump cây layer PSD/PSB trước khi dám kết luận "thiếu design" (`tools/psd-tree.py`) | `/check-design` gãy ở bước dump — `ModuleNotFoundError: psd_tools`, không phải lỗi design |
+| **MCP + extension browser** — xem bảng ["MCP nào phải kết nối"](#mcp--extension-nào-phải-kết-nối) ngay dưới (chỉ Atlassian là bắt buộc) | quét Jira · dò/tải design · `/ui-check` | tuỳ cái, xem cột cuối bảng đó |
 | **Đã clone sẵn các repo code** (`cdn-source`, `new-mainsite`…) | `config.repos` phải trỏ vào chúng | `/daily doctor` báo `W7 repos[...] không có trên đĩa` |
-| **Quyền SharePoint** của designer | nấc tải design tự động | `/daily` báo chưa tải được design, không chết |
+| **Quyền SharePoint** của designer (folder design được share cho bạn) | có quyền mới search/tải được | `/daily` báo chưa tải được design, không chết |
+| **Browser mặc định là Edge/Chrome đã login SSO** | nấc tải design `open -a <browser> <direct-url>` dùng session sẵn có của bạn | tải về tab trắng / rơi xuống fallback "mở tay", không chết |
 | `cd console && npm install` (chỉ khi dùng console) | `npm start` = `build && serve`, **không** tự install | webpack chết ngay lệnh đầu, thông báo không nói gì về nguyên nhân |
 | Sửa tay 4 dòng đường dẫn trong `tools/radar-agent.plist` (chỉ khi muốn radar nền) | plist ghi cứng đường dẫn máy người tạo, `radar-install.sh` copy nguyên xi | launchd `cd` vào thư mục không tồn tại rồi **chết âm thầm**. `radar-install.sh` giờ chặn trước và in ra 4 dòng cần sửa |
 
 Không có Atlassian MCP / SharePoint thì phần lớn `/daily` vẫn chạy (board, phase, gate, console) —
 chỉ mất nhánh quét Jira và tải design.
+
+### MCP / extension nào phải kết nối
+
+Chỉ **Atlassian** là bắt buộc; những cái còn lại thiếu thì mất đúng một nhánh, không chết cả skill.
+Riêng phần browser cho `/ui-check`: **chọn 1 trong 2** — Playwright MCP (cài 1 lệnh, không cần
+build) hoặc browserpilot (phải build, nhưng ít call hơn hẳn). Có sẵn Playwright thì dùng luôn,
+đừng cài thêm.
+
+| Kết nối | Bật thế nào | Skill nào gọi tới | Thiếu thì |
+|---|---|---|---|
+| **Atlassian** (connector) | `/mcp` → authenticate | `/daily` quét Jira (`searchJiraIssuesUsingJql` · `getJiraIssue`) · `/check-design` đọc description + toàn bộ comment · `tools/radar-tick.mjs` | `/daily` chết ngay bước quét, không có thông báo gợi ý |
+| **Microsoft 365** (connector) | `/mcp` → authenticate | dò design trên SharePoint/OneDrive (`sharepoint_search` · `sharepoint_folder_search`) | mất nấc "design đã giao chưa" tự động — vẫn còn nhánh bóc link trong ticket |
+| **Claude in Chrome** (extension) | `/chrome` → chọn *Enabled by default* đúng 1 lần, mọi phiên sau tự nối | tải **cả folder** design 4 bước (`skills/daily/scripts/sp-scan.js` · `sp-fetch.js` chạy qua `javascript_tool`) · `/bug-fixer-lite` ghi ngược sheet QC | phải tải design tay; `/bug-fixer-lite` không ghi được sheet (VS Code panel cũng vướng chỗ này) |
+| **Playwright MCP** — *cách nhanh, chọn 1 trong 2* | `claude mcp add playwright -- npx @playwright/mcp@latest` (không phải build gì) | `/ui-check` chạy theo bảng đổi tool ở `skills/ui-check/SKILL.md:83` — mỗi action 1 call | thiếu cả 2 thì `/ui-check` không chạy được Lớp 1 |
+| **browserpilot** (MCP local, repo anh em trong cdn-source) — *cách gọn call, chọn 1 trong 2* | `cd <cdn-source>/products/tontagent/browserpilot && npm install && npm run build` rồi `claude mcp add browserpilot -- node $(pwd)/dist/index.js` — `dist/` **không vào git** nên bắt buộc build 1 lần | `/ui-check` bản gốc: mở `dist/`, đổi viewport PC↔mobile, chạy nguyên script Lớp 1 1 call, đọc 404/console | như trên |
 
 ## Cài đặt (member mới)
 
@@ -41,7 +58,7 @@ Script symlink `skills/` + `hooks/` vào `~/.claude/`, rồi tạo `config.json`
 bản `.example.json`. Nó **không xoá gì** và **không sửa `settings.json`** của bạn — gặp thư mục
 thật trùng tên thì đổi tên `.bak-<n>` rồi mới link. Chạy `--check` để xem trước, không đụng gì.
 
-Sau đó còn 3 việc (script in ra sẵn, kèm trạng thái hiện tại của máy bạn):
+Sau đó còn 4 việc (script in ra sẵn 3 việc đầu, kèm trạng thái hiện tại của máy bạn):
 
 1. **Sửa `config.json`** — `repos` phải là đường dẫn thật trên máy bạn, `cloudId` + `gitAuthor`
    của bạn. Cứ để nguyên placeholder là `/daily doctor` báo `E10`, không báo xanh giả.
@@ -49,9 +66,42 @@ Sau đó còn 3 việc (script in ra sẵn, kèm trạng thái hiện tại củ
    (giữ nguyên key cũ, backup ra `settings.json.bak-before-agent-auto`). Nó chỉ ghi khi
    **chắc chắn an toàn**: chưa có file, hoặc có file mà chưa khai `PreToolUse`. Đã có hook của
    thứ khác thì script không đụng, chỉ in khối JSON để bạn gộp tay.
-   Kiểm bằng `bash hooks/guard-bash.test.sh` (phải `56 pass · 0 fail`).
-3. **Mở phiên Claude Code mới** (skill chỉ nạp lúc khởi động) rồi gõ `/daily doctor` —
+   Kiểm bằng `bash hooks/guard-bash.test.sh` (phải `58 pass · 0 fail`).
+3. **Trỏ `~/.claude/CLAUDE.md` vào `rules/`** — installer **không** đụng file này. Thiếu bước
+   này thì `rules/` nằm im: agent không biết đọc `R-PM-*`, `R-TWIG-*`… trước khi sửa file.
+   Thêm vào CLAUDE.md của bạn một bảng "chạm tới X → đọc `<AGENT_AUTO>/rules/<file>.md`",
+   `<AGENT_AUTO>` là đường dẫn thật chỗ bạn cài (2 chỗ cài khác nhau ⇒ 2 path khác nhau).
+4. **Mở phiên Claude Code mới** (skill chỉ nạp lúc khởi động) rồi gõ `/daily doctor` —
    phải ra **0 ERROR** thì mới thật sự xong.
+
+### Cấu hình cá nhân — `config.json`
+
+`install-skills.sh` copy `config.example.json` → `config.json` (file này **không vào git**, mỗi máy
+một bản). Ba trường đầu bảng là **bắt buộc**; để nguyên placeholder `<...>` thì `/daily doctor` báo
+`E10` chứ không báo xanh giả.
+
+| Trường | Lấy ở đâu | Để nguyên mẫu thì sao |
+|---|---|---|
+| `cloudId` | hỏi Claude *"cho tôi cloudId Jira"* — nó gọi MCP `getAccessibleAtlassianResources` | `E10`, `/daily` không quét được Jira |
+| `gitAuthor` | `git config user.email` của chính bạn | `E10`, tab "Git của tôi" + metrics effort đếm nhầm commit người khác |
+| `repos.*` | đường dẫn **tuyệt đối** tới repo đã clone trên máy bạn | `E10` (còn `<...>`) hoặc `W7` (trỏ chỗ không tồn tại) → `/daily` không suy được phase từ commit |
+| `jql` | mặc định `assignee = currentUser() AND statusCategory != Done` — dùng được ngay, sửa nếu bạn theo project khác | không sao |
+| `jqlConfirmed` | để `false` — lần chạy đầu `/daily` hỏi xác nhận JQL đúng 1 lần rồi tự set `true` | không sao |
+| `jqlRecentDone` | nhánh quét 2: ticket đã đóng ở mốc HTML nhưng còn mốc test/release | không sao |
+| `siteUrl` | `https://vnggames.atlassian.net` — chỉ để dựng link ticket | link ticket sai host |
+| `gameMap` | nexusId (3 ký tự đầu tên folder gt-promotion) → mã game; **dùng chung cả team**, gặp game mới thì bổ sung rồi commit `config.example.json` | ticket của game lạ không nối được với folder gt-promotion |
+| `bugSheets` | để `{}` — `/daily` tự bóc link sheet trong comment Jira; điền tay khi game có sheet cố định | không sao |
+| `dashboardUrl` | để trống lần đầu; publish dashboard xong thì **dán URL artifact vào đây** (skill đọc trường này để redeploy đúng 1 URL, chưa tự ghi ngược) | mỗi lần chạy đẻ một URL dashboard mới |
+| `notify` · `adhocCounter` | để nguyên | không sao |
+| `radar.*` | chỉ đụng khi bật radar nền (`tools/radar-install.sh`); `everyMin` phải khớp `StartInterval` trong `tools/radar-agent.plist` | radar không chạy / console tưởng radar chết |
+
+**Dữ liệu riêng của bạn** không nằm trong `config.json` mà sinh dần khi dùng: `state.json`
+(ticket đã thấy, phase, mốc, `paths` nối ticket ↔ folder code, `design`, `bugSheets`) ·
+`boards/` · `tasks/` · `designs/` · `history/`. Cặp ticket ↔ folder làm việc do `/daily` **hỏi 1
+lần rồi nhớ**, hoặc gắn thẳng bằng `/daily link GW-xxx <repo> <path>`.
+
+Kiểm cả cụm bằng `/daily doctor` — **0 ERROR** mới là cài xong. Đổi máy/đổi chỗ clone repo thì chỉ
+cần sửa lại `repos.*` rồi chạy lại doctor.
 
 ### Cái gì vào git, cái gì không
 
@@ -181,7 +231,7 @@ trong bảng duyệt (clone campaign gần nhất cùng game — code-developer 
 | `config.json` | cloudId + JQL Jira, đường dẫn các repo. **Không vào git** (mỗi máy một bản) — mẫu ở `config.example.json`. `jqlConfirmed: false` → lần chạy đầu sẽ hỏi xác nhận 1 lần. |
 | `state.json` | Ticket đã thấy lần trước → lần sau chỉ xử lý MỚI/ĐỔI/CÒN DỞ. **Không vào git** — mẫu ở `state.example.json`. |
 | `schema/vocab.json` | **Nguồn vốn từ duy nhất** — phase · loại mốc · trạng thái design. Skill ghi phase đúng `id` trong file này, console (`server/lib/vocab.js`) đọc chính file này — không còn 3 nơi khai riêng (skill prose · `constants.js` · `phases.js`) như trước 2026-08-03. |
-| `tools/state-doctor.mjs` | Validator CHỈ ĐỌC: `state.json` có đúng hợp đồng vocab không (7 luật ERROR E1-E7 + 5 luật WARN W1-W5). `tools/state-doctor.test.mjs` = 20 ca. |
+| `tools/state-doctor.mjs` | Validator CHỈ ĐỌC: `state.json` có đúng hợp đồng vocab không (10 luật ERROR E1-E10 — `E10` là cổng cài đặt, soi `config.json` — + 7 luật WARN W1-W7). `tools/state-doctor.test.mjs` = 27 ca. |
 | `boards/YYYY-MM-DD.md` | Board mỗi ngày: trạng thái từng task, log, mục "Cần bạn". |
 | `tasks/<JIRA-KEY>/` | `brief.md` bóc từ ticket. |
 | `designs/<JIRA-KEY>/` | Kho design tập trung: ảnh dùng được + `_raw/` (zip/PSD gốc) — /daily tự tải về đây. |
@@ -193,6 +243,9 @@ trong bảng duyệt (clone campaign gần nhất cùng game — code-developer 
 | `tools/fe-gate.mjs` | **Gate chất lượng**: bắt thứ được khai báo mà không tồn tại (font/ảnh 404, `dist/` cũ hơn source). `tools/fe-gate.test.mjs` = self-test 18 ca. |
 | `.backups/` | Bản sao quay vòng trước mỗi lần ghi board/state (30 bản). Không vào git. |
 | `dashboard.html` | Nguồn dashboard artifact (1 URL cố định, mỗi lần chạy redeploy). |
+| `tools/build-dashboard.mjs` | Sinh khối `DATA` của `dashboard.html` **từ `state.json`** — trước 3/8 khối này viết tay nên tự lệch với state. Có test đi kèm. |
+| `tools/psd-tree.py` | Dump cây layer PSD/PSB (kind, bbox, blend, mask…) — `/check-design` gọi ở bước soát tầng FILE. Cần `psd-tools`. |
+| `tools/sp-diff.mjs` | So 2 manifest SharePoint cũ ↔ mới để biết designer sửa/thêm/xoá file gì. |
 | `console/` | Web local (webpack + jQuery + xterm) — xem README riêng trong đó. |
 | `docs/specs/` | Design doc của chính hệ thống này. |
 | `rules/` | **Luật có mã + severity** (`MUST` chặn / `SHOULD` cảnh báo) cho 4 repo trong `config.json` — `pm-contract.md` (R-PM-*) · `repo-new-mainsite.md` (R-TWIG-*) · `repo-vportal2view.md` (R-VP2-*) · `repo-gt-promotion.md` (R-GTP-*); `cdn-source` đã có `CLAUDE.md` riêng. Global CLAUDE.md chỉ TRỎ tới đây, không copy luật → 1 nguồn duy nhất như `schema/vocab.json`. |
@@ -215,7 +268,7 @@ Luật văn xuôi thì agent có thể quên; hook thì không. 2 hook `PreToolU
 chung qua `lib-secret-paths.sh`, không lặp 2 nơi):
 
 ```bash
-bash hooks/guard-bash.test.sh   # 56 ca — matcher Bash
+bash hooks/guard-bash.test.sh   # 58 ca — matcher Bash
 bash hooks/guard-read.test.sh   # 17 ca — matcher Read|Grep
 ```
 

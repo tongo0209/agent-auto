@@ -42,6 +42,10 @@ check allow 'rsync -a dist/ ../gt-promotion-template/jxm/req123/Promotion/'
 check allow "sed -i '' 's/abc/def/' templates/abm/layout/index.html.twig"
 check allow 'git checkout -b feature/gw-660'
 check allow 'git checkout dev'
+# 14/8/2026: user gỡ cổng cho commit (còn sửa được, hỏi từng lần chỉ ngắt luồng) — push vẫn ask.
+check allow 'git commit -m "(feat): trung-thu Frame7 drifting clouds"'
+check allow 'git add -A . && git commit -F -'
+check allow 'git commit --amend --no-edit'
 check allow 'head -50 package.json'
 check allow 'cat composer.json'
 # Ca thật 13/8: hook bản đầu chặn oan lệnh này khi đang kiểm /api/alerts của console.
@@ -69,7 +73,6 @@ check deny 'php bin/console doctrine:database:drop --force'
 check deny 'mysql -u root -e "DROP TABLE users"'
 
 # --- Phải ASK: việc của con người, agent không tự quyết ---
-check ask 'git commit -m "[cdn-source] fix banner"'
 check ask 'git push origin feature/gw-660'
 check ask 'git push --force-with-lease origin feature/gw-660'
 check ask 'git reset --hard HEAD'

@@ -79,14 +79,16 @@ fi
 
 # ---------- ASK: việc của con người, không phải của agent ----------
 
-# G-GIT-2 · commit/push (luật CLAUDE.md: hỏi user TỪNG lần, kể cả commit local)
+# G-GIT-2 · PUSH (14/8/2026: user gỡ cổng cho `git commit`)
+# Vì sao tách commit ra khỏi luật này: commit là việc CÒN SỬA ĐƯỢC (amend/reset/revert, chưa ai
+# thấy), hỏi từng lần chỉ tổ ngắt luồng; còn push là bước ĐI RA NGOÀI — người khác pull về,
+# CI/CD chạy — nên vẫn phải do người bấm.
 # Ở bypassPermissions không còn prompt để mà hỏi ⇒ hạ xuống deny, user tự gõ lệnh.
-# Ở các mode khác giữ ask như cũ (agent vẫn commit hộ được sau khi user bấm duyệt).
-if [[ $low =~ (^|[[:space:];&|])git[[:space:]]+(commit|push)([[:space:]]|$) ]]; then
+if [[ $low =~ (^|[[:space:];&|])git[[:space:]]+push([[:space:]]|$) ]]; then
   if [ "$pmode" = "bypassPermissions" ]; then
-    decide deny G-GIT-2 "dang o bypassPermissions - khong con prompt de duyet. Ban tu chay lenh commit/push, hoac doi mode neu muon agent lam ho"
+    decide deny G-GIT-2 "dang o bypassPermissions - khong con prompt de duyet. Ban tu chay lenh push, hoac doi mode neu muon agent lam ho"
   fi
-  decide ask G-GIT-2 "commit/push phai do ban duyet tung lan"
+  decide ask G-GIT-2 "push la buoc di ra ngoai - phai do ban duyet tung lan"
 fi
 
 # G-GIT-3 · xoá diff chưa commit — cả 3 skill đều để user tự review diff, mất là mất thật

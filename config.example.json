@@ -1,0 +1,45 @@
+{
+  "_doc": "Mẫu cấu hình agent-auto. tools/install-skills.sh copy file này thành config.json (KHÔNG vào git — mỗi người một bản vì chứa đường dẫn máy mình). Sửa 3 chỗ bắt buộc: repos, cloudId, gitAuthor.",
+
+  "cloudId": "<cloudId Jira của bạn — lấy bằng MCP Atlassian getAccessibleAtlassianResources>",
+  "siteUrl": "https://vnggames.atlassian.net",
+  "jql": "assignee = currentUser() AND statusCategory != Done ORDER BY duedate ASC",
+  "jqlConfirmed": false,
+  "jqlRecentDone": "assignee = currentUser() AND statusCategory = Done AND updated >= -45d ORDER BY updated DESC",
+  "jqlRecentDoneNote": "Nhánh quét thứ 2: bắt ticket Jira đã đóng ở mốc HTML nhưng còn mốc test/release phía sau. Ticket ở nhánh này chỉ bỏ khỏi radar khi mốc MUỘN NHẤT trong milestones đã qua.",
+
+  "repos": {
+    "cdn-source": "<đường dẫn tuyệt đối tới repo cdn-source trên máy bạn>",
+    "new-mainsite": "<đường dẫn tuyệt đối tới repo new-mainsite>",
+    "gt-promotion-template": "<đường dẫn tuyệt đối tới repo gt-promotion-template>",
+    "vportal2view": "<đường dẫn tuyệt đối tới repo vportal2view>"
+  },
+
+  "gitAuthor": "<email git của bạn, vd ten@vng.com.vn — dùng lọc commit của riêng bạn>",
+  "notify": true,
+
+  "bugSheets": {},
+  "adhocCounter": 0,
+  "dashboardUrl": "",
+
+  "gameMap": {
+    "_doc": "nexusId (3 ký tự đầu tên folder gt-promotion) → mã game. Dùng chung cả team, bổ sung khi gặp game mới.",
+    "221": "jxm",
+    "496": "ddtank",
+    "903": "taydu2",
+    "A49": "cfl",
+    "A70": "nghichthuyhan",
+    "A78": "lan"
+  },
+
+  "radar": {
+    "enabled": false,
+    "days": [1, 2, 3, 4, 5],
+    "hours": [8, 18],
+    "graceMin": 3,
+    "lockStaleMin": 15,
+    "timeoutMin": 5,
+    "everyMin": 60,
+    "_note": "everyMin phải khớp StartInterval trong tools/radar-agent.plist (console suy ngưỡng chết = 2.5 nhịp). Bật bằng tools/radar-install.sh."
+  }
+}

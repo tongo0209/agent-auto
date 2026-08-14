@@ -1,0 +1,6 @@
+{
+  "_doc": "Mẫu state rỗng. tools/install-skills.sh copy thành state.json (KHÔNG vào git — state là việc của riêng từng dev). Skill /daily tự ghi tiếp; kiểm bằng /daily doctor.",
+  "schemaVersion": 2,
+  "lastRun": null,
+  "issues": {}
+}

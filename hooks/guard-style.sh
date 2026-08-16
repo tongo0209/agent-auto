@@ -20,6 +20,7 @@
 
 ABS_MAX=${GUARD_STYLE_MAX:-2}     # dư quá bao nhiêu dòng comment thì lên tiếng
 PCT_MAX=${GUARD_STYLE_PCT:-20}    # hoặc: comment chiếm quá bao nhiêu % đoạn vừa ghi (khi có ≥2 dòng)
+LONG_WORDS=${GUARD_STYLE_LONG:-8}  # comment từ ngần này từ trở lên = giải thích thật, không phải mô tả lại code
 
 input=$(cat)
 tool=$(printf '%s' "$input" | jq -r '.tool_name // ""' 2>/dev/null)
@@ -73,7 +74,13 @@ parsed=$(printf '%s\n' "$new" | awk '
 # --- Tầng 1: tự thân đủ để được tha ---
 # MJ__/MS__ là hook hành vi + style của libraryMainsite (cdn-source) — hợp đồng y như pm__,
 # comment đánh dấu chúng là ĐƯỢC KHUYẾN KHÍCH. Thiếu 2 tiền tố này là bắt oan cả repo cdn-source.
-T1='pm__|MJ__|MS__|eslint-disable|stylelint-disable|prettier-ignore|@ts-|@license|copyright|sourcemappingurl|noqa|jshint|hack|workaround|polyfill|quirk'
+T1='pm__|MJ__|MS__|eslint-disable|stylelint-disable|prettier-ignore|@ts-|@license|copyright|sourcemappingurl|noqa|jshint|hack|workaround|polyfill|quirk|@param|@returns|@return|@typedef|@type |@example'
+
+# Dấu hiệu comment nêu LÝ DO / HỆ QUẢ — đúng ngoại lệ (b) của R-CS-1 dù không nhắc trình duyệt.
+# Đo thật 16/8/2026 trên products/lan/2026-mainsite: bản không có tầng này bắt oan đúng loại comment
+# giá trị nhất — "Đổi tên bundle = đổi URL trên CDN => người đã vào trang không bị kẹt",
+# "index-th hardcode và 3 template bên new-mainsite thì phải sửa tay". Code không nói ra được điều đó.
+WHY='=>|->|vì |bởi |nếu không|không thì|phải sửa|nhớ sửa|cẩn thận|lưu ý|chú ý|đừng |cấm |sẽ bị|sẽ mất|dẫn tới|dẫn đến|tránh |giữ nguyên|không được|chỉ dùng|do lib|do platform|theo design|theo yêu cầu|mốc release'
 # --- Tầng 2: tên trình duyệt/nền tảng — chỉ tha khi kèm dấu hiệu vấn đề thật (T2CTX) ---
 T2='safari|chrome|firefox|edge|webkit|moz-|ms-|ios|android|samsung|opera|ie[[:space:]]*[0-9]'
 T2CTX='[0-9]|<|>|không|khong|bug|lỗi|loi|fix|fail|crash|sai|vỡ|vo[[:space:]]|render'
@@ -81,10 +88,37 @@ T2CTX='[0-9]|<|>|không|khong|bug|lỗi|loi|fix|fail|crash|sai|vỡ|vo[[:space:]
 violations=$(printf '%s\n' "$parsed" | grep '^C' | cut -f2- \
   | grep -viE "$T1" \
   | grep -vE "^[[:space:]]*(/\*+|\*+/|\*|<!--|-->|\{#|#\})[[:space:]]*$" \
-  | awk -v t2="$T2" -v t2ctx="$T2CTX" '
-      { low = tolower($0)
-        if (low ~ t2 && low ~ t2ctx) next   # trình duyệt + dấu hiệu vấn đề → tha
-        print }
+  | awk -v t2="$T2" -v t2ctx="$T2CTX" -v why="$WHY" -v LONG="$LONG_WORDS" '
+      {
+        body = $0
+        sub(/^[[:space:]]*(\/\/+|\/\*+|\*+|<!--|\{#)[[:space:]]*/, "", body)
+        # Phải cắt CẢ dấu đóng: "-->" chứa "->" nên nếu để nguyên thì mọi comment HTML đều
+        # khớp tầng WHY và được tha oan. Ca test html-comment-mo-ta bắt được đúng lỗi này.
+        # (Không dùng dấu nháy đơn trong khối awk — nó đóng chuỗi shell, awk sẽ lỗi cú pháp.)
+        sub(/[[:space:]]*(-->|\*\/|#\})[[:space:]]*$/, "", body)
+        gsub(/[[:space:]]+$/, "", body)
+        low = tolower(body)
+
+        # CODE BỊ COMMENT OUT — rác, phải xoá hẳn. Không cho tầng "tại sao" tha, vì code chết
+        # hay chứa "=>" (arrow function) nên sẽ lọt oan qua WHY.
+        dead = (body ~ /[{};]$/) \
+            || (body ~ /^@(include|extend|media|import)/) \
+            || (body ~ /^[.#&][a-zA-Z0-9_-]+/) \
+            || (body ~ /^[a-z-]+:[[:space:]]*[^[:space:]].*;$/)
+
+        if (!dead) {
+          if (low ~ t2 && low ~ t2ctx) next   # trình duyệt + dấu hiệu vấn đề → tha
+          if (low ~ why) next                 # nêu lý do/hệ quả → ngoại lệ (b)
+          # ĐỘ DÀI là dấu hiệu mạnh nhất, mạnh hơn mọi danh sách từ khoá.
+          # Đo thật 16/8/2026 trên cfl-ms-25-alarmclock (code thật của team):
+          #   mô tả lại code   → "Lấy nút", "Gán sự kiện", "UL"                     = 1-4 từ
+          #   giải thích tại sao → "18px: 18*1.3 + padding 8*2 = 39.4px, vừa khe 41px" = 15 từ
+          # Danh sách từ khoá không bao giờ phủ hết cách người ta viết lý do bằng tiếng Việt;
+          # số từ thì phủ được. Thà bỏ sót comment dài mà nhảm còn hơn bắt oan comment cứu người sau.
+          if (split(body, w, /[[:space:]]+/) >= LONG) next
+        }
+        print (dead ? "D\t" : "V\t") $0
+      }
     ')
 
 count=$(printf '%s' "$violations" | grep -c .)
@@ -102,17 +136,19 @@ fi
 # vì gỡ comment là việc làm cả lượt chứ không phải sửa từng dòng theo danh sách.
 LIST_MAX=12
 report=""; n=0
-while IFS= read -r text; do
-  [ -z "$text" ] && continue
+while IFS= read -r row; do
+  [ -z "$row" ] && continue
   n=$((n+1))
   [ "$n" -gt "$LIST_MAX" ] && continue
+  kind=${row%%$'\t'*}; text=${row#*$'\t'}
+  [ "$kind" = "D" ] && tag="[code chết] " || tag=""
   trimmed=$(printf '%s' "$text" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
   real=""
   [ -f "$file" ] && real=$(grep -nF -- "$trimmed" "$file" 2>/dev/null | head -1 | cut -d: -f1)
   if [ -n "$real" ]; then
-    report="${report}  ${file}:${real}  ${trimmed}"$'\n'
+    report="${report}  ${file}:${real}  ${tag}${trimmed}"$'\n'
   else
-    report="${report}  ${file}  ${trimmed}"$'\n'
+    report="${report}  ${file}  ${tag}${trimmed}"$'\n'
   fi
 done <<< "$violations"
 [ "$count" -gt "$LIST_MAX" ] && report="${report}  … còn $((count - LIST_MAX)) dòng nữa (soát cả file)"$'\n'
@@ -126,7 +162,8 @@ printf '%s\t%s\t%s\n' "$(date '+%F %T')" "R-CS-1 ($count/${total}=${pct}%)" "$fi
   echo ""
   printf '%s' "$report"
   echo ""
-  echo "Gỡ các dòng trên. Nếu dòng nào giải thích thứ code KHÔNG tự nói ra được thì giữ lại và"
+  echo "[code chết] = code bị comment out → XOÁ HẲN, git đã giữ lịch sử rồi."
+  echo "Còn lại: gỡ đi. Dòng nào giải thích thứ code KHÔNG tự nói ra được thì giữ lại và"
   echo "nói rõ lý do trong báo cáo. Cần comment mới hiểu tên biến → đổi tên (R-CS-5), đừng giữ comment."
 } >&2
 exit 2

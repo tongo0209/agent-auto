@@ -103,6 +103,25 @@ check warn 'lách: comment HTML nhiều dòng' /a/index.html '<!--
 -->
 <div></div>'
 
+# --- Phải QUIET: comment GIẢI THÍCH THẬT lấy nguyên văn từ code team
+#     (products/lan/2026-mainsite/assets/cfl-ms-25-alarmclock). Bắt oan mấy dòng này là
+#     phá đúng thứ có giá trị nhất trong repo. ---
+check quiet 'giải thích magic number thật' /a/src/a.scss '// 18px: 18*1.3 + padding 8*2 = 39.4px, vừa khe 41px giữa tiêu đề và hàng 1.
+// Tăng lên 20px là toast cao 42px và bắt đầu đè lên hàng đầu tiên.
+font-size: 18px;
+line-height: 1.3;'
+
+check quiet 'giải thích cơ chế + bài học bug' /a/src/a.js '// Cách khoá: URL nằm ở bảng AUDIO bên dưới chứ không phải trong HTML, JS chỉ gắn vào thẻ
+// khi hàng đó đã qua mốc. Hàng chưa tới mốc có link rỗng nên bấm không lấy được gì.
+// Mốc đọc từ data-open. CHỈ nhận đúng mẫu YYYY-MM-DD và luôn quy về giờ VN,
+// KHÔNG dùng new Date(chuỗi) thô: bản cũ làm vậy nên gõ kiểu Việt Nam thì mở khoá cả loạt.
+init();'
+
+# --- Phải WARN: code bị comment out, DÙ DÀI (độ dài không cứu code chết) ---
+check warn 'code chết dài vẫn bị bắt' /a/src/a.scss '//   transition: all 0.3s ease-in-out, transform 0.2s linear, opacity 0.4s;
+//   background-position: center center, left top, right bottom, 0 0;
+//   animation: fish-jump 2s infinite ease-in-out alternate both running;'
+
 # --- Phải QUIET: hook của libraryMainsite trong cdn-source cũng là hợp đồng ---
 check quiet 'hợp đồng MJ__/MS__' /a/src/main.js '// MJ__toogleActive: hook lib, GIỮ NGUYÊN typo
 $(".MJ__toogleActive").on("click", run);
@@ -159,6 +178,13 @@ check quiet 'webpack.config' /a/webpack.config.js '// một
 // hai
 // ba
 // bốn'
+
+# --- Hook KHÔNG được lỗi cú pháp awk/sed: lỗi kiểu đó làm violations rỗng ⇒ im lặng ⇒
+#     hook coi như tắt mà không ai biết. Ca đã trả giá 16/8/2026: một dấu nháy đơn trong
+#     comment tiếng Việt bên trong khối awk '…' đóng chuỗi shell sớm, 10/23 ca im lặng. ---
+err=$(jq -nc '{tool_name:"Write",tool_input:{file_path:"/a/x.js",content:"// một\n// hai\n// ba\nrun();"}}' \
+      | bash "$HOOK" 2>&1 >/dev/null | grep -cE '^(awk|sed|jq|.*: line [0-9]+:)')
+if [ "$err" -eq 0 ]; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL  hook tự lỗi cú pháp (awk/sed) — sẽ im lặng giả"; fi
 
 printf '\nguard-style: %d pass, %d fail\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

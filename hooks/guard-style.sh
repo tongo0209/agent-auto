@@ -45,84 +45,100 @@ case "$tool" in
 esac
 [ -z "$new" ] && exit 0
 
-# --- tách dòng comment (kể cả thân block và comment cuối dòng) ---
-# Ra 2 loại bản ghi: "C<TAB>nội dung" = dòng comment · "N" = dòng có nội dung (để tính tỉ lệ).
-parsed=$(printf '%s\n' "$new" | awk '
-  BEGIN { blk = 0 }
-  {
-    line = $0
-    is_c = 0
-    if (blk) {
-      is_c = 1
-      if (line ~ /\*\//  && blk == 1) blk = 0
-      if (line ~ /-->/   && blk == 2) blk = 0
-      if (line ~ /#\}/   && blk == 3) blk = 0
-    }
-    else if (line ~ /^[[:space:]]*\/\*/)  { is_c = 1; if (line !~ /\*\//) blk = 1 }
-    else if (line ~ /^[[:space:]]*<!--/)  { is_c = 1; if (line !~ /-->/)  blk = 2 }
-    else if (line ~ /^[[:space:]]*\{#/)   { is_c = 1; if (line !~ /#\}/)  blk = 3 }
-    else if (line ~ /^[[:space:]]*\/\//)  { is_c = 1 }
-    # comment CUỐI DÒNG: phải có code rồi khoảng trắng rồi "//" — khoảng trắng bắt buộc là thứ
-    # loại được "http://" (đứng ngay sau dấu hai chấm, không có khoảng trắng).
-    else if (line ~ /[];,)}A-Za-z0-9_"][[:space:]]+\/\/[[:space:]]*[^\/[:space:]]/) { is_c = 1 }
+# --- Phân tích: tách comment, gom KHỐI comment liền nhau, rồi mới phán ---
+# Vì sao gom khối: comment giải thích thường trải nhiều dòng, mỗi dòng lẻ thì ngắn.
+# Đo thật 16/8/2026 trên jxm/2026-vo-lam-tinh-tu-subweb — chấm từng dòng thì
+# "// lưới 1500, phân trang 2992, footer 3146." và "// không phải 70 như rect trong PSD)."
+# đều bị bắt oan, dù chúng là dòng 2-3 của một lời giải thích số đo lấy từ PSD.
 
-    if (is_c) print "C\t" line
-    else if (line ~ /[^[:space:]]/) print "N"
-  }
-')
-
-# --- Tầng 1: tự thân đủ để được tha ---
+# --- Tầng 1: tự thân đủ để được tha (so ở dạng chữ thường) ---
 # MJ__/MS__ là hook hành vi + style của libraryMainsite (cdn-source) — hợp đồng y như pm__,
 # comment đánh dấu chúng là ĐƯỢC KHUYẾN KHÍCH. Thiếu 2 tiền tố này là bắt oan cả repo cdn-source.
-T1='pm__|MJ__|MS__|eslint-disable|stylelint-disable|prettier-ignore|@ts-|@license|copyright|sourcemappingurl|noqa|jshint|hack|workaround|polyfill|quirk|@param|@returns|@return|@typedef|@type |@example'
+T1='pm__|mj__|ms__|eslint-disable|stylelint-disable|prettier-ignore|@ts-|@license|copyright|sourcemappingurl|noqa|jshint|hack|workaround|polyfill|quirk|@param|@returns|@return|@typedef|@type |@example|psd'
 
 # Dấu hiệu comment nêu LÝ DO / HỆ QUẢ — đúng ngoại lệ (b) của R-CS-1 dù không nhắc trình duyệt.
-# Đo thật 16/8/2026 trên products/lan/2026-mainsite: bản không có tầng này bắt oan đúng loại comment
-# giá trị nhất — "Đổi tên bundle = đổi URL trên CDN => người đã vào trang không bị kẹt",
-# "index-th hardcode và 3 template bên new-mainsite thì phải sửa tay". Code không nói ra được điều đó.
+# Đo thật trên products/lan/2026-mainsite: thiếu tầng này thì bắt oan đúng loại comment giá trị nhất —
+# "Đổi tên bundle = đổi URL trên CDN => người đã vào trang không bị kẹt".
 WHY='=>|->|vì |bởi |nếu không|không thì|phải sửa|nhớ sửa|cẩn thận|lưu ý|chú ý|đừng |cấm |sẽ bị|sẽ mất|dẫn tới|dẫn đến|tránh |giữ nguyên|không được|chỉ dùng|do lib|do platform|theo design|theo yêu cầu|mốc release'
 # --- Tầng 2: tên trình duyệt/nền tảng — chỉ tha khi kèm dấu hiệu vấn đề thật (T2CTX) ---
 T2='safari|chrome|firefox|edge|webkit|moz-|ms-|ios|android|samsung|opera|ie[[:space:]]*[0-9]'
 T2CTX='[0-9]|<|>|không|khong|bug|lỗi|loi|fix|fail|crash|sai|vỡ|vo[[:space:]]|render'
 
-violations=$(printf '%s\n' "$parsed" | grep '^C' | cut -f2- \
-  | grep -viE "$T1" \
-  | grep -vE "^[[:space:]]*(/\*+|\*+/|\*|<!--|-->|\{#|#\})[[:space:]]*$" \
-  | awk -v t2="$T2" -v t2ctx="$T2CTX" -v why="$WHY" -v LONG="$LONG_WORDS" '
-      {
-        body = $0
-        sub(/^[[:space:]]*(\/\/+|\/\*+|\*+|<!--|\{#)[[:space:]]*/, "", body)
-        # Phải cắt CẢ dấu đóng: "-->" chứa "->" nên nếu để nguyên thì mọi comment HTML đều
-        # khớp tầng WHY và được tha oan. Ca test html-comment-mo-ta bắt được đúng lỗi này.
-        # (Không dùng dấu nháy đơn trong khối awk — nó đóng chuỗi shell, awk sẽ lỗi cú pháp.)
-        sub(/[[:space:]]*(-->|\*\/|#\})[[:space:]]*$/, "", body)
-        gsub(/[[:space:]]+$/, "", body)
-        low = tolower(body)
+result=$(printf '%s\n' "$new" | awk -v t1="$T1" -v t2="$T2" -v t2ctx="$T2CTX" -v why="$WHY" -v LONG="$LONG_WORDS" '
+  BEGIN { blk = 0; n = 0; bid = 0; prevc = 0; nonempty = 0 }
+  {
+    line = $0; is_c = 0
+    if (blk) {
+      is_c = 1
+      if (line ~ /\*\// && blk == 1) blk = 0
+      if (line ~ /-->/  && blk == 2) blk = 0
+      if (line ~ /#\}/  && blk == 3) blk = 0
+    }
+    else if (line ~ /^[[:space:]]*\/\*/) { is_c = 1; if (line !~ /\*\//) blk = 1 }
+    else if (line ~ /^[[:space:]]*<!--/) { is_c = 1; if (line !~ /-->/)  blk = 2 }
+    else if (line ~ /^[[:space:]]*\{#/)  { is_c = 1; if (line !~ /#\}/)  blk = 3 }
+    else if (line ~ /^[[:space:]]*\/\//) { is_c = 1 }
+    # comment CUỐI DÒNG: phải có code rồi khoảng trắng rồi "//" — khoảng trắng bắt buộc là thứ
+    # loại được "http://" (đứng ngay sau dấu hai chấm, không có khoảng trắng).
+    else if (line ~ /[];,)}A-Za-z0-9_"][[:space:]]+\/\/[[:space:]]*[^\/[:space:]]/) { is_c = 1 }
 
-        # CODE BỊ COMMENT OUT — rác, phải xoá hẳn. Không cho tầng "tại sao" tha, vì code chết
-        # hay chứa "=>" (arrow function) nên sẽ lọt oan qua WHY.
-        dead = (body ~ /[{};]$/) \
-            || (body ~ /^@(include|extend|media|import)/) \
-            || (body ~ /^[.#&][a-zA-Z0-9_-]+/) \
-            || (body ~ /^[a-z-]+:[[:space:]]*[^[:space:]].*;$/)
+    n++; L[n] = line; C[n] = is_c
+    if (line ~ /[^[:space:]]/) nonempty++
 
-        if (!dead) {
-          if (low ~ t2 && low ~ t2ctx) next   # trình duyệt + dấu hiệu vấn đề → tha
-          if (low ~ why) next                 # nêu lý do/hệ quả → ngoại lệ (b)
-          # ĐỘ DÀI là dấu hiệu mạnh nhất, mạnh hơn mọi danh sách từ khoá.
-          # Đo thật 16/8/2026 trên cfl-ms-25-alarmclock (code thật của team):
-          #   mô tả lại code   → "Lấy nút", "Gán sự kiện", "UL"                     = 1-4 từ
-          #   giải thích tại sao → "18px: 18*1.3 + padding 8*2 = 39.4px, vừa khe 41px" = 15 từ
-          # Danh sách từ khoá không bao giờ phủ hết cách người ta viết lý do bằng tiếng Việt;
-          # số từ thì phủ được. Thà bỏ sót comment dài mà nhảm còn hơn bắt oan comment cứu người sau.
-          if (split(body, w, /[[:space:]]+/) >= LONG) next
-        }
-        print (dead ? "D\t" : "V\t") $0
+    if (is_c) {
+      if (!prevc) bid++
+      B[n] = bid
+      body = line
+      sub(/^[[:space:]]*(\/\/+|\/\*+|\*+|<!--|\{#)[[:space:]]*/, "", body)
+      # Cắt CẢ dấu đóng: "-->" chứa "->" nên để nguyên thì mọi comment HTML lọt qua tầng WHY.
+      sub(/[[:space:]]*(-->|\*\/|#\})[[:space:]]*$/, "", body)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", body)
+      BODY[n] = body
+      if (body != "") { W[bid] += split(body, tmp, /[[:space:]]+/); LN[bid]++ }
+    }
+    prevc = is_c
+  }
+  END {
+    for (i = 1; i <= n; i++) {
+      if (!C[i]) continue
+      body = BODY[i]
+      if (body == "") continue          # dòng // rỗng = ngăn đoạn, không phải comment thừa
+      low = tolower(body)
+      if (low ~ t1) continue
+
+      # CODE BỊ COMMENT OUT — rác, xoá hẳn. Độ dài KHÔNG cứu được nó.
+      # "Kết thúc bằng ;" không đủ: "//  - BỎ 2 nút NHẬN THƯỞNG của bản H5 (trang chỉ xem);"
+      # là câu tiếng Việt (đo thật trên xephang.scss). Phải thấy hình dạng code thật.
+      dead = (body ~ /[{}]$/) \
+          || (body ~ /^@(include|extend|media|import)/) \
+          || (body ~ /^[.#&][a-zA-Z0-9_-]+/) \
+          || (body ~ /^[a-z-]+:[[:space:]]*[^[:space:]].*;$/) \
+          || (body ~ /=[^=]*;$/) \
+          || (body ~ /[A-Za-z_$][A-Za-z0-9_$.]*\([^)]*\)[[:space:]]*;$/)
+
+      if (!dead) {
+        if (low ~ t2 && low ~ t2ctx) continue
+        if (low ~ why) continue
+        # ĐỘ DÀI CẢ KHỐI là dấu hiệu mạnh nhất, mạnh hơn mọi danh sách từ khoá.
+        #   mô tả lại code    -> "Lấy nút", "Gán sự kiện", "UL"                        = 1-4 từ
+        #   giải thích tại sao -> "18px: 18*1.3 + padding 8*2 = 39.4px, vừa khe 41px"  = 15 từ
+        # Danh sách từ khoá không phủ hết cách người ta viết lý do bằng tiếng Việt; số từ thì phủ được.
+        # Thà bỏ sót comment dài mà nhảm còn hơn bắt oan comment cứu người sau.
+        # TRUNG BÌNH mỗi dòng, không phải tổng: 4 dòng "Lấy nút"/"Gán click" cộng lại
+        # cũng vượt ngưỡng, trong khi mỗi dòng vẫn chỉ là mô tả lại code.
+        if (LN[B[i]] > 0 && W[B[i]] / LN[B[i]] >= LONG) continue
       }
-    ')
+      print (dead ? "D\t" : "V\t") L[i]
+    }
+    print "#TOTAL\t" nonempty
+  }
+')
+
+violations=$(printf '%s\n' "$result" | grep -v "^#TOTAL")
 
 count=$(printf '%s' "$violations" | grep -c .)
-total=$(printf '%s\n' "$parsed" | grep -c .)
+total=$(printf '%s\n' "$result" | sed -n 's/^#TOTAL\t//p')
+[ -z "$total" ] && total=0
 [ "$total" -eq 0 ] && exit 0
 pct=$(( count * 100 / total ))
 

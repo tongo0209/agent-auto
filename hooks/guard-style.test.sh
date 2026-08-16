@@ -117,6 +117,14 @@ check quiet 'giải thích cơ chế + bài học bug' /a/src/a.js '// Cách kho
 // KHÔNG dùng new Date(chuỗi) thô: bản cũ làm vậy nên gõ kiểu Việt Nam thì mở khoá cả loạt.
 init();'
 
+# --- Phải QUIET: câu tiếng Việt kết thúc bằng ";" KHÔNG phải code chết
+#     (nguyên văn từ jxm/2026-vo-lam-tinh-tu-subweb/assets/xephang/xephang.scss) ---
+check quiet 'câu tiếng Việt có dấu chấm phẩy' /a/src/a.scss '// Khác bản H5 đã port lúc đầu:
+//  - KV header giờ là section frame1 (include ở xephang, không tự vẽ lại);
+//  - BỎ khối MỐC CÁ NHÂN / MỐC TOÀN SERVER + divider (trang này không có);
+//  - BỎ 2 nút NHẬN THƯỞNG của bản H5 (trang chỉ xem);
+.bxh { width: 100%; }'
+
 # --- Phải WARN: code bị comment out, DÙ DÀI (độ dài không cứu code chết) ---
 check warn 'code chết dài vẫn bị bắt' /a/src/a.scss '//   transition: all 0.3s ease-in-out, transform 0.2s linear, opacity 0.4s;
 //   background-position: center center, left top, right bottom, 0 0;

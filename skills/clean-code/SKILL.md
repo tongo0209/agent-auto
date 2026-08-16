@@ -53,8 +53,16 @@ Không tự thêm tính năng, không đổi kiến trúc, không refactor ngoà
 4. **Dọn từng file**, theo thứ tự 4 nhóm trên. File >300 dòng thì dọn theo khối, không rewrite cả file.
 5. **Verify — bắt buộc, không được bỏ:**
    - Build lại (`npm run build` hoặc lệnh của repo). Build fail → **revert file vừa dọn**, báo user, dừng.
-   - `git diff` đọc lại chính diff của mình: có dòng nào đổi hành vi không? có `pm__` nào bị mất không?
-     Kiểm cơ học: `git diff | grep -E '^-.*pm__'` phải RỖNG.
+   - `git diff` đọc lại chính diff của mình: có dòng nào đổi hành vi không?
+   - **Cổng `pm__` — so TẬP HỢP TÊN, không so dòng.** Với từng file đã sửa:
+     ```
+     diff <(git show HEAD:<file> | grep -oE 'pm__[a-zA-Z0-9_-]+' | sort -u) \
+          <(grep -oE 'pm__[a-zA-Z0-9_-]+' <file> | sort -u)
+     ```
+     Phải RỖNG. Mất tên nào = R-PM-1 MUST, revert ngay.
+     ⚠️ KHÔNG dùng `git diff | grep '^-.*pm__'` — cổng đó **báo động giả**: mọi lần định dạng lại một
+     dòng có chứa `pm__` (inline biến, lồng `&.active`) đều làm nó kêu dù không tên nào mất.
+     Đo thật 16/8/2026 trên fixture: 2 báo đỏ, cả 2 đều oan.
    - Repo cdn-source có UI → gợi ý user chạy `/ui-check`, không tự chạy.
 6. **Báo cáo** (mẫu dưới). Không paste lại code — user tự xem diff.
 

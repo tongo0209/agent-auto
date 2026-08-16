@@ -68,11 +68,70 @@ import x from "y";
 /* stylelint-disable */
 const a = 1;'
 
-# --- Phải QUIET: dưới ngưỡng ---
-check quiet 'chỉ 2 dòng comment' /a/src/main.js '// ghi chú một
+# --- Ca LÁCH ĐƯỢC ở bản grep đầu tiên (đo thật 16/8/2026, 5/5 lọt) — nay phải WARN ---
+check warn 'lách: comment cuối dòng' /a/src/main.js 'const a = 1; // số ngày
+const b = 2; // chiều rộng
+const c = 3; // chiều cao
+const d = 4; // màu nền'
+
+check warn 'lách: block /* */ nhiều dòng' /a/src/main.js '/*
+ Khởi tạo landing
+ Gán sự kiện
+ Render danh sách
+*/
+init();'
+
+check warn 'lách: Edit nhỏ, 2/4 dòng = 50%' /a/src/main.js '// Lấy nút
 const a = 1;
-// ghi chú hai
-const b = 2;'
+// Gán click
+btn.on(a);'
+
+check warn 'lách: chèn từ "edge" cho qua' /a/src/main.js '// Lấy nút cho edge
+// Gán click cho edge
+// Render list cho edge
+// Đóng popup cho edge'
+
+check warn 'lách: chèn từ "ios" cho qua' /a/src/main.js '// Lấy nút ios
+// Gán click ios
+// Render ios
+// Đóng ios'
+
+check warn 'lách: comment HTML nhiều dòng' /a/index.html '<!--
+  phần header
+  phần nội dung
+  phần chân trang
+-->
+<div></div>'
+
+# --- Phải QUIET: hook của libraryMainsite trong cdn-source cũng là hợp đồng ---
+check quiet 'hợp đồng MJ__/MS__' /a/src/main.js '// MJ__toogleActive: hook lib, GIỮ NGUYÊN typo
+$(".MJ__toogleActive").on("click", run);
+// MS__wrapper: lib scale cả wrapper, không tự đặt lại width
+setWrap();
+// MJ__popupOpen: lib tự bind, không tự gọi
+bindPopup();'
+
+# --- Phải QUIET: dưới ngưỡng tuyệt đối VÀ không đặc comment ---
+check quiet '1 comment trong đoạn dài' /a/src/main.js '// ghi chú duy nhất
+const a = 1;
+const b = 2;
+const c = 3;
+render(a, b, c);'
+
+# --- Phải QUIET: URL không bị nhầm là comment cuối dòng ---
+check quiet 'URL http:// trong code' /a/src/main.js 'const api = "https://api.vng.com.vn/v1";
+const cdn = "http://cdn.vnggames.com/a.png";
+fetch(api);
+fetch(cdn);
+init();'
+
+# --- Phải QUIET: trình duyệt KÈM dấu hiệu vấn đề (tầng 2 hợp lệ) ---
+check quiet 'trình duyệt + phiên bản/vấn đề' /a/src/main.js '// Safari iOS <16 không fire click trên <label>
+input.on("touchend", run);
+// Chrome 120 tính sai 100vh khi có thanh địa chỉ
+setVh();
+// Firefox render lệch 1px ở backdrop, phải fix bằng transform
+applyBackdrop();'
 
 # --- Phải QUIET: code sạch thật ---
 check quiet 'zero comment' /a/src/main.js 'const VISIBLE_DAYS = 3;

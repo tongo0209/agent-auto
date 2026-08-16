@@ -68,6 +68,14 @@ $visible-days: 3;
 ## Quan hệ với các luật khác
 - Ngoại lệ comment (a) của `R-CS-1` chính là để phục vụ [`pm-contract.md`](pm-contract.md) — `R-PM-1` cấm đổi tên `pm__…`,
   nên một dòng comment đánh dấu hook platform là **được khuyến khích**, không phải vi phạm.
+  Trong `cdn-source`, `MJ__*` (hook hành vi lib) và `MS__*` (style lib) **cũng là hợp đồng** — comment đánh dấu
+  chúng nằm cùng ngoại lệ (a). Ca kinh điển phải ghi chú: `MJ__toogleActive` sai chính tả nhưng **cấm sửa**.
+- **`cdn-source/CLAUDE.md` ghi "Comment giải thích 'tại sao' bằng tiếng Việt"** — đọc dòng đó là
+  **ngoại lệ (b) của R-CS-1**, KHÔNG phải giấy phép comment tự do. "Tại sao" hợp lệ = lý do mà đọc code
+  không suy ra được (hack trình duyệt, hợp đồng lib, magic number lấy từ design). "Tại sao" kiểu
+  `// gán sự kiện click để mở popup` vẫn là vi phạm R-CS-1 vì code đã nói ra rồi.
+  Lưu ý `/code-audit` có luật "convention repo THẮNG ý kiến chung" — R-CS-* không phải ý kiến chung,
+  nó là luật của user; chỉ nhường khi repo quy định NGƯỢC LẠI một cách rõ ràng, không phải khi repo im lặng.
 - `R-CS-3` và `R-CS-6` KHÔNG được viện ra để bỏ bớt phạm vi user yêu cầu. Cắt phần dư ≠ cắt việc.
 
 ## Thực thi cơ học

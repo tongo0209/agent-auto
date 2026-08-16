@@ -48,7 +48,10 @@ Không tự thêm tính năng, không đổi kiến trúc, không refactor ngoà
 1. **Xác định phạm vi.** Mặc định: `git status --short` + `git diff --stat` + `git log origin/<branch>..HEAD --name-only`.
    Không phải git repo → hỏi user đường dẫn.
 2. **Chốt baseline.** Ghi lại: số file, tổng dòng, số dòng comment (`grep -cE '^\s*(//|/\*|\*|<!--|\{#)'`).
-   Có build → chạy build TRƯỚC khi dọn, lưu kết quả làm mốc so sánh.
+   **Chụp danh sách tên `pm__`** vào `/tmp/pm-before.txt` (lệnh ở bước 5) — bắt buộc, đây là thứ duy nhất
+   chứng minh được không mất hook platform khi file chưa commit.
+   Có build → chạy build TRƯỚC khi dọn, lưu kết quả làm mốc so sánh. **Build đã fail từ trước khi dọn**
+   → dừng, báo user: không có mốc thì không chứng minh được "dọn xong vẫn chạy".
 3. **Đọc luật.** `rules/code-style.md`; file nào có `pm__` thì đọc thêm `rules/pm-contract.md`.
 4. **Dọn từng file**, theo thứ tự 4 nhóm trên. File >300 dòng thì dọn theo khối, không rewrite cả file.
 5. **Verify — bắt buộc, không được bỏ:**
@@ -60,6 +63,15 @@ Không tự thêm tính năng, không đổi kiến trúc, không refactor ngoà
           <(grep -oE 'pm__[a-zA-Z0-9_-]+' <file> | sort -u)
      ```
      Phải RỖNG. Mất tên nào = R-PM-1 MUST, revert ngay.
+     **File chưa commit / không có git / mode `full`** → `git show HEAD:` không có gì để so.
+     Khi đó ở **bước 2 (baseline)** phải chụp trước danh sách tên, rồi so lại sau khi dọn:
+     ```
+     # bước 2, TRƯỚC khi dọn:
+     grep -rhoE 'pm__[a-zA-Z0-9_-]+' <phạm vi> | sort -u > /tmp/pm-before.txt
+     # bước 5, SAU khi dọn:
+     grep -rhoE 'pm__[a-zA-Z0-9_-]+' <phạm vi> | sort -u | diff /tmp/pm-before.txt -
+     ```
+     Không chụp được baseline ⇒ **không được dọn file có `pm__`** — báo user, bỏ qua file đó.
      ⚠️ KHÔNG dùng `git diff | grep '^-.*pm__'` — cổng đó **báo động giả**: mọi lần định dạng lại một
      dòng có chứa `pm__` (inline biến, lồng `&.active`) đều làm nó kêu dù không tên nào mất.
      Đo thật 16/8/2026 trên fixture: 2 báo đỏ, cả 2 đều oan.

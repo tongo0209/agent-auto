@@ -13,6 +13,9 @@ import {
   summarize,
   prefilterMine,
   updateHeat,
+  firstScanMode,
+  shouldRetire,
+  lastMilestone,
   pickPrompt,
   checkGates,
   mergeWatch,
@@ -415,4 +418,58 @@ test('sheet mới phát hiện nhưng sửa lần cuối từ lâu ⇒ NGUỘI n
 test('sheet mới phát hiện mà QC vừa sửa xong ⇒ NÓNG ngay lượt đầu', () => {
   const e = updateHeat({}, new Date(2026, 7, 17, 9, 30).toISOString(), T(10));
   assert.equal(e.heat, 'hot');
+});
+
+test('lượt quét ĐẦU trên sheet cũ ⇒ chỉ gieo nền, KHÔNG nã bug tháng trước vào fix — ca thật GW-679', () => {
+  const stale = { seenBugs: {}, modifiedTime: '2026-07-27T03:00:00.000Z' };
+  assert.equal(firstScanMode(stale, T(10)), 'seed');
+});
+
+test('lượt quét đầu trên sheet QC vừa động hôm nay ⇒ xử lý ngay', () => {
+  const fresh = { seenBugs: {}, modifiedTime: new Date(2026, 7, 17, 2).toISOString() };
+  assert.equal(firstScanMode(fresh, T(10)), 'act');
+});
+
+test('đã có nền rồi thì mọi lượt sau đều xử lý bình thường', () => {
+  const seeded = { seenBugs: { 1: 'h' }, modifiedTime: '2026-01-01T00:00:00.000Z' };
+  assert.equal(firstScanMode(seeded, T(10)), 'act');
+});
+
+test('sheet chưa biết mốc sửa ⇒ gieo nền cho chắc, không đoán', () => {
+  assert.equal(firstScanMode({ seenBugs: {} }, T(10)), 'seed');
+});
+
+const ISSUES = {
+  'GW-660': { milestones: { design: '2026-07-27', html: '2026-08-03', release: '2026-08-26' } },
+  'GW-578': { milestones: { html: '2026-07-10', test: '2026-07-14', release: '2026-07-15' } },
+  'GW-999': {},
+};
+
+test('task đã qua release ⇒ thôi theo dõi buglist', () => {
+  assert.equal(shouldRetire({ keys: ['GW-578'] }, ISSUES, T(10)), true);
+});
+
+test('task chưa tới release ⇒ vẫn theo dõi', () => {
+  assert.equal(shouldRetire({ keys: ['GW-660'] }, ISSUES, T(10)), false);
+});
+
+test('ĐÚNG ngày release vẫn còn theo dõi — bug hay về đúng hôm đó', () => {
+  const issues = { 'GW-1': { milestones: { release: '2026-08-17' } } };
+  assert.equal(shouldRetire({ keys: ['GW-1'] }, issues, T(10)), false);
+});
+
+test('sheet dùng chung nhiều ticket: chỉ nghỉ khi TẤT CẢ đã qua release', () => {
+  assert.equal(shouldRetire({ keys: ['GW-578', 'GW-660'] }, ISSUES, T(10)), false);
+});
+
+test('không biết mốc nào ⇒ cứ theo dõi tiếp, không tự ý bỏ', () => {
+  assert.equal(shouldRetire({ keys: ['GW-999'] }, ISSUES, T(10)), false);
+  assert.equal(shouldRetire({ keys: ['GW-chưa-có'] }, ISSUES, T(10)), false);
+  assert.equal(shouldRetire({ keys: [] }, ISSUES, T(10)), false);
+});
+
+test('mốc muộn nhất mới là mốc chốt, kể cả khi nằm sau release', () => {
+  const issues = { 'GW-2': { milestones: { release: '2026-08-10', bugfix: '2026-08-30', _note: 'bỏ qua' } } };
+  assert.equal(lastMilestone(issues['GW-2'].milestones), '2026-08-30');
+  assert.equal(shouldRetire({ keys: ['GW-2'] }, issues, T(10)), false);
 });

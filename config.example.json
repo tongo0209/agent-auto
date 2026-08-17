@@ -49,6 +49,7 @@
     "enabled": true,
     "coolAfterHours": 3,
     "maxSheetReadsPerTick": 3,
+    "freshFirstScanHours": 24,
     "autoFix": true,
     "backfilledAt": null,
     "_note": "Radar buglist hậu bàn giao. Thiết kế: docs/specs/2026-08-17-bug-radar-design.md"

@@ -160,6 +160,25 @@ trong khi vẫn còn bug mở. `unknown` phải được giao cho skill phán, k
 
 Thiếu map `QC / GS Check` là mất **hoàn toàn** khả năng bắt reopen trên sheet GNOTH.
 
+## Nghỉ theo dõi sau release
+
+`shouldRetire(entry, issues, now)`: mốc muộn nhất trong `milestones` của **mọi** ticket gắn
+sheet đã qua ⇒ `retired: true`, bỏ khỏi vòng poll. Đúng ngày release vẫn theo dõi (bug hay về
+đúng hôm đó). Không biết mốc ⇒ vẫn theo dõi — thiếu dữ liệu không phải bằng chứng đã xong.
+
+Cùng tinh thần với `jqlRecentDoneNote` đã có: ticket chỉ rời radar khi mốc MUỘN NHẤT đã qua,
+không phải khi Jira đánh Done.
+
+## Hai lưới chặn "lượt đầu nã cả sheet cũ"
+
+`isSettled` **một mình không đủ** — đo 17/8 trên GW-679: sheet để rỗng cả header
+`DEV Check Status`, nên 12 bug đã fix từ tháng 7 vẫn mang trạng thái trắng và lọt qua lưới.
+
+Lưới thứ hai `firstScanMode(entry)`: `seenBugs` rỗng **và** sheet sửa lần cuối quá
+`freshFirstScanHours` (24h) ⇒ `seed` — chỉ gieo nền `seenBugs` rồi dừng, không fix. Sheet QC
+vừa động trong 24h ⇒ `act`. Đúng tinh thần yêu cầu: radar theo dõi **thay đổi từ lúc bật**,
+không đi đào lại quá khứ.
+
 ## Lọc bug đã xong — `isSettled`
 
 Không có bước này thì lượt backfill đầu tiên nã cả sheet cũ vào `bug-fixer-lite`. Đo thật:

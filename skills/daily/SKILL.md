@@ -361,6 +361,13 @@ là **file brief** ("Brief chi tiết" — GW-629, GW-723), không phải buglis
 entry và **thôi theo dõi sheet đó**. Đừng lọc bằng cách đoán nhãn quanh link — nhãn viết kiểu gì
 cũng có, chỉ nội dung sheet mới là bằng chứng.
 
+**Chỉ theo dõi task CHƯA qua release.** Đầu mỗi lượt, `shouldRetire(entry, state.issues)` —
+mốc MUỘN NHẤT trong `milestones` của mọi ticket gắn sheet đã qua (so theo ngày, **đúng ngày
+release vẫn còn theo dõi** vì bug hay về đúng hôm đó) ⇒ ghi `retired: true` + `retiredAt`,
+bỏ khỏi vòng poll, không đọc lại. Việc đã bàn giao xong hẳn thì thôi canh.
+Không biết mốc (ticket không có trong `state.issues`, hoặc `milestones` trống) ⇒ **cứ theo dõi
+tiếp**, không tự ý bỏ — thiếu dữ liệu không phải bằng chứng đã xong.
+
 Mỗi lượt `bugwatch`:
 
 1. `list_recent_files(orderBy:lastModified)` — **1 call** lấy `modifiedTime` mọi sheet đang
@@ -393,9 +400,19 @@ Recheck`; GNOTH dùng `Assignee`/`Frame`/`Evidence`/`QC / GS Check`. Map cột t
 header**, cấm theo vị trí. Gặp header lạ → thêm vào `COLUMNS` trong `tools/bug-radar.mjs` +
 test, đừng chữa bằng cách đoán ở tầng skill.
 
-⚠ **Lượt đầu trên sheet cũ KHÔNG được nã cả sheet vào fix.** `isSettled` loại bug đã
-`Dev Check Status=Done`, hoặc QC ghi `Confirmed fix`, hoặc `Skip`/`N/A` — trừ khi recheck báo
-`Failed`. Đo thật: 22/23 bug sheet GNOTH đã xong, chỉ 1 bug còn mở.
+⚠ **Lượt đầu trên sheet cũ KHÔNG được nã cả sheet vào fix.** Hai lưới, phải có ĐỦ CẢ HAI:
+
+1. `isSettled` loại bug đã `Dev Check Status=Done`, hoặc QC ghi `Confirmed fix`, hoặc
+   `Skip`/`N/A` — trừ khi recheck báo `Failed`. Đo thật: 22/23 bug sheet GNOTH đã xong.
+2. `firstScanMode(entry)` — `seenBugs` còn rỗng VÀ sheet sửa lần cuối quá
+   `bugRadar.freshFirstScanHours` (24h) ⇒ trả `seed`: **chỉ chạy `commit` để gieo nền rồi
+   dừng**, không gọi `bug-fixer-lite`, báo 1 dòng "đã nạp N bug làm nền, từ giờ chỉ theo dõi
+   thay đổi". Sheet QC vừa động trong 24h qua ⇒ `act`, xử lý ngay.
+
+   Vì sao cần lưới 2: đo 17/8 trên GW-679, sheet để **rỗng cả header `DEV Check Status`** nên
+   `isSettled` không cứu được dòng nào — 12 bug đã fix từ tháng 7 vẫn đứng nguyên trạng thái
+   trắng. Chỉ cần ai chạy `/daily link GW-679` cho qua cổng G2 là radar nã cả 12 bug đó vào
+   `bug-fixer-lite`. Một mình `isSettled` KHÔNG đủ.
 
 **Ghi ngược sheet phải xếp hàng — ràng buộc đã đo 17/8:** phiên nền (`claude -p`) KHÔNG có
 toolset `claude-in-chrome` (`No matching deferred tools found`), trong khi Drive thì có

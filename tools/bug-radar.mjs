@@ -15,6 +15,7 @@ import path from 'node:path';
 export const DEFAULTS = {
   enabled: true,
   coolAfterHours: 3,
+  freshFirstScanHours: 24,
   backfillDays: 30,
   autoFix: true,
 };
@@ -222,6 +223,33 @@ export function updateHeat(entry = {}, modifiedTime, now = new Date(), cfg = {})
     heat: idleH < coolAfterHours ? 'hot' : 'warm',
     changed,
   };
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+export function lastMilestone(milestones = {}) {
+  const days = Object.entries(milestones)
+    .filter(([field, value]) => !field.startsWith('_') && ISO_DAY.test(value))
+    .map(([, value]) => value)
+    .sort();
+  return days.at(-1) || null;
+}
+
+export function shouldRetire(entry = {}, issues = {}, now = new Date()) {
+  const keys = entry.keys || [];
+  if (!keys.length) return false;
+  const today = new Date(now).toISOString().slice(0, 10);
+  return keys.every((key) => {
+    const last = lastMilestone(issues[key]?.milestones);
+    return Boolean(last) && last < today;
+  });
+}
+
+export function firstScanMode(entry = {}, now = new Date(), cfg = {}) {
+  if (Object.keys(entry.seenBugs || {}).length) return 'act';
+  const { freshFirstScanHours } = { ...DEFAULTS, ...cfg };
+  const ageH = entry.modifiedTime ? (Number(now) - Date.parse(entry.modifiedTime)) / 3.6e6 : Infinity;
+  return ageH <= freshFirstScanHours ? 'act' : 'seed';
 }
 
 export function pickPrompt(state = {}, now = new Date(), cfg = {}) {

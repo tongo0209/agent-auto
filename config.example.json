@@ -40,6 +40,17 @@
     "lockStaleMin": 15,
     "timeoutMin": 5,
     "everyMin": 60,
-    "_note": "everyMin phải khớp StartInterval trong tools/radar-agent.plist (console suy ngưỡng chết = 2.5 nhịp). Bật bằng tools/radar-install.sh."
+    "tickEveryMin": 30,
+    "timeoutMinBugwatch": 15,
+    "_note": "everyMin = nhịp lượt ĐẦY ĐỦ, console suy ngưỡng chết = 2.5 nhịp từ số này — giữ 60 dù launchd đá 30' một lần. tickEveryMin = StartInterval thật trong tools/radar-agent.plist; lượt xen giữa chỉ chạy khi có sheet buglist đang nóng. Bật bằng tools/radar-install.sh."
+  },
+
+  "bugRadar": {
+    "enabled": true,
+    "coolAfterHours": 3,
+    "maxSheetReadsPerTick": 3,
+    "autoFix": true,
+    "backfilledAt": null,
+    "_note": "Radar buglist hậu bàn giao. Thiết kế: docs/specs/2026-08-17-bug-radar-design.md"
   }
 }

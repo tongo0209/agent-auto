@@ -194,3 +194,60 @@ test('claude ném lỗi: vẫn ghi sổ và vẫn nhả lock', () => {
   assert.match(row.err, /bùm/);
   assert.equal(fs.existsSync(path.join(d, '.locks/radar.lock')), false);
 });
+
+test('--force vẫn quét tay được dù lượt này lẽ ra bị bỏ vì không sheet nào nóng', () => {
+  const root = tmp('radar-forced-');
+  const statePath = path.join(root, 'state.json');
+  fs.writeFileSync(statePath, JSON.stringify({ bugWatch: { s1: { heat: 'warm' } } }));
+  fs.utimesSync(statePath, 0, 0);
+  const seen = [];
+  const row = runTick({
+    root,
+    now: at(0, 14, 45),
+    argv: ['--force'],
+    runClaude: (prompt) => {
+      seen.push(prompt);
+      return { ok: true, ms: 1, costUsd: 0 };
+    },
+    notify: () => {},
+  });
+  assert.equal(row.skipped, null);
+  assert.deepEqual(seen, ['/daily delta']);
+});
+
+test('lượt nửa giờ không có sheet nóng thì bỏ lượt và KHÔNG gọi claude', () => {
+  const root = tmp('radar-cold-');
+  const statePath = path.join(root, 'state.json');
+  fs.writeFileSync(statePath, JSON.stringify({ bugWatch: { s1: { heat: 'warm' } } }));
+  fs.utimesSync(statePath, 0, 0);
+  let called = 0;
+  const row = runTick({
+    root,
+    now: at(0, 14, 45),
+    runClaude: () => {
+      called++;
+      return { ok: true, ms: 1 };
+    },
+    notify: () => {},
+  });
+  assert.equal(row.skipped, 'cold');
+  assert.equal(called, 0);
+});
+
+test('có sheet nóng ở lượt nửa giờ ⇒ chạy prompt bugwatch chứ không phải delta', () => {
+  const root = tmp('radar-hot-');
+  const statePath = path.join(root, 'state.json');
+  fs.writeFileSync(statePath, JSON.stringify({ bugWatch: { s1: { heat: 'hot' } } }));
+  fs.utimesSync(statePath, 0, 0);
+  const seen = [];
+  runTick({
+    root,
+    now: at(0, 14, 45),
+    runClaude: (prompt) => {
+      seen.push(prompt);
+      return { ok: true, ms: 1 };
+    },
+    notify: () => {},
+  });
+  assert.deepEqual(seen, ['/daily bugwatch']);
+});

@@ -21,7 +21,7 @@
        config.json cho khớp — ngưỡng "radar chết" của console suy từ đó.
        Khung 08-18h T2-T6 do script tự chặn (test được), không nhét 110 dòng
        StartCalendarInterval vào đây. -->
-  <key>StartInterval</key><integer>3600</integer>
+  <key>StartInterval</key><integer>1800</integer>
   <key>RunAtLoad</key><true/>
   <key>ProcessType</key><string>Background</string>
   <key>StandardOutPath</key><string>/Users/lap17727/VNG/agent-auto/history/radar-stdout.log</string>

@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { pickPrompt } from './bug-radar.mjs';
 
 export const DEFAULTS = {
   enabled: true,
@@ -135,6 +136,10 @@ export const ALLOWED_TOOLS = [
   'mcp__claude_ai_Atlassian__searchJiraIssuesUsingJql',
   'mcp__claude_ai_Atlassian__getJiraIssue',
   'mcp__claude_ai_Atlassian__getAccessibleAtlassianResources',
+  'mcp__claude_ai_Google_Drive__list_recent_files',
+  'mcp__claude_ai_Google_Drive__get_file_metadata',
+  'mcp__claude_ai_Google_Drive__read_file_content',
+  'mcp__claude_ai_Google_Drive__search_files',
 ].join(',');
 
 /**
@@ -158,10 +163,10 @@ const todayStr = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /** Gọi claude thật — tách riêng để test tiêm bản giả vào, không phải đốt token mỗi lần chạy test */
-function realClaude(root, timeoutMs, model = null) {
+function realClaude(root, timeoutMs, model = null, prompt = '/daily delta') {
   const t0 = Date.now();
   try {
-    const out = execFileSync('claude', buildArgs('/daily delta', model), {
+    const out = execFileSync('claude', buildArgs(prompt, model), {
       cwd: root,
       timeout: timeoutMs,
       encoding: 'utf8',
@@ -231,6 +236,11 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
   const watched = [path.join(root, 'state.json'), path.join(root, 'boards', todayStr(now) + '.md')];
   if (humanBusy(watched, Date.now(), cfg.graceMin * 60e3)) return write({ at: stamp(), skipped: 'human' });
 
+  const state = readJSON(path.join(root, 'state.json'), { bugWatch: {} });
+  const bugCfg = readJSON(path.join(root, 'config.json'), {}).bugRadar || {};
+  const choice = argv.includes('--force') ? { prompt: '/daily delta', why: 'forced' } : pickPrompt(state, now, bugCfg);
+  if (choice.skip) return { at: stamp(), skipped: choice.skip };
+
   fs.mkdirSync(path.dirname(lock), { recursive: true });
   fs.writeFileSync(lock, JSON.stringify({ pid: process.pid, atMs: Number(now) }));
   try {
@@ -242,7 +252,10 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
     const before = snap();
     if (argv.includes('--dry')) return { at: stamp(), skipped: 'dry' };
 
-    const res = (runClaude || (() => realClaude(root, cfg.timeoutMin * 60e3, cfg.model || null)))();
+    const timeoutMin = choice.prompt === '/daily bugwatch' ? cfg.timeoutMinBugwatch || 15 : cfg.timeoutMin;
+    const res = (runClaude || (() => realClaude(root, timeoutMin * 60e3, cfg.model || null, choice.prompt)))(
+      choice.prompt,
+    );
     const { changed, newRows } = diffCounts(before, snap());
     fs.mkdirSync(path.dirname(sock), { recursive: true });
     if (!fs.existsSync(sock)) fs.writeFileSync(sock, ''); // lượt đầu tiên: chưa có sổ để đọc
@@ -262,6 +275,7 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
       at: stamp(),
       ok: res.ok,
       skipped: null,
+      prompt: choice.prompt,
       ms: res.ms,
       changed,
       newRows,

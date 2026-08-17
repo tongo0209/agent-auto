@@ -86,6 +86,15 @@ export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
   // hoặc ghi tay, console có thể đọc sai cấu trúc.
   if (state.schemaVersion !== 2) err('E5', '(state)', `schemaVersion phải là 2, đang là ${state.schemaVersion}`);
 
+  // W8/W9: bug-radar im lặng là kiểu hỏng tệ nhất — sheet không gắn ticket thì không kiểm được
+  // cổng G1/G2 nên không bao giờ tự fix, còn hàng đợi ghi sheet thì chỉ phiên CLI mới xả được.
+  for (const [sheetId, entry] of Object.entries(state.bugWatch || {})) {
+    const label = entry.title || sheetId.slice(0, 12);
+    if (!entry.keys?.length) warn('W8', label, 'sheet buglist chưa gắn ticket nào — cổng G1/G2 không kiểm được');
+    const queued = entry.pendingSheetWrite?.length || 0;
+    if (queued) warn('W9', label, `${queued} dòng chờ ghi ngược sheet — mở phiên CLI chạy /daily bugwrite`);
+  }
+
   // E10 (+W7): CỔNG CÀI ĐẶT. Trước 14/8 doctor chỉ soi state, nên chạy trên một máy vừa cài
   // xong — config.json còn nguyên placeholder của config.example.json — nó vẫn trả
   // "✓ 0 ERROR · 0 WARN". Mà README bảo member dùng đúng lệnh này để nghiệm thu cài đặt.

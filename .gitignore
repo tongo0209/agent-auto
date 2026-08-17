@@ -42,3 +42,4 @@ knowledge/metrics.jsonl
 
 # Lock của radar nền (tools/radar-tick.mjs) — runtime, không versioned
 .locks/
+.cache/

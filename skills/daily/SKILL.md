@@ -1,6 +1,6 @@
 ---
 name: daily
-description: Bộ điều phối công việc hàng ngày + vòng đời task của dev frontend VNG - một lệnh /daily là quét task Jira assign cho user (project GW), đọc detail + bóc link DESIGN nằm sẵn trong ticket rồi mới dò SharePoint (biết design ĐÃ GIAO chưa — có link trong ticket là đã giao, search trắng KHÔNG phải bằng chứng chưa giao), NỐI TICKET VỚI FOLDER LÀM VIỆC (neo theo nexusId trong tên folder gt-promotion + đoán fuzzy campaign trong cdn-source, hỏi 1 lần rồi nhớ mãi) để suy PHASE từ commit thật và ghi metrics effort tự động, theo dõi PHASE từng ticket theo vòng đời thật (chờ-design → sẵn-sàng → đang-code → giao-HTML qua gt-promotion-template nếu task có kênh promotion → chờ-test → fix-bug → xong-FE), pull gt-promotion phát hiện động tĩnh từ promotion, tự phát hiện buglist (sheet cố định per-game trong config + link sheets trong comment Jira) để soạn lệnh bug-fixer-lite, phân loại theo bảng routing rồi trình kế hoạch cho user duyệt ĐÚNG 1 LẦN rồi tự chạy hết (code qua code-developer full/fix/code/batch), theo dõi qua board local agent-auto/boards/ + dashboard HTML artifact 1 URL cố định, cảnh báo trễ mốc timeline. KHÔNG ghi ngược Jira, KHÔNG commit/push, KHÔNG tự chạy bug-fixer-lite trong VS Code panel. Modes: mặc định (trọn luồng) | plan (quét + kế hoạch, không thực thi) | prep <KEY> (chuẩn bị sâu 1 ticket) | week (kế hoạch tuần 14 ngày + cảnh báo dồn deadline) | add <link|text> (nhận việc ngoài Jira thành task ADHOC) | link <KEY> [repo path] (gắn ticket với folder làm việc) | delta (radar quét nhanh thay đổi Jira + gt-promotion; chạy nền tự động bằng launchd) | wrap (chốt ngày: tổng kết + soạn standup + ghi metrics) | status (đọc board, không quét) | doctor (chạy tools/state-doctor.mjs, tự sửa cái sửa được, báo cái không tự sửa kèm mã luật, không quét Jira/không code). Dùng khi user gõ /daily hoặc nói "check task jira hôm nay", "hôm nay làm gì", "kế hoạch tuần", "chốt ngày".
+description: Bộ điều phối công việc hàng ngày + vòng đời task của dev frontend VNG - một lệnh /daily là quét task Jira assign cho user (project GW), đọc detail + bóc link DESIGN nằm sẵn trong ticket rồi mới dò SharePoint (biết design ĐÃ GIAO chưa — có link trong ticket là đã giao, search trắng KHÔNG phải bằng chứng chưa giao), NỐI TICKET VỚI FOLDER LÀM VIỆC (neo theo nexusId trong tên folder gt-promotion + đoán fuzzy campaign trong cdn-source, hỏi 1 lần rồi nhớ mãi) để suy PHASE từ commit thật và ghi metrics effort tự động, theo dõi PHASE từng ticket theo vòng đời thật (chờ-design → sẵn-sàng → đang-code → giao-HTML qua gt-promotion-template nếu task có kênh promotion → chờ-test → fix-bug → xong-FE), pull gt-promotion phát hiện động tĩnh từ promotion, tự phát hiện buglist (sheet cố định per-game trong config + link sheets trong comment Jira) để soạn lệnh bug-fixer-lite, phân loại theo bảng routing rồi trình kế hoạch cho user duyệt ĐÚNG 1 LẦN rồi tự chạy hết (code qua code-developer full/fix/code/batch), theo dõi qua board local agent-auto/boards/ + dashboard HTML artifact 1 URL cố định, cảnh báo trễ mốc timeline. KHÔNG ghi ngược Jira, KHÔNG commit/push, KHÔNG tự chạy bug-fixer-lite trong VS Code panel. Modes: mặc định (trọn luồng) | plan (quét + kế hoạch, không thực thi) | prep <KEY> (chuẩn bị sâu 1 ticket) | week (kế hoạch tuần 14 ngày + cảnh báo dồn deadline) | add <link|text> (nhận việc ngoài Jira thành task ADHOC) | link <KEY> [repo path] (gắn ticket với folder làm việc) | delta (radar quét nhanh thay đổi Jira + gt-promotion; chạy nền tự động bằng launchd) | bugwatch (radar buglist hậu bàn giao: soi sheet QC qua Google Drive, thấy bug mới thì tự kiểm 4 cổng sở hữu rồi gọi bug-fixer-lite) | bugwrite (xả hàng đợi ghi ngược sheet, cần phiên CLI có Chrome) | wrap (chốt ngày: tổng kết + soạn standup + ghi metrics) | status (đọc board, không quét) | doctor (chạy tools/state-doctor.mjs, tự sửa cái sửa được, báo cái không tự sửa kèm mã luật, không quét Jira/không code). Dùng khi user gõ /daily hoặc nói "check task jira hôm nay", "hôm nay làm gì", "kế hoạch tuần", "chốt ngày".
 ---
 
 # /daily — điều phối ngày + vòng đời task: Jira → kế hoạch → chạy → giao HTML → bug → chốt
@@ -103,6 +103,10 @@ Token đầu của `$ARGUMENTS`:
   `claude -p` gọi được `searchJiraIssuesUsingJql` (OK GW-720, 16.6s) và gọi được cả skill
   (`/daily status`, 47s); launchd chạy `/daily delta` đủ cả `git pull` gt-promotion.
   Thiết kế: `agent-auto/docs/specs/2026-08-13-radar-auto-design.md`.
+- `bugwatch` → **radar buglist hậu bàn giao**, KHÔNG hỏi gì, không quét Jira. Chi tiết luật +
+  bằng chứng đo: mục "Bug-radar" bên dưới và `docs/specs/2026-08-17-bug-radar-design.md`.
+- `bugwrite` → xả hàng đợi `pendingSheetWrite` lên sheet (cần Chrome ⇒ chỉ chạy được ở phiên
+  CLI tương tác). Mode mặc định tự làm việc này ở Bước 0, nên hiếm khi phải gõ tay.
 - `wrap` → chốt ngày: đọc board + diff repo đã đụng → tổng kết ✅/⚠️/🕐 → soạn đoạn standup
   (paste được vào chat team) → **ghi metrics** (xem Vòng học) → cập nhật dashboard lần cuối →
   nhắc mục "Cần bạn" còn mở. KHÔNG quét Jira lại, KHÔNG code thêm.
@@ -120,6 +124,10 @@ Token đầu của `$ARGUMENTS`:
 
 Đọc `config.json` + `state.json` (thiếu state → tạo `{"lastRun":null,"issues":{}}`).
 `jqlConfirmed: false` → sau quét, xác nhận JQL với user 1 lần rồi set `true`.
+**Xả hàng đợi ghi sheet** (chỉ phiên CLI tương tác, mode mặc định): có
+`state.bugWatch[*].pendingSheetWrite` không rỗng → ghi lên sheet qua Chrome rồi dọn hàng đợi.
+Phiên nền không làm được việc này (không có toolset chrome) nên đừng thử.
+
 **Pull gt-promotion đầu phiên** (mode mặc định/plan/delta): `git -C <root> pull --ff-only`
 timeout 60s — fail/timeout → báo 1 dòng + đi tiếp (không chặn). Commit mới đụng folder
 `<game>/<slug>-<nexusId>/` của task đang theo dõi → dòng "📦 promotion vừa cập nhật <task>"
@@ -134,7 +142,12 @@ và luật đo `done` (KHÔNG lọc theo `resolutiondate` — nhiều ticket `CO
 
 Rút gọn: so `updated` với state → nhãn MỚI/ĐỔI/CÒN DỞ; comment mới có link
 `docs.google.com/spreadsheets` → `state.issues[key].bugSheets` (tên field CỐ ĐỊNH, console đọc
-field này) + phase → `bugfix`. Lỗi auth connector → DỪNG SỚM, báo user bật connector Atlassian.
+field này) + phase → `bugfix`.
+
+**Bóc link buglist ở CẢ ticket đã Done** (nhánh `jqlRecentDone`): ticket Done vẫn phải soi
+`description` + `comment` tìm link sheet rồi nạp vào `state.bugWatch` — đây là lúc QC bàn giao
+xong mới dán link. Thấy Done là gạt sang `closed` rồi thôi = mù đúng chỗ bug-radar sinh ra để
+canh. Xem mục "Bug-radar". Lỗi auth connector → DỪNG SỚM, báo user bật connector Atlassian.
 **Key biến mất khỏi query không tự động = `closed`** — xem luật phân biệt `reassigned`/`closed`
 ở mục Vòng đời task trên.
 
@@ -304,6 +317,91 @@ Dashboard `dashboard.html` (artifact, dùng khi cần share/xem ngoài máy): la
 (object `BOARD`: date, week[], tasks[], todos[]). Trường task: `key,url,title,lane,repo,due,
 dueLabel,phase,status(planned|running|done|blocked|waiting),note`. Publish tool Artifact cùng
 file path + favicon 🗓️ + `url` = `config.dashboardUrl` (giữ 1 URL). Headless không có Artifact → bỏ qua.
+
+## Bug-radar — theo dõi buglist sau khi đã bàn giao
+
+Task code xong → Done → bàn giao Promotion/GS → QC dán **link buglist** vào ticket. Từ đó
+ticket rơi khỏi JQL chính (`statusCategory != Done`) nên không ai soi nữa. Bug-radar bịt chỗ đó.
+
+**Tín hiệu vào watchlist là LINK BUGLIST, không phải trạng thái ticket.** QC hay dán link
+trước khi mình kịp đánh Done ⇒ quét cả ticket Done lẫn chưa Done. Nguồn ticket Done tái dùng
+`config.jqlRecentDone` (đã có sẵn, 45 ngày) — KHÔNG đẻ query mới.
+
+**Nạp watchlist bằng ĐÚNG 1 CALL — để JQL lọc hộ, đừng đọc từng ticket:**
+
+```
+assignee = currentUser() AND updated >= -45d
+  AND (description ~ "docs.google.com/spreadsheets" OR comment ~ "docs.google.com/spreadsheets")
+```
+
+⚠ **CẤM gọi `getJiraIssue` từng ticket để tìm link.** Đã trả giá 17/8: lượt bugwatch đầu tiên
+đi đường đó, chạy **22 phút, tốn $2.63 rồi bị giết** mà chưa ghi được gì. Query trên lọc thẳng
+trên server: 23 ticket Done → chỉ **6 ticket** thật sự có link, một call là xong. Chỉ ticket
+nào khớp bằng `comment` mà description không có link mới cần lấy comment riêng.
+
+Lượt đầu (`config.bugRadar.backfilledAt` = null) chạy query trên cho toàn bộ 45 ngày rồi ghi
+`backfilledAt`; các lượt sau `delta` tự bắt vì QC dán link là `updated` của ticket đổi.
+**Ghi `state.bugWatch` NGAY sau mỗi ticket bóc được**, đừng gom tới cuối — lượt này có thể bị
+timeout (`radar.timeoutMinBugwatch`, mặc định 15'), gom tới cuối là mất sạch và lượt sau làm
+lại từ đầu, không bao giờ tiến.
+
+**KÊNH 2 — dò thẳng từ Drive (BẮT BUỘC, không phải phương án dự phòng).** ⚠ Đo 17/8: sheet
+`BugList GNOTH: Chengdu Tournament Web` đang được QC sửa **trong ngày**, thuộc **GW-610** (task
+của mình, đã Done) — mà ticket đó `updated` từ 29/7 và **không có link buglist nào trong ticket**.
+QC chỉ share qua Drive. Chỉ đi theo link trong Jira là mù đúng cái sheet đang nóng nhất.
+Luật: mỗi lượt, trong chính call `list_recent_files` đã dùng để poll, nhận thêm file
+`mimeType = spreadsheet` có tiêu đề bắt đầu bằng `BugList`/`Bug List` → nạp vào watchlist, rồi
+ghép về ticket bằng `matchSheetToTicket(title, tickets)` (khớp token tên, ngưỡng 0.5 — đã khớp
+đúng GW-610/GW-660/GW-679 trên dữ liệu thật). Không ghép được ticket nào → vẫn theo dõi nhưng
+`keys` rỗng, `state-doctor` W8 nhắc; KHÔNG tự fix vì cổng G1/G2 không kiểm được.
+
+⚠ **Link trong ticket KHÔNG chắc là buglist.** Đo 17/8: 2/5 link `docs.google.com/spreadsheets`
+là **file brief** ("Brief chi tiết" — GW-629, GW-723), không phải buglist. Sau lần đọc nội dung
+đầu tiên, `scan` trả `isBugSheet: false` (không có cột `BugID`) ⇒ ghi `notBugSheet: true` vào
+entry và **thôi theo dõi sheet đó**. Đừng lọc bằng cách đoán nhãn quanh link — nhãn viết kiểu gì
+cũng có, chỉ nội dung sheet mới là bằng chứng.
+
+Mỗi lượt `bugwatch`:
+
+1. `list_recent_files(orderBy:lastModified)` — **1 call** lấy `modifiedTime` mọi sheet đang
+   theo dõi. Sheet không nằm trang đầu → `get_file_metadata` bù.
+2. `modifiedTime` không đổi ⇒ DỪNG ở đây, không đọc nội dung. Đây là chỗ giữ chi phí.
+3. Đổi ⇒ `read_file_content(sheetId)` → ghi **nguyên văn khối bảng có cột BugID** vào
+   `.cache/bugsheets/<sheetId>.md` (chỉ dòng bắt đầu bằng `|`, không rút gọn).
+   ⚠ **Tối đa `bugRadar.maxSheetReadsPerTick` sheet MỚI mỗi lượt** (mặc định 3), ưu tiên sheet
+   `modifiedTime` mới nhất; phần còn lại để lượt sau. Đo 17/8: một lần đọc sheet mất ~90s, nên
+   lượt đầu phải đọc cả 5 sheet là chắc chắn vượt timeout. Có trần thì mọi lượt đều về đích và
+   watchlist đầy dần qua vài lượt — vẫn không cần user làm gì.
+4. `node tools/bug-radar.mjs scan <sheetId>` — **máy phán, không phải LLM**: parse, so
+   `seenBugs`, lọc bug đã xong, chia rổ. Đọc `toSkill` để biết có việc thật không.
+5. `toSkill > 0` → kiểm 4 cổng sở hữu (dưới). Đủ 4 → gọi `bug-fixer-lite`. Rớt → ghi
+   `## Cần bạn` + notify, KHÔNG đụng code.
+6. Xong lượt fix → `node tools/bug-radar.mjs commit <sheetId>` ghi `seenBugs`. **Chỉ commit
+   SAU khi fix xong** — nổ giữa chừng thì lượt sau làm lại, thà lặp còn hơn nuốt mất bug.
+7. Ticket liên quan → `phase = bugfix` (kèm `reopenedFrom` nếu trước đó `closed`/`done-fe`).
+
+**Bốn cổng sở hữu** (`checkGates`) — chỉ tự fix khi PASS đủ 4:
+`G1` assignee còn là mình · `G2` `paths` + `pathsConfirmed` · `G3` sheet đọc được ·
+`G4` `toSkill > 0`.
+
+⚠ **G4 đếm `toSkill` = mine + unknown, KHÔNG phải mine.** Đo trên sheet thật GNOTH 17/8:
+**19/23 dòng bỏ trống cột `Bug Type`** — lọc theo type thì mineCount = 0 và radar chặn nhầm
+sạch. Radar chỉ prefilter LỎNG, quyền phán cuối cùng thuộc `bug-fixer-lite` với ma trận đầy đủ.
+
+⚠ **Schema sheet KHÔNG cố định giữa các game.** CFL dùng `Assignee Fix`/`Notes`/`QC / GS
+Recheck`; GNOTH dùng `Assignee`/`Frame`/`Evidence`/`QC / GS Check`. Map cột theo **TÊN
+header**, cấm theo vị trí. Gặp header lạ → thêm vào `COLUMNS` trong `tools/bug-radar.mjs` +
+test, đừng chữa bằng cách đoán ở tầng skill.
+
+⚠ **Lượt đầu trên sheet cũ KHÔNG được nã cả sheet vào fix.** `isSettled` loại bug đã
+`Dev Check Status=Done`, hoặc QC ghi `Confirmed fix`, hoặc `Skip`/`N/A` — trừ khi recheck báo
+`Failed`. Đo thật: 22/23 bug sheet GNOTH đã xong, chỉ 1 bug còn mở.
+
+**Ghi ngược sheet phải xếp hàng — ràng buộc đã đo 17/8:** phiên nền (`claude -p`) KHÔNG có
+toolset `claude-in-chrome` (`No matching deferred tools found`), trong khi Drive thì có
+(`DRIVE=OK`). Nên radar fix được code nhưng KHÔNG ghi được `DEV Check Status`. Kết quả cần ghi
+vào `bugWatch[sheetId].pendingSheetWrite`, board ghi `🕐 chờ ghi sheet: N dòng`, phiên `/daily`
+tương tác kế tiếp tự xả ở Bước 0.
 
 ## Vòng học (metrics)
 

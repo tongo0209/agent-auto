@@ -7,7 +7,15 @@
  */
 export function layoutMarks(
   milestones,
-  { pctOf, daysUntilOf, keyIds = ['html'], minGapPct = 10, offGapPct = minGapPct, maxDays = Infinity }
+  {
+    pctOf,
+    daysUntilOf,
+    keyIds = ['html'],
+    minGapPct = 10,
+    offGapPct = minGapPct,
+    maxDays = Infinity,
+    flipPct = Infinity,
+  }
 ) {
   const marks = Object.entries(milestones || {})
     // Key mở đầu `_` là GHI CHÚ của skill (`_conflict`, `_designGuess`…), không phải mốc.
@@ -25,6 +33,24 @@ export function layoutMarks(
     .filter((m) => m.left !== null)
     .sort((a, b) => a.left - b.left || a.days - b.days);
 
+  // Hai mốc rơi ĐÚNG cùng một ngày (hay gặp nhất: `duedate` trùng `html`) nằm chồng chấm lên
+  // nhau, và chấm vẽ sau đè lên đầu chữ của nhãn vẽ trước — ca thật GW-747 ngày 17/8: nhãn
+  // "HTML" đọc ra thành "…ML". Luật giãn nhãn bên dưới KHÔNG cứu được vì nó chỉ giấu CHỮ, chấm
+  // vẫn còn. Gộp còn MỘT chấm: mốc ưu tiên (HTML) thắng, tên mốc bị gộp đi vào `alsoNames`.
+  const perDay = new Map();
+  for (const m of [...marks]) {
+    const peer = perDay.get(m.date);
+    if (!peer) {
+      perDay.set(m.date, m);
+      continue;
+    }
+    const keep = keyIds.includes(m.name) ? m : peer;
+    const drop = keep === m ? peer : m;
+    keep.alsoNames = [...(keep.alsoNames || []), ...(drop.alsoNames || []), drop.name];
+    perDay.set(m.date, keep);
+    marks.splice(marks.indexOf(drop), 1);
+  }
+
   // Mọi mốc ngoài khung đều ghim cùng 100% → giữ nguyên là chồng chấm chồng chữ ở mép phải
   // (ca thật GW-525: review2 31/8 + release 19/9). Gộp còn MỘT chấm mang mốc SỚM NHẤT — nó
   // tới trước nên là cái phải canh trước; số mốc còn lại đi vào `moreOff` cho nhãn "+n".
@@ -34,11 +60,25 @@ export function layoutMarks(
     for (const m of offs.slice(1)) marks.splice(marks.indexOf(m), 1);
   }
 
-  // Mỗi nhãn đã hiện chiếm một VÙNG CẤM quanh nó, không phải một điểm: nhãn mốc off dài hơn
-  // hẳn (kèm ngày + "+n" + mũi tên) và đổ ngược về trái nên vùng của nó rộng hơn `minGapPct`.
+  // Nhãn chảy MỘT PHÍA từ chấm: sang phải, hoặc sang trái khi mốc nằm quá phải (`flip`) / ngoài
+  // khung (`off`). Nên vùng cấm cũng phải một phía — bản cũ cấm đối xứng ±gap quanh chấm, đúng
+  // với cách vẽ cũ (căn giữa cả cụm chấm+nhãn) nhưng sai từ khi cụm được neo theo CHẤM: nửa vùng
+  // xin bên trái bị bỏ không, còn nhãn thật tràn sang phải gấp đôi phần được cấm nên chấm mốc
+  // sau rơi vào giữa chữ.
+  //
+  // `flip` chốt Ở ĐÂY chứ không để gantt.js tự so `left > flipPct`: hướng nhãn quyết định vùng
+  // cấm, tách 2 chỗ là đúng lúc sửa 1 chỗ thì chỗ kia lệch.
+  for (const m of marks) m.flip = m.off || m.left > flipPct;
+  const zoneOf = (m) => {
+    const gap = m.off ? offGapPct : minGapPct;
+    return m.flip ? { from: m.left - gap, to: m.left } : { from: m.left, to: m.left + gap };
+  };
   const taken = [];
-  const fits = (left) => taken.every((t) => Math.abs(left - t.left) >= t.gap);
-  const claim = (m) => taken.push({ left: m.left, gap: m.off ? offGapPct : minGapPct });
+  const fits = (m) => {
+    const z = zoneOf(m);
+    return taken.every((t) => z.to <= t.from || z.from >= t.to);
+  };
+  const claim = (m) => taken.push(zoneOf(m));
   // Mốc ưu tiên (HTML) và mốc NGOÀI KHUNG giành nhãn trước: mốc off là thứ duy nhất nói được
   // "còn mốc nữa ở ngoài khung nhìn", để luật giãn nhãn bịt nó thì hàng đó thành mù ngày.
   const first = (m) => keyIds.includes(m.name) || m.off;
@@ -47,7 +87,7 @@ export function layoutMarks(
     claim(m);
   }
   for (const m of marks.filter((m) => !first(m))) {
-    m.showLabel = fits(m.left);
+    m.showLabel = fits(m);
     if (m.showLabel) claim(m);
   }
   return marks;

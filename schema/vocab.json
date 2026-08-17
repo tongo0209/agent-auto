@@ -7,7 +7,7 @@
     {"id": "deliver", "label": "giao HTML", "icon": "deliver", "sev": "warn", "group": "Giao HTML", "active": true},
     {"id": "wait-test", "label": "chờ test", "icon": "test", "sev": "wait", "group": "Chờ test", "lateExempt": true},
     {"id": "bugfix", "label": "fix bug", "icon": "bug", "sev": "crit", "group": "Fix bug", "active": true, "lateExempt": true},
-    {"id": "done-fe", "label": "xong FE", "icon": "done", "sev": "ok", "group": "Đã xong / ra khỏi tay", "lateExempt": true, "dim": true, "folded": true},
+    {"id": "done-fe", "label": "xong FE", "icon": "done", "sev": "ok", "group": "Đã xong / ra khỏi tay", "doneMine": true, "lateExempt": true, "dim": true, "folded": true},
     {"id": "reassigned", "label": "đã chuyển người", "icon": "handoff", "sev": "wait", "group": "Đã xong / ra khỏi tay", "offMyPlate": true, "gone": true, "lateExempt": true, "folded": true, "needsHandoff": true},
     {"id": "closed", "label": "đóng", "icon": "closed", "sev": "wait", "group": "Đã xong / ra khỏi tay", "offMyPlate": true, "doneMine": true, "lateExempt": true, "dim": true, "folded": true}
   ],

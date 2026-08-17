@@ -44,8 +44,11 @@ export const OFF_MY_PLATE_PHASES = idsWhere('offMyPlate');
  *   là deadline của người nhận → không vẽ hàng timeline nào cả (vẽ ra chỉ đọc nhầm thành nợ
  *   của mình). Vẫn giữ dòng trong BẢNG task vì còn việc bàn giao.
  *
- * `doneMine` (closed) — việc CỦA MÌNH đã xong, nhưng Test/Release của BE/QC còn ở phía trước
- *   và đó chính là lúc bug quay lại. Vẫn vẽ hàng (mờ) chừng nào còn mốc tương lai.
+ * `doneMine` (done-fe, closed) — việc CỦA MÌNH đã xong, nhưng Test/Release của BE/QC còn ở phía
+ *   trước và đó chính là lúc bug quay lại. Vẫn vẽ hàng (mờ) chừng nào còn mốc tương lai.
+ *   `done-fe` vào nhóm này từ 17/8: trước đó chỉ `closed` mang cờ, nên ticket xong FE mà mốc đã
+ *   qua hết vẫn nằm lại timeline vĩnh viễn (ca thật GW-627: 4 mốc quá khứ, hàng chỉ còn 1 chấm
+ *   Release bên trái vạch hôm nay — không còn gì để canh mà vẫn chiếm chỗ).
  */
 export const GONE_PHASES = idsWhere('gone');
 export const DONE_PHASES = idsWhere('doneMine');

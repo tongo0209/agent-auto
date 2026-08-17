@@ -17,7 +17,7 @@
    Làm mờ CẢ HÀNG bằng opacity thay vì đổi màu từng phần: mọi chấm mốc đều ăn màu severity
    riêng, đổi màu từng cái là 6 chỗ phải nhớ; opacity thì tự đúng và vẫn hover đọc được. */
 .grow.dim {
-  opacity: 0.42;
+  opacity: 0.62;
 }
 .grow.dim:hover {
   opacity: 1;
@@ -116,24 +116,30 @@
 
 /* Mốc: chấm + nhãn nhỏ */
 .gmark {
+  --dot: 8px;
   position: absolute;
   top: 50%;
-  transform: translate(-50%, -50%);
+  /* Neo theo CHẤM, không phải theo cả cụm [chấm + nhãn]. `translate(-50%)` cũ căn giữa cả cụm
+     nên chấm bị đẩy khỏi ngày của nó đúng NỬA BỀ RỘNG NHÃN — nhãn càng dài lệch càng nhiều
+     (đã thấy thật 17/8: chấm HTML của GW-747 rơi đúng hôm nay mà vẽ hẳn sang trái vạch xanh,
+     và "Due Jira" của GW-525 bị đẩy ra ngoài mép trái track). */
+  transform: translateY(-50%);
+  margin-left: calc(var(--dot) / -2);
   display: flex;
   align-items: center;
   gap: 3px;
   white-space: nowrap;
   z-index: 2;
 }
-/* Nhãn có nền mờ để chữ không lẫn vào dải .gspan/gridline chạy phía sau */
+/* Nhãn có nền ĐỤC để chữ không lẫn vào dải .gspan/gridline chạy phía sau */
 .gmark b {
-  background: color-mix(in srgb, var(--raise) 82%, transparent);
+  background: var(--raise);
   padding: 0 2px;
   border-radius: 2px;
 }
 .gmark i {
-  width: 8px;
-  height: 8px;
+  width: var(--dot);
+  height: var(--dot);
   border-radius: 50%;
   background: var(--sev, var(--muted));
   box-shadow: 0 0 0 2px var(--raise);
@@ -144,9 +150,10 @@
   font: 600 var(--fs-xs) var(--font-mono);
   color: var(--muted);
 }
+.gmark.key {
+  --dot: 10px;
+}
 .gmark.key i {
-  width: 10px;
-  height: 10px;
   border-radius: 3px;
 }
 .gmark.key b {
@@ -160,14 +167,23 @@
    (đã thấy thật: nhãn "Review 1" của mốc cuối bị cắt mất chữ). */
 .gmark.flip {
   flex-direction: row-reverse;
-}
-.gmark.flip i {
-  margin-left: 3px;
+  /* Nhãn đổ sang trái ⇒ chấm là phần tử PHẢI NHẤT của cụm, nên neo bằng mép phải + nửa chấm
+     (đối xứng với luật neo ở .gmark). */
+  transform: translate(-100%, -50%);
+  margin-left: calc(var(--dot) / 2);
 }
 
 /* Mốc quá gần mốc trước → chỉ giữ chấm, tên xem bằng tooltip (hết chữ chồng chữ) */
 .gmark.nolabel b {
   display: none;
+}
+/* Mốc CÓ nhãn nằm trên mốc chỉ-có-chấm: hai mốc sát nhau thì mốc sau đã mất nhãn, nhưng CHẤM
+   của nó vẫn vẽ và vì là sibling sau nên nó liếm vào chữ của mốc trước (đã thấy thật GW-660:
+   "Dev BE" đọc thành "Dev B●"). Chữ thắng — chấm bị che vài px vẫn nhận ra, chữ mất ký tự
+   thì không. z-index phải đặt ở `.gmark` chứ không ở `<b>`: mỗi `.gmark` đã là một stacking
+   context riêng nên z-index bên trong không leo được qua sibling. */
+.gmark:not(.nolabel) {
+  z-index: 3;
 }
 
 /* Mốc NGOÀI khung 28 ngày (hay gặp nhất: Release của task đã xong FE) — ghim mép phải, chấm
@@ -175,12 +191,13 @@
    Nhãn luôn đổ về trái vì chấm nằm sát mép. */
 .gmark.off {
   flex-direction: row-reverse;
-  /* Ghim TRỌN span vào trong track: mốc thường căn giữa theo % (translateX(-50%)) nên một nửa
-     nhãn tràn qua mép phải và bị cắt (đã thấy thật: "Review 2 08/31 +1 →" của GW-525 mất đuôi). */
+  /* Ghim TRỌN span vào trong track, không để nửa nhãn tràn qua mép phải rồi bị cắt (đã thấy
+     thật: "Review 2 08/31 +1 →" của GW-525 mất đuôi). Chấm ghim đúng mép 100%, không cộng
+     nửa chấm như .flip — mốc này nằm NGOÀI khung nên mép phải mới là chỗ đúng của nó. */
   transform: translate(-100%, -50%);
+  margin-left: 0;
 }
 .gmark.off i {
-  margin-left: 3px;
   background: transparent;
   border: 2px dashed var(--sev, var(--muted));
   box-shadow: none;

@@ -444,15 +444,27 @@ export function renderToday(data) {
 
   renderKpis({ issues, need, today });
   renderWeek(data.week || []);
-  // Timeline: ticket ĐÃ ĐÓNG của mình vẫn có hàng (vẽ mờ) chừng nào còn mốc tương lai — FE xong
-  // không phải hết việc, Test/Release của BE/QC mới là lúc bug quay lại và cần canh. Ticket ĐÃ
-  // CHUYỂN NGƯỜI thì không vẽ: việc không còn bên mình. Luật đầy đủ ở keepOnTimeline
-  // (core/marks.mjs). KPI + dải mốc + cảnh báo vẫn lọc sạch OFF_MY_PLATE như cũ.
+  // Timeline: ticket ĐÃ XONG phần mình vẫn có hàng (vẽ mờ) chừng nào còn mốc tương lai — FE xong
+  // không phải hết việc, Test/Release của BE/QC mới là lúc bug quay lại và cần canh. Hết mốc
+  // tương lai thì bỏ hẳn hàng. Ticket ĐÃ CHUYỂN NGƯỜI thì không vẽ: việc không còn bên mình.
+  // Luật đầy đủ ở keepOnTimeline (core/marks.mjs). KPI + dải mốc + cảnh báo vẫn lọc OFF_MY_PLATE.
+  //
+  // Thứ tự hàng = mốc gần nhất tăng dần, việc CÒN TRONG TAY lên trước nhóm đã xong FE. Trước đây
+  // để nguyên thứ tự `state.json` (thứ tự ticket được thêm vào) nên hàng đầu timeline là ticket
+  // đã đóng, còn việc gấp nhất nằm áp chót.
+  const rank = ([, i]) => (DONE_PHASES.includes(i.phase) ? 1 : 0);
+  const soonest = ([, i]) => nextMilestone(i, today)?.days ?? Infinity;
   $('#gantt-box').html(
     ganttTimeline(
-      issues.filter(([, i]) =>
-        keepOnTimeline(i, { gonePhases: GONE_PHASES, donePhases: DONE_PHASES, daysUntilOf: (d) => daysUntil(d, today) })
-      ),
+      issues
+        .filter(([, i]) =>
+          keepOnTimeline(i, {
+            gonePhases: GONE_PHASES,
+            donePhases: DONE_PHASES,
+            daysUntilOf: (d) => daysUntil(d, today),
+          })
+        )
+        .sort((a, b) => rank(a) - rank(b) || soonest(a) - soonest(b)),
       today
     )
   );

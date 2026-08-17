@@ -19,8 +19,10 @@ const MAX_DAYS = DAYS_TOTAL - DAYS_BEFORE - 1;
 const LABEL_FLIP_PCT = 74;
 /** 2 mốc gần nhau hơn ngưỡng này thì chỉ mốc đầu được hiện nhãn (tránh chữ chồng chữ) */
 const LABEL_MIN_GAP_PCT = 10;
-/** Nhãn mốc ngoài khung dài hơn hẳn (kèm ngày + "+n" + mũi tên) nên vùng cấm quanh nó rộng hơn */
-const LABEL_OFF_GAP_PCT = 25;
+/** Nhãn mốc ngoài khung dài hơn hẳn (kèm ngày + "+n" + mũi tên) nên vùng cấm của nó rộng hơn.
+ *  16 chứ không phải 25 như bản cũ: vùng cấm giờ tính MỘT PHÍA (chỉ bên trái chấm, đúng hướng
+ *  nhãn đổ) nên nó phải xấp xỉ bề rộng CHỮ THẬT, không phải nửa vùng đối xứng. */
+const LABEL_OFF_GAP_PCT = 16;
 
 /** Trục ngày: từ (hôm nay - 3) đến +24 ngày */
 function buildAxis(todayISO) {
@@ -72,6 +74,7 @@ export function ganttTimeline(issues, todayISO) {
         minGapPct: LABEL_MIN_GAP_PCT,
         offGapPct: LABEL_OFF_GAP_PCT,
         maxDays: MAX_DAYS,
+        flipPct: LABEL_FLIP_PCT,
       });
 
       const markHtml = marks
@@ -81,7 +84,7 @@ export function ganttTimeline(issues, todayISO) {
           const cls = [
             'gmark',
             m.name === 'html' ? 'key' : '',
-            m.left > LABEL_FLIP_PCT ? 'flip' : '',
+            m.flip && !m.off ? 'flip' : '',
             m.showLabel ? '' : 'nolabel',
             m.off ? 'off' : '',
           ]
@@ -93,6 +96,10 @@ export function ganttTimeline(issues, todayISO) {
           return `<span class="${cls}" style="left:${m.left}%;--sev:var(--${sev})"
                     title="${escapeHtml(label)} ${m.date} (${m.days < 0 ? 'đã qua' : 'còn ' + m.days + 'd'})${
                       m.off ? ' — ngoài khung 28 ngày' : ''
+                    }${
+                      m.alsoNames
+                        ? ' · trùng ngày: ' + m.alsoNames.map((n) => MILESTONE_LABEL[n] || n).join(', ')
+                        : ''
                     }">
                     <i></i><b>${escapeHtml(text)}</b></span>`;
         })

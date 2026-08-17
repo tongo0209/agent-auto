@@ -49,6 +49,6 @@ test('cờ dẫn xuất', () => {
   // mờ như done-fe. `reassigned` KHÔNG dim vì không được vẽ hàng nào cả — xem GONE_PHASES.
   assert.deepEqual(DIM_PHASES, ['done-fe', 'closed']);
   assert.deepEqual(GONE_PHASES, ['reassigned']);
-  assert.deepEqual(DONE_PHASES, ['closed']);
+  assert.deepEqual(DONE_PHASES, ['done-fe', 'closed']);
   assert.equal(MILESTONE_LABEL.duedate, 'Due Jira');
 });

@@ -94,6 +94,24 @@ test('2 mốc gần nhau: chỉ 1 nhãn hiện', () => {
   assert.deepEqual(marks.map((m) => m.showLabel), [true, false]);
 });
 
+// Hướng nhãn quyết định vùng cấm, nên `flip` phải do layoutMarks chốt — gantt.js chỉ đọc lại.
+test('mốc quá phải được đánh dấu flip, mốc bên trái ngưỡng thì không', () => {
+  const marks = layoutMarks({ design: '2026-08-05', release: '2026-08-17' }, { pctOf, daysUntilOf, flipPct: 74 });
+  assert.equal(marks.find((m) => m.name === 'design').flip, false);
+  assert.equal(marks.find((m) => m.name === 'release').flip, true);
+});
+
+// Nhãn đổ sang TRÁI thì vùng bên phải chấm còn trống — mốc nằm sau nó vẫn được nhãn. Vùng cấm
+// đối xứng của bản cũ chặn oan cả phía đó.
+test('mốc nằm phải một nhãn đã đổ sang trái thì vẫn giữ được nhãn', () => {
+  const marks = layoutMarks(
+    { review1: '2026-08-16', release: '2026-08-18' },
+    { pctOf, daysUntilOf, minGapPct: 10, flipPct: 70 }
+  );
+  assert.equal(marks.find((m) => m.name === 'review1').flip, true);
+  assert.equal(marks.find((m) => m.name === 'release').showLabel, true);
+});
+
 test('mốc HTML luôn giành được nhãn dù đứng sau mốc khác', () => {
   const marks = layoutMarks({ design: '2026-08-05', html: '2026-08-06' }, { pctOf, daysUntilOf, minGapPct: 10 });
   const html = marks.find((m) => m.name === 'html');
@@ -102,11 +120,28 @@ test('mốc HTML luôn giành được nhãn dù đứng sau mốc khác', () =>
   assert.equal(design.showLabel, false);
 });
 
+// Ca thật GW-747 ngày 17/8: `html` và `duedate` cùng rơi 17/8 → 2 chấm chồng nhau, chấm vẽ sau
+// đè lên đầu chữ nhãn vẽ trước nên "HTML" hiện ra thành "…ML". Giấu chữ (nolabel) không cứu
+// được vì chấm vẫn còn → phải gộp còn MỘT chấm, mốc ưu tiên giữ tên, mốc kia vào `alsoNames`.
+test('hai mốc cùng ngày gộp thành một chấm, mốc ưu tiên giữ tên', () => {
+  const marks = layoutMarks({ duedate: '2026-08-05', html: '2026-08-05' }, { pctOf, daysUntilOf, maxDays: 17 });
+  assert.equal(marks.length, 1);
+  assert.equal(marks[0].name, 'html');
+  assert.deepEqual(marks[0].alsoNames, ['duedate']);
+});
+
+test('mốc cùng ngày mà không có mốc ưu tiên thì giữ mốc đầu', () => {
+  const marks = layoutMarks({ test: '2026-08-05', review1: '2026-08-05' }, { pctOf, daysUntilOf, maxDays: 17 });
+  assert.equal(marks.length, 1);
+  assert.equal(marks[0].name, 'test');
+  assert.deepEqual(marks[0].alsoNames, ['review1']);
+});
+
 // ── keepOnTimeline: ai được vẽ hàng trên timeline ────────────────────────────────────────
 // Luật user chốt 6/8, phân biệt 2 kiểu "ra khỏi tay" mà bản cũ gộp làm một:
 //  · `closed`     = việc CỦA MÌNH đã xong → vẫn phải thấy ngày Test/Release để canh fix kịp.
 //  · `reassigned` = việc đã sang người khác → KHÔNG còn tồn tại bên mình, theo dõi mốc là nhiễu.
-const DONE = ['closed'];
+const DONE = ['done-fe', 'closed'];
 const GONE = ['reassigned'];
 const opts = { donePhases: DONE, gonePhases: GONE, daysUntilOf };
 
@@ -130,6 +165,18 @@ test('ticket đã đóng mà mọi mốc đã qua thì bỏ khỏi timeline', ()
 
 test('ticket đã đóng không có mốc nào thì bỏ khỏi timeline', () => {
   assert.equal(keepOnTimeline({ phase: 'closed' }, opts), false);
+});
+
+// Ca thật GW-627 (17/8): xong FE, cả 4 mốc đã qua. Trước 17/8 chỉ `closed` mang cờ `doneMine`
+// nên hàng này ở lại timeline vĩnh viễn với đúng 1 chấm Release bên trái vạch hôm nay.
+test('ticket xong FE mà mọi mốc đã qua thì bỏ khỏi timeline', () => {
+  const issue = { phase: 'done-fe', milestones: { html: '2026-08-01', release: '2026-08-02' } };
+  assert.equal(keepOnTimeline(issue, opts), false);
+});
+
+test('ticket xong FE mà còn mốc BE/QC phía trước thì vẫn vẽ', () => {
+  const issue = { phase: 'done-fe', milestones: { html: '2026-08-01', release: '2026-08-26' } };
+  assert.equal(keepOnTimeline(issue, opts), true);
 });
 
 // Key ghi chú `_conflict` là chữ, không phải ngày — không được đọc thành "còn mốc tương lai".

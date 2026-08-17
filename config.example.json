@@ -38,7 +38,7 @@
     "hours": [8, 18],
     "graceMin": 3,
     "lockStaleMin": 15,
-    "timeoutMin": 5,
+    "timeoutMin": 10,
     "everyMin": 60,
     "tickEveryMin": 30,
     "timeoutMinBugwatch": 15,

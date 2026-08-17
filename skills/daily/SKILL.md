@@ -96,7 +96,12 @@ Token đầu của `$ARGUMENTS`:
   duedate đã dời vẫn hiện số cũ — user nhìn thấy ngay và mất tin vào console. Đã trả giá 6/8:
   GW-556 đóng 12:48, `delta` cập nhật state+board đủ nhưng snapshot còn của 3/8 nên console vẫn
   vẽ ○, lại thiếu hẳn GW-713 và vẫn ghi mốc GW-477 cũ (8/7 thay vì 8/10).
-  **Chạy nền = launchd** (`agent-auto/tools/radar-tick.mjs`, mỗi 60' trong 08–18h T2–T6):
+  ⚠ **Trần thời gian đã nới 5' → 10' (17/8).** Đo trên `history/radar.jsonl`: 8/23 lượt hỏng,
+  **7 lượt do chạm đúng trần 300s**, trong khi lượt thành công có trung vị 178s và max 235s —
+  trần cũ đặt sát mép phân bố. Lượt timeout đốt trọn 5 phút token mà KHÔNG ra kết quả, tệ hơn
+  hẳn trả thêm 1 phút để có kết quả. Lượt `bugwatch` dùng trần riêng `timeoutMinBugwatch` (15').
+  **Chạy nền = launchd** (`agent-auto/tools/radar-tick.mjs`, mỗi 30' trong 08–18h T2–T6; lượt
+  đầy đủ vẫn 60', lượt xen giữa chỉ chạy khi có sheet buglist đang nóng):
   không cần mở console hay tab nào. Bật/tắt bằng `config.radar.enabled` (nút trên console);
   sổ ở `history/radar.jsonl`; quét tay 1 lượt: `node tools/radar-tick.mjs --force`.
   ⚠ Chỗ này TỪNG cấm cron vì tưởng phiên nền mất token connector Jira. **Đo lại 13/8: sai** —

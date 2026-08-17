@@ -310,3 +310,73 @@ Mỗi bài học 1 block. Nguồn ghi: `fe-gate` fail tự append block nháp ·
 - **Nguyên nhân**: bước (2) của mode `delta` chỉ định nghĩa cho `gt-promotion-template` (repo bàn giao FE↔BE). Nhưng code FE thật nằm ở `cdn-source` (landing) và `new-mainsite` (mainsite) — chính hai repo KHÔNG được quét. Radar theo dõi được động tĩnh của người khác mà mù động tĩnh của chính mình.
 - **Lưới chặn**: thêm bước (2b) vào `skills/daily/SKILL.md` — delta phải `git log --since` (KHÔNG pull, khỏi chậm) cho MỌI repo trong `config.repos`, không hard-code 1 repo. Chi phí ~1 lệnh/repo, vẫn dưới trần <1 phút của mode nhẹ.
 - **Nguồn**: /daily delta lượt 11 ngày 13/8 22:52.
+
+## Chữ lồng chữ: text vừa bake trong ảnh vừa render HTML (17/8/2026, GW-760)
+
+**Bắt được gì:** dòng subtitle "Hoàn thành tân thủ và khảo sát trên server test" hiện HAI lớp
+chồng nhau trên landing TF v2 — một lớp nằm sẵn trong `textmain*.png`, một lớp render ở
+`.header__sub`. Cả 4 ngôn ngữ. Build PASS, console sạch, design-checker vòng CHỐT cũng PASS;
+chỉ user nhìn màn hình mới thấy (trông như chữ nhoè / có bóng đổ vì 2 lớp lệch vài px).
+
+**Nguyên nhân:** hai nguồn sự thật không ai đối chiếu — job cắt ảnh gom layer chữ đó vào ảnh,
+trong khi spec lại liệt kê chính chuỗi đó ở mục "toạ độ phần tử render bằng HTML". Dev làm đúng
+cả hai. Đây là lỗi của người viết spec, không phải của dev.
+
+**Lưới chặn:** `agent-auto/tools/baked-text-guard.py` — đọc CHÍNH file job đã đưa cho
+`psd-export.py` (nên danh sách "đã bake" luôn khớp ảnh thật, không khai lại tay), gom mọi layer
+`type` trong subtree các path `show`, rồi so với từng text node trong `dist/*.html`.
+
+```bash
+python3 ~/VNG/agent-auto/tools/baked-text-guard.py \
+  --job /tmp/<job-pc>.json --job /tmp/<job-mb>.json \
+  --dist <path>/dist
+```
+
+Chỉ báo khi chuỗi bake chiếm ≥60% một text node (nên "NHẬN THƯỞNG" bake không bị báo nhầm chỉ
+vì note có cụm "để được nhận thưởng"), và bỏ qua chuỗi < 12 ký tự. Exit 1 khi có trùng.
+
+**Quy tắc phân tầng để không tái phạm:** mỗi chuỗi chỉ được tồn tại ở ĐÚNG MỘT tầng.
+- Bake trong ảnh: chữ nghệ thuật — có gradient/stroke/glow, font riêng của designer, nằm trong
+  cụm đồ hoạ (tiêu đề, badge, dải bước, và mọi dòng nằm CÙNG cụm đó).
+- Render HTML: chữ vận hành, đổi theo ngày/thị trường — timeline, điều kiện, menu, nav.
+Khi cắt ảnh mà gom cả một cụm, thì MỌI dòng chữ trong cụm đó thuộc tầng ảnh — đừng tách lẻ một
+dòng ra HTML "cho dễ sửa", đó chính là lúc sinh ra lồng chữ.
+
+## Kiểm "chữ có tràn khung" là CHƯA ĐỦ — phải kiểm khung có VA vào phần tử bên cạnh (17/8/2026, GW-760)
+
+**Bắt được gì:** nút "Thể lệ & Phần thưởng" bản ID mobile. Manager đo `chuRong 149 < khungRong 205`
+rồi kết luận "không tràn, đạt"; design-checker cũng PASS. User chụp màn hình: **viền pill cắt
+ngang icon social đầu tiên**. Đo lại bằng bbox: nút `545,92→750,135`, icon `707,132→750,175` ⇒
+chồng 3px. Nguyên nhân: CSS đặt `top 92, height 43` trong khi PSD (`btn thể lệ/BG`) là
+`top 82, height 46` — sai 10px, đáy nút tụt từ 128 xuống 135.
+
+**Vì sao lọt:** cả người lẫn agent chỉ kiểm quan hệ *chữ ↔ khung chứa nó*, không ai kiểm quan hệ
+*khung ↔ hàng xóm*. Phép đo "chữ có vừa khung không" luôn PASS dù khung nằm sai chỗ.
+
+**Lưới chặn:** khi verify một phần tử có toạ độ tuyệt đối, ngoài "chữ vừa khung" phải thêm phép
+kiểm giao nhau với các phần tử lân cận:
+```js
+const a = el.getBoundingClientRect(), b = neighbor.getBoundingClientRect();
+const overlap = !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+```
+Và luôn lấy `left/top/width/height` từ **bbox của layer BG trong PSD**, không phải bbox của layer
+chữ — chữ nằm thụt vào trong khung nên hai số này khác nhau.
+
+## Font phải bóc từ `StyleRun` của PSD, không suy từ v1 hay từ mắt (17/8/2026, GW-760)
+
+**Bắt được gì:** dev đặt nút thể lệ `Barlow-Regular` và note `Roboto-Regular`. PSD ghi
+**Oswald-Light** và **HarmonyOS Sans Medium**. Oswald là font condensed — thay bằng font thường
+là chữ phình ngang, tràn viền pill trên mobile (user phát hiện). Cùng lỗi này còn làm khối note
+bản ID wrap thừa 1 dòng và bị nút CTA đè.
+
+**Cách lấy đúng:**
+```python
+runs = layer.engine_dict['StyleRun']['RunArray']; fonts = layer.resource_dict['FontSet']
+sd = runs[0]['StyleSheet']['StyleSheetData']
+fonts[sd['Font']]['Name'], sd['FontSize'], sd['Leading']
+```
+⚠ `FontSize` là **số thô chưa nhân transform của layer** — đừng chép thẳng vào CSS, phải căn cho
+ink chữ trùng bbox design ±1px.
+
+⚠ Font PSD đòi mà repo không có (ca này: Barlow-Medium) thì GIỮ bản gần nhất đang có và ghi rõ là
+hạn chế — đừng lặng lẽ đổi sang font khác hẳn.

@@ -65,3 +65,26 @@ Không bao giờ ghi vào `.psd`. Kiểm lại sau khi chạy: size PSD phải k
 `sp-manifest.json` (bản designer up). GW-525: 26 371 853 byte trước = sau.
 `app.displayDialogs = DialogModes.NO` là bắt buộc — PSD dùng GROBOLD/SukhumvitSet, thiếu font
 sẽ hiện modal "missing fonts" và treo cả script.
+
+## 5. Layer có dấu `/` trong tên bị TẮT ÂM THẦM — preview sai màu mà không báo lỗi
+
+`show` dùng `/` làm ký tự phân cấp, nên layer tên `Brightness/Contrast 683` không thể trỏ tới:
+`assignment()` không thấy key đó, mọi state khác lại tắt hết layer không được liệt kê ⇒ **adjustment
+layer biến mất khỏi mọi ảnh xuất ra**. Log vẫn in `OK`, ảnh vẫn có nội dung, chỉ có màu là sai.
+
+Đo thật trên VLTT MOBILE (14/8): nền xuất thiếu adjustment **sáng hơn bản đúng 30/255** ở mọi điểm.
+Hậu quả: cắt nền theo ảnh đó rồi so build với chính ảnh đó → tưởng "đã khớp", trong khi so với PSD
+mở bằng Photoshop thì lệch cả 30. Ngược lại, cắt nền đúng rồi so với preview sai → tưởng code sai.
+
+**Cách phát hiện:** state `_control` (`show: ["*"]`) LUÔN đúng vì nó giữ nguyên cờ designer lưu. So một
+vùng nền trống của state cô lập với `_control`; lệch đều một hằng số ⇒ đang mất adjustment layer.
+
+**Cách xử lý:** bỏ qua `show`, viết JSX riêng bật/tắt theo INDEX của `doc.layers[i]` (Photoshop index
+0 = trên cùng; psd-tools duyệt dưới→lên nên `ps_idx = (n-1) - psd_idx`). Ví dụ đã chạy thật:
+
+```jsx
+for (var i = 0; i <= 5; i++) doc.layers[i].visible = false;  // tắt các page group
+doc.layers[6].visible = true;   // Brightness/Contrast 683  <- KHÔNG trỏ được bằng show
+doc.layers[7].visible = true;   // Layer 684 (nền)
+doc.saveAs(new File(out), png, true, Extension.LOWERCASE);
+```

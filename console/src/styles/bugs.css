@@ -1,0 +1,78 @@
+.bugsum {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.bugsum.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.bugsum .btn {
+  margin-left: auto;
+}
+
+/* ---- Tab Bug: hàng radar nền đã fix, chờ bạn verify ---- */
+.buggroup {
+  margin-bottom: 14px;
+}
+.grouphead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 700 var(--fs) var(--font-ui);
+  color: var(--muted);
+  margin: 4px 0 7px;
+}
+.bugrow {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: var(--r);
+  padding: 9px 11px;
+  margin-bottom: 7px;
+}
+.bugrow.ok {
+  border-left-color: var(--ok);
+}
+.bugrow.warn {
+  border-left-color: var(--warn);
+}
+.bugrow .h {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.bugrow .h .bchip {
+  margin-left: auto;
+}
+.bugdesc {
+  margin-top: 6px;
+}
+.bugnote,
+.bugwhy {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 5px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.bugwhy {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-radius: var(--r);
+  padding: 5px 8px;
+}
+.bugfoot {
+  margin-top: 6px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}

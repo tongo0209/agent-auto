@@ -1,6 +1,6 @@
 ---
 name: daily
-description: Bộ điều phối công việc hàng ngày + vòng đời task của dev frontend VNG - một lệnh /daily là quét task Jira assign cho user (project GW), đọc detail + bóc link DESIGN nằm sẵn trong ticket rồi mới dò SharePoint (biết design ĐÃ GIAO chưa — có link trong ticket là đã giao, search trắng KHÔNG phải bằng chứng chưa giao), NỐI TICKET VỚI FOLDER LÀM VIỆC (neo theo nexusId trong tên folder gt-promotion + đoán fuzzy campaign trong cdn-source, hỏi 1 lần rồi nhớ mãi) để suy PHASE từ commit thật và ghi metrics effort tự động, theo dõi PHASE từng ticket theo vòng đời thật (chờ-design → sẵn-sàng → đang-code → giao-HTML qua gt-promotion-template nếu task có kênh promotion → chờ-test → fix-bug → xong-FE), pull gt-promotion phát hiện động tĩnh từ promotion, tự phát hiện buglist (sheet cố định per-game trong config + link sheets trong comment Jira) để soạn lệnh bug-fixer-lite, phân loại theo bảng routing rồi trình kế hoạch cho user duyệt ĐÚNG 1 LẦN rồi tự chạy hết (code qua code-developer full/fix/code/batch), theo dõi qua board local agent-auto/boards/ + dashboard HTML artifact 1 URL cố định, cảnh báo trễ mốc timeline. KHÔNG ghi ngược Jira, KHÔNG commit/push, KHÔNG tự chạy bug-fixer-lite trong VS Code panel. Modes: mặc định (trọn luồng) | plan (quét + kế hoạch, không thực thi) | prep <KEY> (chuẩn bị sâu 1 ticket) | week (kế hoạch tuần 14 ngày + cảnh báo dồn deadline) | add <link|text> (nhận việc ngoài Jira thành task ADHOC) | link <KEY> [repo path] (gắn ticket với folder làm việc) | delta (radar quét nhanh thay đổi Jira + gt-promotion; chạy nền tự động bằng launchd) | bugwatch (radar buglist hậu bàn giao: soi sheet QC qua Google Drive, thấy bug mới thì tự kiểm 4 cổng sở hữu rồi gọi bug-fixer-lite) | bugwrite (xả hàng đợi ghi ngược sheet, cần phiên CLI có Chrome) | wrap (chốt ngày: tổng kết + soạn standup + ghi metrics) | status (đọc board, không quét) | doctor (chạy tools/state-doctor.mjs, tự sửa cái sửa được, báo cái không tự sửa kèm mã luật, không quét Jira/không code). Dùng khi user gõ /daily hoặc nói "check task jira hôm nay", "hôm nay làm gì", "kế hoạch tuần", "chốt ngày".
+description: Bộ điều phối công việc hàng ngày + vòng đời task của dev frontend VNG - một lệnh /daily là quét task Jira assign cho user (project GW), đọc detail + bóc link DESIGN nằm sẵn trong ticket rồi mới dò SharePoint (biết design ĐÃ GIAO chưa — có link trong ticket là đã giao, search trắng KHÔNG phải bằng chứng chưa giao), NỐI TICKET VỚI FOLDER LÀM VIỆC (neo theo nexusId trong tên folder gt-promotion + đoán fuzzy campaign trong cdn-source, hỏi 1 lần rồi nhớ mãi) để suy PHASE từ commit thật và ghi metrics effort tự động, theo dõi PHASE từng ticket theo vòng đời thật (chờ-design → sẵn-sàng → đang-code → giao-HTML qua gt-promotion-template nếu task có kênh promotion → chờ-test → fix-bug → xong-FE), pull gt-promotion phát hiện động tĩnh từ promotion, tự phát hiện buglist (sheet cố định per-game trong config + link sheets trong comment Jira) để soạn lệnh bug-fixer-lite, phân loại theo bảng routing rồi trình kế hoạch cho user duyệt ĐÚNG 1 LẦN rồi tự chạy hết (code qua code-developer full/fix/code/batch), theo dõi qua board local agent-auto/boards/ + dashboard HTML artifact 1 URL cố định, cảnh báo trễ mốc timeline. KHÔNG ghi ngược Jira, KHÔNG commit/push, KHÔNG tự chạy bug-fixer-lite trong VS Code panel. Modes: mặc định (trọn luồng) | plan (quét + kế hoạch, không thực thi) | prep <KEY> (chuẩn bị sâu 1 ticket) | week (kế hoạch tuần 14 ngày + cảnh báo dồn deadline) | add <link|text> (nhận việc ngoài Jira thành task ADHOC) | link <KEY> [repo path] (gắn ticket với folder làm việc) | delta (radar quét nhanh thay đổi Jira + gt-promotion; chạy nền tự động bằng launchd) | bugwatch (radar buglist hậu bàn giao: soi sheet QC qua Google Drive, thấy bug mới thì tự kiểm 4 cổng sở hữu rồi gọi bug-fixer-lite) | bugwrite (cổng duyệt + xả hàng đợi ghi ngược sheet, cần phiên CLI có Chrome) | wrap (chốt ngày: tổng kết + soạn standup + ghi metrics) | status (đọc board, không quét) | doctor (chạy tools/state-doctor.mjs, tự sửa cái sửa được, báo cái không tự sửa kèm mã luật, không quét Jira/không code). Dùng khi user gõ /daily hoặc nói "check task jira hôm nay", "hôm nay làm gì", "kế hoạch tuần", "chốt ngày".
 ---
 
 # /daily — điều phối ngày + vòng đời task: Jira → kế hoạch → chạy → giao HTML → bug → chốt
@@ -110,8 +110,9 @@ Token đầu của `$ARGUMENTS`:
   Thiết kế: `agent-auto/docs/specs/2026-08-13-radar-auto-design.md`.
 - `bugwatch` → **radar buglist hậu bàn giao**, KHÔNG hỏi gì, không quét Jira. Chi tiết luật +
   bằng chứng đo: mục "Bug-radar" bên dưới và `docs/specs/2026-08-17-bug-radar-design.md`.
-- `bugwrite` → xả hàng đợi `pendingSheetWrite` lên sheet (cần Chrome ⇒ chỉ chạy được ở phiên
-  CLI tương tác). Mode mặc định tự làm việc này ở Bước 0, nên hiếm khi phải gõ tay.
+- `bugwrite` → **cổng duyệt** rồi xả hàng đợi `pendingSheetWrite` lên sheet (cần Chrome ⇒ chỉ
+  chạy được ở phiên CLI tương tác). Mode mặc định tự làm việc này ở Bước 0, nên hiếm khi phải
+  gõ tay. Luật duyệt theo `grade`: xem mục "Chấm độ chắc" bên dưới.
 - `wrap` → chốt ngày: đọc board + diff repo đã đụng → tổng kết ✅/⚠️/🕐 → soạn đoạn standup
   (paste được vào chat team) → **ghi metrics** (xem Vòng học) → cập nhật dashboard lần cuối →
   nhắc mục "Cần bạn" còn mở. KHÔNG quét Jira lại, KHÔNG code thêm.
@@ -424,6 +425,47 @@ toolset `claude-in-chrome` (`No matching deferred tools found`), trong khi Drive
 (`DRIVE=OK`). Nên radar fix được code nhưng KHÔNG ghi được `DEV Check Status`. Kết quả cần ghi
 vào `bugWatch[sheetId].pendingSheetWrite`, board ghi `🕐 chờ ghi sheet: N dòng`, phiên `/daily`
 tương tác kế tiếp tự xả ở Bước 0.
+
+### Chấm độ chắc — máy chấm, không phải LLM tự nhận
+
+⚠ **CẤM tự tay ghi vào `pendingSheetWrite`.** Xếp hàng bằng ĐÚNG một lệnh, để máy chấm điểm:
+
+```
+node tools/bug-radar.mjs queue <sheetId> '{"bugId":"3","desc":"…QC ghi gì…",
+  "note":"…đã sửa gì, commit nào…","fixCommit":"63b5ff89d","verifyHint":"mở <url>, bấm X, nhìn Y",
+  "evidence":{"buildOk":true,"liveMatch":true,"hasQcImage":false,"repro":true}}'
+```
+
+`gradeFix` trả `verified` chỉ khi `buildOk && liveMatch && (hasQcImage || repro)`. Thiếu mảnh
+nào ⇒ `unverified` kèm lý do enum (`build-failed` · `build-not-run` · `live-mismatch` ·
+`live-not-checked` · `no-evidence`). **Không có bằng chứng thì để trống, đừng khai khống** —
+lưới này chỉ có giá trị khi đầu vào thật.
+
+Bốn bằng chứng lấy ở đâu: `buildOk` = exit code build · `liveMatch` = `curl` file trên CDN rồi
+`cmp` với `dist/` local (tiền lệ CFM #3 17/8) · `hasQcImage` = cột `Image` của sheet có link ·
+`repro` = có tái hiện được bug TRƯỚC khi sửa.
+
+**Luật duyệt ở `bugwrite`:**
+- `verified` → trình gọn (bug gì · commit nào · verify ra sao), user gật là ghi Done.
+- `unverified` → **BẮT BUỘC** hiện lý do chưa verify + `verifyHint` + file đã sửa. **Không được
+  ghi Done khi user chưa gật.** Code cứ sửa sẵn để user khỏi gõ lại, nhưng dòng sheet để nguyên.
+- Xả xong dòng nào thì bỏ dòng đó khỏi `pendingSheetWrite`.
+
+### Báo cho user — console là kênh chính
+
+Radar nền chỉ cần **ghi `state.json`**; console (`localhost:4747`) tự đọc lại mỗi 3s nên user
+load lại trang là thấy. Tab **Bug** hiện 2 rổ (`verified` chờ gật · `unverified` cần mắt người)
+kèm số giờ treo, cộng danh sách buglist đang theo dõi với động tĩnh lượt quét cuối.
+
+⚠ **KHÔNG dùng artifact `dashboard.html` cho việc này**: phiên headless không có tool Artifact
+(đo 18/8 — file đứng từ 3/8, cũ 15 ngày). Console không dính ràng buộc đó.
+
+`commit` ghi thêm `lastScan` (rowsTotal · settled · toSkill · fresh · changed · **reopened là
+danh sách bugId** · mine/unknown/notMine) để console kể được động tĩnh mà không cần LLM thuật lại.
+
+`tools/radar-tick.mjs` so `countPending` **trước/sau** mỗi lượt, chỉ đếm phần TĂNG rồi bắn popup
+macOS loại `bugfix`. Lượt vừa XẢ hàng đợi không bị hiểu nhầm là có việc mới. Popup chỉ để kéo
+user về console — nội dung ngắn, không lặp lại.
 
 ## Vòng học (metrics)
 

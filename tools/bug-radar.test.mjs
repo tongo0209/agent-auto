@@ -18,6 +18,9 @@ import {
   lastMilestone,
   pickPrompt,
   checkGates,
+  gradeFix,
+  countPending,
+  queueRow,
   mergeWatch,
 } from './bug-radar.mjs';
 
@@ -42,7 +45,6 @@ const REAL_SHEET = `|  |  |  |  |  |  |  |  |  |  |
 | ID | meiochan03939@gmail.com | meichen220498@gmail.com |
 | RoleID | 1449674790 | 1704875616 |`;
 
-
 test('bóc sheetId từ description Jira, bỏ trùng, giữ thứ tự', () => {
   const text = `**BUGLIST:** https://docs.google.com/spreadsheets/d/1XFJ-8m6FnWWx21XLnNuBurEpv33TavFZG6V86Iz5j-w/edit?gid=0#gid=0
   lặp lại https://docs.google.com/spreadsheets/d/1XFJ-8m6FnWWx21XLnNuBurEpv33TavFZG6V86Iz5j-w/edit
@@ -62,7 +64,6 @@ test('không nhận nhầm link Google Doc / Drive folder thành buglist', () =>
 test('sheetId ngắn bất thường bị bỏ — tránh bắt rác từ text QC dán lỗi', () => {
   assert.deepEqual(extractSheetLinks('docs.google.com/spreadsheets/d/abc123/edit'), []);
 });
-
 
 test('parse đúng 3 bug thật, bỏ 2 dòng trống chỉ có BugID', () => {
   const rows = parseBugTable(REAL_SHEET);
@@ -121,7 +122,6 @@ test('normalizeCell gộp khoảng trắng và xuống dòng của ô nhiều d�
   assert.equal(normalizeCell('  Giảm   từ 64px\n\n-> 50px '), 'Giảm từ 64px -> 50px');
 });
 
-
 test('hash ổn định khi chỉ khác khoảng trắng/hoa thường', () => {
   const a = { bugId: '1', desc: 'Bể  layout', devStatus: '', recheck: '', assignee: 'Promotion', type: 'Visual' };
   const b = { bugId: '1', desc: 'bể layout', devStatus: '', recheck: '', assignee: 'promotion', type: 'visual' };
@@ -173,7 +173,6 @@ test('seenBugs cũ của bug đã biến mất khỏi sheet vẫn được giữ
   assert.ok(d.next['1'] === 'abc');
 });
 
-
 test('bug Functional/Performance/Visual = của mình ở mọi vùng', () => {
   for (const type of ['Functional', 'Performance', 'Visual', 'visual - CSS']) {
     assert.equal(classifyBug({ assignee: 'Promotion', type }), 'mine', type);
@@ -207,7 +206,6 @@ test('prefilter chia đúng 3 rổ trên sheet thật', () => {
   );
 });
 
-
 const T = (h, m = 0) => new Date(2026, 7, 17, h, m);
 
 test('sheet vừa đổi ⇒ nóng', () => {
@@ -236,7 +234,6 @@ test('mốc modifiedTime luôn được ghi lại để lượt sau so', () => {
   assert.equal(updateHeat({ modifiedTime: 'A' }, 'B', T(10)).modifiedTime, 'B');
 });
 
-
 test('đầu giờ luôn chạy lượt delta đầy đủ', () => {
   assert.deepEqual(pickPrompt({ bugWatch: {} }, T(9, 5)), { prompt: '/daily delta', why: 'full' });
 });
@@ -255,7 +252,6 @@ test('tắt bugRadar thì lượt nửa giờ im hẳn dù sheet đang nóng', (
   const state = { bugWatch: { s1: { heat: 'hot' } } };
   assert.deepEqual(pickPrompt(state, T(9, 35), { enabled: false }), { skip: 'bugradar-off' });
 });
-
 
 const OK = { assigneeIsMe: true, pathsConfirmed: true, sheetReadable: true, mineCount: 2 };
 
@@ -277,7 +273,6 @@ test('không có bug nào của mình ⇒ chặn ở G4', () => {
 test('rớt nhiều cổng thì báo hết, không dừng ở cổng đầu', () => {
   assert.deepEqual(checkGates({}).failed, ['g1', 'g2', 'g3', 'g4']);
 });
-
 
 test('sheet mới được thêm kèm ticket, sheet cũ giữ nguyên seenBugs', () => {
   const before = { s1: { url: 'u1', keys: ['GW-1'], seenBugs: { 1: 'h' }, heat: 'hot' } };
@@ -472,4 +467,53 @@ test('mốc muộn nhất mới là mốc chốt, kể cả khi nằm sau releas
   const issues = { 'GW-2': { milestones: { release: '2026-08-10', bugfix: '2026-08-30', _note: 'bỏ qua' } } };
   assert.equal(lastMilestone(issues['GW-2'].milestones), '2026-08-30');
   assert.equal(shouldRetire({ keys: ['GW-2'] }, issues, T(10)), false);
+});
+
+const FULL = { buildOk: true, liveMatch: true, hasQcImage: true, repro: true };
+
+test('đủ bằng chứng máy ⇒ verified', () => {
+  assert.equal(gradeFix(FULL).grade, 'verified');
+  assert.equal(gradeFix({ ...FULL, repro: false }).grade, 'verified');
+  assert.equal(gradeFix({ ...FULL, hasQcImage: false }).grade, 'verified');
+});
+
+test('thiếu từng mảnh bằng chứng ⇒ unverified kèm lý do phân biệt được', () => {
+  assert.equal(gradeFix({ ...FULL, buildOk: false }).why, 'build-failed');
+  assert.equal(gradeFix({ ...FULL, buildOk: undefined }).why, 'build-not-run');
+  assert.equal(gradeFix({ ...FULL, liveMatch: false }).why, 'live-mismatch');
+  assert.equal(gradeFix({ ...FULL, liveMatch: undefined }).why, 'live-not-checked');
+  assert.equal(gradeFix({ ...FULL, hasQcImage: false, repro: false }).why, 'no-evidence');
+  assert.equal(gradeFix({}).grade, 'unverified');
+});
+
+test('mọi lý do unverified đều có nhãn tiếng Việt để console và popup khỏi tự chế', () => {
+  const cases = [{ buildOk: false }, {}, { buildOk: true, liveMatch: false }, { buildOk: true }, { ...FULL, hasQcImage: false, repro: false }];
+  for (const c of cases) assert.ok(gradeFix(c).whyLabel, `thiếu nhãn cho ${JSON.stringify(c)}`);
+  assert.equal(gradeFix(FULL).whyLabel, null);
+});
+
+test('xếp hàng: chấm điểm ngay lúc ghi, không để lúc đọc mới đoán', () => {
+  const entry = queueRow({}, { bugId: '3', evidence: FULL }, T(1));
+  assert.equal(entry.pendingSheetWrite.length, 1);
+  assert.equal(entry.pendingSheetWrite[0].grade, 'verified');
+  assert.equal(entry.pendingSheetWrite[0].queuedAt, T(1).toISOString());
+});
+
+test('xếp hàng lại cùng bugId ⇒ THAY dòng cũ, không đẻ bản trùng', () => {
+  const once = queueRow({}, { bugId: '3', evidence: {} }, T(1));
+  const twice = queueRow(once, { bugId: '3', evidence: FULL }, T(2));
+  assert.equal(twice.pendingSheetWrite.length, 1);
+  assert.equal(twice.pendingSheetWrite[0].grade, 'verified');
+});
+
+test('đếm hàng chờ tách theo grade — đây là thứ radar-tick so trước/sau để quyết báo', () => {
+  const state = {
+    bugWatch: {
+      a: { pendingSheetWrite: [{ bugId: '1', grade: 'verified' }, { bugId: '2', grade: 'unverified' }] },
+      b: { pendingSheetWrite: [{ bugId: '9', grade: 'verified' }] },
+      c: {},
+    },
+  };
+  assert.deepEqual(countPending(state), { total: 3, verified: 2, unverified: 1 });
+  assert.deepEqual(countPending({}), { total: 0, verified: 0, unverified: 0 });
 });

@@ -16,8 +16,6 @@ export const DEFAULTS = {
   enabled: true,
   coolAfterHours: 3,
   freshFirstScanHours: 24,
-  backfillDays: 30,
-  autoFix: true,
 };
 
 const SHEET_URL = /docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]{20,})/g;
@@ -113,7 +111,7 @@ export function parseBugTable(markdown = '') {
 
 const TITLE_NOISE = /^(bug|buglist|list|web|event|fix|request|clone|mainsite|landing|ldp|page|\d{4,})$/;
 
-export function titleTokens(title = '') {
+function titleTokens(title = '') {
   return new Set(
     normalizeCell(title)
       .toLowerCase()
@@ -200,7 +198,9 @@ export function prefilterMine(rows = []) {
   const buckets = { mine: [], notMine: [], unknown: [] };
   for (const row of rows) {
     const verdict = classifyBug(row);
-    buckets[verdict === 'not-mine' ? 'notMine' : verdict].push(row);
+    if (verdict === 'mine') buckets.mine.push(row);
+    else if (verdict === 'unknown') buckets.unknown.push(row);
+    else buckets.notMine.push(row);
   }
   return buckets;
 }
@@ -209,11 +209,8 @@ export function updateHeat(entry = {}, modifiedTime, now = new Date(), cfg = {})
   const { coolAfterHours } = { ...DEFAULTS, ...cfg };
   const firstSight = !entry.modifiedTime;
   const changed = Boolean(modifiedTime) && modifiedTime !== entry.modifiedTime;
-  const lastChangeAt = changed
-    ? firstSight
-      ? modifiedTime
-      : new Date(now).toISOString()
-    : entry.lastChangeAt || null;
+  let lastChangeAt = entry.lastChangeAt || null;
+  if (changed) lastChangeAt = firstSight ? modifiedTime : new Date(now).toISOString();
   const idleH = lastChangeAt ? (Number(now) - Date.parse(lastChangeAt)) / 3.6e6 : Infinity;
   return {
     ...entry,
@@ -261,7 +258,7 @@ export function pickPrompt(state = {}, now = new Date(), cfg = {}) {
   return { skip: 'cold' };
 }
 
-export const GATES = {
+const GATES = {
   g1: 'assignee không còn là mình',
   g2: 'chưa biết task sống ở folder nào (chạy /daily link <KEY>)',
   g3: 'không đọc được sheet bằng account mình',
@@ -297,6 +294,43 @@ export function summarize(seen, markdown) {
   };
 }
 
+const UNVERIFIED = {
+  'build-failed': 'build không pass',
+  'build-not-run': 'chưa build lại sau khi sửa',
+  'live-mismatch': 'bản trên CDN chưa khớp dist local',
+  'live-not-checked': 'chưa đối chiếu bản live trên CDN',
+  'no-evidence': 'không có ảnh QC lẫn bước tái hiện để đối chiếu',
+};
+
+/**
+ * Chấm độ chắc của một fix bằng BẰNG CHỨNG MÁY THU ĐƯỢC, không bằng lời LLM tự nhận.
+ * Cùng bằng chứng phải ra cùng kết luận mọi lượt — đó là lý do nó nằm ở đây chứ không ở skill.
+ */
+export function gradeFix(evidence = {}) {
+  const { buildOk, liveMatch, hasQcImage, repro } = evidence;
+  const fail = (why) => ({ grade: 'unverified', why, whyLabel: UNVERIFIED[why] });
+  if (buildOk !== true) return fail(buildOk === false ? 'build-failed' : 'build-not-run');
+  if (liveMatch !== true) return fail(liveMatch === false ? 'live-mismatch' : 'live-not-checked');
+  if (!hasQcImage && !repro) return fail('no-evidence');
+  return { grade: 'verified', why: null, whyLabel: null };
+}
+
+export function countPending(state = {}) {
+  const rows = Object.values(state.bugWatch || {}).flatMap((e) => e.pendingSheetWrite || []);
+  return {
+    total: rows.length,
+    verified: rows.filter((r) => r.grade === 'verified').length,
+    unverified: rows.filter((r) => r.grade !== 'verified').length,
+  };
+}
+
+export function queueRow(entry = {}, row = {}, now = new Date()) {
+  const graded = gradeFix(row.evidence || {});
+  const queued = { ...row, ...graded, queuedAt: new Date(now).toISOString() };
+  const rest = (entry.pendingSheetWrite || []).filter((r) => r.bugId !== row.bugId);
+  return { ...entry, pendingSheetWrite: [...rest, queued] };
+}
+
 export function mergeWatch(bugWatch = {}, found = [], now = new Date()) {
   const next = { ...bugWatch };
   for (const { sheetId, url, key, title } of found) {
@@ -328,27 +362,51 @@ const readJSON = (p, fb) => {
   }
 };
 
-function cli([cmd, sheetId]) {
+function saveState(statePath, state) {
+  const backupDir = path.join(ROOT, '.backups', 'state');
+  fs.mkdirSync(backupDir, { recursive: true });
+  const tag = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
+  fs.copyFileSync(statePath, path.join(backupDir, `state-${tag}.json`));
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
+}
+
+function cli([cmd, sheetId, payload]) {
   const statePath = path.join(ROOT, 'state.json');
   const state = readJSON(statePath, { issues: {}, bugWatch: {} });
   if (cmd === 'pick') {
     const cfg = readJSON(path.join(ROOT, 'config.json'), {}).bugRadar || {};
     return pickPrompt(state, new Date(), cfg);
   }
+  if (cmd === 'pending') return countPending(state);
   const entry = (state.bugWatch || {})[sheetId] || {};
-  const md = fs.readFileSync(path.join(CACHE, `${sheetId}.md`), 'utf8');
-  const sum = summarize(entry.seenBugs || {}, md);
-  if (cmd === 'scan') return { sheetId, ...sum, next: undefined, seenCount: Object.keys(sum.next).length };
-  if (cmd === 'commit') {
-    const backupDir = path.join(ROOT, '.backups', 'state');
-    fs.mkdirSync(backupDir, { recursive: true });
-    const tag = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
-    fs.copyFileSync(statePath, path.join(backupDir, `state-${tag}.json`));
-    state.bugWatch = { ...state.bugWatch, [sheetId]: { ...entry, seenBugs: sum.next } };
-    fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
-    return { sheetId, committed: Object.keys(sum.next).length };
+  if (cmd === 'queue') {
+    const updated = queueRow(entry, JSON.parse(payload));
+    state.bugWatch = { ...state.bugWatch, [sheetId]: updated };
+    saveState(statePath, state);
+    const row = updated.pendingSheetWrite.at(-1);
+    return { sheetId, bugId: row.bugId, grade: row.grade, why: row.why, pending: countPending(state) };
   }
-  throw new Error(`lệnh không hiểu: ${cmd} — dùng scan|commit|pick`);
+  const md = fs.readFileSync(path.join(CACHE, `${sheetId}.md`), 'utf8');
+  const { next, ...found } = summarize(entry.seenBugs || {}, md);
+  if (cmd === 'scan') return { sheetId, ...found, seenCount: Object.keys(next).length };
+  if (cmd === 'commit') {
+    const lastScan = {
+      at: new Date().toISOString(),
+      rowsTotal: found.rowsTotal,
+      settled: found.settled,
+      toSkill: found.toSkill,
+      fresh: found.fresh.length,
+      changed: found.changed.length,
+      reopened: found.reopened,
+      mine: found.mine.length,
+      unknown: found.unknown.length,
+      notMine: found.notMine.length,
+    };
+    state.bugWatch = { ...state.bugWatch, [sheetId]: { ...entry, seenBugs: next, lastScan } };
+    saveState(statePath, state);
+    return { sheetId, committed: Object.keys(next).length, lastScan };
+  }
+  throw new Error(`lệnh không hiểu: ${cmd} — dùng scan|commit|queue|pending|pick`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) {

@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { pickPrompt } from './bug-radar.mjs';
+import { countPending, pickPrompt } from './bug-radar.mjs';
 
 export const DEFAULTS = {
   enabled: true,
@@ -107,9 +107,10 @@ export function failStreak(rows = []) {
  */
 const AUTH_ERR = /invalid api key|\/login|unauthor|authenticat|credential|token.*expir/i;
 
-export function decideNotify({ ok, err = '', changed = false, streak = 0 }) {
+export function decideNotify({ ok, err = '', changed = false, streak = 0, bugsAdded = {} }) {
   if (!ok && AUTH_ERR.test(err)) return { send: true, kind: 'auth' };
   if (!ok) return streak >= 3 ? { send: true, kind: 'dead' } : { send: false, kind: null };
+  if (bugsAdded.verified || bugsAdded.unverified) return { send: true, kind: 'bugfix' };
   return changed ? { send: true, kind: 'change' } : { send: false, kind: null };
 }
 
@@ -198,12 +199,25 @@ function osaNotify(title, message) {
   }
 }
 
+/** Chỉ đếm phần TĂNG: lượt vừa xả hàng đợi không được biến thành tin báo có việc mới. */
+export function pendingDelta(before = {}, after = {}) {
+  const grew = (k) => Math.max(0, (after[k] || 0) - (before[k] || 0));
+  return { verified: grew('verified'), unverified: grew('unverified') };
+}
+
 const MSG = {
   change: (r) =>
     'Có thay đổi mới: ' +
     Object.entries(r.newRows)
       .map(([k, v]) => `${v} dòng ${k}`)
       .join(' · '),
+  bugfix: (r) =>
+    [
+      r.bugsAdded.verified && `${r.bugsAdded.verified} bug đã fix + verify, chờ bạn gật`,
+      r.bugsAdded.unverified && `${r.bugsAdded.unverified} bug đã sửa CHƯA verify được, cần bạn xem`,
+    ]
+      .filter(Boolean)
+      .join(' · ') + ' — mở console :4747 hoặc /daily bugwrite',
   auth: () => 'Phiên Claude hết hạn — radar đang quét ra trắng. Chạy /login.',
   dead: (r) => `Radar hỏng ${r.streak} lượt liên tiếp: ${String(r.err).slice(0, 120)}`,
 };
@@ -238,6 +252,7 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
 
   const state = readJSON(path.join(root, 'state.json'), { bugWatch: {} });
   const bugCfg = readJSON(path.join(root, 'config.json'), {}).bugRadar || {};
+  const pendingBefore = countPending(state);
   const choice = argv.includes('--force') ? { prompt: '/daily delta', why: 'forced' } : pickPrompt(state, now, bugCfg);
   if (choice.skip) return { at: stamp(), skipped: choice.skip };
 
@@ -257,6 +272,7 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
       choice.prompt,
     );
     const { changed, newRows } = diffCounts(before, snap());
+    const bugsAdded = pendingDelta(pendingBefore, countPending(readJSON(path.join(root, 'state.json'), {})));
     fs.mkdirSync(path.dirname(sock), { recursive: true });
     if (!fs.existsSync(sock)) fs.writeFileSync(sock, ''); // lượt đầu tiên: chưa có sổ để đọc
     const rows = fs
@@ -283,8 +299,8 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
       err: res.err,
     });
     const streak = failStreak([...rows, row]);
-    const { send, kind } = decideNotify({ ok: res.ok, err: res.err || '', changed, streak });
-    if (send) notify('Radar — agent-auto', MSG[kind]({ ...row, streak }));
+    const { send, kind } = decideNotify({ ok: res.ok, err: res.err || '', changed, streak, bugsAdded });
+    if (send) notify('Radar — agent-auto', MSG[kind]({ ...row, streak, bugsAdded }));
     return row;
   } catch (err) {
     return write({

@@ -9,6 +9,7 @@
 @import './alerts.css';
 @import './drawer.css';
 @import './review.css'; /* sau cards/table: ghi đè ô tick của .need + .ttable.small */
+@import './bugs.css';
 @import './gantt.css';
 @import './charts.css';
 @import './terminal.css';

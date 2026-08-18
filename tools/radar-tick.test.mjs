@@ -12,6 +12,7 @@ import {
   diffCounts,
   failStreak,
   decideNotify,
+  pendingDelta,
   buildArgs,
   runTick,
   ALLOWED_TOOLS,
@@ -250,4 +251,30 @@ test('có sheet nóng ở lượt nửa giờ ⇒ chạy prompt bugwatch chứ k
     notify: () => {},
   });
   assert.deepEqual(seen, ['/daily bugwatch']);
+});
+
+test('hàng chờ duyệt tăng ⇒ báo loại bugfix, KHÔNG để lẫn vào tin "có thay đổi" chung', () => {
+  assert.deepEqual(decideNotify({ ok: true, changed: true, bugsAdded: { verified: 1, unverified: 0 } }), {
+    send: true,
+    kind: 'bugfix',
+  });
+  assert.deepEqual(decideNotify({ ok: true, changed: true, bugsAdded: { verified: 0, unverified: 2 } }), {
+    send: true,
+    kind: 'bugfix',
+  });
+  assert.equal(decideNotify({ ok: true, changed: true, bugsAdded: { verified: 0, unverified: 0 } }).kind, 'change');
+});
+
+test('hỏng hoặc hết hạn đăng nhập vẫn thắng tin bug — sửa được radar mới nói chuyện fix', () => {
+  assert.equal(decideNotify({ ok: false, err: 'Invalid API key', bugsAdded: { verified: 5 } }).kind, 'auth');
+  assert.equal(decideNotify({ ok: false, err: 'boom', streak: 3, bugsAdded: { verified: 5 } }).kind, 'dead');
+});
+
+test('lượt XẢ hàng đợi không được báo là có việc mới', () => {
+  assert.deepEqual(pendingDelta({ verified: 3, unverified: 1 }, { verified: 0, unverified: 0 }), {
+    verified: 0,
+    unverified: 0,
+  });
+  assert.deepEqual(pendingDelta({}, { verified: 2, unverified: 1 }), { verified: 2, unverified: 1 });
+  assert.deepEqual(pendingDelta({ verified: 2 }, { verified: 2 }), { verified: 0, unverified: 0 });
 });

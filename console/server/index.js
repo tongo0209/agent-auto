@@ -54,6 +54,7 @@ app.use('/api', require('./routes/delta'));
 // Radar nền (launchd → tools/radar-tick.mjs): đọc sổ history/radar.jsonl + công tắc bật/tắt
 app.use('/api', require('./routes/radar'));
 app.use('/api', require('./routes/debt'));
+app.use('/api', require('./routes/bugs'));
 // Serve dist/ thật của ticket (ngoài /api vì đây là trang web, không phải JSON)
 app.use('/', require('./routes/preview'));
 

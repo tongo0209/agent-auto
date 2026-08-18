@@ -42,6 +42,8 @@ export const api = {
   // Radar nền (launchd → tools/radar-tick.mjs) — trạng thái + công tắc
   radar: () => getJSON('/api/radar'),
   radarToggle: (enabled) => postJSON('/api/radar/toggle', { enabled }),
+  /** Hàng bug chờ bạn duyệt + động tĩnh buglist (radar nền ghi state.bugWatch) */
+  bugs: () => getJSON('/api/bugs'),
   /** Nợ "Cần bạn" ở board CŨ mà hôm nay không ai nhắc lại — tick bằng `boardCheck` với `date` gốc */
   debt: () => getJSON('/api/debt'),
   // Hợp đồng state.json vs schema/vocab.json (Task 5) — trộn vào dải cảnh báo

@@ -37,6 +37,7 @@
     <div class="tabs" role="tablist">
       <button type="button" class="tab active" data-tab="today" role="tab">Hôm nay</button>
       <button type="button" class="tab" data-tab="review" role="tab">Review <span class="count" id="review-count"></span></button>
+      <button type="button" class="tab" data-tab="bugs" role="tab">Bug <span class="count" id="bug-count"></span></button>
       <button type="button" class="tab" data-tab="months" role="tab">Theo tháng</button>
       <button type="button" class="tab" data-tab="git" role="tab">Git của tôi</button>
     </div>
@@ -107,6 +108,14 @@
       <h2>Việc chờ bạn đẩy lên <span class="srcnote">console chỉ gõ hộ lệnh · Enter là bạn bấm</span></h2>
       <div class="flashbar" id="review-flash"></div>
       <div id="review"></div>
+    </section>
+
+    <!-- Tab: Bug — hàng radar nền đã fix, chờ bạn verify rồi mới đánh Done lên sheet QC -->
+    <section class="pane" id="pane-bugs">
+      <h2>Bug chờ bạn duyệt <span class="srcnote" id="bug-src">radar nền ghi · console chỉ đọc · ghi sheet bằng /daily bugwrite</span></h2>
+      <div id="bug-pending"></div>
+      <h2>Buglist đang theo dõi <span class="srcnote" id="bug-watchnote"></span></h2>
+      <div id="bug-sheets"></div>
     </section>
 
     <!-- Tab: Theo tháng (gồm cả phần lịch sử: board cũ · gt-promotion · metrics) -->

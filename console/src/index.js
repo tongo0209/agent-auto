@@ -13,12 +13,14 @@ import { initTicketPanel } from '@panels/ticketPanel';
 import { initReviewPanel, loadReview } from '@panels/reviewPanel';
 import { initMonthsPanel, loadMonths } from '@panels/monthsPanel';
 import { initGitPanel, loadGit } from '@panels/gitPanel';
+import { initBugPanel, loadBugs } from '@panels/bugPanel';
 import { initHistoryPanel, loadHistory } from '@panels/historyPanel';
 
 // Tab "Theo tháng" gánh luôn phần lịch sử (board cũ · gt-promotion · metrics · vòng học) —
 // trước đây là tab riêng nhưng chỉ có 3 dòng nội dung nên đứng riêng thành cả màn trống.
 const PANEL_LOADERS = {
   review: loadReview,
+  bugs: loadBugs,
   months: () => Promise.all([loadMonths(), loadHistory()]),
   git: loadGit,
 };
@@ -113,6 +115,7 @@ $(function boot() {
   initTodayPanel({ terminals, notify });
   initReviewPanel({ terminals });
   initMonthsPanel();
+  initBugPanel({ terminals });
   initGitPanel();
   initHistoryPanel();
 
@@ -151,6 +154,10 @@ $(function boot() {
       $b.prop('disabled', false).text('Cập nhật');
     }
   });
+
+  // Badge tab Bug phải sống ngay lúc load trang, không đợi bạn bấm vào tab mới biết có hàng
+  loadBugs();
+  setInterval(loadBugs, 15000);
 
   // Tab Review poll chậm hơn (git status có cache 5s phía server)
   setInterval(() => {

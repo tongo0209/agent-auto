@@ -67,13 +67,16 @@ launchd 30' → radar-tick
    │     đầu giờ (phút < 30)     → "/daily delta"      (đủ, đã gồm bước bugwatch)
    │     nửa giờ + không sheet hot → skip 'cold'       (không tốn token)
    └─ claude -p <prompt>
-         ├─ 1 call list_recent_files → modifiedTime mọi sheet
-         ├─ sheet nào modifiedTime ĐỔI:
-         │     ├─ get_file_metadata(excludeContentSnippets:false) → bảng bug
-         │     ├─ diffRows(seenBugs) → dòng MỚI / ĐỔI / REOPEN
-         │     └─ dòng mới ≠ 0 → 4 cổng sở hữu
+         ├─ shouldRetire → sheet của task đã qua release: nghỉ theo dõi, bỏ khỏi vòng poll
+         ├─ 1 call list_recent_files → modifiedTime mọi sheet + nhận sheet "BugList*" mới
+         ├─ sheet nào modifiedTime ĐỔI (tối đa maxSheetReadsPerTick sheet mới mỗi lượt):
+         │     ├─ read_file_content → bảng markdown → .cache/bugsheets/<id>.md
+         │     ├─ node bug-radar.mjs scan → isBugSheet / settled / toSkill
+         │     │     isBugSheet false → notBugSheet, thôi theo dõi (là file brief)
+         │     ├─ firstScanMode = seed (sheet cũ, chưa có nền) → chỉ commit nền rồi DỪNG
+         │     └─ toSkill > 0 → 4 cổng sở hữu
          │           PASS đủ 4 → Skill bug-fixer-lite (fix code, KHÔNG commit/push)
-         │                        → xếp pendingSheetWrite
+         │                        → xếp pendingSheetWrite → commit seenBugs
          │           rớt cổng   → 1 dòng "## Cần bạn" + notify, KHÔNG đụng code
          └─ phase ticket → bugfix (kèm reopenedFrom nếu trước đó closed/done-fe)
 ```
@@ -111,11 +114,14 @@ launchd 30' → radar-tick
 
 ## Nhiệt: nóng 30' / nguội 60'
 
-Hàm thuần `heatOf(entry, now, cfg)`:
+Hàm thuần `updateHeat(entry, modifiedTime, now, cfg)`:
 
-- `modifiedTime` khác giá trị đã lưu ⇒ `hot`, `lastChangeAt = now`.
-- `hot` và `now - lastChangeAt >= coolAfterHours (3h)` ⇒ `warm`.
-- Ngoài khung 08–18h ⇒ `warm` (cổng giờ của radar-tick vẫn chặn ở tầng trên).
+- `modifiedTime` khác giá trị đã lưu ⇒ `changed`, mốc `lastChangeAt` được cập nhật.
+- `now - lastChangeAt < coolAfterHours (3h)` ⇒ `hot`, ngược lại ⇒ `warm`.
+- **Lần đầu thấy một sheet**, `lastChangeAt` lấy chính `modifiedTime` của sheet chứ không lấy
+  `now` — nếu không, sheet sửa lần cuối 3 tuần trước vẫn bị coi là nóng suốt 3 tiếng chỉ vì
+  hôm nay mình mới nhìn thấy nó.
+- Cổng giờ 08–18h do `radar-tick` chặn ở tầng trên, `updateHeat` không cần biết.
 
 launchd hạ `StartInterval` 3600 → **1800**. Lượt nửa giờ mà không sheet nào nóng thì
 `skipped:'cold'` — không gọi `claude`, nên chi phí ngày thường **không tăng**.
@@ -181,8 +187,8 @@ không đi đào lại quá khứ.
 
 ## Lọc bug đã xong — `isSettled`
 
-Không có bước này thì lượt backfill đầu tiên nã cả sheet cũ vào `bug-fixer-lite`. Đo thật:
-sheet GNOTH có 23 dòng, **22 đã xong, chỉ 1 bug còn mở**.
+Lưới thứ nhất, đọc trạng thái QC đã ghi sẵn trong sheet. Đo thật trên sheet GNOTH: 23 dòng,
+**22 đã xong, chỉ 1 bug còn mở**.
 
 ```
 recheck báo Failed/reopen        ⇒ CÒN MỞ  (thắng mọi dấu hiệu khác)
@@ -194,7 +200,8 @@ hai cột trống                     ⇒ CÒN MỞ
 
 ## Chống fix lại bug cũ
 
-Mỗi dòng bug có `rowHash = sha1(bugId | description | devCheckStatus | qcRecheck)`.
+Mỗi dòng bug có `rowHash = sha1(bugId | desc | devStatus | recheck | assignee | type)`,
+chuẩn hoá khoảng trắng và hoa–thường trước khi băm.
 
 - `bugId` chưa có trong `seenBugs` ⇒ **MỚI**.
 - `bugId` có nhưng hash khác ⇒ **ĐỔI** (QC sửa mô tả, hoặc recheck trả Failed = **REOPEN**).
@@ -224,7 +231,7 @@ Ticket có bug mới ⇒ `phase = "bugfix"` kể cả đang `closed`, kèm `reop
 
 | Rủi ro | Xử |
 |---|---|
-| ~~Sheet lớn bị cắt nội dung~~ | **Đã đo 17/8, không xảy ra**: `read_file_content` trên sheet GNOTH 45MB trả `TRUNCATED=NO`, đủ 23 dòng bug (97s, $0.74) |
+| Sheet lớn bị cắt nội dung — **đã loại trừ** | Đo 17/8: `read_file_content` trên sheet GNOTH 45MB trả `TRUNCATED=NO`, đủ 23 dòng bug (97s, $0.74) |
 | Header lạ ở game mới | Thêm vào `COLUMNS` + test; radar không đoán ở tầng skill |
 | Radar fix code khi không ai trông | Không commit/push; mọi thay đổi nằm trong working tree cho user xem diff |
 | Chi phí tăng | Lượt nửa giờ không có sheet nóng thì skip; chỉ đọc nội dung khi `modifiedTime` đổi |
@@ -234,10 +241,10 @@ Ticket có bug mới ⇒ `phase = "bugfix"` kể cả đang `closed`, kèm `reop
 
 | File | Việc |
 |---|---|
-| `tools/bug-radar.mjs` | NEW — hàm thuần: `parseBugTable`, `rowHash`, `diffRows`, `heatOf`, `pickPrompt`, `prefilterMine`, `extractSheetLinks` |
-| `tools/bug-radar.test.mjs` | NEW — test cho từng hàm trên |
-| `tools/radar-tick.mjs` | chọn prompt theo nhiệt; nới `ALLOWED_TOOLS` (Drive) |
+| `tools/bug-radar.mjs` | NEW — hàm thuần + CLI `scan`/`commit`/`pick`: `parseBugTable`, `looksLikeBugSheet`, `rowHash`, `diffRows`, `isSettled`, `classifyBug`, `prefilterMine`, `updateHeat`, `firstScanMode`, `shouldRetire`, `matchSheetToTicket`, `checkGates`, `mergeWatch`, `pickPrompt` |
+| `tools/bug-radar.test.mjs` | NEW — 67 test, fixture chép nguyên văn từ 2 sheet QC thật |
+| `tools/radar-tick.mjs` | chọn prompt theo nhiệt; trần riêng cho bugwatch; nới `ALLOWED_TOOLS` (Drive) |
 | `tools/radar-agent.plist` | `StartInterval` 3600 → 1800 |
-| `config.json` | thêm khối `bugRadar` |
-| `skills/daily/SKILL.md` | mode `bugwatch` + `bugwrite`; luật bóc link sheet cho ticket Done |
-| `tools/state-doctor.mjs` | luật kiểm hình dạng `bugWatch` |
+| `config.json` + `config.example.json` | khối `bugRadar`; `radar.tickEveryMin`, `timeoutMinBugwatch`; `timeoutMin` 5 → 10 |
+| `skills/daily/SKILL.md` | mode `bugwatch` + `bugwrite` + mục "Bug-radar" |
+| `tools/state-doctor.mjs` | W8 sheet chưa gắn ticket · W9 hàng đợi ghi sheet còn tồn |

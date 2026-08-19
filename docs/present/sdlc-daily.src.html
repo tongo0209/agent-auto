@@ -989,43 +989,50 @@
     <section class="slide" data-chapter="Đề xuất">
       <header>
         <p class="eyebrow">Đề xuất</p>
-        <h2>Chạy thử 2 tuần — nhẹ, đo được, dừng được</h2>
+        <h2>Áp dụng cả bộ — cài một lệnh, docs dẫn từng bước</h2>
       </header>
       <div class="body">
         <div class="cards">
           <div class="card t">
-            <em>Phạm vi thử</em>
-            <h3>Nhỏ, không phiền ai</h3>
+            <em>Cài thế nào</em>
+            <h3>Một lệnh, có kiểm hộ</h3>
             <ul>
-              <li><b>1–2 người</b> dùng phần theo dõi trước: radar + board + brief — trên task thật đang làm.</li>
-              <li><b>Không đổi cách làm của ai khác</b>, không đụng repo chung.</li>
-              <li>Cần: Claude Code · Jira · Google Drive · máy bật trong giờ làm.</li>
+              <li><b>1 lệnh</b> <code class="k">install-skills.sh</code> — đủ 9 skill + 4 agent +
+                hook + statusline, tự kiểm dependency.</li>
+              <li>Còn <b>5 việc tay</b> (auth Jira, config, dán rules, ghép Chrome) — installer
+                in sẵn checklist đúng thứ tự.</li>
+              <li><code class="k">/daily doctor</code> <b>0 ERROR = cài xong</b> — không phải đoán
+                mình đứng ở đâu.</li>
             </ul>
-            <span class="foot">2 tuần · task thật · phần nhẹ trước</span>
+            <span class="foot">1 lệnh · 5 việc tay · doctor kiểm cuối</span>
           </div>
           <div class="card h">
             <em>Phần tôi lo</em>
-            <h3>Cài đặt và kèm</h3>
+            <h3>Docs và kèm buổi đầu</h3>
             <ul>
-              <li><b>Cài giúp từng người</b> — 1 buổi là chạy được.</li>
-              <li><b>Chỉnh quy ước</b> theo repo mình: gắn ticket–folder, phân loại bug theo vùng sở hữu.</li>
-              <li><b>Kèm tuần đầu</b> — máy hiểu sai chỗ nào, sửa luật ngay chỗ đó.</li>
+              <li><b>Docs cài đặt dẫn từng bước</b> — vừa được soát lại bằng 3 lượt kiểm độc lập,
+                vá hơn 20 lỗ "cài xong tưởng đủ".</li>
+              <li><b>Kèm từng người buổi đầu</b> — máy hiểu sai chỗ nào, sửa luật ngay chỗ đó.</li>
+              <li><b>Quy ước riêng</b> (gắn ticket–folder, phân loại bug) chỉnh 1 lần, cả team dùng chung.</li>
             </ul>
             <span class="foot">Vướng gì ping tôi</span>
           </div>
           <div class="card t">
-            <em>Hết 2 tuần</em>
-            <h3>Quyết bằng số, không bằng cảm giác</h3>
+            <em>Dùng cả bộ</em>
+            <h3>Đủ 6 bước, người giữ quyền quyết</h3>
             <ul>
-              <li>Board mỗi sáng <b>có đọc được không</b>; bug và bản mới của design <b>có bị bắt kịp không</b>.</li>
-              <li>Ổn → mở rộng dần sang <b>làn dựng code</b>. Chưa ổn → <b>dừng, không mất gì</b>.</li>
+              <li><b>Trọn quy trình</b>: từ nhận ticket tới fix bug QC — mỗi bước một lệnh, repo này
+                chứa tất cả.</li>
+              <li><b>3 điểm vẫn là người</b>: duyệt kế hoạch, review diff, bấm push.</li>
+              <li>Sau vài tuần <b>quyết tiếp bằng số</b>: board đọc được không, bug và bản mới design
+                có bị bắt kịp không.</li>
             </ul>
-            <span class="foot">Ổn thì mở rộng · không thì dừng</span>
+            <span class="foot">Máy lo phần lặp · người giữ 3 điểm quyết</span>
           </div>
         </div>
       </div>
-      <p class="note">Không cần cam kết dài — bộ này <b>tháo ra dùng từng mảnh</b>: lấy phần thấy hợp,
-        dừng lúc nào cũng được.</p>
+      <p class="note">Vẫn <b>tháo ra dùng từng mảnh</b> được nếu ai đó chỉ muốn một phần — nhưng bộ đã
+        đóng gói đủ để <b>dùng nguyên con</b>: skill, agent, luật, hook nằm chung một repo.</p>
     </section>
 
     <section class="slide" data-chapter="Sắp tới">

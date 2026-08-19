@@ -508,21 +508,22 @@
       <canvas class="fx" id="fx" aria-hidden="true"></canvas>
       <div class="hero" style="grid-row: 1 / -1;">
         <div>
-          <p class="eyebrow">Chia sẻ nội bộ · 17/8/2026</p>
-          <h1>Đưa SDLC vào việc hằng ngày của team Frontend</h1>
-          <p class="lede">Team vẫn đi đủ 6 bước của SDLC, nhưng đi theo trí nhớ: xong một bước không
-            có gì để kiểm lại, cũng không có chốt nào chặn trước khi sang bước sau. Việc đã làm là
-            <b>biến 6 bước đó thành lệnh gõ được</b>, để máy lo phần việc lặp đi lặp lại.</p>
+          <p class="eyebrow">Chia sẻ nội bộ · <span id="today">17/8/2026</span></p>
+          <h1>Thử đưa SDLC vào việc hằng ngày của Frontend</h1>
+          <p class="lede">Task theo dõi thủ công trên Jira: design nằm ngay trong ticket, nhưng
+            <b>bổ sung sau là dễ miss</b>; giao xong thì bug lại nằm ở sheet của QC. Không chỗ nào
+            tự nói việc đang tới đâu — vẫn phải nhớ bằng đầu. Tôi lấy SDLC làm khung, dựng 6 bước đó
+            thành <b>lệnh gõ được</b>, chạy trên task của mình. Mang ra đây như một
+            <b>đề xuất</b>.</p>
           <div class="meta">
-            <span><b><span data-to="20">0</span> ngày</b>chạy thật</span>
-            <span><b><span data-to="13">0</span> ticket</b>đi qua quy trình</span>
-            <span><b><span data-to="454">0</span> test</b>tự động · 0 fail</span>
+            <span><b><span id="days" data-to="20">0</span> ngày</b>tự chạy thật</span>
+            <span><b><span data-to="13">0</span> ticket</b>đã đi hết quy trình</span>
             <span><b><span data-to="3">0</span> điểm</b>bắt buộc có người</span>
           </div>
         </div>
 
         <div class="rail">
-          <header>6 bước SDLC · ứng với việc thật của team</header>
+          <header>6 bước SDLC · ứng với việc thật đang làm</header>
           <span class="scan" aria-hidden="true"></span>
           <ol>
             <li style="--i:0"><i></i><b>Requirements</b><span>Nhận ticket</span></li>
@@ -539,15 +540,16 @@
     <section class="slide" data-chapter="Tại sao làm">
       <header>
         <p class="eyebrow">Tại sao làm</p>
-        <h2>Làm đủ bước, nhưng không bước nào có chốt — nên lỗi lọt mà không ai biết</h2>
+        <h2>Theo dõi bằng tay, không bước nào có chốt — nên lỗi lọt mà không ai biết</h2>
       </header>
       <div class="body">
         <div class="cards">
           <div class="card r">
             <em>Vấn đề 1</em>
-            <h3>Không biết task đang ở bước nào</h3>
-            <p>Trạng thái task <b>nằm trong đầu người làm</b>. Đánh Done xong là task
-              <span class="hl">rơi khỏi mọi bảng theo dõi</span> — đúng lúc QC bắt đầu test.</p>
+            <h3>Trạng thái task chỉ có trong đầu người làm</h3>
+            <p>Jira đánh tay, ticket <b>cập nhật sau thì trôi mất</b>. Đánh Done xong là task
+              <span class="hl">rơi khỏi mọi bảng theo dõi</span> và chuyển sang sheet QC — đúng lúc
+              QC bắt đầu test.</p>
           </div>
           <div class="card r">
             <em>Vấn đề 2</em>
@@ -570,7 +572,7 @@
             <strong>một điều kiện phải đạt</strong> mới sang bước sau.</p>
         </div>
       </div>
-      <p class="note">Tự động hoá ở đây không phải để AI viết code hộ. Là để 6 bước sẵn có
+      <p class="note">Tự động hoá ở đây không phải để AI viết code hộ. Là để 6 bước của SDLC
         <b>chạy được bằng lệnh</b> và <b>kiểm lại được bằng số</b>.</p>
     </section>
 
@@ -654,10 +656,10 @@
               <tr>
                 <td class="src">Description ticket Jira</td>
                 <td>Việc phải làm, timeline, <b>link DESIGN</b></td>
-                <td class="trap">Link DESIGN nằm lẫn giữa mấy link brief. <b>Bóc sót một dòng</b> là báo nhầm “chưa có design” suốt 4 ngày.</td>
+                <td class="trap">Máy từng <b>đi search SharePoint theo tên event</b> thay vì đọc dòng DESIGN có sẵn — báo nhầm “chưa có design” cho ticket đã giao, người phải tự bắt lỗi.</td>
               </tr>
               <tr>
-                <td class="src">File .docx / .xlsx đính kèm</td>
+                <td class="src">File .docx / .xlsx kèm design</td>
                 <td><b>Cơ chế chi tiết</b>, công thức tính điểm, cột bảng xếp hạng</td>
                 <td class="trap">Chi tiết hơn Jira. Ticket ghi “03/08”, docx ghi “03~04/08” — <b>đó là khoảng, hạn là ngày cuối</b>.</td>
               </tr>
@@ -682,8 +684,10 @@
         <div class="band teal">
           <b>brief.md</b>
           <p>Năm nguồn trên gộp lại thành <strong><code class="k">tasks/&lt;KEY&gt;/brief.md</code></strong> —
-            các mục: <strong>Việc · Phạm vi · Timeline · Nơi làm việc · Việc còn mở · Câu hỏi cho PM</strong>.
-            Mỗi dòng ghi kèm nguồn và giờ đọc. Hai nguồn đá nhau thì ghi cả hai và nói rõ tin cái nào, vì sao.</p>
+            lõi là <strong>Việc · Timeline · Design</strong>, thêm <strong>Nơi làm việc · Việc còn mở</strong>
+            khi đã dò ra; câu hỏi cho PM tách sang <code class="k">design-gap.md</code> do
+            <code class="k">/check-design</code> sinh. Mốc nào hai nguồn đá nhau thì ghi cả hai và nói rõ tin
+            cái nào, vì sao.</p>
         </div>
       </div>
       <p class="note">Đây là bước tốn công nhất nhưng cũng đáng nhất: bóc sai brief thì cả 5 bước sau
@@ -1095,6 +1099,13 @@
     box.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
   });
   let at = 0;
+
+  const START = new Date(2026, 6, 30); // commit đầu của agent-auto
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  document.getElementById('days').dataset.to = Math.max(1, Math.round((today - START) / 864e5));
+  document.getElementById('today').textContent =
+    now.getDate() + '/' + (now.getMonth() + 1) + '/' + now.getFullYear();
 
   function countUp(el) {
     const to = Number(el.dataset.to);

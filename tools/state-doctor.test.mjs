@@ -64,7 +64,7 @@ const codes = (list) => list.map((f) => f.code).sort();
 
 test('state sạch → không phát hiện gì', () => {
   const root = fixture({
-    issues: { 'GW-1': { phase: 'coding', milestones: { html: '2026-08-10' }, paths: [{ repo: 'cdn-source', path: '.' }] } },
+    issues: { 'GW-1': { phase: 'coding', summary: 'tên việc', milestones: { html: '2026-08-10' }, paths: [{ repo: 'cdn-source', path: '.' }] } },
   });
   const r = runDoctor({ root, skipIcons: true });
   assert.deepEqual(r.errors, []);
@@ -146,7 +146,7 @@ test('W3 reassigned mà chưa có handoff.md · W5 còn _conflict', () => {
 
 test('exit code: có error → 1, chỉ warn → 0', () => {
   const bad = fixture({ issues: { 'GW-1': { phase: 'x', milestones: { html: '2026-08-10' } } } });
-  const warnOnly = fixture({ issues: { 'GW-1': { phase: 'coding', milestones: {} } } });
+  const warnOnly = fixture({ issues: { 'GW-1': { phase: 'coding', summary: 'tên việc', milestones: {} } } });
   assert.equal(runDoctor({ root: bad, skipIcons: true }).errors.length > 0, true);
   assert.equal(runDoctor({ root: warnOnly, skipIcons: true }).errors.length, 0);
 });
@@ -255,6 +255,7 @@ test('W6 đang code mà design còn thiếu → cảnh báo, không phải lỗi
     issues: {
       'GW-1': {
         phase: 'coding',
+        summary: 'tên việc',
         milestones: { html: '2026-08-10' },
         paths: [{ repo: 'cdn-source', path: '.' }],
         design: {
@@ -373,4 +374,28 @@ test('W7: repo trỏ path không tồn tại → chỉ WARN, không chặn', () 
   const r = runDoctor({ root, skipIcons: true });
   assert.ok(codes(r.warns).includes('W7'));
   assert.ok(!codes(r.errors).includes('E10'), 'path sai ≠ chưa cấu hình');
+});
+
+test('W8 sheet mồ côi — nhắc khi đang theo dõi, im khi user đã tắt theo dõi', () => {
+  const nag = fixture({ bugWatch: { s1: { follow: true, title: 'sheet mồ côi', keys: [] } } });
+  assert.ok(codes(runDoctor({ root: nag, skipIcons: true }).warns).includes('W8'));
+
+  const muted = fixture({ bugWatch: { s1: { follow: true, title: 'sheet mồ côi', keys: [], follow: false } } });
+  assert.ok(!codes(runDoctor({ root: muted, skipIcons: true }).warns).includes('W8'));
+});
+
+// E11 sinh ra từ 19/8 GW-779: delta thêm ticket mới mà bỏ sót summary, console render title "—"
+test('E11 thiếu summary → ERROR (console mất title)', () => {
+  const root = fixture({ issues: { 'GW-1': { phase: 'coding', milestones: { html: '2026-08-10' } } } });
+  assert.ok(codes(runDoctor({ root, skipIcons: true }).errors).includes('E11'));
+});
+
+test('E11 summary rỗng hoặc chỉ khoảng trắng cũng là mất title', () => {
+  const root = fixture({ issues: { 'GW-1': { phase: 'coding', summary: '   ', milestones: { html: '2026-08-10' } } } });
+  assert.ok(codes(runDoctor({ root, skipIcons: true }).errors).includes('E11'));
+});
+
+test('E11 đối chứng — có summary thật thì im lặng', () => {
+  const root = fixture({ issues: { 'GW-1': { phase: 'coding', summary: '[C19][ANANTA] Landing pre-register', milestones: { html: '2026-08-10' } } } });
+  assert.ok(!codes(runDoctor({ root, skipIcons: true }).errors).includes('E11'));
 });

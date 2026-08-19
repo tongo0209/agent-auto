@@ -13,6 +13,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { isWatched } from './bug-radar.mjs';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
@@ -90,7 +91,7 @@ export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
   // cổng G1/G2 nên không bao giờ tự fix, còn hàng đợi ghi sheet thì chỉ phiên CLI mới xả được.
   for (const [sheetId, entry] of Object.entries(state.bugWatch || {})) {
     const label = entry.title || sheetId.slice(0, 12);
-    if (!entry.keys?.length) warn('W8', label, 'sheet buglist chưa gắn ticket nào — cổng G1/G2 không kiểm được');
+    if (isWatched(entry) && !entry.keys?.length) warn('W8', label, 'sheet buglist chưa gắn ticket nào — cổng G1/G2 không kiểm được');
     const queued = entry.pendingSheetWrite?.length || 0;
     if (queued) warn('W9', label, `${queued} dòng chờ ghi ngược sheet — mở phiên CLI chạy /daily bugwrite`);
   }
@@ -139,6 +140,11 @@ export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
     // E1: phase phải nằm trong enum vocab — đây chính là lỗi 3/8 (skill ghi "reassigned" lạ).
     if (!phaseIds.has(issue.phase)) {
       err('E1', key, `phase "${issue.phase}" không có trong vocab (${[...phaseIds].join(' · ')})`);
+    }
+
+    // E11: console render `issue.summary || '—'` — thiếu field là user thấy hàng không tên (19/8 GW-779)
+    if (!String(issue.summary || '').trim()) {
+      err('E11', key, 'thiếu summary (tên ticket) — console render title thành "—"');
     }
 
     const ms = issue.milestones || {};

@@ -1,5 +1,7 @@
 # Nâng cấp agent-auto — hợp đồng dữ liệu + tính năng đứng trên nền đó
 
+> ⚠️ **MỘT PHẦN LỖI THỜI** — khối JSON `vocab` từng chép trong file này đã lệch 7 chỗ so với bản thật nên đã được thay bằng 1 dòng trỏ nguồn. Nguồn vốn từ duy nhất: `schema/vocab.json`.
+
 - Ngày: 2026-08-03
 - Phạm vi: `console/` (web local) · `tools/` · skill `~/.claude/skills/daily/`
 - Trạng thái: design đã chốt (user: "làm full"), chờ kế hoạch triển khai
@@ -47,39 +49,9 @@ CLI tương tác, nên giữ `/loop`) · không đụng `gt-promotion-template` 
 
 Đặt ở `agent-auto/schema/vocab.json` (ngoài `console/`) vì cả console **và** skill đều đọc.
 
-```json
-{
-  "version": 1,
-  "phases": [
-    { "id": "waiting-design", "label": "chờ design", "icon": "wait",   "sev": "wait", "group": "Chờ design",   "htmlTodo": true },
-    { "id": "ready",          "label": "sẵn sàng",   "icon": "ready",  "sev": "ok",   "group": "Sẵn sàng",     "htmlTodo": true },
-    { "id": "coding",         "label": "đang code",  "icon": "coding", "sev": "warn", "group": "Đang code",    "htmlTodo": true, "active": true },
-    { "id": "deliver",        "label": "giao HTML",  "icon": "deliver","sev": "warn", "group": "Giao HTML",    "htmlDone": true, "active": true },
-    { "id": "wait-test",      "label": "chờ test",   "icon": "test",   "sev": "wait", "group": "Chờ test",     "htmlDone": true, "lateExempt": true },
-    { "id": "bugfix",         "label": "fix bug",    "icon": "bug",    "sev": "crit", "group": "Fix bug",      "htmlDone": true, "active": true, "lateExempt": true },
-    { "id": "done-fe",        "label": "xong FE",    "icon": "done",   "sev": "ok",   "group": "Đã xong / ra khỏi tay", "htmlDone": true, "lateExempt": true, "dim": true, "folded": true },
-    { "id": "reassigned",     "label": "đã chuyển người", "icon": "handoff", "sev": "wait", "group": "Đã xong / ra khỏi tay", "offMyPlate": true, "lateExempt": true, "folded": true },
-    { "id": "closed",         "label": "đóng",       "icon": "closed", "sev": "wait", "group": "Đã xong / ra khỏi tay", "htmlDone": true, "offMyPlate": true, "lateExempt": true, "folded": true }
-  ],
-  "milestones": [
-    { "id": "design",  "label": "Design",    "mustDeliver": true },
-    { "id": "html",    "label": "HTML",      "mustDeliver": true, "key": true },
-    { "id": "deliver", "label": "Giao HTML", "mustDeliver": true },
-    { "id": "dev",     "label": "Dev BE",    "mustDeliver": true },
-    { "id": "test",    "label": "Test",      "mustDeliver": true },
-    { "id": "bugfix",  "label": "Fix bug",   "mustDeliver": true },
-    { "id": "release", "label": "Release",   "mustDeliver": true },
-    { "id": "review1", "label": "Review 1",  "mustDeliver": true },
-    { "id": "review2", "label": "Review 2",  "mustDeliver": true },
-    { "id": "duedate", "label": "Due Jira",  "mustDeliver": false }
-  ],
-  "designStatus": [
-    { "id": "đã-giao-đã-tải",   "label": "design đã có local",              "short": "local",   "icon": "design-local",    "sev": "ok" },
-    { "id": "đã-giao-chưa-tải", "label": "design đã giao · cần bấm Download","short": "cần tải", "icon": "design-download", "sev": "warn" },
-    { "id": "chưa-có-link",     "label": null }
-  ]
-}
-```
+**Nội dung `vocab.json` KHÔNG chép lại ở đây** — bản chép trong spec này đã lệch 7 chỗ so với bản thật
+(sai `htmlDone` cho `deliver`/`wait-test`/`bugfix`, thiếu `lateExempt`…). Đọc thẳng `schema/vocab.json`;
+`tools/state-doctor.mjs` kiểm state theo đúng file đó.
 
 Ý nghĩa từng cờ, và ai đọc nó:
 

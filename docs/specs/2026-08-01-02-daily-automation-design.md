@@ -1,5 +1,7 @@
 # Tự động hoá /daily (hệ con ①)
 
+> ⚠️ **LỊCH SỬ** — bị thay bởi `docs/specs/2026-08-13-radar-auto-design.md`. Radar không còn chạy bằng nút toolbar `/loop 30m` trong phiên; nay là launchd (`tools/radar-install.sh` + `tools/radar-tick.mjs`).
+
 Ngày: 2026-08-01 · Trạng thái: đã duyệt · Thứ tự thực thi: 2/4
 
 ## Quyết định khung: KHÔNG đụng Jira

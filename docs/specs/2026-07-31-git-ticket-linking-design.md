@@ -1,5 +1,7 @@
 # Design: Nối git ↔ Jira ticket (suy phase + effort thật)
 
+> ⚠️ **LỊCH SỬ** — format `knowledge/metrics.jsonl` trong file này đã lệch với bản thật. Nguồn đúng: `console/server/lib/learn.js`.
+
 **Ngày:** 2026-07-31 · **Trạng thái:** Đã duyệt · Nối tiếp `2026-07-31-daily-console-design.md`
 
 ## Vấn đề

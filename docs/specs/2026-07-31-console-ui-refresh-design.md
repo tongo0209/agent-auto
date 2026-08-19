@@ -1,5 +1,7 @@
 # Daily Console — làm lại giao diện cho professional + clean (2026-07-31)
 
+> ⚠️ **LỊCH SỬ** — bảng "Hiện trạng" liệt kê các lỗi ĐÃ FIX XONG, đọc như việc còn tồn là hiểu nhầm. Console nay có 5 tab, không phải 3.
+
 Yêu cầu user: "giao diện hiển thị chưa ổn lắm, xử lý luôn các icon, cần professional và clean hơn".
 Quyết định đã chốt trong lượt brainstorm: **làm lại bố cục cột trái + polish**, icon dùng
 **thư viện lucide qua npm**, mật độ **gọn-pro** (nhiều dữ liệu trong 1 màn), **giữ palette** hiện tại.

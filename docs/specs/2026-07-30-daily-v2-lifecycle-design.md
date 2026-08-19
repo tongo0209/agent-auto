@@ -1,5 +1,7 @@
 # Design v2: /daily — Luồng lớn dài hạn (vòng đời task + tuần + học + intake + delta)
 
+> ⚠️ **LỊCH SỬ** — chuỗi 7 phase kèm emoji trong file này KHÔNG còn đúng. Nguồn vốn từ duy nhất là `schema/vocab.json`: 9 phase (thêm `reassigned`, `closed`), không emoji.
+
 **Ngày:** 2026-07-30 · **Trạng thái:** Đã duyệt · Kế thừa spec v1 (`2026-07-30-daily-orchestrator-design.md`)
 
 ## Quyết định đã chốt với user (vòng brainstorm 2)

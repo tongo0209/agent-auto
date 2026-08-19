@@ -1,5 +1,7 @@
 # Gate chất lượng output FE (hệ con ③)
 
+> ⚠️ **MỘT PHẦN LỖI THỜI** — endpoint `GET /api/gate/:key` đã bị gỡ 18/8/2026 (code chết, UI lấy trọn qua `/api/gates`). Phần còn lại của spec vẫn đúng.
+
 Ngày: 2026-08-01 · Trạng thái: đã duyệt · Thứ tự thực thi: 3/4
 
 ## Vấn đề — lỗi thiếu-vắng mà mọi lưới lọc đều trượt

@@ -1,5 +1,7 @@
 # Vòng học & dự báo (hệ con ④)
 
+> ⚠️ **LỊCH SỬ** — tiền đề của file ("chưa ghi được một bản ghi học nào") đã hết đúng: `knowledge/metrics.jsonl` có dữ liệu thật, người ghi là `console/server/lib/learn.js`. Xem schema thật ở đó, đừng lấy schema trong file này.
+
 Ngày: 2026-08-01 · Trạng thái: đã duyệt · Thứ tự thực thi: 4/4
 
 ## Sự thật phải nhìn thẳng

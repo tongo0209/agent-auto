@@ -1,5 +1,7 @@
 # Design: Skill `/daily` — Bộ điều phối công việc hàng ngày
 
+> ⚠️ **LỊCH SỬ** — bị thay bởi `docs/specs/2026-08-13-radar-auto-design.md`. Mệnh đề "không cron vì phiên nền không auth được connector Jira" đã bị ĐO THẬT bác bỏ 13/8/2026 (`claude -p` gọi được `searchJiraIssuesUsingJql`). Đường dẫn skill trong file cũng đã đổi (`skills/` trong repo, `~/.claude/skills` chỉ là symlink).
+
 **Ngày:** 2026-07-30 · **Trạng thái:** Đã duyệt (user chốt Hướng A)
 
 ## Mục tiêu

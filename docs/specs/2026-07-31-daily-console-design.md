@@ -1,5 +1,7 @@
 # Design: Daily Console — web local bọc terminal claude
 
+> ⚠️ **LỊCH SỬ** — file khai console CHỈ ĐỌC dữ liệu agent-auto. Sai: console CÓ GHI (tick board · metrics · phases · công tắc theo dõi buglist). Xem `README.md` mục Daily Console.
+
 **Ngày:** 2026-07-31 · **Trạng thái:** Đã build & verify (v2.0.0, webpack)
 
 ## Nguyên tắc

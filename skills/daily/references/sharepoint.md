@@ -40,7 +40,8 @@ cách KHÔNG ăn (đã thử, đừng lặp lại). `SKILL.md` giữ lại luậ
     3. Task đã `coding`/xong UI → đề xuất trong kế hoạch: ảnh ĐỔI → `/code-developer
        compare` (so code hiện tại với ảnh mới, chỉ ra lệch) rồi `fix`; chỉ thêm ảnh MỚI
        → `code`/`fix` phần thêm. Task chưa code → chỉ cần dùng bản mới, không việc gì thêm.
-       Cập nhật `state.design.sourceModified` = bản mới (đã xử lý xong thì thôi cảnh báo lại).
+       Cập nhật `state.design.sourceModified` = bản mới và XOÁ `design.sourceChanged` nếu có —
+       cùng một công tắc tắt cảnh báo (đã xử lý xong thì thôi nhắc lại).
   - **Nấc 1 — `open` URL TẢI TRỰC TIẾP bằng browser mặc định (cách CHỐT, verify thật 31/7:
     tải trọn 400MB ~140s, KHÔNG hỏi nơi lưu, KHÔNG cần extension, KHÔNG dính account Claude
     — chạy được cả khi browser login `tont@` mà phiên CLI là account khác):**
@@ -156,7 +157,8 @@ cách KHÔNG ăn (đã thử, đừng lặp lại). `SKILL.md` giữ lại luậ
   - **Tải ALL hay chỉ file update?** Nguồn là **ZIP** → zip là 1 khối, bản mới = tải
     nguyên zip mới (1 file, rẻ) — selective nằm ở khâu SO CŨ↔MỚI sau giải nén (chỉ file
     ĐỔI/MỚI thành việc). Nguồn là **FOLDER nhiều file rời** → manifest là **ảnh chụp CÂY NGUỒN**
-    do `sp-scan.js` sinh (`~/Downloads/sp-manifest-<KEY>.json`, chép vào `designs/<KEY>/`), KHÔNG
+    do `sp-scan.js` sinh (`~/Downloads/sp-manifest-<KEY>.json`, chép vào `designs/<KEY>/` và ĐỔI
+    TÊN thành `sp-manifest.json` — quy ước chốt 19/8, gặp bản cũ còn đuôi `-<KEY>` thì rename), KHÔNG
     phải danh sách file mình đã lấy. ⛔ Ghi manifest = tập đã tải là lỗi đã mắc ở GW-556: lần sau
     so "manifest ↔ nguồn" chỉ thấy 8 file đó có đổi hay không, **không bao giờ lộ ra 48 file
     chưa từng tải**. Lần sau CHỈ tải file `modified` mới hơn manifest hoặc chưa có local

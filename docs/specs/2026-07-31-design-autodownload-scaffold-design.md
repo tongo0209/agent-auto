@@ -109,9 +109,9 @@ Ghi lại đây làm tư liệu, không phải việc.
 ### B1. /daily chọn nguồn + điều phối (Bước 3 + 4)
 
 - Điều kiện áp dụng: task dựng MỚI (chưa có folder trong cdn-source — `state.paths` chưa có
-  entry cdn-source) và design đã có local. *(Nới 19/8/2026: HOẶC brief đã chốt game + kênh +
-  slug — làn `scaffold-only`, dựng khung khi design chưa về; luật hiện hành ở
-  `skills/daily/SKILL.md` Bước 3/4.)*
+  entry cdn-source) và design đã có local. *(Nới 19/8/2026: HOẶC — làn `scaffold-only`, dựng khung khi
+  design chưa về — suy được game không còn ❓ + kênh rõ từ loại task, slug user chốt trong lượt
+  duyệt; luật hiện hành ở `skills/daily/SKILL.md` Bước 3/4.)*
 - **Suy `<game>` theo thứ tự bằng chứng** (bổ sung 2026-07-31 — tag ticket không đáng tin:
   GW-660 tag `[CFM]` nhưng folder thật `products/cfl/`): (1) token game trong tên folder cha
   gt-promotion đã neo nexusId (`A49-CFL` → `cfl`) khớp `ls products/`; (2) tag summary

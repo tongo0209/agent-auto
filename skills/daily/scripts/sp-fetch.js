@@ -1,7 +1,8 @@
 /* sp-fetch.js — PHÁT LỆNH TẢI hàng loạt file SharePoint qua session browser.
  *
  * Chạy qua: mcp__claude-in-chrome__javascript_tool, trên tab CÙNG origin (đã có session).
- * Nguồn TODO: `node sp-coverage.mjs <manifest> <designDir> --todo` → dán vào mảng TODO.
+ * Nguồn TODO: `node sp-coverage.mjs <manifest> <designDir> --todo` (tải bù) hoặc
+ *   `node sp-diff.mjs <manifest cũ> <manifest mới> --todo` (bản mới — designwatch) → dán vào TODO.
  *
  * Browser tải nền về ~/Downloads. Script này KHÔNG biết khi nào tải xong (page không thấy
  * download API) — phần "xong chưa" là việc của phía local: poll ~/Downloads rồi chạy

@@ -31,7 +31,12 @@ const load = p => {
   if (!Array.isArray(m.files)) throw new Error(`${p}: không có mảng files`);
   return m;
 };
-const A = load(oldPath), B = load(newPath);
+let A, B;
+try { A = load(oldPath); B = load(newPath); }
+catch (e) { // path sai / manifest hỏng = exit 2, đừng để throw thoát mã 1 giả dạng "có thay đổi"
+  console.error(`sp-diff: không đọc được manifest — ${e.message}`);
+  process.exit(2);
+}
 
 /* CHẶN MANIFEST HỎNG — đây là lưới an toàn quan trọng nhất của file này.
    Ca thật 11/8 17:12: tab Chrome treo, `javascript_tool` báo timeout NHƯNG script vẫn chạy tiếp

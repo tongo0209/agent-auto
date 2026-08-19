@@ -26,6 +26,7 @@ Mỗi ticket cần biết nó "sống" ở folder nào. Lưu `state.issues[KEY].
 | Điều kiện | Phase |
 |---|---|
 | Có commit ≤7 ngày trong path cdn-source | tối thiểu `coding` |
+| …trừ ticket có `scaffoldedAt` + design chưa về | KHÔNG nâng — khung clone ≠ code thật |
 | Có commit trong path gt-promotion (`…/mainsite/`) | `deliver` |
 | Không commit + chưa có design | giữ `waiting-design` |
 | Phase hiện tại ∈ {wait-test, bugfix, done-fe} | **KHÔNG hạ** về coding |

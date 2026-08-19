@@ -109,6 +109,8 @@ Token đầu của `$ARGUMENTS`:
   Drive — `tools/radar-tick.mjs`). Riêng design host **Google Drive** thì quét được ngay tại
   đây: `get_file_metadata` so `modifiedTime` với `design.sourceModified` → mới hơn = designer
   up bản mới → set `design.sourceChanged` + báo như bản mới (luồng SO CŨ↔MỚI).
+  ⚠ Nguồn **ZIP SharePoint** thì CHƯA có watcher — designer đè zip mới chỉ lộ khi
+  `sharepoint_search` lại thấy `lastModifiedDateTime` mới; lỗ ghi nhận, đừng tưởng bước này cover.
   CHỈ báo thay đổi + cập nhật board/state. Không code.
   ⚠ Bước (4) KHÔNG được bỏ dù `delta` là mode nhẹ: tab **"Theo tháng"** của console đọc THẲNG
   `months.json`, không tự suy từ `state.json`. Bỏ qua = task vừa đóng vẫn hiện ○ "đang làm" và
@@ -136,11 +138,13 @@ Token đầu của `$ARGUMENTS`:
   định) — trả lời "designer có up bản mới không", câu mà coverage KHÔNG trả lời được (coverage
   so local với manifest CŨ). Cần Chrome ⇒ chỉ phiên CLI, như `bugwrite`. Mỗi ticket:
   (1) `scripts/sp-scan.js` trên tab SharePoint → manifest mới `~/Downloads/sp-manifest-<KEY>.json`;
-  (2) `node tools/sp-diff.mjs designs/<KEY>/sp-manifest.json <manifest mới>` —
+  (2) `node tools/sp-diff.mjs designs/<KEY>/sp-manifest.json <manifest mới>` (tên manifest local
+  CHỐT là `sp-manifest.json` — gặp bản cũ kiểu `sp-manifest-<KEY>.json` thì rename trước) —
   exit 0 → ghi `design.lastScanAt`, xoá `scanDue`, xong;
   exit 1 → `--todo` đổ danh sách MỚI/ĐỔI vào `sp-fetch.js` tải về, đi luồng SO CŨ↔MỚI sẵn có
   (`references/sharepoint.md`), thay manifest local bằng bản mới, ghi
-  `design.sourceChanged = {at, added, changed}` + ⚠️ đầu báo cáo "design <KEY> có bản mới";
+  `design.sourceChanged = {at, added, changed}` + ⚠️ đầu báo cáo "design <KEY> có bản mới",
+  và CŨNG ghi `lastScanAt` + xoá `scanDue` (vừa quét xong — đừng để board nhắc lại vòng nữa);
   exit 2 → quét hỏng (tab treo/manifest rỗng) — KHÔNG kết luận gì, mở tab mới quét lại (luật
   chặn của chính `sp-diff.mjs`, ca thật 11/8). Đã xử lý xong bản mới (compare/fix vào kế hoạch)
   → xoá `sourceChanged` để thôi cảnh báo lặp.
@@ -246,9 +250,10 @@ tóm tắt việc, timeline milestones, link design, link nexus (bóc nexusId), 
 - Canva/Figma → ghi link + 📎 cần mở tay. KHÔNG chặn luồng, KHÔNG đoán design.
 - Ticket có mốc Design CHƯA TỚI và **không có link DESIGN trong ticket** → phase `waiting-design`,
   KHÔNG vào kế hoạch chạy; lần /daily đầu tiên SAU mốc phải tự nhắc + dò lại.
-  **Ngoại lệ `scaffold-only` (19/8):** ticket `waiting-design` là task dựng MỚI + brief đã chốt
-  đủ game + kênh + slug → được vào bảng duyệt dạng hàng **scaffold-only** (dựng khung trước,
-  KHÔNG code) — điều kiện + guard ở cột `Khung nguồn` Bước 3, thực thi ở Bước 4.
+  **Ngoại lệ `scaffold-only` (19/8):** ticket `waiting-design` là task dựng MỚI + suy được game
+  KHÔNG còn dấu ❓ (thang bằng chứng Bước 3) + kênh rõ từ loại task → được vào bảng duyệt dạng
+  hàng **scaffold-only** (slug do Bước 3 đề xuất, user chốt trong lượt duyệt; dựng khung trước,
+  KHÔNG code) — guard ở cột `Khung nguồn` Bước 3, thực thi ở Bước 4.
 - **Ticket CÓ link DESIGN mà chưa tải được** (`design.status = đã-giao-chưa-tải`): phase vẫn
   `waiting-design` (luật ảnh-local mới cho `ready` không đổi) NHƯNG:
   - Bảng duyệt + board phải ghi "**design đã giao** — cần bạn bấm Download (1 thao tác)", TUYỆT
@@ -281,9 +286,9 @@ buglist → soạn lệnh `/bug-fixer-lite` (CLI); sửa vặt ≤2 file → t�
   `<missingTop>`" và đề xuất dựng phần đủ trước.
 **Cảnh báo, KHÔNG chặn** — quyền quyết vẫn của user (`state-doctor` W6 cũng chỉ warn).
 
-**Task dựng MỚI (chưa có entry cdn-source trong `paths`) + (design đã local HOẶC brief đã chốt
-game + kênh + slug — hàng `scaffold-only` khi design chưa về) → thêm cột `Khung nguồn` vào
-bảng duyệt:**
+**Task dựng MỚI (chưa có entry cdn-source trong `paths`) + (design đã local HOẶC — hàng
+`scaffold-only` khi design chưa về — suy được game không còn ❓ + kênh rõ từ loại task; slug do
+Bước 3 đề xuất, user chốt khi duyệt) → thêm cột `Khung nguồn` vào bảng duyệt:**
 - **Suy `<game>` (folder trong `products/`) theo thứ tự bằng chứng — CẤM đoán từ tag suông:**
   0. **Tra `config.gameMap` trước** (`{"496":"ddtank","A49":"cfl",...}` — mã số/mã chữ dự án
      → folder products). Trúng → nhận luôn. Đây là bộ nhớ "hỏi 1 lần nhớ mãi": mọi lần
@@ -311,8 +316,9 @@ bảng duyệt:**
   user đổi ngay trong lượt duyệt (KHÔNG thêm cổng hỏi).
 - KHÔNG đụng tool scaffoldPSD/cắt ảnh từ PSD (quyết định user 2026-07-31) — chỉ clone khung
   + dựng UI từ ảnh trong `designs/<KEY>/`; ảnh thật user tự cắt.
-- **Guard riêng hàng `scaffold-only`:** còn "❓ game đoán" hoặc user chưa sửa slug trong lượt
-  duyệt → KHÔNG chạy, giữ hàng lại lượt sau. Lý do: scaffold idempotent (folder đích tồn tại →
+- **Guard riêng hàng `scaffold-only`:** còn "❓ game đoán" hoặc slug CHƯA được user chốt trong
+  lượt duyệt (chốt = xác nhận giữ đề xuất, hoặc sửa rồi xác nhận) → KHÔNG chạy, giữ hàng lại
+  lượt sau. Lý do: scaffold idempotent (folder đích tồn tại →
   SKIP vĩnh viễn), clone sai game/slug là phải xoá folder bằng tay — với hàng thường ảnh design
   còn giúp phát hiện sớm, hàng scaffold-only thì không có gì đối chiếu.
 

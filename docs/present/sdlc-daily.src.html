@@ -407,7 +407,6 @@
   .slide.intro[data-on] .meta > span:nth-child(1) { animation-delay: .62s; }
   .slide.intro[data-on] .meta > span:nth-child(2) { animation-delay: .70s; }
   .slide.intro[data-on] .meta > span:nth-child(3) { animation-delay: .78s; }
-  .slide.intro[data-on] .meta > span:nth-child(4) { animation-delay: .86s; }
 
   .navbar {
     display: flex;
@@ -496,7 +495,7 @@
 <div class="deck">
 
   <header class="topbar">
-    <span class="brand">agent-auto <em>· SDLC cho team Frontend</em></span>
+    <span class="brand">agent-auto <em>· đề xuất SDLC cho Frontend</em></span>
     <span class="chapter" id="chapter">Mở đầu</span>
     <span class="counter"><span id="cur">1</span> / <span id="total">13</span></span>
   </header>
@@ -510,7 +509,7 @@
         <div>
           <p class="eyebrow">Chia sẻ nội bộ · <span id="today">17/8/2026</span></p>
           <h1>Thử đưa SDLC vào việc hằng ngày của Frontend</h1>
-          <p class="lede">Task theo dõi thủ công trên Jira: design nằm ngay trong ticket, nhưng
+          <p class="lede">Task được theo dõi thủ công trên Jira: design nằm ngay trong ticket, nhưng
             <b>bổ sung sau là dễ miss</b>; giao xong thì bug lại nằm ở sheet của QC. Không chỗ nào
             tự nói việc đang tới đâu — vẫn phải nhớ bằng đầu. Tôi lấy SDLC làm khung, dựng 6 bước đó
             thành <b>lệnh gõ được</b>, chạy trên task của mình. Mang ra đây như một
@@ -990,7 +989,7 @@
     <section class="slide" data-chapter="Áp dụng">
       <header>
         <p class="eyebrow">Áp dụng</p>
-        <h2>Team khác áp dụng được gì</h2>
+        <h2>Team lấy về thì dùng được gì</h2>
       </header>
       <div class="body">
         <div class="cards">
@@ -1281,6 +1280,10 @@
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     cMain = readColor('--auto'); cWarm = readColor('--human');
   });
+  // nút theme của viewer Artifact stamp data-theme, không đổi prefers-color-scheme
+  new MutationObserver(() => {
+    cMain = readColor('--auto'); cWarm = readColor('--human');
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   document.getElementById('next').addEventListener('click', () => show(at + 1));
   document.getElementById('prev').addEventListener('click', () => show(at - 1));

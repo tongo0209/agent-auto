@@ -52,9 +52,9 @@
     "coolAfterHours": 3,
     "maxSheetReadsPerTick": 3,
     "freshFirstScanHours": 24,
-    "autoFix": true,
+    "autoFix": false,
     "backfilledAt": null,
-    "_note": "Radar buglist hậu bàn giao. Thiết kế: docs/specs/2026-08-17-bug-radar-design.md · OPT-IN từ 18/8/2026: sheet mới vào sổ ở trạng thái CHƯA theo dõi, user tự bật bằng nút tab Bug hoặc `node tools/bug-radar.mjs watch <sheetId>` · autoFix = công tắc cho phép radar gọi /bug-fixer-lite (đọc ở skills/daily/SKILL.md bước 5, KHÔNG có code nào đọc — trước 18/8 nó là công tắc chết) · pollEveryHours = sau bao lâu không poll thì tự chạy 1 lượt bugwatch dù không sheet nào \"hot\"; thiếu nó là radar câm vĩnh viễn sau lượt cuối. Hạ số = tốn tiền hơn (~$1/lượt).",
+    "_note": "Radar buglist hậu bàn giao. Thiết kế: docs/specs/2026-08-17-bug-radar-design.md · OPT-IN từ 18/8/2026: sheet mới vào sổ ở trạng thái CHƯA theo dõi, user tự bật bằng nút tab Bug hoặc `node tools/bug-radar.mjs watch <sheetId>` · autoFix = công tắc cho phép radar gọi /bug-fixer-lite — mặc định false, chỉ bật SAU khi đã cài skill bug-fixer-lite (installer có kiểm) (đọc ở skills/daily/SKILL.md bước 5, KHÔNG có code nào đọc — trước 18/8 nó là công tắc chết) · pollEveryHours = sau bao lâu không poll thì tự chạy 1 lượt bugwatch dù không sheet nào \"hot\"; thiếu nó là radar câm vĩnh viễn sau lượt cuối. Hạ số = tốn tiền hơn (~$1/lượt).",
     "pollEveryHours": 3
   },
   "janitor": {

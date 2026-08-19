@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 
 const HOME = process.env.HOME;
 const CONSOLE_ROOT = path.resolve(__dirname, '..', '..');
@@ -11,7 +12,8 @@ module.exports = {
   AGENT_AUTO,
   VNG_ROOT,
   DIST: path.join(CONSOLE_ROOT, 'dist'),
-  PTY_CWD: VNG_ROOT,
+  // máy cài ngoài ~/VNG thì rơi về AGENT_AUTO — không có fallback là pty chết, mất tab terminal
+  PTY_CWD: fs.existsSync(VNG_ROOT) ? VNG_ROOT : AGENT_AUTO,
   /** Chỉ cho phép mở Finder/VS Code trong các gốc này */
   OPEN_WHITELIST: [VNG_ROOT, AGENT_AUTO],
   file: {

@@ -17,11 +17,20 @@ case "${1:-install}" in
     # ÂM THẦM — `launchctl print` vẫn thấy job, chỉ có `last exit` khác 0. Nên cảnh báo ngay ở
     # đây, chỗ người ta sẽ đọc, thay vì để họ chờ 60 phút rồi tự hỏi sao radar không nhả nhịp.
     HERE="$(cd "$(dirname "$0")/.." && pwd)"
-    if ! grep -q "<string>$HERE</string>" "$SRC"; then
-      echo "⚠ radar-agent.plist đang trỏ vào đường dẫn của máy khác, KHÔNG phải $HERE"
-      echo "  Sửa 4 dòng có đường dẫn trong $SRC rồi chạy lại lệnh này:"
-      grep -n "VNG/agent-auto" "$SRC" | sed 's/^/    /'
+    # Đếm ĐỦ 4 dòng — grep 1 dòng WorkingDirectory là pass giả: 3 dòng path còn lại
+    # (cd trong ProgramArguments + 2 log path) nằm trong string dài, sửa sót vẫn lọt.
+    n=$(grep -c "$HERE" "$SRC" || true)
+    if [ "$n" -lt 4 ]; then
+      echo "⚠ radar-agent.plist mới trỏ $n/4 dòng vào $HERE — còn dòng của máy khác."
+      echo "  Sửa các dòng đường dẫn sau trong $SRC rồi chạy lại lệnh này:"
+      grep -n "agent-auto" "$SRC" | grep "<string>" | sed 's/^/    /'
       echo "  (chưa cài gì cả — dừng ở đây cho an toàn)"
+      exit 1
+    fi
+    # Thử đúng môi trường launchd sẽ chạy (login zsh): thiếu node/claude là job chết âm thầm.
+    if ! /bin/zsh -lc '[ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"; command -v node >/dev/null && command -v claude >/dev/null'; then
+      echo "⚠ login shell không thấy node hoặc claude CLI — launchd sẽ chết âm thầm y hệt."
+      echo "  Tự kiểm: /bin/zsh -lc 'node -v && claude --version' rồi cài thứ còn thiếu."
       exit 1
     fi
     cp "$SRC" "$DEST"

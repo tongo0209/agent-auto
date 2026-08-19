@@ -15,7 +15,11 @@ Skill **và** dữ liệu vận hành của `/daily`. Skill nằm ngay trong rep
 | **Quyền SharePoint** của designer (folder design được share cho bạn) | có quyền mới search/tải được | `/daily` báo chưa tải được design, không chết |
 | **Browser mặc định là Edge/Chrome đã login SSO** | nấc tải design `open -a <browser> <direct-url>` dùng session sẵn có của bạn | tải về tab trắng / rơi xuống fallback "mở tay", không chết |
 | `cd console && npm install` (chỉ khi dùng console) | `npm start` = `build && serve`, **không** tự install | webpack chết ngay lệnh đầu, thông báo không nói gì về nguyên nhân |
-| Sửa tay 4 dòng đường dẫn trong `tools/radar-agent.plist` (chỉ khi muốn radar nền) | plist ghi cứng đường dẫn máy người tạo, `radar-install.sh` copy nguyên xi | launchd `cd` vào thư mục không tồn tại rồi **chết âm thầm**. `radar-install.sh` giờ chặn trước và in ra 4 dòng cần sửa |
+| Sửa tay 4 dòng đường dẫn trong `tools/radar-agent.plist` (chỉ khi muốn radar nền) | plist ghi cứng đường dẫn máy người tạo, `radar-install.sh` copy nguyên xi | launchd `cd` vào thư mục không tồn tại rồi **chết âm thầm**. `radar-install.sh` chặn trước: đếm đủ 4 dòng path + thử node/claude trong đúng login shell mà launchd sẽ dùng |
+
+**Tự chuẩn bị trước — không script nào kiểm hộ được:** account Jira đã được add vào project GW
+(`vnggames.atlassian.net`) · quyền SharePoint vào folder design của designer · Claude Code bản đủ
+mới (skill + hook + `claude -p` headless) và ngân sách token cho radar (~$1/lượt).
 
 Không có Atlassian MCP / SharePoint thì phần lớn `/daily` vẫn chạy (board, phase, gate, console) —
 chỉ mất nhánh quét Jira và tải design.
@@ -31,13 +35,16 @@ build) hoặc browserpilot (phải build, nhưng ít call hơn hẳn). Có sẵn
 |---|---|---|---|
 | **Atlassian** (connector) | `/mcp` → authenticate | `/daily` quét Jira (`searchJiraIssuesUsingJql` · `getJiraIssue`) · `/check-design` đọc description + toàn bộ comment · `tools/radar-tick.mjs` | `/daily` chết ngay bước quét, không có thông báo gợi ý |
 | **Microsoft 365** (connector) | `/mcp` → authenticate | dò design trên SharePoint/OneDrive (`sharepoint_search` · `sharepoint_folder_search`) | mất nấc "design đã giao chưa" tự động — vẫn còn nhánh bóc link trong ticket |
-| **Claude in Chrome** (extension) | `/chrome` → chọn *Enabled by default* đúng 1 lần, mọi phiên sau tự nối | tải **cả folder** design 4 bước (`skills/daily/scripts/sp-scan.js` · `sp-fetch.js` chạy qua `javascript_tool`) · `/bug-fixer-lite` ghi ngược sheet QC | phải tải design tay; `/bug-fixer-lite` không ghi được sheet (VS Code panel cũng vướng chỗ này) |
+| **Google Drive** (connector) | `/mcp` → authenticate | radar nền đọc buglist Google Sheets (`tools/bug-radar.mjs`) + quét design host Drive (`/daily delta` bước 5) | bug-radar và nhánh Drive của designwatch **chết im lặng** — radar vẫn chạy nhưng không thấy gì |
+| **Claude in Chrome** (extension) | `/chrome` → chọn *Enabled by default* đúng 1 lần, mọi phiên sau tự nối. ⚠ ghép theo **account Claude** — 1 profile browser/1 account; Edge trên macOS chưa hiện trong danh sách | tải **cả folder** design 4 bước (`skills/daily/scripts/sp-scan.js` · `sp-fetch.js` chạy qua `javascript_tool`) · `/bug-fixer-lite` ghi ngược sheet QC | phải tải design tay; `/bug-fixer-lite` không ghi được sheet (VS Code panel cũng vướng chỗ này) |
 | **Playwright MCP** — *cách nhanh, chọn 1 trong 2* | `claude mcp add playwright -- npx @playwright/mcp@latest` (không phải build gì) | `/ui-check` chạy theo bảng đổi tool ở mục *"Máy không có browserpilot? — fallback Playwright MCP"* trong `skills/ui-check/SKILL.md` — mỗi action 1 call | thiếu cả 2 thì `/ui-check` không chạy được Lớp 1 |
 | **browserpilot** (MCP local, repo anh em trong cdn-source) — *cách gọn call, chọn 1 trong 2* | `cd <cdn-source>/products/tontagent/browserpilot && npm install && npm run build` rồi `claude mcp add browserpilot -- node $(pwd)/dist/index.js` — `dist/` **không vào git** nên bắt buộc build 1 lần | `/ui-check` bản gốc: mở `dist/`, đổi viewport PC↔mobile, chạy nguyên script Lớp 1 1 call, đọc 404/console | như trên |
 
 ## Cài đặt (member mới)
 
-Bản phát hành đi kèm **cdn-source** — đã pull cdn-source là có sẵn, không cần clone gì thêm:
+Bản phát hành đi kèm **cdn-source** (`products/tontagent/`) gồm: agent-auto, browserpilot,
+bug-fixer bản gọn, bug-fixer-lite. ⚠ **CHƯA gồm `/code-developer` + `/design-analyst`** — xem
+mục "Skill ngoài repo" về kênh cài. Đã pull cdn-source là chạy được phần dưới:
 
 ```bash
 bash <cdn-source>/products/tontagent/agent-auto/tools/install-skills.sh
@@ -58,21 +65,26 @@ Script symlink `skills/` + `hooks/` vào `~/.claude/`, rồi tạo `config.json`
 bản `.example.json`. Nó **không xoá gì** và **không sửa `settings.json`** của bạn — gặp thư mục
 thật trùng tên thì đổi tên `.bak-<n>` rồi mới link. Chạy `--check` để xem trước, không đụng gì.
 
-Sau đó còn 4 việc (script in ra sẵn 3 việc đầu, kèm trạng thái hiện tại của máy bạn):
+Sau đó còn 5 việc — installer in sẵn danh sách này (đúng thứ tự, kèm trạng thái máy bạn):
 
-1. **Sửa `config.json`** — `repos` phải là đường dẫn thật trên máy bạn, `cloudId` + `gitAuthor`
-   của bạn. Cứ để nguyên placeholder là `/daily doctor` báo `E10`, không báo xanh giả.
-2. **Bật hook guardrail** — chạy lại kèm `--write-hooks` để script ghi hộ vào `settings.json`
-   (giữ nguyên key cũ, backup ra `settings.json.bak-before-agent-auto`). Nó chỉ ghi khi
-   **chắc chắn an toàn**: chưa có file, hoặc có file mà chưa khai `PreToolUse`. Đã có hook của
-   thứ khác thì script không đụng, chỉ in khối JSON để bạn gộp tay.
-   Kiểm bằng `bash hooks/guard-bash.test.sh` (phải `58 pass · 0 fail`) — xem cả 3 hook ở mục
+1. **Kết nối MCP** (gõ `/mcp`): **Atlassian** (bắt buộc — `/daily` quét Jira) · **Google Drive**
+   (radar đọc buglist sheet + design host Drive) · Microsoft 365 (dò SharePoint). Làm TRƯỚC —
+   bước 2 cần MCP để lấy cloudId.
+2. **Sửa `config.json`** — đúng 3 chỗ: `cloudId` (hỏi Claude *"cho tôi cloudId Jira"* — nó gọi
+   MCP vừa auth), `gitAuthor` (= `git config user.email`), `repos` (đường dẫn tuyệt đối trên máy
+   bạn). Để nguyên placeholder là `/daily doctor` báo `E10`, không báo xanh giả.
+3. **Bật hook + statusline** — chạy lại kèm `--write-hooks`: script ghi hộ `settings.json`
+   (backup 1 lần ra `settings.json.bak-before-agent-auto`, kèm luôn key `statusLine`). Nó chỉ
+   ghi khi **chắc chắn an toàn**: chưa có hook nào (soi cả `PreToolUse` lẫn `PostToolUse`);
+   đã có hook của thứ khác thì không đụng, chỉ in khối JSON để bạn gộp tay.
+   Kiểm bằng `bash hooks/guard-bash.test.sh` (phải `58 pass · 0 fail`) — xem cả 4 hook ở mục
    ["Guardrails cơ học"](#guardrails-cơ-học-hook).
-3. **Trỏ `~/.claude/CLAUDE.md` vào `rules/`** — installer **không** đụng file này. Thiếu bước
-   này thì `rules/` nằm im: agent không biết đọc `R-PM-*`, `R-TWIG-*`… trước khi sửa file.
-   Thêm vào CLAUDE.md của bạn một bảng "chạm tới X → đọc `<AGENT_AUTO>/rules/<file>.md`",
-   `<AGENT_AUTO>` là đường dẫn thật chỗ bạn cài (2 chỗ cài khác nhau ⇒ 2 path khác nhau).
-4. **Mở phiên Claude Code mới** (skill chỉ nạp lúc khởi động) rồi gõ `/daily doctor` —
+4. **Trỏ `~/.claude/CLAUDE.md` vào `rules/`** — installer in sẵn **khối markdown dán được**
+   (đường dẫn đã điền), chỉ việc dán vào cuối file. Thiếu bước này thì `rules/` nằm im: agent
+   không biết đọc `R-PM-*`, `R-TWIG-*`… trước khi sửa file. (Bản global CLAUDE.md đầy đủ —
+   routing loại việc, luật `pm__`, git/verify — hiện do người bảo trì cấp; khối rules là phần
+   tối thiểu phải có.)
+5. **Mở phiên Claude Code mới** (skill chỉ nạp lúc khởi động) rồi gõ `/daily doctor` —
    phải ra **0 ERROR** thì mới thật sự xong.
 
 ### Cấu hình cá nhân — `config.json`
@@ -95,7 +107,7 @@ một bản). Ba trường đầu bảng là **bắt buộc**; để nguyên pla
 | `dashboardUrl` | để trống lần đầu; publish dashboard xong thì **dán URL artifact vào đây** (skill đọc trường này để redeploy đúng 1 URL, chưa tự ghi ngược) | mỗi lần chạy đẻ một URL dashboard mới |
 | `notify` · `adhocCounter` | để nguyên | không sao |
 | `radar.*` | chỉ đụng khi bật radar nền (`tools/radar-install.sh`); `tickEveryMin` phải khớp `StartInterval` trong `tools/radar-agent.plist`, `everyMin` là nhịp lượt ĐẦY ĐỦ (console suy ngưỡng "radar chết" = 2,5 nhịp từ số này) | radar không chạy / console tưởng radar chết |
-| `bugRadar.*` | radar buglist hậu bàn giao. **`autoFix` mặc định `true`** — thấy bug mới của mình, qua đủ 4 cổng sở hữu là radar **tự gọi `/bug-fixer-lite` sửa**, không hỏi; muốn radar chỉ báo chứ đừng sửa thì đặt `false`. `coolAfterHours: 3` (sheet nguội thì giãn nhịp) · `maxSheetReadsPerTick: 3` (trần đọc sheet mỗi lượt, chống nổ token) · `freshFirstScanHours: 24` (sheet mới hơn ngần này mới coi là nóng; sheet cũ chỉ nạp làm nền, KHÔNG nã lại cả list) | để nguyên là chạy đúng như thiết kế; `enabled: false` thì tắt hẳn nhánh này |
+| `bugRadar.*` | radar buglist hậu bàn giao. **`autoFix` mặc định `false`** (đổi 19/8 — bật SAU khi đã cài `bug-fixer-lite`, installer có kiểm): bật lên thì thấy bug mới của mình, qua đủ 4 cổng sở hữu là radar **tự gọi `/bug-fixer-lite` sửa**, không hỏi. `coolAfterHours: 3` (sheet nguội thì giãn nhịp) · `maxSheetReadsPerTick: 3` (trần đọc sheet mỗi lượt, chống nổ token) · `freshFirstScanHours: 24` (sheet mới hơn ngần này mới coi là nóng; sheet cũ chỉ nạp làm nền, KHÔNG nã lại cả list) | để nguyên là chạy đúng như thiết kế; `enabled: false` thì tắt hẳn nhánh này |
 | `janitor.*` | dọn rác nặng, chạy ghép trong `radar-tick` (1 lượt/ngày). `donePhases` + `graceDays: 7` = ticket xong bao lâu thì được dọn · `heavyDirs` (`_raw`/`_src`) · `cacheKeepDays: 14` · `backupsKeepPerFamily: 10` · `archiveKeepDays: 30` với `archiveAutoDelete: false` (hết hạn thì chỉ BÁO). Chỉ tự xoá thứ **tải lại được** (có `sp-manifest.json` hoặc `designLink`) | để nguyên là an toàn; `enabled: false` thì `designs/_raw/` phình dần |
 
 **Dữ liệu riêng của bạn** không nằm trong `config.json` mà sinh dần khi dùng: `state.json`
@@ -105,6 +117,9 @@ lần rồi nhớ**, hoặc gắn thẳng bằng `/daily link GW-xxx <repo> <pat
 
 Kiểm cả cụm bằng `/daily doctor` — **0 ERROR** mới là cài xong. Đổi máy/đổi chỗ clone repo thì chỉ
 cần sửa lại `repos.*` rồi chạy lại doctor.
+
+**Đọc tới đây là đủ để DÙNG.** Phần dưới là tài liệu tra cứu (cấu trúc repo, tool, guardrails) —
+không phải bước cài.
 
 ### Cái gì vào git, cái gì không
 
@@ -118,26 +133,6 @@ mỗi lần hai người chạy `/daily` là đụng nhau trên cùng file.
 | `*.example.json` — bản mẫu để script sinh file thật | `designs/` (rất nặng, tải lại từ SharePoint được) |
 
 Các thư mục dữ liệu vẫn còn sau khi clone nhờ `.gitkeep`, chỉ là rỗng.
-
-### Phát hành bản mới sang cdn-source (người bảo trì)
-
-```bash
-bash tools/sync-to-cdn.sh --dry-run   # xem sẽ đổi gì
-bash tools/sync-to-cdn.sh             # ghi thật, rồi commit tay bên cdn-source
-```
-
-**Danh sách** file lấy từ `git ls-files` (nên `state.json`, `config.json`, `boards/`, `designs/`,
-`node_modules/` không có đường lọt sang), nhưng **nội dung** lấy từ worktree — bản đầu dùng
-`git checkout-index` và đó là lỗi: file đã `git add` rồi sửa tiếp (`AM`) sẽ sang cdn-source ở bản
-cũ hơn cái đang chạy. So sánh bằng `--checksum`, không theo mtime, nên `--dry-run` chỉ kêu khi
-nội dung thật sự khác.
-
-File **chưa `git add`** thì không phát hành được — script in cảnh báo đếm rõ số file. Đừng bỏ qua
-dòng đó: 14/8 nó bắt được 23 file console chưa track, thiếu chúng thì console **chết ngay lúc
-khởi động** (`MODULE_NOT_FOUND` ở 6 module, 11 chỗ import) mà `git status` nhìn qua vẫn thấy sạch.
-
-Script không commit/push. Sửa skill thì sửa ở repo agent-auto rồi sync, đừng sửa thẳng bản trong
-cdn-source (lần sync sau `rsync --delete` sẽ ghi đè mất).
 
 ### Skill trong repo này
 
@@ -157,10 +152,11 @@ ngay sau mỗi lần `state.json` đổi). Chúng bảo vệ chính `boards/` ·
 
 | Skill | Repo | `/daily` dùng thế nào |
 |---|---|---|
-| `/code-developer` | `promptAgent/` | **gọi thật** qua tool Skill (`skills/daily/SKILL.md` mục *"Bước 4 — Thực thi"*) — thiếu là bước giao việc code gãy |
-| `/bug-fixer-lite` | `cdn-source/products/tontagent/` | **soạn lệnh ra board** (mục *"Bước 3 — Phân loại + trình kế hoạch"*), và được radar buglist gọi thật ở mục *"Bug-radar"* khi qua đủ 4 cổng sở hữu |
+| `/code-developer` | `promptAgent/` — ⚠ **chưa có kênh cài public** (repo không có remote, bản phát hành cdn-source không kèm); member mới cần thì hỏi người bảo trì | **gọi thật** qua tool Skill (`skills/daily/SKILL.md` mục *"Bước 4 — Thực thi"*) — thiếu là bước giao việc code gãy |
+| `/bug-fixer-lite` | `cdn-source/products/tontagent/` — cài theo README ở đó | **soạn lệnh ra board** (mục *"Bước 3 — Phân loại + trình kế hoạch"*), và được radar buglist gọi thật ở mục *"Bug-radar"* khi qua đủ 4 cổng sở hữu |
+| `/bug-fixer` (bản full) | `cdn-source/products/tontagent/bug-fixer` — `bash install.sh` (bản tách gọn, KHÔNG kèm code-developer) | bảng routing global trỏ buglist QC vào đây; chưa cài thì dùng `/bug-fixer-lite` |
 
-Cài 2 skill này theo README của repo tương ứng. Phần quét Jira · suy phase · dò design ·
+`install-skills.sh --check` kiểm hộ 2 skill đầu (mục "Liên kết ngoài repo"). Phần quét Jira · suy phase · dò design ·
 ghi board · `/daily plan|week|status|doctor` **không phụ thuộc** hai skill trên.
 `/daily` chưa có nhánh xử lý riêng cho ca thiếu skill — mất `/code-developer` thì lỗi nổi lên ở
 tầng tool, chưa được nuốt gọn thành cảnh báo.
@@ -170,6 +166,7 @@ tầng tool, chưa được nuốt gọn thành cảnh báo.
 ```bash
 cd ~/VNG/agent-auto/console
 npm install                                # lần đầu thôi — `npm start` KHÔNG tự install
+                                           # máy sạch cần Xcode CLT cho node-pty: xcode-select --install
 npm start                                  # rồi mở http://127.0.0.1:4747
 ```
 
@@ -263,12 +260,32 @@ trong bảng duyệt (clone campaign gần nhất cùng game — code-developer 
 | `tools/bug-radar.mjs` | **OPT-IN từ 18/8: buglist mới chỉ vào sổ, KHÔNG tự theo dõi** — bật từng cái bằng nút tab Bug hoặc `node tools/bug-radar.mjs watch <sheetId>`. Phần **thuần tính toán** của radar buglist hậu bàn giao: bug nào mới, bug nào của mình, lượt này có đáng gọi `claude` không, hàng đợi ghi ngược sheet. Tách khỏi skill để máy quyết định + máy kiểm được. `tools/bug-radar.test.mjs` = 78 ca. |
 | `tools/radar-tick.mjs` | **Một lượt radar nền**: gọi `/daily delta` trong phiên headless (`claude -p`), ghép luôn 1 lượt `janitor`/ngày, ghi sổ `history/radar.jsonl`. `tools/radar-tick.test.mjs` = 28 ca. |
 | `tools/radar-install.sh` | Cài/gỡ radar nền qua launchd (`install\|uninstall\|status\|kick`). Chặn trước nếu `radar-agent.plist` còn trỏ đường dẫn máy khác — nếu không launchd `cd` sai chỗ rồi **chết âm thầm**. Tắt tạm thì sửa `config.radar.enabled=false`, đừng gỡ job. |
-| `tools/statusline.mjs` | Statusline cho mọi phiên Claude Code: cảnh báo mốc + số bug chờ duyệt hiện ngay trên thanh trạng thái, khỏi mở console. Chỉ đọc `state.json` bằng hàm thuần — **không** gọi git/mạng vì chạy lại mỗi lần harness vẽ thanh. |
+| `tools/statusline.mjs` | Statusline cho mọi phiên Claude Code: cảnh báo mốc + số bug chờ duyệt hiện ngay trên thanh trạng thái, khỏi mở console. Chỉ đọc `state.json` bằng hàm thuần — **không** gọi git/mạng vì chạy lại mỗi lần harness vẽ thanh. Bật: `--write-hooks` của installer tự ghi key `statusLine`. |
 | `tools/baked-text-guard.py` | Bắt lỗi **chữ lồng chữ**: text vừa bake trong ảnh vừa render bằng HTML (ca GW-760). Build PASS, console sạch, checker qua — chỉ mắt người mới thấy. Dùng: `--job <job.json> --dist <dist>`. |
 | `tools/janitor.mjs` | **Dọn rác tự động** (1 lượt/ngày, ghép trong `radar-tick`): xoá `_raw/`+`_src/` của ticket đã xong, quay vòng `.backups/`, dọn `.cache/` quá hạn. Chỉ tự xoá thứ **tải lại được** (có `sp-manifest.json` hoặc `designLink`); thứ mất là mất luôn thì chỉ BÁO. Sổ hoàn tác `.janitor-log.jsonl`. Xem trước: `node tools/janitor.mjs --dry`. `tools/janitor.test.mjs` = 49 ca. |
 | `console/` | Web local (webpack + jQuery + xterm) — xem README riêng trong đó. |
 | `docs/specs/` | Design doc của chính hệ thống này. |
 | `rules/` | **Luật có mã + severity** (`MUST` chặn / `SHOULD` cảnh báo). Theo repo: `pm-contract.md` (R-PM-*, mọi file có class `pm__`) · `repo-new-mainsite.md` (R-TWIG-*) · `repo-vportal2view.md` (R-VP2-*) · `repo-gt-promotion.md` (R-GTP-*) · `cdn-source-standard.md` (R-CDN-*, chuẩn code landing/skin — thắng cả `cdn-source/CLAUDE.md` lẫn knowledge snapshot). Theo chủ đề: `popup-library.md` (R-POP-*, popup là design system) · `html-handoff.md` (R-HO-*, HTML rời cdn-source sang gt-promotion/new-mainsite). **Không theo repo cụ thể**: `code-style.md` (R-CS-1..7) — áp cho mọi repo, mọi ngôn ngữ, cùng nguồn luật với hook `guard-style.sh` và skill `/clean-code`. Global CLAUDE.md **trỏ** tới đây và chỉ được nhắc lại bản RÚT GỌN của R-CS-* (đủ để agent không phải mở file cho việc nhỏ); mọi luật khác thì chỉ trỏ, chi tiết + ví dụ ❌/✅ nằm ở đây — file này là nguồn phán quyết khi 2 bản lệch nhau. |
+
+### Phát hành bản mới sang cdn-source (người bảo trì)
+
+```bash
+bash tools/sync-to-cdn.sh --dry-run   # xem sẽ đổi gì
+bash tools/sync-to-cdn.sh             # ghi thật, rồi commit tay bên cdn-source
+```
+
+**Danh sách** file lấy từ `git ls-files` (nên `state.json`, `config.json`, `boards/`, `designs/`,
+`node_modules/` không có đường lọt sang), nhưng **nội dung** lấy từ worktree — bản đầu dùng
+`git checkout-index` và đó là lỗi: file đã `git add` rồi sửa tiếp (`AM`) sẽ sang cdn-source ở bản
+cũ hơn cái đang chạy. So sánh bằng `--checksum`, không theo mtime, nên `--dry-run` chỉ kêu khi
+nội dung thật sự khác.
+
+File **chưa `git add`** thì không phát hành được — script in cảnh báo đếm rõ số file. Đừng bỏ qua
+dòng đó: 14/8 nó bắt được 23 file console chưa track, thiếu chúng thì console **chết ngay lúc
+khởi động** (`MODULE_NOT_FOUND` ở 6 module, 11 chỗ import) mà `git status` nhìn qua vẫn thấy sạch.
+
+Script không commit/push. Sửa skill thì sửa ở repo agent-auto rồi sync, đừng sửa thẳng bản trong
+cdn-source (lần sync sau `rsync --delete` sẽ ghi đè mất).
 
 ## Gate chất lượng trước khi báo xong FE
 
@@ -283,7 +300,7 @@ browser fallback im lặng. Exit ≠ 0 = còn ERROR ⇒ `code-developer` không 
 
 ## Guardrails cơ học (hook)
 
-Luật văn xuôi thì agent có thể quên; hook thì không. **3 hook** sống trong repo ở `hooks/`,
+Luật văn xuôi thì agent có thể quên; hook thì không. **4 hook** sống trong repo ở `hooks/`,
 `~/.claude/hooks/` chỉ là symlink do `tools/install-skills.sh` tạo (luật secret dùng chung qua
 `lib-secret-paths.sh`, không lặp 2 nơi):
 
@@ -294,8 +311,8 @@ bash hooks/guard-style.test.sh   # 28 ca — PostToolUse, matcher Write|Edit
 bash hooks/guard-state.test.sh   # 5 ca  — PostToolUse, matcher Write|Edit|Bash
 ```
 
-Cài xong nhớ dán khối `hooks` vào `~/.claude/settings.json` — installer in ra sẵn, nó **không**
-tự sửa settings của bạn.
+Bật trong `settings.json` bằng `install-skills.sh --write-hooks` (ghi hộ ca an toàn, backup 1
+lần, kèm statusline); settings đã có hook của thứ khác thì installer chỉ in khối JSON để gộp tay.
 
 - **deny** (`guard-bash.sh`): `rm -rf /`·`$HOME` · `curl|sh` · force-push nhánh chung ·
   `DROP TABLE`/`doctrine:database:drop`. `guard-read.sh` deny đọc secret (`.env`, `id_rsa`,

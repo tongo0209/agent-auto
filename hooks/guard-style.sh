@@ -1,7 +1,7 @@
 #!/bin/bash
 # PostToolUse hook cho Write|Edit — bắt comment thừa NGAY sau khi ghi file (R-CS-1).
 #
-# Vì sao cần: luật zero-comment trong CLAUDE.md là văn xuôi, phiên dài thì trôi; hook thì không trôi.
+# Vì sao cần: luật comment tối giản trong CLAUDE.md là văn xuôi, phiên dài thì trôi; hook thì không trôi.
 # Vì sao PostToolUse chứ không PreToolUse: chặn trước sẽ hỏng luồng (file không được ghi, phải viết lại
 # từ đầu). Ghi xong rồi báo "dòng 12, 30 là comment thừa" thì chỉ tốn 1 Edit gỡ — rẻ hơn nhiều.
 #
@@ -56,7 +56,7 @@ esac
 # comment đánh dấu chúng là ĐƯỢC KHUYẾN KHÍCH. Thiếu 2 tiền tố này là bắt oan cả repo cdn-source.
 T1='pm__|mj__|ms__|eslint-disable|stylelint-disable|prettier-ignore|@ts-|@license|copyright|sourcemappingurl|noqa|jshint|hack|workaround|polyfill|quirk|@param|@returns|@return|@typedef|@type |@example|psd'
 
-# Dấu hiệu comment nêu LÝ DO / HỆ QUẢ — đúng ngoại lệ (b) của R-CS-1 dù không nhắc trình duyệt.
+# Dấu hiệu comment nêu LÝ DO / HỆ QUẢ — đúng loại (b)+(c) của R-CS-1 dù không nhắc trình duyệt.
 # Đo thật trên products/lan/2026-mainsite: thiếu tầng này thì bắt oan đúng loại comment giá trị nhất —
 # "Đổi tên bundle = đổi URL trên CDN => người đã vào trang không bị kẹt".
 WHY='=>|->|vì |bởi |nếu không|không thì|phải sửa|nhớ sửa|cẩn thận|lưu ý|chú ý|đừng |cấm |sẽ bị|sẽ mất|dẫn tới|dẫn đến|tránh |giữ nguyên|không được|chỉ dùng|do lib|do platform|theo design|theo yêu cầu|mốc release'
@@ -172,9 +172,9 @@ done <<< "$violations"
 printf '%s\t%s\t%s\n' "$(date '+%F %T')" "R-CS-1 ($count/${total}=${pct}%)" "$file" >> "$HOME/.claude/hooks/guard.log" 2>/dev/null
 
 {
-  echo "[guard-style R-CS-1 MUST] Đoạn vừa ghi có $count dòng comment không thuộc 2 ngoại lệ hợp lệ"
-  echo "($count/$total dòng = ${pct}%). Ngoại lệ: hợp đồng pm__/id/data-*, hack trình duyệt."
-  echo "Luật: zero comment — xem ~/VNG/agent-auto/rules/code-style.md"
+  echo "[guard-style R-CS-1 MUST] Đoạn vừa ghi có $count dòng comment không thuộc 3 loại hợp lệ"
+  echo "($count/$total dòng = ${pct}%). Được phép: hợp đồng pm__/MS__/MJ__/id/data-* · hack trình duyệt-thư viện · logic bí ẩn."
+  echo "Luật: comment tối đa 1 dòng ngắn — xem ~/VNG/agent-auto/rules/code-style.md"
   echo ""
   printf '%s' "$report"
   echo ""

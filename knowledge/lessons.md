@@ -3,16 +3,11 @@
 Mỗi bài học 1 block. Nguồn ghi: `fe-gate` fail tự append block nháp · `/daily wrap` · gõ tay.
 `code-developer` đọc file này TRƯỚC khi giao dev.
 
-## clone-khung-khong-mang-font-cua-design-moi
-
-- Bắt được: GW-654 dựng bằng cách clone `2026-affiliate-2`; khung chỉ mang 2 font của đợt trước,
-  thiếu 8 font design mới — gồm `PlusJakartaSans-SemiBold`, font nhiều nhất toàn trang (373 run).
-- Nguyên nhân: CSS trỏ tới font không tồn tại vẫn là CSS HỢP LỆ → build 0 error, console browser
-  sạch, browser fallback im lặng, 2 design-checker nhìn ảnh vẫn PASS. Lỗi thuộc loại THIẾU-VẮNG:
-  không có gì "sai" để nhìn thấy, chỉ có thứ đáng ra phải có mà không có.
-- Lưới chặn: `tools/fe-gate.mjs` check `font-file-missing` + `font-undeclared` + `design-font-unused`
-  — so danh sách khai báo với danh sách file thật trên đĩa. Bắt buộc chạy trước khi báo xong FE.
-- Nguồn: GW-654 · 2026-08-01
+**Giữ file gọn** (file được nạp trước mỗi lần giao việc nên mỗi dòng thừa tốn context thật):
+- Bài học cũ hơn 3 tháng mà đã thành luật có mã (`rules/*.md`) hoặc hook (`hooks/*.sh`) → rút còn
+  1 dòng trỏ mã luật, bỏ phần kể lại câu chuyện.
+- Block nháp `fe-gate` append mà "Nguyên nhân" vẫn để trống sau 1 tuần → xoá; số đo đáng giữ thì
+  gộp 1 dòng vào block cùng chủ đề. KHÔNG xoá số đo có ngày tháng — chỉ xoá phần diễn giải lặp.
 
 ## metrics-phu-thuoc-buoc-go-tay-thi-khong-bao-gio-co-du-lieu
 
@@ -26,17 +21,25 @@ Mỗi bài học 1 block. Nguồn ghi: `fe-gate` fail tự append block nháp ·
 
 ## thu-vang-mat-can-so-danh-sach-khong-phai-nhin-anh
 
-- Bắt được: 3 lớp kiểm tra (build · console browser · design-checker qua ảnh) đều trượt cùng một
-  lỗi font. Ảnh chụp và mắt người không phân biệt được font fallback gần giống.
-- Nguyên nhân: mọi lớp đó kiểm "cái đang có có đúng không", không lớp nào kiểm "cái phải có có
-  mặt không".
+- Bắt được: GW-654 dựng bằng cách clone `2026-affiliate-2`; khung chỉ mang 2 font của đợt trước,
+  thiếu 8 font design mới — gồm `PlusJakartaSans-SemiBold`, font nhiều nhất toàn trang (373 run).
+  3 lớp kiểm tra (build · console browser · 2 lượt design-checker qua ảnh) đều trượt: ảnh chụp và mắt
+  người không phân biệt được font fallback gần giống.
+- Nguyên nhân: CSS trỏ tới font không tồn tại vẫn là CSS HỢP LỆ → build 0 error, console sạch,
+  browser fallback im lặng. Mọi lớp kiểm trên đều hỏi "cái đang có có đúng không", không lớp nào
+  hỏi "cái PHẢI CÓ có mặt không" — lỗi loại THIẾU-VẮNG thì không có gì "sai" để nhìn thấy.
 - Lưới chặn: với mỗi loại tài nguyên (font, ảnh, sprite), luôn có 1 check dạng
-  *tập khai báo* − *tập file thật* = ∅. Rẻ, tất định, chạy < 1s.
+  *tập khai báo* − *tập file thật* = ∅. Rẻ, tất định, chạy < 1s. Đã dựng: `tools/fe-gate.mjs`
+  check `font-file-missing` + `font-undeclared` + `design-font-unused`, bắt buộc chạy trước khi
+  báo xong FE.
+- Gate đó về sau bắt lại đúng loại lỗi này 3 lần trên dist thật: `font-undeclared` "Barlow"
+  (2026-birthday-sariel · 3/8) · `font-undeclared` "PSL034PRO" (2026-vo-lam-tinh-tu-subweb · 4/8) ·
+  `font-file-missing` `CormorantGaramond-Bold.ttf` (2026-mainsite · 10/8).
 - Nguồn: GW-654 · 2026-08-01
 
 ## sp-rest-clipboard-chet-doc-rest-bang-extension-thay-the
 
-- Bắt được: `scripts/sp-rest.sh` (đường clipboard: `open -a Edge` → System Events `Cmd+A`/`Cmd+C`
+- Bắt được: `scripts/sp-rest.sh` (script đã xoá 18/8/2026 — giữ bài học, đừng đi tìm file; đường clipboard: `open -a Edge` → System Events `Cmd+A`/`Cmd+C`
   → `pbpaste`) trả về **nguyên văn clipboard cũ của user** và `exit 1`. Rất dễ tưởng là SharePoint
   chặn quyền, vì triệu chứng giống hệt ca `accessDenied` — nhưng REST hoàn toàn ăn.
 - Nguyên nhân: `keystroke` qua System Events cần quyền Accessibility cho app đang chạy shell;
@@ -106,7 +109,7 @@ Mỗi bài học 1 block. Nguồn ghi: `fe-gate` fail tự append block nháp ·
   vào `state.issues['GW-477'].design.secondPass` — **một chỗ không ai đọc lại**. 3 ngày sau tái
   phạm nguyên xi. ⇒ Bài học loại "lưới chặn" mà chỉ nằm trong state của 1 ticket thì coi như
   chưa ghi: phải nâng lên `SKILL.md` (đổi quy trình) hoặc thành script chạy được.
-- Lưới chặn (đã dựng 3/8, `~/.claude/skills/daily/scripts/`):
+- Lưới chặn (đã dựng 3/8, `skills/daily/scripts/`):
   `sp-scan.js` quét đệ quy → manifest cây nguồn tự tải về Downloads ·
   `sp-coverage.mjs` so kho local ↔ manifest, **exit 1 nếu thiếu** (đây mới là định nghĩa "đủ") ·
   `sp-fetch.js` phát lệnh tải hàng loạt · `sp-collect.mjs` nhặt + verify magic bytes.
@@ -137,18 +140,6 @@ Mỗi bài học 1 block. Nguồn ghi: `fe-gate` fail tự append block nháp ·
   → file về `~/Downloads`, phía local đọc bằng `fs`. Tool chỉ trả 1 dòng tóm tắt.
 - Áp dụng được cho mọi ca "trang biết dữ liệu lớn mà mình cần ở local": listing, bảng, log, export.
 - Nguồn: GW-556 · 2026-08-03
-
-## gate-font-undeclared-2026-08-03
-- Bắt được: 1 ERROR (font-undeclared) trên dist — font-family "Barlow" dùng 1 chỗ nhưng KHÔNG có @font-face nào khai (browser sẽ fallback im lặng)
-- Nguyên nhân: (điền — vì sao lọt tới đây)
-- Lưới chặn: fe-gate check font-undeclared (đã bắt được, giữ nguyên trong luồng code-developer)
-- Nguồn: 2026-birthday-sariel · 2026-08-03
-
-## gate-font-undeclared-2026-08-04
-- Bắt được: 1 ERROR (font-undeclared) trên dist — font-family "PSL034PRO" dùng 2 chỗ nhưng KHÔNG có @font-face nào khai (browser sẽ fallback im lặng)
-- Nguyên nhân: (điền — vì sao lọt tới đây)
-- Lưới chặn: fe-gate check font-undeclared (đã bắt được, giữ nguyên trong luồng code-developer)
-- Nguồn: 2026-vo-lam-tinh-tu-subweb · 2026-08-04
 
 ## ticket-dong-o-moc-html-van-con-moc-test-release-phia-sau
 
@@ -209,12 +200,6 @@ Mỗi bài học 1 block. Nguồn ghi: `fe-gate` fail tự append block nháp ·
   (3) chỉ khi đó mới chạy fe-gate lần cuối. `git checkout -- <campaign>/dist/` khôi phục được vì file
   còn trong git, nhưng khôi phục xong thì mất output mới ⇒ luôn kết bằng build-pro, không kết bằng checkout.
 - Nguồn: 2026-mainsite (GW-627 alarm-clock) · 2026-08-10
-
-## gate-font-file-missing-2026-08-10
-- Bắt được: 2 ERROR (font-file-missing) trên dist — @font-face "CormorantGaramondBold" trỏ file không tồn tại: fonts/CormorantGaramond-Bold.ttf
-- Nguyên nhân: (điền — vì sao lọt tới đây)
-- Lưới chặn: fe-gate check font-file-missing (đã bắt được, giữ nguyên trong luồng code-developer)
-- Nguồn: 2026-mainsite · 2026-08-10
 
 ## build-lai-dist-lam-doi-185-file-cua-trang-da-release-2026-08-10
 - Bắt được: chạy `npm run build-pro` trên campaign đã release ⇒ `git diff` ra **185 file dist thay đổi**
@@ -380,3 +365,100 @@ ink chữ trùng bbox design ±1px.
 
 ⚠ Font PSD đòi mà repo không có (ca này: Barlow-Medium) thì GIỮ bản gần nhất đang có và ghi rõ là
 hạn chế — đừng lặng lẽ đổi sang font khác hẳn.
+
+## `updateHeat()` không có ai gọi ở production — `heat`/`modifiedTime` là số chết (18/8/2026, bug-radar)
+
+**Bắt được gì:** lượt `/daily bugwatch` 14:55 thấy 13/13 sheet trong `state.bugWatch` đứng
+`heat: "warm"` dù sheet CFL vừa đổi 07:47 cùng ngày. `grep -rn updateHeat tools console skills`
+chỉ ra **2 nơi**: định nghĩa trong `tools/bug-radar.mjs:233` và `bug-radar.test.mjs`. Không một
+đường chạy thật nào gọi nó — `radar-tick.mjs` chỉ đóng dấu `lastPollAt`, CLI `scan`/`commit`
+không chạm `modifiedTime`.
+
+**Nguyên nhân:** hàm được viết + test đầy đủ (7 test xanh) nên trông như đang chạy. Test xanh
+chứng minh hàm ĐÚNG, không chứng minh hàm ĐƯỢC GỌI. `heat` chết im lặng vì cửa `stale` vẫn kéo
+được lượt bugwatch, nên không ai thấy thiếu.
+
+**Hậu quả đang gánh:** `modifiedTime` phải do skill (LLM) ghi tay sau mỗi lượt poll — đúng kiểu
+việc đã làm `heat` chết lần trước. Ghi sớm (trước khi fix) = lượt sau tưởng sheet không đổi, bỏ
+luôn lượt đọc; ghi muộn = đọc lại sheet ~90s không cần thiết. Lượt 14:55 chọn ghi muộn (giữ
+`modifiedTime` cũ) để không nuốt bug #5/#6.
+
+**Lưới chặn:** test "hàm đúng" phải đi kèm test/assert "có đường gọi" cho mọi hàm trạng thái —
+hoặc `state-doctor` thêm WARN khi mọi entry `bugWatch` cùng một `heat` mà `lastChangeAt` chênh
+nhau > `coolAfterHours`. Cách bền hơn: cho `radar-tick.mjs` gọi `updateHeat(entry, modifiedTime)`
+ngay tại chỗ nó đã đóng dấu `lastPollAt`, và bỏ hẳn việc skill ghi `modifiedTime`.
+
+**Nguồn:** `/daily bugwatch` 18/8/2026 14:55 · `docs/specs/2026-08-18-bug-verify-console-design.md`
+
+## Cờ `muted` của bug-radar bị đè mất — board ghi 1 chuyện, `state.json` giữ chuyện khác
+
+**Bắt được gì:** lượt `/daily delta` 18/8/2026 15:34 thấy `state-doctor` báo **W8 = 4**, trong khi
+board 12:09 cùng ngày ghi "W8: 5 → 2 sau khi tắt 3 sheet nguội". Đối chiếu 8 bản `.backups/state`:
+mọi bản từ 13:43 trở đi đều có 3 sheet đó `muted: false` — mute **không dính**; ngược lại
+`BugList Kiếm Hiệp Tình Mainsite` (sheet còn nóng, board ghi rõ *không* nên tắt) lại `muted: true`
+từ ~14:48. Tức trạng thái thật đúng NGƯỢC với quyết định đã ghi.
+
+**Nguyên nhân:** `isWatched()` và nhánh W8 trong `state-doctor.mjs` đều đúng (dòng 94 có
+`isWatched(entry) &&`), nên lỗi ở dữ liệu chứ không ở lưới. `state.json` là một file JSON ghi đè
+toàn bộ, không có version/lock: phiên nào đọc trước rồi ghi sau sẽ xoá thay đổi của phiên khác.
+Bằng chứng có phiên song song: `.backups/state/state-pre-unbackfill-20260818-150107.json` —
+một tiến trình khác ghi state lúc 15:01, ngoài nhịp của cả `radar-tick` lẫn phiên `/daily`.
+
+**Hậu quả đang gánh:** mỗi lượt `bugwatch` vẫn poll 3 sheet chết (16/7, 16/7, 14/7) và bỏ qua
+1 sheet còn động — vừa hao token vừa mù đúng chỗ cần canh. Board thành nguồn KHÔNG đáng tin cho
+trạng thái radar, vì nó ghi ý định chứ không đọc lại file sau khi ghi.
+
+**Lưới chặn:** (a) mọi lệnh đổi cờ `bugWatch` (`watch`/`unwatch`/`queue`) phải **đọc lại
+`state.json` rồi in trạng thái sau khi ghi**, và board chép đúng output đó thay vì chép ý định;
+(b) `state-doctor` thêm WARN khi số sheet `muted` lệch so với lần chạy trước mà không có dòng nào
+trong `history/` giải thích; (c) dài hạn: mọi ghi `state.json` đi qua đúng một hàm
+read-modify-write có so `mtime` trước khi ghi, phát hiện file đã đổi thì merge lại thay vì đè.
+
+**Nguồn:** `/daily delta` 18/8/2026 15:34 · `.backups/state/state-20260818-14*.json` ·
+`tools/state-doctor.mjs:94`
+
+## 19/8/2026 — `updateHeat()` là code chết: 3 field nhịp radar do LLM ghi tay, cửa `hot` chưa nổ lần nào
+
+**Bắt được gì:** `grep -rn "updateHeat" tools console/server skills` chỉ ra **1 hit duy nhất** —
+chính dòng `export function updateHeat` ở `tools/bug-radar.mjs:296`. Hàm có 5 ca test pass nhưng
+KHÔNG có caller: không CLI, không `radar-tick.mjs`, không console. Hệ quả đo được trong state:
+13/13 sheet `heat: "warm"`, tức cửa `hot` của `pickPrompt` chưa nổ lần nào kể từ khi bug-radar
+ra đời 17/8 — mọi lượt bugwatch đều vào bằng cửa `stale`.
+
+**Nguyên nhân:** hàm được viết + test theo TDD rồi bỏ quên khâu nối dây. Test đơn vị xanh nên
+không ai thấy thiếu; `SKILL.md` lại ghi "Skill KHÔNG ghi `heat`, giao cho máy" nên phiên nào chạy
+bugwatch cũng phải ghi TAY `modifiedTime`/`lastChangeAt` vào `state.json` để lượt sau còn so được
+— đúng thứ luật đó cấm, và là một nhánh ghi state không qua `saveState` (không backup, dễ đè).
+
+**Hậu quả đang gánh:** sheet vừa đổi không được vào ngay, phải chờ đủ 3h `pollEveryHours`;
+`heat` trên console vô nghĩa; và `changed` — cổng quyết định có đốt 90s đọc sheet hay không — do
+LLM tự so bằng mắt thay vì máy phán.
+
+**Lưới chặn:** (a) đã thêm CLI `node tools/bug-radar.mjs heat <sheetId> <modifiedTime>` gọi
+`updateHeat` + `saveState`, in `changed` để skill quyết định đọc/không đọc; `SKILL.md` bước 2 của
+`bugwatch` giờ trỏ đúng lệnh này; (b) luật rút ra cho lần sau: **hàm export + có test mà `grep`
+tên nó ra đúng 1 hit là code chết** — TDD xanh không chứng minh đã nối dây, phải grep caller.
+
+**Nguồn:** `/daily bugwatch` 19/8/2026 15:41 · `tools/bug-radar.mjs:296` (hàm) + `:537` (CLI mới) ·
+`node --test tools/bug-radar.test.mjs` 119/119 pass sau khi vá
+
+## 19/8/2026 — Sprite gõ toạ độ tay: một icon sai từ lúc viết, không ai thấy
+
+**Chuyện gì:** khảo sát cơ chế sprite để viết luật `R-SPR-*` thì đụng bug đang nằm sẵn trong repo —
+`products/dt3q/landing/2026-sinh-nhat-7-ai/assets/dt3q-ld-sinhnhat-loichuc/dt3q-ld-sinhnhat-loichuc.scss:390`
+gõ tay `background-position: -408px -212px` cho `.icon-vote-heart`, trong khi `scss/sprite.generated.scss`
+không khai ô nào ở toạ độ đó (ô `btn-heart` thật nằm `527/137`, atlas 630×418). Icon đang cắt trúng
+khoảng giữa các ô.
+
+**Vì sao lọt:** build vẫn xanh — spritesmith không biết ai đọc toạ độ nào. Chỉ mắt người mở trang mới
+thấy, mà icon 21×21 thì nhìn lướt không ra.
+
+**Lưới chặn:** `R-SPR-5` (`rules/cdn-source-standard.md`) cấm gõ `background-position` số cứng và cấm
+`url()` trỏ PNG lẻ trong `images/sprite/` — phải `@include sprite($tên)`. Toạ độ tay còn chết lần nữa
+mỗi khi spritesmith xếp lại atlas.
+
+**Chưa xử lý:** bug này thuộc campaign khác, ngoài phạm vi đợt viết luật — chưa sửa, ai vào
+`2026-sinh-nhat-7-ai` thì sửa kèm. Quét cùng kiểu còn **123 dòng SCSS** + **179 thẻ Twig** trỏ thẳng
+ảnh lẻ trong `images/sprite/` trên toàn repo.
+
+**Nguồn:** khảo sát sprite 19/8/2026 · đã tự kiểm lại bằng `sed`/`grep`, không tin báo cáo agent

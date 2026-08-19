@@ -36,12 +36,17 @@ selector hoặc đổi tên class làm chết nút trên production.
 
 | Nhóm | Làm gì | Luật |
 |---|---|---|
-| **Comment** | Gỡ mọi comment mô tả lại code. **Giữ** 2 loại: hợp đồng `pm__`, hack/workaround trình duyệt–thư viện. Nghi ngờ → giữ và liệt kê ra báo cáo để user quyết. | R-CS-1 |
+| **Comment** | Gỡ comment mô tả lại code, banner `// =====`, JSDoc nhiều dòng, comment mốc section. **Giữ** 3 loại (rút còn 1 dòng ngắn nếu đang dài dòng): hợp đồng platform `pm__`/`MS__`/`MJ__`/`data-*` · hack/workaround trình duyệt–thư viện · logic bí ẩn (công thức, thứ tự bắt buộc, ràng buộc backend). Comment dài hơn đoạn code nó tả → rút gọn. Nghi ngờ → giữ và liệt kê ra báo cáo để user quyết. | R-CS-1 |
 | **Phòng thủ thừa** | Gỡ `try-catch` bọc DOM query, `if (!el) return`, `?.` cho thứ luôn tồn tại. **Chỉ gỡ khi đã xác minh** element/field có trong markup cùng file hoặc luôn có trong response. Không xác minh được → giữ nguyên. | R-CS-2 |
 | **Trừu tượng 1-lần-dùng** | Inline hàm/biến trung gian/util chỉ có đúng 1 chỗ gọi. Grep toàn repo trước khi inline — có ≥2 chỗ dùng thì GIỮ. | R-CS-3 |
 | **Lặp & tên** | Gộp selector CSS trùng thuộc tính, thay thứ viết tay bằng mixin/class repo đã có, magic number → hằng có tên. | R-CS-4, R-CS-5 |
 
 Không tự thêm tính năng, không đổi kiến trúc, không refactor ngoài 4 nhóm trên.
+
+Trong `cdn-source`: dọn xong vẫn phải đúng `~/VNG/agent-auto/rules/cdn-source-standard.md` (R-CDN-*) và
+`popup-library.md` (R-POP-*) — **KHÔNG** được "gọn hoá" bằng cách thay `@include mobile/pc` bằng `@media`,
+đổi px sang rem/%, gộp popup `extends base.html.twig` thành markup phẳng, hay xoá class `MS__`/`MJ__` "thừa".
+Thấy code lệch chuẩn khi dọn → **liệt kê ra báo cáo kèm mã luật**, không tự sửa (ngoài 4 nhóm).
 
 ## Quy trình
 
@@ -99,7 +104,7 @@ Phát hiện KHÔNG sửa (ngoài phạm vi skill)
 
 Verify
 - ⏱ build: <lệnh> → <kết quả thật>
-- `git diff | grep '^-.*pm__'` → rỗng ✅
+- cổng `pm__` (so TẬP HỢP TÊN, bước 5): `diff <(git show HEAD:<file> | grep -oE 'pm__[a-zA-Z0-9_-]+' | sort -u) <(grep -oE 'pm__[a-zA-Z0-9_-]+' <file> | sort -u)` → rỗng ✅
 - Chưa commit, chưa push — user tự review diff.
 ```
 

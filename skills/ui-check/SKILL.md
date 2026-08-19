@@ -26,7 +26,17 @@ không cần ảnh design), mắt so design sau (Lớp 2 — chỉ khi có ảnh
 4. Build one-shot `npm run build-dev` — CẤM `npm run dev` (watch treo phiên).
 5. browserpilot headless:false. Kết thúc = `session reset` + kill server nền + báo ⏱.
 6. Đọc waiver TRƯỚC khi báo lỗi — lệch chủ ý user đã duyệt không phải bug.
+7. Chấm cả CHUẨN, không chỉ lệch design — R-CDN-* / R-POP-* / R-HO-*, mỗi lệch ghi mã luật.
 ```
+
+**Trục chuẩn (thêm vào report, không thay các lớp check hiện có).** Luật: `~/VNG/agent-auto/rules/cdn-source-standard.md`,
+`popup-library.md`, `html-handoff.md`. Bốn thứ nhìn được từ output build:
+- **Popup**: markup popup thiếu `MS__popup`/`MS__opacity`/`MJ__close-popup`/`MS__box` → popup tự chế, không extends base (R-POP-2, R-POP-3).
+- **Responsive**: `@media` xuất hiện trong CSS build mà không đến từ mixin `mobile`/`pc` → R-CDN-5.
+- **Scale**: kích thước/toạ độ dùng `rem`/`%` cho phần tử trong section thay vì px tuyệt đối → R-CDN-4.
+- **Bàn giao**: file HTML trong `gt-promotion-template` còn path tương đối, mất `<% MODULE_CONTENT %>`, hoặc thiếu `#MS__wrapper`/`MS__layer-loading`/`layer-rotate` → R-HO-1..3.
+
+Trang có gameplay promotion → nhắc user chạy `/check-promotion <loại> <file>` (R-POP-7) và ghi vào phần Giới hạn nếu chưa chạy.
 
 ## Bước 0a — Chạy `fe-gate` TRƯỚC khi mở browser
 
@@ -108,7 +118,8 @@ test end-to-end trên browserpilot.)
 | `h-overflow` | scrollWidth > viewport; nếu html/body overflow-x:hidden → 🟡 (có thể decor bleed chủ ý) | 🔴/🟡 |
 | `font-error` | document.fonts có font status=error | 🔴 |
 | `lib-not-pruned` | Cả .MS__pc lẫn .MS__mb còn trong DOM → nghi lib init fail | 🟡 |
-| `read_signals` | 404 network + uncaught console error | 🔴 |
+| `lib-pruned-wrong-side` | Lib giữ nhầm nhánh so với viewport: PC (>768px) chỉ còn .MS__mb, hoặc mobile chỉ còn .MS__pc | 🔴 |
+| `read_signals` | 404 network + uncaught console error (không phải check của script, lấy từ signals) | 🔴 |
 
 Phân loại report: 🔴 lỗi thật (kèm dẫn chứng selector + src) / 🟡 nghi ngờ cần mắt người /
 ⚪ waiver. Waiver đọc từ `.claude/knowledge/waivers.md` của campaign nếu có.

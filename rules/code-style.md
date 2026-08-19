@@ -9,7 +9,7 @@ sinh ra dài gấp đôi mức cần, người sau đọc phải nhảy 3 chỗ 
 
 | ID | Sev | Luật |
 |---|---|---|
-| **R-CS-1** | MUST | **Zero comment.** Đúng 2 ngoại lệ được viết comment: (a) **hợp đồng platform** — `pm__…`/`id` đặc biệt/`data-*`, ghi để người sau không đổi tên; (b) **hack/workaround** — quirk trình duyệt, bug thư viện, thứ mà đọc code không đoán ra lý do. Comment mô tả lại việc code đang làm (`// gán sự kiện click`, `// loop qua items`) = vi phạm. |
+| **R-CS-1** | MUST | **Comment tối giản — 1 dòng, đúng 3 loại.** Được viết comment khi và chỉ khi thuộc: (a) **hợp đồng platform** — `pm__…`/`MS__`/`MJ__`/`id` đặc biệt/`data-*`, ghi để người sau không đổi tên; (b) **hack/workaround** — quirk trình duyệt, bug thư viện; (c) **logic bí ẩn** — công thức, thứ tự bắt buộc, ràng buộc với backend/lib mà đọc code không suy ra được. Mỗi lần **tối đa 1 dòng ngắn** (~≤80 ký tự, tiếng Việt). CẤM: mô tả lại code (`// gán sự kiện click`), banner `// =====`, JSDoc nhiều dòng, comment mốc section (`// phần popup`) — file dài thì tách bằng tên hàm/biến, và comment **dài hơn đoạn code nó tả** là vi phạm dù thuộc 3 loại trên. |
 | **R-CS-2** | MUST | **Không phòng thủ thừa.** Không `try-catch` bọc DOM query, không `if (!el) return`, không `?.` rải khắp — trừ khi element/field **thật sự có thể vắng** theo điều kiện render hoặc theo response API. Viết "cho chắc" làm code dài gấp đôi và giấu mất chỗ hỏng thật. |
 | **R-CS-3** | MUST | **Rule of two.** Không tách hàm / biến trung gian / util / file config cho thứ chỉ dùng **1 lần**. Trừu tượng chỉ ra đời khi đã có **≥2 chỗ dùng thật** — không phải "biết đâu sau này cần". |
 | **R-CS-4** | MUST | **Grep trước khi viết.** Mixin, class tiện ích, biến SCSS, helper repo đã có → dùng lại. Cấm viết lại thứ đã tồn tại trong repo. |
@@ -27,9 +27,13 @@ const btn = document.querySelector('.pm__btn-claim');
 // Gán sự kiện click
 btn.addEventListener('click', handleClaim);
 
-// ✅ chỉ 2 loại này được tồn tại
-// pm__btn-claim: hook JS platform, đổi tên = nút chết
-// Safari iOS <16 không fire click trên <label>, phải bind vào input
+// ❌ mốc section + banner: tách bằng tên, đừng comment
+// ============ POPUP ============
+
+// ✅ 3 loại được tồn tại, mỗi chỗ 1 dòng ngắn
+// pm__btn-claim: hook platform, đổi tên = nút chết
+// Safari iOS <16 không fire click trên <label>
+// Backend trả point theo lượt x10, chia 10 trước khi hiện
 ```
 
 **R-CS-2 — phòng thủ**
@@ -71,16 +75,37 @@ $visible-days: 3;
   Trong `cdn-source`, `MJ__*` (hook hành vi lib) và `MS__*` (style lib) **cũng là hợp đồng** — comment đánh dấu
   chúng nằm cùng ngoại lệ (a). Ca kinh điển phải ghi chú: `MJ__toogleActive` sai chính tả nhưng **cấm sửa**.
 - **`cdn-source/CLAUDE.md` ghi "Comment giải thích 'tại sao' bằng tiếng Việt"** — đọc dòng đó là
-  **ngoại lệ (b) của R-CS-1**, KHÔNG phải giấy phép comment tự do. "Tại sao" hợp lệ = lý do mà đọc code
+  **loại (b)+(c) của R-CS-1**, KHÔNG phải giấy phép comment tự do. "Tại sao" hợp lệ = lý do mà đọc code
   không suy ra được (hack trình duyệt, hợp đồng lib, magic number lấy từ design). "Tại sao" kiểu
   `// gán sự kiện click để mở popup` vẫn là vi phạm R-CS-1 vì code đã nói ra rồi.
   Lưu ý `/code-audit` có luật "convention repo THẮNG ý kiến chung" — R-CS-* không phải ý kiến chung,
   nó là luật của user; chỉ nhường khi repo quy định NGƯỢC LẠI một cách rõ ràng, không phải khi repo im lặng.
 - `R-CS-3` và `R-CS-6` KHÔNG được viện ra để bỏ bớt phạm vi user yêu cầu. Cắt phần dư ≠ cắt việc.
+- Viết code trong `cdn-source` → còn phải theo [`cdn-source-standard.md`](cdn-source-standard.md) (R-CDN-*)
+  và [`popup-library.md`](popup-library.md) (R-POP-*). Đưa HTML sang platform → [`html-handoff.md`](html-handoff.md) (R-HO-*).
+
+## Commit (chốt 19/8/2026 — hết đá nhau)
+- **Repo đẩy lên git VNG** (`cdn-source`, `gt-promotion-template`, `new-mainsite`, `vportal2view`): theo skill
+  `/commit` — Conventional Commits `(<type>): <mô tả>` + footer `Co-Authored-By`. Đây là format CI/CD VNG bắt.
+- **Repo nội bộ** (`agent-auto`, `promptAgent`, tool cá nhân): giữ `[<leaf-folder>] <English subject>` + trailer Co-Authored-By.
+- `git push`: KHÔNG BAO GIỜ tự làm, hỏi user từng lần. `git commit`: tự làm được ở repo nội bộ và `cdn-source`;
+  **KHÔNG commit** ở `gt-promotion-template` / `new-mainsite` (R-GTP-2, R-TWIG-4).
 
 ## Thực thi cơ học
-`~/.claude/hooks/guard-style.sh` (PostToolUse trên `Write|Edit`) đếm comment trong **đoạn vừa ghi**,
-trừ whitelist (`pm__`, hack, tên trình duyệt, `eslint-disable`, `@ts-`, license), dư quá ngưỡng thì
-in thẳng `file:line` các dòng vi phạm để gỡ ngay. Hook chỉ đo được `R-CS-1` — `R-CS-2..7` là trách
-nhiệm tự giác + `/clean-code` + `/code-audit`.
+`~/.claude/hooks/guard-style.sh` (PostToolUse trên `Write|Edit`) đếm comment trong **đoạn vừa ghi**
+(KHÔNG soi cả file), chỉ với file code frontend (`.js .mjs .cjs .ts .jsx .tsx .vue .scss .css .less
+.html .htm .twig`) và bỏ qua `node_modules/`, `dist/`, `build/`, `vendor/`, `coverage/`, `*.min.*`,
+`webpack.config*`.
+Được tha: `pm__`/`MJ__`/`MS__`, `hack`/`workaround`/`polyfill`/`quirk`, `eslint-disable`/`stylelint-disable`/
+`prettier-ignore`, `@ts-`, license, jsdoc (`@param`/`@returns`/`@type`…), `psd`; comment nêu
+**lý do/hệ quả** (`=>`, "vì", "nếu không", "cẩn thận"…); và khối comment
+dài (trung bình ≥8 từ/dòng) — vì mô tả lại code luôn ngắn. Tên trình duyệt chỉ được tha khi dòng có
+thêm dấu hiệu vấn đề thật (số phiên bản, `<`/`>`, "lỗi/bug/fix"). Code bị comment out bị gắn
+`[code chết]` và **không** được độ dài cứu. Lên tiếng khi dư quá 2 dòng, HOẶC có ≥2 dòng comment mà
+chúng chiếm >20% đoạn vừa ghi; in `file:line` từng dòng vi phạm (nhiều nhất 12 dòng). Hook **không chặn ghi**, chỉ báo về cho model gỡ ngay
+trong lượt đó. Hook chỉ đo được `R-CS-1` — `R-CS-2..7` là trách nhiệm tự giác + `/clean-code` + `/code-audit`.
 Self-test: `bash ~/.claude/hooks/guard-style.test.sh`.
+
+**Hook THOÁNG HƠN luật — im lặng ≠ đạt.** Hook tha jsdoc và khối comment dài (≥8 từ/dòng), trong khi
+`R-CS-1` bản 19/8/2026 **cấm** jsdoc nhiều dòng, banner, comment mốc section và comment dài hơn code nó tả.
+Tự soát theo luật, đừng chờ hook kêu.

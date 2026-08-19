@@ -1,0 +1,1286 @@
+<title>Đưa SDLC vào việc hằng ngày</title>
+
+<style>
+  :root {
+    --stage: #ffffff;
+    --panel: #f2f6f7;
+    --panel-2: #e9eff1;
+    --ink: #0c181e;
+    --muted: #52636c;
+    --faint: #84959d;
+    --line: #d0dadd;
+    --line-soft: #e3ebed;
+    --auto: #0d7a83;
+    --auto-soft: #d8ecee;
+    --human: #a2600d;
+    --human-soft: #f6ead6;
+    --halt: #a33b52;
+    --halt-soft: #f8e4e8;
+    --glow-a: rgba(13, 122, 131, .09);
+    --glow-b: rgba(162, 96, 13, .07);
+    --sans: "Avenir Next", "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --stage: #0d1820;
+      --panel: #142029;
+      --panel-2: #1a2833;
+      --ink: #e2eaef;
+      --muted: #94a6b1;
+      --faint: #697d8a;
+      --line: #21313d;
+      --line-soft: #182530;
+      --auto: #4bbcc7;
+      --auto-soft: #0e3138;
+      --human: #dfa457;
+      --human-soft: #34260f;
+      --halt: #e08096;
+      --halt-soft: #351720;
+      --glow-a: rgba(75, 188, 199, .10);
+      --glow-b: rgba(223, 164, 87, .07);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --stage: #0d1820;
+    --panel: #142029;
+    --panel-2: #1a2833;
+    --ink: #e2eaef;
+    --muted: #94a6b1;
+    --faint: #697d8a;
+    --line: #21313d;
+    --line-soft: #182530;
+    --auto: #4bbcc7;
+    --auto-soft: #0e3138;
+    --human: #dfa457;
+    --human-soft: #34260f;
+    --halt: #e08096;
+    --halt-soft: #351720;
+    --glow-a: rgba(75, 188, 199, .10);
+    --glow-b: rgba(223, 164, 87, .07);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--stage);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -10%;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(46vw 42vh at 8% -6%, var(--glow-a), transparent 62%),
+      radial-gradient(40vw 38vh at 98% 106%, var(--glow-b), transparent 62%);
+    animation: drift 26s ease-in-out infinite alternate;
+  }
+
+  @keyframes drift {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    to   { transform: translate3d(2.5%, -2%, 0) scale(1.07); }
+  }
+
+  .deck { position: relative; z-index: 1; height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 15px clamp(22px, 4vw, 60px);
+    border-bottom: 1px solid var(--line-soft);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .topbar .brand { color: var(--ink); white-space: nowrap; }
+  .topbar .brand em { font-style: normal; color: var(--faint); }
+  .chapter { color: var(--auto); }
+  .counter { margin-left: auto; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  main { min-height: 0; display: grid; overflow: hidden; perspective: 1600px; }
+  main > .slide { grid-area: 1 / 1; }
+
+  .wipe {
+    position: absolute; top: 0; left: 0; right: 0; height: 2px; z-index: 5; pointer-events: none;
+    background: linear-gradient(90deg, transparent, var(--auto), transparent);
+    transform: scaleX(0); transform-origin: left; opacity: 0;
+  }
+  .wipe.go { animation: wipe .62s cubic-bezier(.35,.75,.2,1); }
+  @keyframes wipe {
+    0%   { transform: scaleX(0); transform-origin: left; opacity: .95; }
+    55%  { transform: scaleX(1); transform-origin: left; opacity: .95; }
+    56%  { transform: scaleX(1); transform-origin: right; opacity: .95; }
+    100% { transform: scaleX(0); transform-origin: right; opacity: 0; }
+  }
+
+  .slide {
+    display: none;
+    grid-template-rows: auto 1fr auto;
+    gap: clamp(16px, 2.6vh, 30px);
+    width: min(1460px, 100%);
+    margin: 0 auto;
+    padding: clamp(24px, 4vh, 48px) clamp(22px, 4vw, 60px) clamp(14px, 2.2vh, 24px);
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .slide[data-on] { display: grid; z-index: 2; }
+  .slide[data-out] {
+    display: grid; z-index: 1; pointer-events: none; overflow: hidden;
+    animation: leave .2s cubic-bezier(.4, 0, 1, 1) both;
+  }
+  @keyframes leave {
+    from { opacity: 1; transform: none; }
+    to   { opacity: 0; transform: translateY(-16px) scale(.988); }
+  }
+  main[data-dir="back"] .slide[data-out] { animation-name: leaveBack; }
+  @keyframes leaveBack {
+    from { opacity: 1; transform: none; }
+    to   { opacity: 0; transform: translateY(16px) scale(.988); }
+  }
+
+  .slide { position: relative; }
+
+  .slide:not(.intro):not(.solo)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: radial-gradient(currentColor 1px, transparent 1px);
+    background-size: 34px 34px;
+    color: var(--auto);
+    opacity: .05;
+    -webkit-mask-image: radial-gradient(120% 90% at 82% 22%, #000 0%, transparent 68%);
+    mask-image: radial-gradient(120% 90% at 82% 22%, #000 0%, transparent 68%);
+    animation: gridDrift 30s linear infinite;
+  }
+  @keyframes gridDrift { to { background-position: 34px 34px; } }
+
+  .slide:not(.intro):not(.solo)::after {
+    content: attr(data-num);
+    position: absolute;
+    right: clamp(18px, 3vw, 48px);
+    bottom: clamp(10px, 3vh, 40px);
+    z-index: 0;
+    pointer-events: none;
+    font-family: var(--mono);
+    font-size: clamp(120px, 17vw, 250px);
+    font-weight: 500;
+    line-height: .8;
+    letter-spacing: -.06em;
+    color: var(--auto);
+    opacity: .045;
+  }
+  .slide[data-on]:not(.intro):not(.solo)::after { animation: numIn 1.2s cubic-bezier(.2,.8,.2,1) .2s backwards; }
+  @keyframes numIn { from { opacity: 0; transform: translateY(26px) scale(.96); } to { opacity: .045; transform: none; } }
+
+  .slide > header, .slide > .body, .slide > .note { position: relative; z-index: 1; }
+
+  .slide, .wrap, .tiles, .cards { scrollbar-width: none; -ms-overflow-style: none; }
+  .slide::-webkit-scrollbar,
+  .wrap::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .17em;
+    text-transform: uppercase;
+    color: var(--auto);
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+  }
+  .eyebrow::after { content: ""; height: 1px; flex: 1; background: linear-gradient(90deg, var(--auto), var(--line) 40%, transparent); transform-origin: left; }
+  .slide[data-on] .eyebrow::after { animation: ruleIn 1s cubic-bezier(.2,.8,.2,1) .26s backwards; }
+  @keyframes ruleIn { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+
+  h1 { font-size: clamp(34px, 4.6vw, 60px); line-height: 1.03; letter-spacing: -.032em; margin: 0; text-wrap: balance; font-weight: 600; max-width: 15ch; }
+  h2 { font-size: clamp(23px, 2.6vw, 36px); line-height: 1.14; letter-spacing: -.022em; margin: 0; text-wrap: balance; font-weight: 600; max-width: 30ch; }
+  .lede { color: var(--muted); font-size: clamp(15px, 1.05vw, 17px); margin: 18px 0 0; max-width: 58ch; }
+
+  .body { min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: 16px; }
+
+  .note {
+    border-top: 1px solid var(--line);
+    padding: 12px 0 0 26px;
+    position: relative;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.65;
+    color: var(--muted);
+    max-width: 124ch;
+  }
+  .note::before { content: "//"; position: absolute; left: 0; top: 12px; color: var(--faint); }
+  .note b { color: var(--ink); font-weight: 500; }
+
+  .hero { display: grid; grid-template-columns: 1fr minmax(330px, 420px); gap: clamp(28px, 4.5vw, 66px); align-items: center; height: 100%; }
+  .hero .meta { margin-top: 34px; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 18px 24px; max-width: 640px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .hero .meta b { display: block; color: var(--ink); font-size: 24px; font-weight: 500; letter-spacing: -.025em; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+
+  .rail { position: relative; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); overflow: hidden; }
+  .rail > header { padding: 11px 16px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 10px; letter-spacing: .15em; text-transform: uppercase; color: var(--faint); }
+  .rail ol { position: relative; list-style: none; margin: 0; padding: 14px 0; }
+  .rail ol::before { content: ""; position: absolute; left: 37px; top: 26px; bottom: 26px; width: 1px; background: var(--line); }
+  .rail li { position: relative; display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 12px; padding: 9px 18px 9px 58px; }
+  .rail li i {
+    position: absolute; left: 32px; top: 50%; margin-top: -5.5px;
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--panel); border: 1px solid var(--line);
+    animation: node 5s ease-in-out infinite;
+    animation-delay: calc(var(--i) * .34s);
+  }
+  .rail li b { font-size: 14.5px; font-weight: 600; }
+  .rail li span { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+  .rail .scan {
+    position: absolute; left: 0; right: 0; height: 108px;
+    background: linear-gradient(180deg, transparent, var(--auto-soft) 45%, transparent);
+    opacity: .7; pointer-events: none;
+    animation: scan 5s linear infinite;
+  }
+
+  @keyframes node {
+    0%, 8% { background: var(--panel); border-color: var(--line); box-shadow: none; }
+    14%    { background: var(--auto); border-color: var(--auto); box-shadow: 0 0 0 5px var(--auto-soft); }
+    40%    { background: var(--auto); border-color: var(--auto); box-shadow: 0 0 0 0 transparent; }
+    100%   { background: var(--panel); border-color: var(--line); box-shadow: none; }
+  }
+  @keyframes scan {
+    from { transform: translateY(-108px); }
+    to   { transform: translateY(430px); }
+  }
+
+  .wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 16px 10px 0; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  thead th { border-bottom: 1px solid var(--line); }
+  th { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); font-weight: 400; white-space: nowrap; }
+  td.ph { font-family: var(--mono); color: var(--auto); font-size: 11.5px; letter-spacing: .06em; white-space: nowrap; }
+  td.ph b { display: block; color: var(--ink); font-family: var(--sans); font-size: 14px; letter-spacing: 0; margin-top: 2px; font-weight: 600; }
+  td.gate { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  td.src b { font-weight: 600; }
+  td.was { color: var(--halt); }
+  code.cmd { font-family: var(--mono); font-size: 12.5px; color: var(--auto); background: var(--auto-soft); padding: 2px 7px; border-radius: 2px; white-space: nowrap; display: inline-block; margin: 1px 0; }
+  code.k { font-family: var(--mono); font-size: 12px; color: var(--ink); background: var(--panel-2); padding: 1px 5px; border-radius: 2px; }
+  .by { display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 3px 8px; border-radius: 2px; background: var(--human-soft); color: var(--human); white-space: nowrap; }
+
+  .card p b, .card p strong,
+  .flow p b, .flow p strong,
+  .rail li b, .band p b { color: var(--ink); font-weight: 600; }
+  .tile span b, .tile span strong {
+    font: inherit; font-weight: 600; letter-spacing: inherit; color: var(--ink);
+  }
+
+  tbody td { color: var(--muted); }
+  tbody td b, tbody td strong { color: var(--ink); font-weight: 600; }
+  td.src { color: var(--auto); font-weight: 600; }
+  td.trap { color: var(--muted); }
+  td.trap b { color: var(--halt); font-weight: 600; }
+
+  .hl {
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: inset 0 -.36em 0 var(--auto-soft);
+    box-shadow: inset 0 -.36em 0 color-mix(in srgb, var(--auto) 26%, transparent);
+    border-radius: 2px;
+    padding: 0 2px;
+    margin: 0 -2px;
+  }
+  .hl.h { box-shadow: inset 0 -.36em 0 color-mix(in srgb, var(--human) 26%, transparent); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; align-content: start; }
+  .card { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 4px; padding: 17px 18px 19px; background: var(--panel); display: flex; flex-direction: column; gap: 9px; transition: transform .25s cubic-bezier(.2,.7,.3,1), border-color .25s, box-shadow .25s; }
+  .card > *, .tile > * { position: relative; z-index: 1; }
+  .card::before, .tile::before {
+    content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(240px 180px at var(--mx, 50%) var(--my, 0%), var(--auto-soft), transparent 70%);
+    opacity: 0; transition: opacity .3s;
+  }
+  .card:hover::before, .tile:hover::before { opacity: .9; }
+  .card:hover { transform: translateY(-3px); border-color: var(--auto); box-shadow: 0 10px 26px rgba(0,0,0,.10); }
+  .card em { font-family: var(--mono); font-style: normal; font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--auto); }
+  .card h3 { margin: 0; font-size: 15.5px; font-weight: 600; }
+  .card h3 code { font-family: var(--mono); font-size: 14px; color: var(--auto); }
+  .card p { margin: 0; font-size: 13px; color: var(--muted); }
+  .card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+  .card li { font-size: 12.5px; color: var(--muted); padding-left: 16px; position: relative; }
+  .card li::before { content: ""; position: absolute; left: 0; top: 8px; width: 7px; height: 1px; background: currentColor; opacity: .6; }
+  .card li b { color: var(--ink); font-weight: 600; }
+  .card .foot { margin-top: auto; padding-top: 11px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); }
+  .card.step { border-top: 2px solid var(--auto); }
+
+  .card.t { border-top: 2px solid var(--auto); }
+  .card.h { border-top: 2px solid var(--human); }
+  .card.h em, .card.h h3 code { color: var(--human); }
+  .card.h:hover { border-color: var(--human); }
+  .card.r { border-top: 2px solid var(--halt); }
+  .card.r em { color: var(--halt); }
+  .card.r:hover { border-color: var(--halt); }
+  .card.n { border-top: 2px solid var(--line); }
+  .card.n em { color: var(--faint); }
+
+  .chip {
+    display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .03em;
+    padding: 1px 7px; border-radius: 3px; white-space: nowrap;
+    background: var(--auto-soft); color: var(--auto);
+  }
+  .chip.h { background: var(--human-soft); color: var(--human); }
+  .chip.r { background: var(--halt-soft); color: var(--halt); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .tile { position: relative; overflow: hidden; border: 1px solid var(--line); border-top: 2px solid var(--auto); border-radius: 4px; background: var(--panel); padding: 17px 18px 19px; display: flex; flex-direction: column; gap: 10px; transition: transform .25s cubic-bezier(.2,.7,.3,1), box-shadow .25s; }
+  .tile:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(0,0,0,.10); }
+  .tile em { font-family: var(--mono); font-style: normal; font-size: 12px; color: var(--auto); letter-spacing: .02em; }
+  .tile > b { font-family: var(--mono); font-size: clamp(30px, 3.4vw, 44px); font-weight: 500; letter-spacing: -.045em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .tile span { font-size: 12.5px; color: var(--muted); }
+  .tile .src { margin-top: auto; padding-top: 10px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); }
+
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .ins { border: 1px solid var(--line); border-left: 2px solid var(--auto); border-radius: 4px; background: var(--panel-2); padding: 16px 18px 18px; }
+  .ins.warn { border-left-color: var(--human); }
+  .ins > b { display: block; font-family: var(--mono); font-size: clamp(23px, 2.4vw, 31px); font-weight: 500; letter-spacing: -.035em; color: var(--auto); line-height: 1; margin-bottom: 9px; font-variant-numeric: tabular-nums; }
+  .ins.warn > b { color: var(--human); }
+  .ins p { margin: 0; font-size: 13px; color: var(--muted); }
+  .ins p strong { color: var(--ink); font-weight: 600; }
+
+  .band { border: 1px solid var(--line); border-left: 2px solid var(--human); border-radius: 4px; background: var(--panel-2); padding: 15px 18px; display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; }
+  .band > b { font-family: var(--mono); font-size: clamp(20px, 2.2vw, 28px); font-weight: 500; letter-spacing: -.03em; color: var(--human); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .band p { margin: 0; font-size: 13px; color: var(--muted); }
+  .band p strong { color: var(--ink); font-weight: 600; }
+  .band.teal { border-left-color: var(--auto); }
+  .band.teal > b { color: var(--auto); }
+
+  .flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: var(--panel); }
+  .flow > div { padding: 15px 17px 17px; border-right: 1px solid var(--line); position: relative; }
+  .flow > div:last-child { border-right: 0; }
+  .flow em { display: block; font-family: var(--mono); font-style: normal; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin-bottom: 7px; }
+  .flow strong { display: block; font-size: 14.5px; font-weight: 600; margin-bottom: 6px; }
+  .flow strong code { font-family: var(--mono); font-size: 13px; color: var(--auto); }
+  .flow p { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .flow .out { display: block; margin-top: 9px; font-family: var(--mono); font-size: 11px; color: var(--auto); }
+
+  .slide.solo { grid-template-rows: 1fr; place-items: center; }
+  .solo-in {
+    font-size: clamp(72px, 17vw, 250px);
+    font-weight: 600;
+    letter-spacing: -.05em;
+    line-height: 1;
+    color: var(--ink);
+  }
+
+  .slide.intro { position: relative; }
+  .slide.intro > .hero { position: relative; z-index: 1; }
+  .fx {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    -webkit-mask-image: linear-gradient(100deg, transparent 4%, rgba(0,0,0,.30) 30%, #000 62%);
+    mask-image: linear-gradient(100deg, transparent 4%, rgba(0,0,0,.30) 30%, #000 62%);
+  }
+
+  @keyframes unmask {
+    from { opacity: 0; clip-path: inset(0 0 108% 0); transform: translateY(14px); }
+    to   { opacity: 1; clip-path: inset(0 0 -8% 0); transform: none; }
+  }
+
+  .slide.intro[data-on] .hero > * { animation: none; }
+  .slide.intro[data-on] .eyebrow { animation: enterUp .62s cubic-bezier(.2,.7,.3,1) .05s backwards; }
+  .slide.intro[data-on] h1 { animation: unmask 1.05s cubic-bezier(.2,.8,.2,1) .16s backwards; }
+  .slide.intro[data-on] .lede { animation: enterUp .72s cubic-bezier(.2,.7,.3,1) .46s backwards; }
+  .slide.intro[data-on] .rail { animation: enterUp .85s cubic-bezier(.2,.7,.3,1) .34s backwards; }
+  .slide.intro[data-on] .meta > span { animation: enterUp .6s cubic-bezier(.2,.7,.3,1) backwards; }
+  .slide.intro[data-on] .meta > span:nth-child(1) { animation-delay: .62s; }
+  .slide.intro[data-on] .meta > span:nth-child(2) { animation-delay: .70s; }
+  .slide.intro[data-on] .meta > span:nth-child(3) { animation-delay: .78s; }
+  .slide.intro[data-on] .meta > span:nth-child(4) { animation-delay: .86s; }
+
+  .navbar {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 11px clamp(22px, 4vw, 60px) 14px;
+    border-top: 1px solid var(--line-soft);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .07em;
+    color: var(--muted);
+  }
+  .navbar .track { flex: 1; height: 2px; background: var(--line); position: relative; overflow: hidden; }
+  .navbar .fill { position: absolute; inset: 0 auto 0 0; background: var(--auto); transition: width .45s cubic-bezier(.2,.7,.3,1); box-shadow: 0 0 10px 1px var(--auto); }
+  .navbar button { font: inherit; letter-spacing: inherit; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 3px; padding: 7px 14px; cursor: pointer; transition: border-color .18s, color .18s, transform .18s; }
+  .navbar button:hover { border-color: var(--auto); color: var(--auto); transform: translateY(-1px); }
+  .navbar button:focus-visible { outline: 2px solid var(--auto); outline-offset: 2px; }
+  .navbar .hint { color: var(--faint); }
+
+  @keyframes enterUp { from { opacity: 0; transform: translateY(20px) rotateX(6deg); } to { opacity: 1; transform: none; } }
+  @keyframes enterDown { from { opacity: 0; transform: translateY(-20px) rotateX(-6deg); } to { opacity: 1; transform: none; } }
+  .cards, .tiles, .pair, .flow, .body > .wrap { perspective: 1100px; }
+  .cards > *, .tiles > *, .pair > *, .flow > * { transform-origin: 50% 100%; }
+  tbody tr { transform-origin: 0 50%; }
+
+  .slide[data-on]:not(.intro) h2 { animation: unmask .85s cubic-bezier(.2,.8,.2,1) .2s backwards; }
+
+  .slide[data-on] > header,
+  .slide[data-on] .solo-in,
+  .slide[data-on] > .note,
+  .slide[data-on] .hero > *,
+  .slide[data-on] .cards > *,
+  .slide[data-on] .tiles > *,
+  .slide[data-on] .pair > *,
+  .slide[data-on] .flow > *,
+  .slide[data-on] > .body > .band,
+  .slide[data-on] > .body > .wrap,
+  .slide[data-on] tbody tr {
+    animation: enterUp .6s cubic-bezier(.16, .84, .28, 1) backwards;
+  }
+  main[data-dir="back"] .slide[data-on] > header,
+  main[data-dir="back"] .slide[data-on] > .note,
+  main[data-dir="back"] .slide[data-on] .hero > *,
+  main[data-dir="back"] .slide[data-on] .cards > *,
+  main[data-dir="back"] .slide[data-on] .tiles > *,
+  main[data-dir="back"] .slide[data-on] .pair > *,
+  main[data-dir="back"] .slide[data-on] .flow > *,
+  main[data-dir="back"] .slide[data-on] > .body > .band,
+  main[data-dir="back"] .slide[data-on] > .body > .wrap,
+  main[data-dir="back"] .slide[data-on] tbody tr {
+    animation-name: enterDown;
+  }
+
+  .slide[data-on] > header { animation-delay: .17s; }
+  .slide[data-on] > .body > *,
+  .slide[data-on] > .body > .band,
+  .slide[data-on] > .body > .wrap { animation-delay: .23s; }
+  .slide[data-on] > .note { animation-delay: .46s; }
+  .slide[data-on] :is(.cards, .tiles, .pair, .flow, .hero) > :nth-child(1) { animation-delay: .24s; }
+  .slide[data-on] :is(.cards, .tiles, .pair, .flow, .hero) > :nth-child(2) { animation-delay: .31s; }
+  .slide[data-on] :is(.cards, .tiles, .pair, .flow) > :nth-child(3) { animation-delay: .36s; }
+  .slide[data-on] :is(.cards, .tiles, .pair, .flow) > :nth-child(4) { animation-delay: .41s; }
+  .slide[data-on] tbody tr { animation-duration: .5s; }
+  .slide[data-on] tbody tr:nth-child(1) { animation-delay: .27s; }
+  .slide[data-on] tbody tr:nth-child(2) { animation-delay: .31s; }
+  .slide[data-on] tbody tr:nth-child(3) { animation-delay: .35s; }
+  .slide[data-on] tbody tr:nth-child(4) { animation-delay: .39s; }
+  .slide[data-on] tbody tr:nth-child(5) { animation-delay: .43s; }
+  .slide[data-on] tbody tr:nth-child(6) { animation-delay: .47s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, body::before, .rail .scan, .rail li i { animation: none !important; transition: none !important; }
+    .wipe { display: none; }
+    .rail .scan { display: none; }
+  }
+
+  @media (max-width: 940px) {
+    .hero { grid-template-columns: 1fr; }
+    .band, .pair { grid-template-columns: 1fr; gap: 8px; }
+    .flow { grid-template-columns: 1fr; }
+    .flow > div { border-right: 0; border-bottom: 1px solid var(--line); }
+    .slide { padding: 22px 20px 14px; }
+  }
+</style>
+
+<div class="deck">
+
+  <header class="topbar">
+    <span class="brand">agent-auto <em>· SDLC cho team Frontend</em></span>
+    <span class="chapter" id="chapter">Mở đầu</span>
+    <span class="counter"><span id="cur">1</span> / <span id="total">13</span></span>
+  </header>
+
+  <main id="stage">
+    <span class="wipe" id="wipe" aria-hidden="true"></span>
+
+    <section class="slide intro" data-chapter="Mở đầu" data-on>
+      <canvas class="fx" id="fx" aria-hidden="true"></canvas>
+      <div class="hero" style="grid-row: 1 / -1;">
+        <div>
+          <p class="eyebrow">Chia sẻ nội bộ · 17/8/2026</p>
+          <h1>Đưa SDLC vào việc hằng ngày của team Frontend</h1>
+          <p class="lede">Team vẫn đi đủ 6 bước của SDLC, nhưng đi theo trí nhớ: xong một bước không
+            có gì để kiểm lại, cũng không có chốt nào chặn trước khi sang bước sau. Việc đã làm là
+            <b>biến 6 bước đó thành lệnh gõ được</b>, để máy lo phần việc lặp đi lặp lại.</p>
+          <div class="meta">
+            <span><b><span data-to="20">0</span> ngày</b>chạy thật</span>
+            <span><b><span data-to="13">0</span> ticket</b>đi qua quy trình</span>
+            <span><b><span data-to="454">0</span> test</b>tự động · 0 fail</span>
+            <span><b><span data-to="3">0</span> điểm</b>bắt buộc có người</span>
+          </div>
+        </div>
+
+        <div class="rail">
+          <header>6 bước SDLC · ứng với việc thật của team</header>
+          <span class="scan" aria-hidden="true"></span>
+          <ol>
+            <li style="--i:0"><i></i><b>Requirements</b><span>Nhận ticket</span></li>
+            <li style="--i:1"><i></i><b>Design</b><span>Nhận &amp; soát design</span></li>
+            <li style="--i:2"><i></i><b>Implementation</b><span>Dựng landing</span></li>
+            <li style="--i:3"><i></i><b>Testing</b><span>Test trước khi giao</span></li>
+            <li style="--i:4"><i></i><b>Deployment</b><span>Giao HTML</span></li>
+            <li style="--i:5"><i></i><b>Maintenance</b><span>Fix bug QC</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-chapter="Tại sao làm">
+      <header>
+        <p class="eyebrow">Tại sao làm</p>
+        <h2>Làm đủ bước, nhưng không bước nào có chốt — nên lỗi lọt mà không ai biết</h2>
+      </header>
+      <div class="body">
+        <div class="cards">
+          <div class="card r">
+            <em>Vấn đề 1</em>
+            <h3>Không biết task đang ở bước nào</h3>
+            <p>Trạng thái task <b>nằm trong đầu người làm</b>. Đánh Done xong là task
+              <span class="hl">rơi khỏi mọi bảng theo dõi</span> — đúng lúc QC bắt đầu test.</p>
+          </div>
+          <div class="card r">
+            <em>Vấn đề 2</em>
+            <h3>Xong một bước cũng không kiểm lại được</h3>
+            <p>“Design đủ chưa”, “bản đang chạy có đúng bản mình giao không” —
+              <span class="hl">không ai trả lời chắc được</span>, chủ yếu là <b>đoán</b>.</p>
+          </div>
+          <div class="card r">
+            <em>Vấn đề 3</em>
+            <h3>Làm xong không để lại số nào</h3>
+            <p>Task đóng là hết. Lần sau ước lượng vẫn dựa vào <b>kinh nghiệm cá nhân</b>,
+              <span class="hl">không có số liệu nào để bám</span>.</p>
+          </div>
+        </div>
+        <div class="band teal">
+          <b>SDLC</b>
+          <p><strong>Dựa trên mô hình SDLC quen thuộc:</strong> Requirements → Design →
+            Implementation → Testing → Deployment → Maintenance. Không thêm bước nào mới, chỉ làm
+            hai việc: mỗi bước có <strong>một kết quả kiểm lại được</strong>, và
+            <strong>một điều kiện phải đạt</strong> mới sang bước sau.</p>
+        </div>
+      </div>
+      <p class="note">Tự động hoá ở đây không phải để AI viết code hộ. Là để 6 bước sẵn có
+        <b>chạy được bằng lệnh</b> và <b>kiểm lại được bằng số</b>.</p>
+    </section>
+
+    <section class="slide" data-chapter="Bản đồ">
+      <header>
+        <p class="eyebrow">Làm được gì</p>
+        <h2>Mỗi bước có một lệnh để gõ và một điều kiện để qua</h2>
+      </header>
+      <div class="body">
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:19%">Bước</th>
+                <th style="width:26%">Lệnh</th>
+                <th style="width:29%">Máy làm gì</th>
+                <th style="width:26%">Qua bước sau khi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="ph">01<b>Requirements</b></td>
+                <td><code class="cmd">/daily</code> <code class="cmd">/daily delta</code></td>
+                <td>Quét Jira, <b>bóc brief</b>, lấy deadline, <b>gắn ticket với folder code</b>, báo khi sắp trễ</td>
+                <td class="gate">Có deadline + biết code nằm ở folder nào <span class="by">Duyệt</span></td>
+              </tr>
+              <tr>
+                <td class="ph">02<b>Design</b></td>
+                <td><code class="cmd">/daily prep</code> <code class="cmd">/check-design</code></td>
+                <td>Tải design về, <b>mở cây layer trong PSD</b>, liệt kê <b>màn còn thiếu</b> và câu cần hỏi PM</td>
+                <td class="gate">Đủ màn để bắt đầu code</td>
+              </tr>
+              <tr>
+                <td class="ph">03<b>Implementation</b></td>
+                <td><code class="cmd">/code-developer</code></td>
+                <td><b>Bóc spec từ ảnh</b>, code theo luật repo, <b>tự review lại bằng một vai riêng</b></td>
+                <td class="gate">build EXIT 0 · fe-gate 0 ERROR <span class="by">Review diff</span></td>
+              </tr>
+              <tr>
+                <td class="ph">04<b>Testing</b></td>
+                <td><code class="cmd">/check-promotion</code> <code class="cmd">/ui-check</code> <code class="cmd">/website-audit</code></td>
+                <td>Soát popup theo <b>39 loại promotion</b>, mở <b>browser thật</b> đo giao diện, audit trước production</td>
+                <td class="gate">Không còn lỗi chặn</td>
+              </tr>
+              <tr>
+                <td class="ph">05<b>Deployment</b></td>
+                <td><code class="cmd">/commit</code> + <code class="cmd">/daily delta</code></td>
+                <td>Copy sang repo bàn giao, <span class="hl">so byte</span> để biết bên nhận có sửa đè lên không</td>
+                <td class="gate">Bên nhận xác nhận đã nhận <span class="by">Bấm push</span></td>
+              </tr>
+              <tr>
+                <td class="ph">06<b>Maintenance</b></td>
+                <td><code class="cmd">/bug-fixer-lite</code> + radar nền</td>
+                <td>Canh buglist sau khi giao, <b>tách bug mới / QC sửa mô tả / bug mở lại</b>, fix rồi ghi Done</td>
+                <td class="gate">Hết bug thuộc phần mình</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="note">Ba ô <span class="by">nền cam</span> là chỗ bắt buộc có người: duyệt kế hoạch,
+        review diff, bấm push. Còn lại gõ lệnh xong là đi làm việc khác.</p>
+    </section>
+
+    <section class="slide" data-chapter="Bước 01 · Brief">
+      <header>
+        <p class="eyebrow">Bước 01 · brief</p>
+        <h2>Brief không nằm ở một chỗ — nó nằm ở năm chỗ</h2>
+      </header>
+      <div class="body">
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:22%">Đọc từ đâu</th>
+                <th style="width:34%">Lấy được gì</th>
+                <th style="width:44%">Bẫy đã gặp thật</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="src">Description ticket Jira</td>
+                <td>Việc phải làm, timeline, <b>link DESIGN</b></td>
+                <td class="trap">Link DESIGN nằm lẫn giữa mấy link brief. <b>Bóc sót một dòng</b> là báo nhầm “chưa có design” suốt 4 ngày.</td>
+              </tr>
+              <tr>
+                <td class="src">File .docx / .xlsx đính kèm</td>
+                <td><b>Cơ chế chi tiết</b>, công thức tính điểm, cột bảng xếp hạng</td>
+                <td class="trap">Chi tiết hơn Jira. Ticket ghi “03/08”, docx ghi “03~04/08” — <b>đó là khoảng, hạn là ngày cuối</b>.</td>
+              </tr>
+              <tr>
+                <td class="src">Attachment trong ticket</td>
+                <td>Có khi design <b>giao thẳng dạng file</b>, không phải link SharePoint</td>
+                <td class="trap">Một ca design 92 MB đính kèm ngay trong ticket — <b>tìm trên SharePoint không bao giờ ra</b>.</td>
+              </tr>
+              <tr>
+                <td class="src">Comment + chat với PM</td>
+                <td><span class="hl">Phạm vi chốt thật</span>, thường khác mô tả ban đầu</td>
+                <td class="trap">Một câu chat “clone luôn cái H5 và web ra thay header” <b>đổi phạm vi từ 1 bản thành 2 bản</b>.</td>
+              </tr>
+              <tr>
+                <td class="src">Code đang chạy</td>
+                <td>Đối chiếu xem <b>việc nào thật ra đã có sẵn</b></td>
+                <td class="trap">Mở twig ra xem thì phần lớn “điểm khác” bản cũ đã có ⇒ <b>việc còn lại chỉ là thay header + đổi bảng xếp hạng</b>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="band teal">
+          <b>brief.md</b>
+          <p>Năm nguồn trên gộp lại thành <strong><code class="k">tasks/&lt;KEY&gt;/brief.md</code></strong> —
+            các mục: <strong>Việc · Phạm vi · Timeline · Nơi làm việc · Việc còn mở · Câu hỏi cho PM</strong>.
+            Mỗi dòng ghi kèm nguồn và giờ đọc. Hai nguồn đá nhau thì ghi cả hai và nói rõ tin cái nào, vì sao.</p>
+        </div>
+      </div>
+      <p class="note">Đây là bước tốn công nhất nhưng cũng đáng nhất: bóc sai brief thì cả 5 bước sau
+        đi sai theo, mà không ai biết cho tới lúc QC test.</p>
+    </section>
+
+    <section class="slide" data-chapter="Bước 01 · Nối folder">
+      <header>
+        <p class="eyebrow">Bước 01 · nối folder</p>
+        <h2>Ticket gọi một tên, folder code tên khác — nối bằng ba mối</h2>
+      </header>
+      <div class="body">
+        <div class="cards">
+          <div class="card step">
+            <em>Mối 1 · mã game</em>
+            <h3>Đọc mã trong tiêu đề ticket</h3>
+            <p>Tiêu đề <code class="k">[A86.TF_VN][Total Football]</code> → tra bảng
+              <code class="k">gameMap</code> → <code class="k">products/totalfootball</code>.</p>
+            <p>Bảng này <b>học dần</b>: gặp mã mới thì ghi thêm một dòng, <b>lần sau khỏi đoán lại</b>.</p>
+            <span class="foot">Hiện có 7 mã: 221 · 496 · 903 · A49 · A70 · A78 · A86</span>
+          </div>
+          <div class="card step">
+            <em>Mối 2 · nexusId</em>
+            <h3>Khớp số hiệu ticket với tên folder</h3>
+            <p>Ticket có <code class="k">nexusId 58799</code>; folder bên repo bàn giao đặt tên kèm
+              đúng số đó — <code class="k">…_58799</code>.</p>
+            <p>Số khớp thì <b>gần như chắc</b>. Nhưng <b>có ca số lệch</b>, nên không dừng ở đây.</p>
+            <span class="foot">Đúng thì nhanh, sai thì phải xuống mối 3</span>
+          </div>
+          <div class="card step">
+            <em>Mối 3 · đọc file</em>
+            <h3>Mở file ra xác nhận, không đoán</h3>
+            <p>Mở HTML trong repo bàn giao, xem nó nạp <code class="k">dist/&lt;game&gt;.css|js</code>
+              của folder nào bên <code class="k">cdn-source</code>.</p>
+            <p>Nó trỏ tới đâu thì đó chính là folder cần sửa — <span class="hl">bằng chứng, không phải suy đoán</span>.</p>
+            <span class="foot">Chốt xong ghi pathsConfirmed, lần sau khỏi dò lại</span>
+          </div>
+        </div>
+        <div class="band">
+          <b>Khi ba mối không khớp</b>
+          <p>Chuyện thường gặp: tên trên ticket, tên folder trong repo và số hiệu <strong>không
+            trùng nhau</strong> — mỗi bên đặt tên theo thói quen của mình. Lúc đó mối 3 là chỗ gỡ:
+            <strong>file luôn nói thật</strong> nó đang dùng asset của folder nào. Chốt xong thì ghi
+            lại vào state, lần sau khỏi dò từ đầu.</p>
+        </div>
+      </div>
+      <p class="note">Chưa nối được folder thì các bước sau không có chỗ nào để sửa cho đúng — nên đây
+        là <b>điều kiện chặn của bước Requirements</b>, không phải việc làm sau cũng được.</p>
+    </section>
+
+    <section class="slide" data-chapter="Bước 03 · Dựng">
+      <header>
+        <p class="eyebrow">Bước 03 · dựng</p>
+        <h2>Từ ảnh design ra code: ba vai, bàn giao cho nhau bằng file</h2>
+      </header>
+      <div class="body">
+        <div class="flow">
+          <div>
+            <em>Vai 1</em>
+            <strong><code>design-analyst</code></strong>
+            <p>Đọc ảnh, khảo sát <b>design system sẵn có của repo</b>, rồi viết spec: số đo, màu,
+              khoảng cách. Chỗ nào không chắc thì dồn vào mục <b>“Câu hỏi mở”</b> chứ
+              <span class="hl">không đoán số</span>.</p>
+            <span class="out">→ specs/&lt;slug&gt;.md</span>
+          </div>
+          <div>
+            <em>Vai 2</em>
+            <strong><code>frontend-developer</code></strong>
+            <p>Đọc spec và file luật của repo rồi code. <span class="hl">Không mở lại ảnh</span> —
+              ảnh đã được bóc thành spec ở vai trước, mở lại chỉ <b>tốn thêm và dễ lệch</b>.</p>
+            <span class="out">→ source + bản build</span>
+          </div>
+          <div>
+            <em>Vai 3</em>
+            <strong><code>design-checker</code></strong>
+            <p>So code với spec, ghi report <b>từng điểm lệch</b> kèm <code class="k">file:line</code>.
+              FAIL thì quay lại vai 2, <b>tối đa 2 vòng</b>; vẫn FAIL thì
+              <span class="hl">dừng, hỏi người</span>.</p>
+            <span class="out">→ reports/&lt;slug&gt;-check-N.md</span>
+          </div>
+        </div>
+        <div class="pair">
+          <div class="ins">
+            <b>Ghép design với folder</b>
+            <p>Trước khi code, spec ghi rõ <strong>màn nào ứng với file nào</strong> trong repo. Khi
+              dựng bản mới thì ghi rõ <strong>lấy khung từ folder nào sang folder nào</strong> — nhờ
+              vậy cả ba vai làm đúng một chỗ, và trang cũ đang chạy không bị đụng vào.</p>
+          </div>
+          <div class="ins warn">
+            <b>Ba làn, chọn theo việc</b>
+            <p><strong>quick</strong> — dưới 4 file, chỗ sửa đã rõ: tự sửa, không gọi vai nào.
+              <strong>mid</strong> — việc vừa: một vai dev, tự verify. <strong>full</strong> — dựng
+              mới từ design: đủ ba vai. Chọn sai làn thì ghi một dòng vào file gate-tuning, lần sau
+              chọn đúng hơn.</p>
+          </div>
+        </div>
+        <div class="band teal">
+          <b>Library</b>
+          <p>Popup, co giãn PC/mobile, vòng quay, mốc thưởng — <strong>library dùng chung có sẵn hết</strong>.
+            Ba vai chỉ code phần riêng của campaign, không viết lại.</p>
+        </div>
+      </div>
+      <p class="note">Ba vai <b>không nói chuyện trực tiếp</b> — analyst ghi spec ra file, dev đọc file
+        đó, checker cũng đọc file đó. Cấm dán lại nội dung spec hay code vào prompt, chỉ truyền đường dẫn.</p>
+    </section>
+
+    <section class="slide" data-chapter="Console">
+      <header>
+        <p class="eyebrow">Nhìn vào đâu</p>
+        <h2>Console: mở ra thấy hết, không phải mò từng chỗ</h2>
+      </header>
+      <div class="body">
+        <div class="cards">
+          <div class="card t">
+            <em>Tab Hôm nay</em>
+            <h3>Việc của hôm nay</h3>
+            <ul>
+              <li>Task đang ở bước nào, sửa ở folder nào.</li>
+              <li>Mục <span class="chip h">Cần bạn</span> và <span class="chip r">cảnh báo gấp</span> — thứ duy nhất bắt buộc đọc.</li>
+              <li><b>Gate chất lượng</b> <span class="chip">PASS</span> / <span class="chip r">FAIL</span> của lần build gần nhất.</li>
+              <li><span class="chip h">Mốc 14 ngày tới</span> — biết tuần này dồn chỗ nào.</li>
+            </ul>
+          </div>
+          <div class="card h">
+            <em>Tab Theo tháng · Git của tôi</em>
+            <h3>Nhìn xa hơn một ngày</h3>
+            <ul>
+              <li>Timeline mốc của từng ticket theo tháng.</li>
+              <li><b>Ước lượng so với thực tế</b> — số để lần sau ước lượng đỡ hớ.</li>
+              <li>Commit mới nhất theo từng task, và <b>còn nợ push không</b>.</li>
+            </ul>
+          </div>
+          <div class="card t">
+            <em>Mở một ticket</em>
+            <h3>Mọi thứ của ticket đó một chỗ</h3>
+            <ul>
+              <li><b>Brief</b> · <b>board các ngày trước</b> · <b>ảnh design</b> · <b>file &amp; folder</b>.</li>
+              <li>Nút <span class="chip">Đánh Done</span> và ghi log ngay tại chỗ.</li>
+              <li>Terminal gõ thẳng lệnh, không phải đổi cửa sổ.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="band teal">
+          <b>Giúp gì</b>
+          <p>Trước đây phải mở Jira, mở repo, mở sheet, mở Drive rồi tự ghép lại trong đầu.
+            Giờ <strong>mở console là thấy hết ở một chỗ</strong> và biết ngay hôm nay phải chạm vào
+            cái gì. Việc cần người quyết nằm riêng một mục, không lẫn vào phần máy đã tự lo xong.</p>
+        </div>
+      </div>
+      <p class="note">Lợi ích lớn nhất không phải là đẹp, mà là <b>bớt phải nhớ</b>: mở ra là biết
+        đang đứng ở đâu, còn nợ gì, và hôm nay ai cần mình.</p>
+    </section>
+
+    <section class="slide" data-chapter="Nhịp ngày">
+      <header>
+        <p class="eyebrow">Chạy thế nào</p>
+        <h2>Một ngày chỉ cần gõ ba lúc</h2>
+      </header>
+      <div class="body">
+        <div class="cards">
+          <div class="card step">
+            <em>Đầu ngày</em>
+            <h3><code class="cmd">/daily</code></h3>
+            <ul>
+              <li>Quét Jira, bóc brief, lấy deadline, <b>gắn ticket với folder code</b>.</li>
+              <li>Đưa ra <b>một bảng kế hoạch</b> — duyệt đúng một lần rồi nó tự chạy.</li>
+              <li>Xuất board của ngày và mục <b>“Cần bạn”</b>.</li>
+            </ul>
+            <span class="foot">Đọc mỗi sáng · chỉ mục “Cần bạn” là bắt buộc</span>
+          </div>
+          <div class="card step">
+            <em>Trong ngày</em>
+            <h3><code class="cmd">/daily delta</code> → lệnh của bước đang làm</h3>
+            <ul>
+              <li>Delta soi nhanh: Jira đổi gì, bên nhận sửa gì, <b>còn nợ push không</b>.</li>
+              <li>Task tới lượt thì gõ lệnh của <b>đúng bước nó đang đứng</b>.</li>
+              <li>Lệnh nào cũng <b>tự chạy điều kiện của bước đó</b> trước khi báo xong.</li>
+            </ul>
+            <span class="foot">Gõ khi cần · một lượt delta khoảng một phút</span>
+          </div>
+          <div class="card step">
+            <em>Chạy nền</em>
+            <h3>Radar · 60 phút một lượt</h3>
+            <ul>
+              <li>Chỉ chạy trong giờ làm, <b>nhường khi người đang gõ</b>, không chạy chồng lượt.</li>
+              <li>Canh buglist QC sau khi giao — <span class="hl">chỗ trước đây không ai ngó</span>.</li>
+              <li>Sheet không đổi thì <b>dừng luôn</b>; đổi mới đọc và <b>so từng dòng</b>.</li>
+            </ul>
+            <span class="foot">Không ai bấm · tự dừng khi task qua ngày release</span>
+          </div>
+        </div>
+      </div>
+      <p class="note">Ba luật áp cho cả ba: <b>có bằng chứng thật mới đổi trạng thái</b> (commit,
+        file, byte) · <b>không chắc thì ghi vào mục “Cần bạn” rồi dừng</b> ·
+        <b>không tự push, không tự sửa Jira</b>.</p>
+    </section>
+
+    <section class="slide" data-chapter="Hiệu quả">
+      <header>
+        <p class="eyebrow">Hiệu quả</p>
+        <h2>Sáu chỗ trước đây lọt, giờ bắt được</h2>
+      </header>
+      <div class="body">
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:30%">Việc</th>
+                <th style="width:22%">Trước</th>
+                <th style="width:48%">Sau</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>Bug QC về sau khi ticket đã đóng</b></td>
+                <td class="was">Không ai ngó</td>
+                <td>Vẫn bắt được dù ticket đóng đã lâu — <b>trong vòng một hai tiếng</b> kể từ lúc QC ghi lên sheet</td>
+              </tr>
+              <tr>
+                <td><b>Buglist không được dán vào Jira</b></td>
+                <td class="was">Không tìm ra</td>
+                <td>Tìm được qua Drive; đồng thời <b>loại luôn những link không phải buglist</b> để khỏi mất công đọc</td>
+              </tr>
+              <tr>
+                <td><b>Bản đang chạy khác bản đã giao</b></td>
+                <td class="was">Chỉ lộ khi user bấm nút</td>
+                <td>So byte phát hiện ngay, <b>kể cả khi giao diện trông vẫn bình thường</b></td>
+              </tr>
+              <tr>
+                <td><b>Deadline bị dời trong Jira</b></td>
+                <td class="was">Biết thì đã trễ</td>
+                <td>Bắt được <b>ngay trong ngày</b>, bảng mốc tự xếp lại theo thứ tự gấp</td>
+              </tr>
+              <tr>
+                <td><b>Cập nhật trạng thái task</b></td>
+                <td class="was">Gõ tay, hay quên</td>
+                <td>Ghi tự động từ <b>commit và trạng thái ticket</b> — không phải nhớ, không phải gõ</td>
+              </tr>
+              <tr>
+                <td><b>Soát design đủ hay thiếu</b></td>
+                <td class="was">Đọc bằng mắt</td>
+                <td>Mở cây layer PSD, thấy cả <b>những màn nằm trong group ẩn</b> mà ảnh preview không có</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="note">Cả sáu đều cùng một kiểu: không ai báo, không có thông báo, mở ra mới biết.
+        <b>Đây là loại việc máy canh tốt hơn người</b> — không phải vì thông minh hơn, mà vì không quên.</p>
+    </section>
+
+    <section class="slide" data-chapter="Tiêu hao">
+      <header>
+        <p class="eyebrow">Tiêu hao</p>
+        <h2>Một lần chạy tốn bao nhiêu</h2>
+      </header>
+      <div class="body">
+        <div class="tiles">
+          <div class="tile">
+            <em>Một lệnh điều phối</em>
+            <b>~1%</b>
+            <span>Khoảng <b>3 triệu token</b> mỗi lượt. Gõ <code class="k">/daily</code> hay
+              <code class="k">/daily delta</code> bao nhiêu lần trong ngày cũng không đáng kể.</span>
+            <span class="src">Đo trên 53 lượt · khoảng 2–5 triệu token</span>
+          </div>
+          <div class="tile">
+            <em>Fix bug một task</em>
+            <b>~2%</b>
+            <span>Khoảng <b>6 triệu token</b> cho trọn một buglist: điều tra, fix, verify và ghi Done lên sheet.</span>
+            <span class="src">Đo trên 23 lượt · task nặng lên tới ~15%</span>
+          </div>
+          <div class="tile">
+            <em>Dựng landing từ design</em>
+            <b>gần trọn</b>
+            <span>Một flow lớn đi hết ba vai analyst → dev → checker <b>ăn gần hết, có khi hơn một phiên</b>.</span>
+            <span class="src">Vài trăm triệu token · đây là phần nặng nhất</span>
+          </div>
+        </div>
+        <div class="pair">
+          <div class="ins">
+            <b>Mốc quy chiếu</b>
+            <p>Một <strong>phiên làm việc 5 giờ</strong> đo được khoảng <strong>350 triệu token</strong>
+              (trung vị của 26 khối làm việc thật). Mọi con số phần trăm ở trên tính theo mốc này, nên
+              team nào cũng quy chiếu được về gói của mình.</p>
+          </div>
+          <div class="ins warn">
+            <b>Chọn làn theo việc</b>
+            <p>Việc nhỏ đi làn <strong>quick</strong>, việc vừa đi <strong>mid</strong>, chỉ khi dựng
+              mới từ design mới cần <strong>full</strong>. Chọn đúng làn là cách tiết kiệm lớn nhất —
+              hơn mọi thứ khác cộng lại.</p>
+          </div>
+        </div>
+      </div>
+      <p class="note">Phần theo dõi và điều phối gần như không tốn gì; phần tốn là lúc thật sự dựng
+        code. Muốn thử trước thì bật <b>theo dõi + radar</b>, chưa cần đụng tới làn dựng — và
+        <b>chi phí canh do bạn quyết</b>: mỗi buglist có một nút bật/tắt theo dõi, sheet đã tắt thì
+        không đọc, không tính vào lượt quét nào.</p>
+    </section>
+
+    <section class="slide" data-chapter="Áp dụng">
+      <header>
+        <p class="eyebrow">Áp dụng</p>
+        <h2>Team khác áp dụng được gì</h2>
+      </header>
+      <div class="body">
+        <div class="cards">
+          <div class="card t">
+            <em>Dùng được ngay</em>
+            <h3>Không dính nghiệp vụ Frontend</h3>
+            <ul>
+              <li><b>Radar chạy nền</b> — chỉ chạy giờ làm, không chạy chồng lượt, nhường khi người đang gõ.</li>
+              <li><b>Canh buglist trên Sheets</b> — biết bug nào mới, bug nào QC vừa sửa, bug nào mở lại.</li>
+              <li><b>Điều kiện sở hữu</b> — để máy biết lúc nào phải dừng, không tự ý đụng vào code.</li>
+              <li><b>Vòng đời task theo bằng chứng</b> + board mỗi ngày.</li>
+            </ul>
+            <span class="foot">Team nào cũng dùng được, gần như không phải sửa</span>
+          </div>
+          <div class="card h">
+            <em>Chỉnh theo team</em>
+            <h3>Phần gắn với quy ước riêng</h3>
+            <ul>
+              <li><b>Cách gắn ticket với folder code</b> theo cách đặt tên repo của team bạn.</li>
+              <li><b>Bảng phân loại bug</b> theo vùng mà team bạn sở hữu.</li>
+              <li><b>File luật của repo</b> — mỗi luật một mã, báo lỗi thì trích mã ra.</li>
+              <li><b>Bước riêng</b> — chỗ tụi mình có “giao HTML”, team khác sẽ có bước khác.</li>
+            </ul>
+            <span class="foot">Chỉnh một lần, dùng lâu dài</span>
+          </div>
+          <div class="card t">
+            <em>Nên bắt đầu từ đâu</em>
+            <h3>Thử phần nhẹ trước</h3>
+            <ul>
+              <li>Bật <b>phần theo dõi và radar</b> trước — gần như không tốn gì, thấy hiệu quả ngay.</li>
+              <li>Dùng vài ngày, đọc board mỗi sáng, chỉnh luật khi nó hiểu sai.</li>
+              <li>Quen rồi mới thêm <b>làn dựng code</b> — đó là phần tốn và cần quen tay.</li>
+              <li>Cần: Claude Code · Jira · Google Drive · máy bật trong giờ làm.</li>
+            </ul>
+            <span class="foot">Không phải làm hết một lượt</span>
+          </div>
+        </div>
+      </div>
+      <p class="note">Không cần lấy nguyên cả bộ. Lấy phần nào thấy hợp, phần còn lại giữ nguyên cách
+        team đang làm — <b>quy trình này thiết kế để tháo ra dùng từng mảnh</b>.</p>
+    </section>
+
+    <section class="slide" data-chapter="Sắp tới">
+      <header>
+        <p class="eyebrow">Hướng phát triển</p>
+        <h2>Đi tiếp về đâu</h2>
+      </header>
+      <div class="body">
+        <div class="cards">
+          <div class="card h">
+            <em>Trung hạn</em>
+            <h3>Ước lượng bằng số</h3>
+            <ul>
+              <li>Đủ dữ liệu rồi thì tính được <b>mỗi bước thường mất bao lâu</b>, thay vì ước bằng cảm giác.</li>
+              <li>Từ đó biết task nào hay kẹt ở bước nào, và kẹt vì lý do gì.</li>
+              <li>Đóng gói phần lõi thành <b>bộ cài đặt</b> để team khác bật lên là chạy.</li>
+            </ul>
+            <span class="foot">Cần thêm vài tuần dữ liệu</span>
+          </div>
+          <div class="card n">
+            <em>Xa hơn</em>
+            <h3>Nối nốt chỗ còn phải nhớ</h3>
+            <ul>
+              <li>Rà lại 6 bước, chỗ nào <b>vẫn phải nhớ bằng đầu</b> thì nối tiếp chỗ đó.</li>
+              <li>Mở rộng sang các loại task khác ngoài landing và mainsite.</li>
+              <li>Chia sẻ để <b>nhiều team dùng chung một bộ lõi</b>, mỗi team giữ phần quy ước riêng.</li>
+            </ul>
+            <span class="foot">Tuỳ nhu cầu thực tế</span>
+          </div>
+        </div>
+      </div>
+      <p class="note">Nguyên tắc giữ nguyên khi đi tiếp: <b>máy lo phần lặp đi lặp lại, người giữ ba
+        điểm quyết</b> — duyệt kế hoạch, review diff, bấm push.</p>
+    </section>
+
+    <section class="slide solo" data-chapter="Demo">
+      <div class="solo-in">Demo</div>
+    </section>
+
+  </main>
+
+  <footer class="navbar">
+    <button id="prev" type="button">← Trước</button>
+    <button id="next" type="button">Sau →</button>
+    <span class="track"><span class="fill" id="fill"></span></span>
+    <span class="hint">← → để chuyển slide</span>
+  </footer>
+
+</div>
+
+<script>
+  const stage = document.getElementById('stage');
+  const slides = [...document.querySelectorAll('.slide')];
+  const fill = document.getElementById('fill');
+  const cur = document.getElementById('cur');
+  const chapter = document.getElementById('chapter');
+  const still = matchMedia('(prefers-reduced-motion: reduce)');
+  document.getElementById('total').textContent = slides.length;
+  slides.forEach((s, i) => { s.dataset.num = String(i + 1).padStart(2, '0'); });
+
+  stage.addEventListener('pointermove', (e) => {
+    const box = e.target.closest && e.target.closest('.card, .tile');
+    if (!box) return;
+    const r = box.getBoundingClientRect();
+    box.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+    box.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+  });
+  let at = 0;
+
+  function countUp(el) {
+    const to = Number(el.dataset.to);
+    if (still.matches) { el.textContent = to; return; }
+    const started = performance.now();
+    const tick = (now) => {
+      const p = Math.min(1, (now - started) / 900);
+      el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  const wipe = document.getElementById('wipe');
+
+  function show(next) {
+    const target = Math.max(0, Math.min(slides.length - 1, next));
+    const prev = at;
+    stage.dataset.dir = target < at ? 'back' : 'fwd';
+    at = target;
+    if (prev !== at) {
+      const old = slides[prev];
+      old.setAttribute('data-out', '');
+      clearTimeout(old._t);
+      old._t = setTimeout(() => old.removeAttribute('data-out'), 230);
+      wipe.classList.remove('go');
+      void wipe.offsetWidth;
+      wipe.classList.add('go');
+    }
+    slides.forEach((s, i) => s.toggleAttribute('data-on', i === at));
+    slides[at].scrollTop = 0;
+    cur.textContent = at + 1;
+    chapter.textContent = slides[at].dataset.chapter || '';
+    fill.style.width = ((at + 1) / slides.length * 100) + '%';
+    slides[at].querySelectorAll('[data-to]').forEach(countUp);
+    if (at === 0) fxStart(); else fxStop();
+  }
+
+  const fx = document.getElementById('fx');
+  const ctx = fx.getContext('2d');
+  let nodes = [], edges = [], pulses = [], raf = 0, t0 = 0;
+
+  function readColor(name) {
+    const hex = getComputedStyle(document.body).getPropertyValue(name).trim();
+    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+    return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [80, 160, 170];
+  }
+  let cMain = readColor('--auto');
+  let cWarm = readColor('--human');
+  const rgba = (c, a) => 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+
+  function build() {
+    const r = fx.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    fx.width = Math.round(r.width * dpr);
+    fx.height = Math.round(r.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const step = 132;
+    const cols = Math.ceil(r.width / step) + 1;
+    const rows = Math.ceil(r.height / step) + 1;
+    nodes = [];
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const seed = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+        const jx = (seed - Math.floor(seed)) - 0.5;
+        const seed2 = Math.sin(x * 269.5 + y * 183.3) * 43758.5453;
+        const jy = (seed2 - Math.floor(seed2)) - 0.5;
+        nodes.push({
+          bx: x * step + jx * step * 0.62,
+          by: y * step + jy * step * 0.62,
+          ph: (seed - Math.floor(seed)) * Math.PI * 2,
+          amp: 5 + (seed2 - Math.floor(seed2)) * 8,
+          x: 0, y: 0,
+        });
+      }
+    }
+    edges = [];
+    const reach = step * 1.16;
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[i].bx - nodes[j].bx, dy = nodes[i].by - nodes[j].by;
+        if (dx * dx + dy * dy < reach * reach) edges.push([i, j]);
+      }
+    }
+    pulses = [];
+    const count = Math.max(6, Math.min(16, Math.round(edges.length / 26)));
+    for (let k = 0; k < count; k++) pulses.push(spawn(k / count));
+  }
+
+  function spawn(offset) {
+    return {
+      e: (Math.random() * edges.length) | 0,
+      t: offset === undefined ? 0 : offset,
+      sp: 0.16 + Math.random() * 0.22,
+      warm: Math.random() < 0.22,
+    };
+  }
+
+  function frame(now) {
+    if (!nodes.length) { build(); raf = requestAnimationFrame(frame); return; }
+    if (!t0) t0 = now;
+    const el = (now - t0) / 1000;
+    const r = fx.getBoundingClientRect();
+    ctx.clearRect(0, 0, r.width, r.height);
+
+    for (const n of nodes) {
+      n.x = n.bx + Math.sin(el * 0.28 + n.ph) * n.amp;
+      n.y = n.by + Math.cos(el * 0.23 + n.ph * 1.3) * n.amp * 0.7;
+    }
+
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = rgba(cMain, 0.13);
+    ctx.beginPath();
+    for (const [i, j] of edges) {
+      ctx.moveTo(nodes[i].x, nodes[i].y);
+      ctx.lineTo(nodes[j].x, nodes[j].y);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = rgba(cMain, 0.30);
+    for (const n of nodes) {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    for (const p of pulses) {
+      p.t += p.sp * 0.016;
+      if (p.t >= 1) Object.assign(p, spawn(0));
+      const e = edges[p.e];
+      if (!e) { Object.assign(p, spawn(0)); continue; }
+      const a = nodes[e[0]], b = nodes[e[1]];
+      const col = p.warm ? cWarm : cMain;
+      const ease = p.t < 0.5 ? p.t * 2 : (1 - p.t) * 2;
+
+      ctx.strokeStyle = rgba(col, 0.34 * ease);
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      const tail = Math.max(0, p.t - 0.28);
+      ctx.moveTo(a.x + (b.x - a.x) * tail, a.y + (b.y - a.y) * tail);
+      ctx.lineTo(a.x + (b.x - a.x) * p.t, a.y + (b.y - a.y) * p.t);
+      ctx.stroke();
+
+      const px = a.x + (b.x - a.x) * p.t, py = a.y + (b.y - a.y) * p.t;
+      const g = ctx.createRadialGradient(px, py, 0, px, py, 11);
+      g.addColorStop(0, rgba(col, 0.85 * ease));
+      g.addColorStop(1, rgba(col, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(px, py, 11, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = rgba(col, 0.95 * ease);
+      ctx.beginPath();
+      ctx.arc(px, py, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    raf = requestAnimationFrame(frame);
+  }
+
+  function fxStart() {
+    if (raf) return;
+    build();
+    if (still.matches) { t0 = performance.now(); frame(t0 + 16); cancelAnimationFrame(raf); raf = 0; return; }
+    raf = requestAnimationFrame(frame);
+  }
+  function fxStop() { cancelAnimationFrame(raf); raf = 0; }
+
+  addEventListener('resize', () => { if (raf || still.matches) build(); });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    cMain = readColor('--auto'); cWarm = readColor('--human');
+  });
+
+  document.getElementById('next').addEventListener('click', () => show(at + 1));
+  document.getElementById('prev').addEventListener('click', () => show(at - 1));
+  addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); show(at + 1); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); show(at - 1); }
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
+  });
+
+  show(0);
+</script>
+
+

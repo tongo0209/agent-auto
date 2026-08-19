@@ -1,6 +1,6 @@
 ---
 name: check-design
-description: Soát design của một task đã ĐỦ so với yêu cầu chưa, trên 3 tầng — tầng FILE (đã tải đủ file nguồn chưa), tầng MÀN (brief/docx/Jira đòi màn nào, design có chưa), tầng TRẠNG THÁI (mobile, hover/active, popup content, ảnh share...). Chỉ báo THIẾU cái NGUỒN có đòi; cái nguồn không nói thì thành câu hỏi cho PM, không bao giờ gọi là thiếu. Không dám kết luận THIẾU trước khi đã dump cây layer PSD/PSB. Xuất báo cáo + block copy gửi PM + ghi bằng chứng có mốc thời gian vào agent-auto (tasks/<KEY>/design-gap.md, state.issues[KEY].design.gaps, mục "Việc còn mở" của brief), lần chạy sau tự so DELTA ("mục X vẫn thiếu sang ngày thứ 3"). Dùng khi user gõ /check-design, hoặc hỏi "design đủ chưa", "còn thiếu design gì", "design này code được chưa", "đòi PM cái gì"; và khi /daily prep xong hoặc trước khi giao /code-developer. KHÔNG đổi phase, KHÔNG commit/push, KHÔNG ghi ngược Jira.
+description: Soát design đã giao có ĐỦ để dựng chưa — đủ file nguồn, đủ màn, đủ trạng thái mà brief/docx/Jira đòi — rồi xuất báo cáo kèm block gửi PM. Dùng khi user gõ /check-design, hoặc hỏi "design đủ chưa", "còn thiếu design gì", "design này code được chưa", "đòi PM cái gì"; và sau /daily prep hoặc trước khi giao /code-developer.
 ---
 
 # /check-design — design đã giao có ĐỦ để dựng chưa
@@ -60,6 +60,15 @@ nhất là `CHƯA-CHẮC`, kèm `evidence.blockedBy` nói rõ kẹt ở đâu.
 > Script `gap-store.mjs` **tự hạ mức** nếu bạn khai `THIẾU` mà `evidence.looked` không có file
 > `.psd/.psb` nào. Đừng nhét tên PSD vào cho qua cửa — hãy đi dump thật. Cũng vậy: khai `ĐỦ`
 > mà không chỉ ra được file/vùng/layer thì bị hạ xuống `CHƯA-CHẮC`.
+
+### Chuẩn để đọc design bằng con mắt thư viện
+
+Khi soi popup trong design: đối chiếu với module có sẵn ở `libraryMainsite-t-popup/html/module/`
+(`popup_login`, `popup_register`, `popup_pre_register`, `popup_condition`, `popup_confirm`, `popup_inform`,
+`popup_reward`, `popup_doithuong`, `popup_history`, `popup_getlist`, `popup_bxh`, `popup_input`, `popup_rule`).
+Popup nào **dùng lại được module** thì ghi kèm tên module — dev khỏi dựng lại (R-POP-1). Popup design vẽ
+khác hẳn khung `base.html.twig` → không phải "thiếu design", mà là mục **hỏi PM** ("có buộc phải khác chuẩn không?").
+Luật: `~/VNG/agent-auto/rules/popup-library.md`.
 
 ## Luồng 5 bước
 

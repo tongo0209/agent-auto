@@ -47,7 +47,7 @@ check warn 'twig comment mô tả' /a/tpl.twig '{# vòng lặp danh sách #}
 {# hết #}
 {% endfor %}'
 
-# --- Phải QUIET: 2 ngoại lệ hợp lệ của R-CS-1 ---
+# --- Phải QUIET: 3 loại comment hợp lệ của R-CS-1 ---
 check quiet 'hợp đồng pm__' /a/src/main.js '// pm__btn-claim: hook JS platform, đổi tên = nút chết
 const claim = document.querySelector(".pm__btn-claim");
 // pm__popup-gift: platform tự mở, không tự toggle
@@ -161,7 +161,7 @@ setVh();
 applyBackdrop();'
 
 # --- Phải QUIET: code sạch thật ---
-check quiet 'zero comment' /a/src/main.js 'const VISIBLE_DAYS = 3;
+check quiet 'code sạch, không comment' /a/src/main.js 'const VISIBLE_DAYS = 3;
 document.querySelector(".pm__popup-claim").classList.add("active");
 items.slice(0, VISIBLE_DAYS).forEach(render);'
 

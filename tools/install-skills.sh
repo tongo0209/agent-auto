@@ -128,6 +128,10 @@ write_hooks_now() {
       { matcher:"Bash",       hooks:[{type:"command",command:"/bin/bash",args:[dir+"/hooks/guard-bash.sh"],timeout:5}] },
       { matcher:"Read|Grep",  hooks:[{type:"command",command:"/bin/bash",args:[dir+"/hooks/guard-read.sh"],timeout:5}] },
     ];
+    j.hooks.PostToolUse = [
+      { matcher:"Write|Edit|MultiEdit",      hooks:[{type:"command",command:"/bin/bash",args:[dir+"/hooks/guard-style.sh"],timeout:5}] },
+      { matcher:"Write|Edit|MultiEdit|Bash", hooks:[{type:"command",command:"/bin/bash",args:[dir+"/hooks/guard-state.sh"],timeout:10}] },
+    ];
     fs.mkdirSync(require("path").dirname(p),{recursive:true});
     fs.writeFileSync(p, JSON.stringify(j,null,2)+"\n");
   ' "$SETTINGS" "$CLAUDE_DIR"
@@ -151,6 +155,15 @@ if [ "$hooks_state" = other ] || [ "$hooks_state" = badjson ]; then
     { "matcher": "Read|Grep",
       "hooks": [{ "type": "command", "command": "/bin/bash",
                   "args": ["$CLAUDE_DIR/hooks/guard-read.sh"], "timeout": 5 }] }
+JSON
+  say "  … và trong PostToolUse:"
+  cat <<JSON
+    { "matcher": "Write|Edit|MultiEdit",
+      "hooks": [{ "type": "command", "command": "/bin/bash",
+                  "args": ["$CLAUDE_DIR/hooks/guard-style.sh"], "timeout": 5 }] },
+    { "matcher": "Write|Edit|MultiEdit|Bash",
+      "hooks": [{ "type": "command", "command": "/bin/bash",
+                  "args": ["$CLAUDE_DIR/hooks/guard-state.sh"], "timeout": 10 }] }
 JSON
 fi
 say ""

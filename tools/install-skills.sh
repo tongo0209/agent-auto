@@ -133,6 +133,9 @@ elif grep -q '"autoFix": *true' "$REPO/config.json" 2>/dev/null; then
 else
   say "  · bug-fixer-lite chưa cài — chỉ cần khi bật bugRadar.autoFix"
 fi
+if [ -e "$CLAUDE_DIR/skills/check-promotion" ]; then good "skill check-promotion — có"
+else say "  · check-promotion chưa cài — bước soát popup (Bước 04) cần; lấy từ repo gt-promotion-template"
+fi
 say ""
 
 # ── Hook trong settings.json ─────────────────────────────────────────────────

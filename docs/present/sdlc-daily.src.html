@@ -997,8 +997,8 @@
             <em>Cài thế nào</em>
             <h3>Một lệnh, có kiểm hộ</h3>
             <ul>
-              <li><b>1 lệnh</b> <code class="k">install-skills.sh</code> — đủ 9 skill + 4 agent +
-                hook + statusline, tự kiểm dependency.</li>
+              <li><b>1 lệnh</b> <code class="k">install-skills.sh --write-hooks</code> — đủ 9 skill
+                + 4 agent, bật hook + statusline, tự kiểm dependency.</li>
               <li>Còn <b>5 việc tay</b> (auth Jira, config, dán rules, ghép Chrome) — installer
                 in sẵn checklist đúng thứ tự.</li>
               <li><code class="k">/daily doctor</code> <b>0 ERROR = cài xong</b> — không phải đoán
@@ -1010,8 +1010,8 @@
             <em>Phần tôi lo</em>
             <h3>Docs và kèm buổi đầu</h3>
             <ul>
-              <li><b>Docs cài đặt dẫn từng bước</b> — vừa được soát lại bằng 3 lượt kiểm độc lập,
-                vá hơn 20 lỗ "cài xong tưởng đủ".</li>
+              <li><b>Docs cài đặt dẫn từng bước</b> — vừa soát lại bằng nhiều lượt kiểm độc lập,
+                vá hàng loạt lỗ "cài xong tưởng đủ".</li>
               <li><b>Kèm từng người buổi đầu</b> — máy hiểu sai chỗ nào, sửa luật ngay chỗ đó.</li>
               <li><b>Quy ước riêng</b> (gắn ticket–folder, phân loại bug) chỉnh 1 lần, cả team dùng chung.</li>
             </ul>
@@ -1021,8 +1021,8 @@
             <em>Dùng cả bộ</em>
             <h3>Đủ 6 bước, người giữ quyền quyết</h3>
             <ul>
-              <li><b>Trọn quy trình</b>: từ nhận ticket tới fix bug QC — mỗi bước một lệnh, repo này
-                chứa tất cả.</li>
+              <li><b>Trọn quy trình</b>: từ nhận ticket tới fix bug QC — mỗi bước một lệnh,
+                <b>phần lõi nằm trọn repo này</b>.</li>
               <li><b>3 điểm vẫn là người</b>: duyệt kế hoạch, review diff, bấm push.</li>
               <li>Sau vài tuần <b>quyết tiếp bằng số</b>: board đọc được không, bug và bản mới design
                 có bị bắt kịp không.</li>
@@ -1031,8 +1031,9 @@
           </div>
         </div>
       </div>
-      <p class="note">Vẫn <b>tháo ra dùng từng mảnh</b> được nếu ai đó chỉ muốn một phần — nhưng bộ đã
-        đóng gói đủ để <b>dùng nguyên con</b>: skill, agent, luật, hook nằm chung một repo.</p>
+      <p class="note">Vẫn <b>tháo ra dùng từng mảnh</b> được — phần lõi (9 skill + 4 agent + luật +
+        hook) nằm chung một repo; riêng <b>2 lệnh mượn repo team sẵn có</b> (soát popup ở
+        gt-promotion-template, fix buglist ở cdn-source) — installer kiểm và nhắc hộ khi thiếu.</p>
     </section>
 
     <section class="slide" data-chapter="Sắp tới">

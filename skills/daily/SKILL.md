@@ -1,6 +1,6 @@
 ---
 name: daily
-description: Điều phối ngày + vòng đời task của dev frontend VNG: quét Jira (project GW), bóc design đã giao, suy phase từ commit thật, trình kế hoạch duyệt 1 lần rồi tự chạy (code qua code-developer), canh buglist QC sau bàn giao, cập nhật board + console. KHÔNG ghi ngược Jira, KHÔNG commit/push. Modes: mặc định | plan | prep <KEY> | week | add | link | delta | bugwatch | bugwrite | wrap | status | doctor. Dùng khi user gõ /daily hoặc nói "check task jira hôm nay", "hôm nay làm gì", "kế hoạch tuần", "chốt ngày".
+description: Điều phối ngày + vòng đời task của dev frontend VNG: quét Jira (project GW), bóc design đã giao, suy phase từ commit thật, trình kế hoạch duyệt 1 lần rồi tự chạy (code qua code-developer), canh buglist QC sau bàn giao, cập nhật board + console. KHÔNG ghi ngược Jira, KHÔNG commit/push. Modes: mặc định | plan | prep <KEY> | week | add | link | delta | bugwatch | bugwrite | designwatch | wrap | status | doctor. Dùng khi user gõ /daily hoặc nói "check task jira hôm nay", "hôm nay làm gì", "kế hoạch tuần", "chốt ngày".
 ---
 
 # /daily — điều phối ngày + vòng đời task: Jira → kế hoạch → chạy → giao HTML → bug → chốt
@@ -100,7 +100,15 @@ Token đầu của `$ARGUMENTS`:
   read-only, không đụng working tree ⇒ an toàn cho mọi repo, kể cả repo có thay đổi chưa commit;
   (3) bóc link sheet mới trong comment → `state.issues[key].bugSheets`;
   (4) **refresh `history/months.json` khi `generatedAt` ≠ hôm nay** — 1 query snapshot theo
-  `references/jql.md` mục "Snapshot theo tháng", ghi đè (backup sang `.backups/months/`).
+  `references/jql.md` mục "Snapshot theo tháng", ghi đè (backup sang `.backups/months/`);
+  (5) **xếp hàng quét lại design** — ticket phase chưa tới `wait-test` có `design.status =
+  đã-giao-đã-tải` + nguồn là FOLDER SharePoint (có manifest): `design.lastScanAt` (fallback
+  `downloadedAt`) quá 48h → set `design.scanDue = true` + 1 dòng board "design <KEY> chưa quét
+  lại N ngày — `/daily designwatch`". KHÔNG quét trong delta: `sp-scan.js` cần tab Chrome cùng
+  origin SharePoint, phiên nền không có toolset chrome (whitelist radar chỉ Atlassian + Google
+  Drive — `tools/radar-tick.mjs`). Riêng design host **Google Drive** thì quét được ngay tại
+  đây: `get_file_metadata` so `modifiedTime` với `design.sourceModified` → mới hơn = designer
+  up bản mới → set `design.sourceChanged` + báo như bản mới (luồng SO CŨ↔MỚI).
   CHỈ báo thay đổi + cập nhật board/state. Không code.
   ⚠ Bước (4) KHÔNG được bỏ dù `delta` là mode nhẹ: tab **"Theo tháng"** của console đọc THẲNG
   `months.json`, không tự suy từ `state.json`. Bỏ qua = task vừa đóng vẫn hiện ○ "đang làm" và
@@ -124,6 +132,18 @@ Token đầu của `$ARGUMENTS`:
 - `bugwrite` → **cổng duyệt** rồi xả hàng đợi `pendingSheetWrite` lên sheet (cần Chrome ⇒ chỉ
   chạy được ở phiên CLI tương tác). Mode mặc định tự làm việc này ở Bước 0, nên hiếm khi phải
   gõ tay. Luật duyệt theo `grade`: xem mục "Chấm độ chắc" bên dưới.
+- `designwatch [<KEY>]` → quét lại NGUỒN design cho ticket có `design.scanDue` (hoặc KEY chỉ
+  định) — trả lời "designer có up bản mới không", câu mà coverage KHÔNG trả lời được (coverage
+  so local với manifest CŨ). Cần Chrome ⇒ chỉ phiên CLI, như `bugwrite`. Mỗi ticket:
+  (1) `scripts/sp-scan.js` trên tab SharePoint → manifest mới `~/Downloads/sp-manifest-<KEY>.json`;
+  (2) `node tools/sp-diff.mjs designs/<KEY>/sp-manifest.json <manifest mới>` —
+  exit 0 → ghi `design.lastScanAt`, xoá `scanDue`, xong;
+  exit 1 → `--todo` đổ danh sách MỚI/ĐỔI vào `sp-fetch.js` tải về, đi luồng SO CŨ↔MỚI sẵn có
+  (`references/sharepoint.md`), thay manifest local bằng bản mới, ghi
+  `design.sourceChanged = {at, added, changed}` + ⚠️ đầu báo cáo "design <KEY> có bản mới";
+  exit 2 → quét hỏng (tab treo/manifest rỗng) — KHÔNG kết luận gì, mở tab mới quét lại (luật
+  chặn của chính `sp-diff.mjs`, ca thật 11/8). Đã xử lý xong bản mới (compare/fix vào kế hoạch)
+  → xoá `sourceChanged` để thôi cảnh báo lặp.
 - `wrap` → chốt ngày: đọc board + diff repo đã đụng → tổng kết ✅/⚠️/🕐 → soạn đoạn standup
   (paste được vào chat team) → **soát metrics** (console tự ghi — xem Vòng học) → cập nhật dashboard lần cuối →
   nhắc mục "Cần bạn" còn mở. KHÔNG quét Jira lại, KHÔNG code thêm.
@@ -226,6 +246,9 @@ tóm tắt việc, timeline milestones, link design, link nexus (bóc nexusId), 
 - Canva/Figma → ghi link + 📎 cần mở tay. KHÔNG chặn luồng, KHÔNG đoán design.
 - Ticket có mốc Design CHƯA TỚI và **không có link DESIGN trong ticket** → phase `waiting-design`,
   KHÔNG vào kế hoạch chạy; lần /daily đầu tiên SAU mốc phải tự nhắc + dò lại.
+  **Ngoại lệ `scaffold-only` (19/8):** ticket `waiting-design` là task dựng MỚI + brief đã chốt
+  đủ game + kênh + slug → được vào bảng duyệt dạng hàng **scaffold-only** (dựng khung trước,
+  KHÔNG code) — điều kiện + guard ở cột `Khung nguồn` Bước 3, thực thi ở Bước 4.
 - **Ticket CÓ link DESIGN mà chưa tải được** (`design.status = đã-giao-chưa-tải`): phase vẫn
   `waiting-design` (luật ảnh-local mới cho `ready` không đổi) NHƯNG:
   - Bảng duyệt + board phải ghi "**design đã giao** — cần bạn bấm Download (1 thao tác)", TUYỆT
@@ -258,8 +281,9 @@ buglist → soạn lệnh `/bug-fixer-lite` (CLI); sửa vặt ≤2 file → t�
   `<missingTop>`" và đề xuất dựng phần đủ trước.
 **Cảnh báo, KHÔNG chặn** — quyền quyết vẫn của user (`state-doctor` W6 cũng chỉ warn).
 
-**Task dựng MỚI (chưa có entry cdn-source trong `paths`) + design đã local → thêm cột
-`Khung nguồn` vào bảng duyệt:**
+**Task dựng MỚI (chưa có entry cdn-source trong `paths`) + (design đã local HOẶC brief đã chốt
+game + kênh + slug — hàng `scaffold-only` khi design chưa về) → thêm cột `Khung nguồn` vào
+bảng duyệt:**
 - **Suy `<game>` (folder trong `products/`) theo thứ tự bằng chứng — CẤM đoán từ tag suông:**
   0. **Tra `config.gameMap` trước** (`{"496":"ddtank","A49":"cfl",...}` — mã số/mã chữ dự án
      → folder products). Trúng → nhận luôn. Đây là bộ nhớ "hỏi 1 lần nhớ mãi": mọi lần
@@ -287,6 +311,10 @@ buglist → soạn lệnh `/bug-fixer-lite` (CLI); sửa vặt ≤2 file → t�
   user đổi ngay trong lượt duyệt (KHÔNG thêm cổng hỏi).
 - KHÔNG đụng tool scaffoldPSD/cắt ảnh từ PSD (quyết định user 2026-07-31) — chỉ clone khung
   + dựng UI từ ảnh trong `designs/<KEY>/`; ảnh thật user tự cắt.
+- **Guard riêng hàng `scaffold-only`:** còn "❓ game đoán" hoặc user chưa sửa slug trong lượt
+  duyệt → KHÔNG chạy, giữ hàng lại lượt sau. Lý do: scaffold idempotent (folder đích tồn tại →
+  SKIP vĩnh viễn), clone sai game/slug là phải xoá folder bằng tay — với hàng thường ảnh design
+  còn giúp phát hiện sớm, hàng scaffold-only thì không có gì đối chiếu.
 
 Trình MỘT bảng: `Ticket · Phase · Việc · Đường ray · Repo · Mốc gần nhất · Thứ tự`.
 Ước lượng tham khảo `knowledge/metrics.jsonl` (task cùng loại trước đó chạy bao lâu).
@@ -308,6 +336,13 @@ Mode `plan`/`week` dừng tại đây.
   board chép danh sách "ảnh chờ user xử lý tay" từ report code-developer. Phase giữ `coding`;
   user thả ảnh thật vào `assets/*/images/` xong → lần /daily sau thấy images đổi
   (git status/mtime) → đề xuất `/code-developer fix` khớp asset thật.
+- **Hàng `scaffold-only` đã duyệt (design chưa về):** gọi `/code-developer full`, args gồm đúng
+  dòng `Scaffold: clone · nguồn <abs> · đích <abs> · scaffold-only` — code-developer clone khung
+  + `npm install` + verify build rồi DỪNG CẢ LƯỢT, không analyst/dev/checker
+  (`references/scaffold-campaign.md` bên đó). Xong: ghi `paths` += entry cdn-source +
+  `pathsConfirmed: true` + `state.issues[KEY].scaffoldedAt`; **phase GIỮ `waiting-design`** —
+  luật "`ready` chỉ khi có ảnh thật" không nới, khung sẵn ≠ design về. Design về → làn thường
+  chạy tiếp, `/code-developer full` tự SKIP scaffold vì folder đã tồn tại.
 - **Phase deliver** (task có kênh promotion, code đã verify): chép output HTML/asset vào
   `<gt-promotion>/<game>/<slug>-<nexusId>/mainsite/` — theo `~/VNG/agent-auto/rules/html-handoff.md`
   (R-HO-1 URL CDN tuyệt đối · R-HO-2 giữ `<% MODULE_CONTENT %>` ở bản `Promotion/` · R-HO-5 soát cả

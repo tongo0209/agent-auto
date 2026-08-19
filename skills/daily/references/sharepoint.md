@@ -22,7 +22,10 @@ cách KHÔNG ăn (đã thử, đừng lặp lại). `SKILL.md` giữ lại luậ
     ⛔ Điều kiện cũ ("folder còn file thật") là **cái đã biến miss thành vĩnh viễn**: tải 8/56
     file cũng thoả, nên mọi lần `/daily` sau đều skip và 48 file thiếu không bao giờ được nhắc
     lại. Không có manifest local (ticket cũ) → chạy `sp-scan.js` dựng manifest rồi mới xét.
-    Coverage exit 1 → **tải bù phần thiếu**, không tải lại từ đầu. State có mà folder rỗng/mất → tải lại. `lastModifiedDateTime`
+    Coverage exit 1 → **tải bù phần thiếu**, không tải lại từ đầu. State có mà folder rỗng/mất → tải lại.
+    ⚠ Coverage so LOCAL ↔ manifest CŨ nên **mù với file designer mới up** (nguồn đổi mà coverage
+    vẫn exit 0) — câu "nguồn có bản mới không" là của `tools/sp-diff.mjs` (NGUỒN ↔ NGUỒN), chạy
+    qua `/daily designwatch`; đừng lấy coverage exit 0 làm bằng chứng "design không đổi". `lastModifiedDateTime`
     mới > `design.sourceModified` đã lưu → designer up BẢN MỚI (cùng link — SharePoint đè
     file): tải lại vào `designs/<KEY>/_raw/v2/` (v3, v4… nếu đổi tiếp) rồi chạy **SO BẢN
     CŨ ↔ MỚI** (dưới), KHÔNG tự xoá bản cũ.
@@ -146,7 +149,9 @@ cách KHÔNG ăn (đã thử, đừng lặp lại). `SKILL.md` giữ lại luậ
     (jpg/png/webp) đưa lên `designs/<KEY>/` (trùng tên → giữ bản mới hơn), PSD/AI giữ `_raw/` +
     liệt kê tên vào brief → VERIFY đếm file thật rồi mới ghi brief + board ("đã tải & giải
     nén: N ảnh preview, K PSD") → ghi `state.issues[KEY].design =
-    {downloadedAt, sourceFile, sourceModified, files:{previews,psd}, manifest?}`. KHÔNG
+    {downloadedAt, sourceFile, sourceModified, files:{previews,psd}, manifest?, lastScanAt?,
+    scanDue?, sourceChanged?}` (`lastScanAt/scanDue/sourceChanged` do delta bước 5 +
+    `designwatch` ghi — xem SKILL.md). KHÔNG
     xoá gì khác trong `~/Downloads`.
   - **Tải ALL hay chỉ file update?** Nguồn là **ZIP** → zip là 1 khối, bản mới = tải
     nguyên zip mới (1 file, rẻ) — selective nằm ở khâu SO CŨ↔MỚI sau giải nén (chỉ file

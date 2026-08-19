@@ -23,7 +23,7 @@
 | **R-VP2-2** | MUST | Text trong `{{ … }}` / `{% … %}` (biến, logic render) → KHÔNG sửa, KHÔNG đoán; đó là việc của backend. |
 | **R-VP2-3** | MUST | Verify PATH-SCOPED: đối chiếu đúng file đã sửa. CẤM grep cả repo — chắc chắn dính bản sao giữa các game. |
 | **R-VP2-4** | MUST | KHÔNG được claim "đã verify runtime" — không render được ở local. Bằng chứng tối đa: `git diff` + Read live path. |
-| **R-VP2-5** | MUST | `git commit`/`git push` phải hỏi bạn từng lần (hook `G-GIT-2` chặn sẵn). Nhánh là `master` — cẩn thận lệnh nào có `-f`. |
+| **R-VP2-5** | MUST | `git commit`/`git push` phải hỏi bạn từng lần — repo dùng chung, 37.718 file, nhánh `master`. `git push` có hook `G-GIT-2` chặn thật (`ask`; ở `bypassPermissions` thành `deny` vì không còn prompt); `git commit` thì KHÔNG hook nào chặn nữa (14/8/2026 user gỡ cổng) — ở repo này đây là **luật tự giác**, đừng vì lệnh chạy được mà commit. `git push -f origin master` bị `G-GIT-1` deny thẳng, nhưng `git push -f` viết tắt (không ghi tên nhánh) chỉ rơi xuống `ask` của `G-GIT-2` — đừng gõ `-f` ở repo này. |
 | **R-VP2-6** | MUST | File có `pm__…` → theo `pm-contract.md` (R-PM-1..4). |
 
 ## Còn mở (cần bạn chốt 1 lần, tôi ghi lại)

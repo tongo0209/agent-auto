@@ -17,7 +17,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { countPending, pickPrompt } from './bug-radar.mjs';
+import { countPending, countOpen, openBySheet, pickPrompt, isWatched } from './bug-radar.mjs';
+import { dueToday, runJanitor, sweepAlert } from './janitor.mjs';
 
 export const DEFAULTS = {
   enabled: true,
@@ -107,9 +108,10 @@ export function failStreak(rows = []) {
  */
 const AUTH_ERR = /invalid api key|\/login|unauthor|authenticat|credential|token.*expir/i;
 
-export function decideNotify({ ok, err = '', changed = false, streak = 0, bugsAdded = {} }) {
+export function decideNotify({ ok, err = '', changed = false, streak = 0, bugsAdded = {}, openAdded = {} }) {
   if (!ok && AUTH_ERR.test(err)) return { send: true, kind: 'auth' };
   if (!ok) return streak >= 3 ? { send: true, kind: 'dead' } : { send: false, kind: null };
+  if (openAdded.total) return { send: true, kind: 'newbug' };
   if (bugsAdded.verified || bugsAdded.unverified) return { send: true, kind: 'bugfix' };
   return changed ? { send: true, kind: 'change' } : { send: false, kind: null };
 }
@@ -151,6 +153,22 @@ export const ALLOWED_TOOLS = [
 export function buildArgs(prompt = '/daily delta', model = null) {
   const args = ['-p', prompt, '--allowedTools', ALLOWED_TOOLS, '--output-format', 'json'];
   return model ? [...args, '--model', model] : args;
+}
+
+/**
+ * Đóng dấu giờ poll bằng MÁY, không nhờ LLM: trường `heat` từng được giao cho skill ghi và kết
+ * quả là không ai ghi — radar câm từ 18/8 01:48. `lastPollAt` là đồng hồ chống chạy loạn nên
+ * càng không được phụ thuộc lời hứa: đóng dấu cả khi lượt hỏng, thà chậm 1 chu kỳ hơn là bắn lại mỗi lượt.
+ */
+function stampPoll(root, now) {
+  const statePath = path.join(root, 'state.json');
+  const state = readJSON(statePath, null);
+  if (!state || !state.bugWatch) return;
+  const at = new Date(now).toISOString();
+  for (const [id, entry] of Object.entries(state.bugWatch)) {
+    if (isWatched(entry)) state.bugWatch[id] = { ...entry, lastPollAt: at };
+  }
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
 }
 
 const readJSON = (p, fb) => {
@@ -205,6 +223,21 @@ export function pendingDelta(before = {}, after = {}) {
   return { verified: grew('verified'), unverified: grew('unverified') };
 }
 
+/** Tổng giảm = vừa xử lý xong bug, KHÔNG phải tin có bug mới — nên mọi ô đều kẹp sàn 0. */
+export function openDelta(before = {}, after = {}) {
+  const grew = (k) => Math.max(0, (after[k] || 0) - (before[k] || 0));
+  const zero = { total: 0, chuaFix: 0, choConfirm: 0, mine: 0, unknown: 0, notMine: 0 };
+  if (!grew('total')) return zero;
+  return {
+    total: grew('total'),
+    chuaFix: grew('chuaFix'),
+    choConfirm: grew('choConfirm'),
+    mine: grew('mine'),
+    unknown: grew('unknown'),
+    notMine: grew('notMine'),
+  };
+}
+
 const MSG = {
   change: (r) =>
     'Có thay đổi mới: ' +
@@ -218,6 +251,19 @@ const MSG = {
     ]
       .filter(Boolean)
       .join(' · ') + ' — mở console :4747 hoặc /daily bugwrite',
+  // Kích hoạt bằng phần TĂNG, nhưng nội dung là TỔNG ĐANG TREO của từng buglist đang theo dõi —
+  // user cần biết "còn lại bao nhiêu việc", không phải "vừa thêm mấy cái".
+  newbug: (r) =>
+    (r.openSheets || [])
+      .map(
+        (s) =>
+          `${s.title}: ` +
+          [s.chuaFix && `${s.chuaFix} chưa fix`, s.choConfirm && `${s.choConfirm} đã sửa, chờ QC confirm`]
+            .filter(Boolean)
+            .join(' · ') +
+          ` (đọc ${s.ageMin} phút trước)`,
+      )
+      .join('\n') + '\nmở console :4747 tab Bug',
   auth: () => 'Phiên Claude hết hạn — radar đang quét ra trắng. Chạy /login.',
   dead: (r) => `Radar hỏng ${r.streak} lượt liên tiếp: ${String(r.err).slice(0, 120)}`,
 };
@@ -250,11 +296,16 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
   const watched = [path.join(root, 'state.json'), path.join(root, 'boards', todayStr(now) + '.md')];
   if (humanBusy(watched, Date.now(), cfg.graceMin * 60e3)) return write({ at: stamp(), skipped: 'human' });
 
+  const swept = dueToday(root, now) ? runJanitor({ root, now }) : null;
+  const sweepMsg = swept && sweepAlert(swept);
+  if (sweepMsg) notify('Dọn rác — agent-auto', sweepMsg);
+
   const state = readJSON(path.join(root, 'state.json'), { bugWatch: {} });
   const bugCfg = readJSON(path.join(root, 'config.json'), {}).bugRadar || {};
   const pendingBefore = countPending(state);
+  const openBefore = countOpen(state, now);
   const choice = argv.includes('--force') ? { prompt: '/daily delta', why: 'forced' } : pickPrompt(state, now, bugCfg);
-  if (choice.skip) return { at: stamp(), skipped: choice.skip };
+  if (choice.skip) return { at: stamp(), skipped: choice.skip, swept };
 
   fs.mkdirSync(path.dirname(lock), { recursive: true });
   fs.writeFileSync(lock, JSON.stringify({ pid: process.pid, atMs: Number(now) }));
@@ -271,8 +322,12 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
     const res = (runClaude || (() => realClaude(root, timeoutMin * 60e3, cfg.model || null, choice.prompt)))(
       choice.prompt,
     );
+    if (choice.prompt === '/daily bugwatch') stampPoll(root, now);
     const { changed, newRows } = diffCounts(before, snap());
-    const bugsAdded = pendingDelta(pendingBefore, countPending(readJSON(path.join(root, 'state.json'), {})));
+    const stateAfter = readJSON(path.join(root, 'state.json'), {});
+    const bugsAdded = pendingDelta(pendingBefore, countPending(stateAfter));
+    const openAdded = openDelta(openBefore, countOpen(stateAfter, now));
+    const openSheets = openBySheet(stateAfter, now);
     fs.mkdirSync(path.dirname(sock), { recursive: true });
     if (!fs.existsSync(sock)) fs.writeFileSync(sock, ''); // lượt đầu tiên: chưa có sổ để đọc
     const rows = fs
@@ -297,10 +352,13 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
       newRows,
       costUsd: res.costUsd,
       err: res.err,
+      swept,
+      openAdded,
+      openSheets,
     });
     const streak = failStreak([...rows, row]);
-    const { send, kind } = decideNotify({ ok: res.ok, err: res.err || '', changed, streak, bugsAdded });
-    if (send) notify('Radar — agent-auto', MSG[kind]({ ...row, streak, bugsAdded }));
+    const { send, kind } = decideNotify({ ok: res.ok, err: res.err || '', changed, streak, bugsAdded, openAdded });
+    if (send) notify('Radar — agent-auto', MSG[kind]({ ...row, streak, bugsAdded, openAdded, openSheets }));
     return row;
   } catch (err) {
     return write({

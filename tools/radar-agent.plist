@@ -16,9 +16,13 @@
     <string>export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] &amp;&amp; . "$NVM_DIR/nvm.sh" &gt;/dev/null; cd /Users/lap17727/VNG/agent-auto &amp;&amp; exec node tools/radar-tick.mjs</string>
   </array>
   <key>WorkingDirectory</key><string>/Users/lap17727/VNG/agent-auto</string>
-  <!-- 60' một nhịp (user chốt 13/8: 30' đo ra ~$20/ngày, 60' ~$10 mà vẫn bắt kịp trong ngày;
-       cần gấp thì có nút "quét ngay" trên console). Đổi số ở đây thì sửa `everyMin` trong
-       config.json cho khớp — ngưỡng "radar chết" của console suy từ đó.
+  <!-- launchd đá 30' một lần (1800), nhưng KHÔNG phải lượt nào cũng tốn tiền — radar-tick chia 2 tầng:
+       phút :00-:29 chạy lượt ĐẦY ĐỦ `/daily delta` (thành ra nhịp thật 60', khớp `radar.everyMin`),
+       phút :30-:59 chỉ chạy `/daily bugwatch` khi có sheet vừa đổi (`hot`) hoặc quá
+       `bugRadar.pollEveryHours` chưa poll (`stale`), còn lại bỏ lượt im lặng.
+       Chi phí đo 13/8: ~$1/lượt ⇒ 30' đều đặn ~$20/ngày, thiết kế 2 tầng này ~$10 + ~$3 bugwatch.
+       Đổi 1800 thì sửa `radar.tickEveryMin`; đổi nhịp lượt đầy đủ thì sửa `radar.everyMin`
+       — ngưỡng "radar chết" của console suy từ `everyMin`.
        Khung 08-18h T2-T6 do script tự chặn (test được), không nhét 110 dòng
        StartCalendarInterval vào đây. -->
   <key>StartInterval</key><integer>1800</integer>

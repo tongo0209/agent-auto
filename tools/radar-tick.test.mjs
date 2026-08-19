@@ -13,6 +13,7 @@ import {
   failStreak,
   decideNotify,
   pendingDelta,
+  openDelta,
   buildArgs,
   runTick,
   ALLOWED_TOOLS,
@@ -199,7 +200,7 @@ test('claude ném lỗi: vẫn ghi sổ và vẫn nhả lock', () => {
 test('--force vẫn quét tay được dù lượt này lẽ ra bị bỏ vì không sheet nào nóng', () => {
   const root = tmp('radar-forced-');
   const statePath = path.join(root, 'state.json');
-  fs.writeFileSync(statePath, JSON.stringify({ bugWatch: { s1: { heat: 'warm' } } }));
+  fs.writeFileSync(statePath, JSON.stringify({ bugWatch: { s1: { follow: true, heat: 'warm' } } }));
   fs.utimesSync(statePath, 0, 0);
   const seen = [];
   const row = runTick({
@@ -219,7 +220,7 @@ test('--force vẫn quét tay được dù lượt này lẽ ra bị bỏ vì kh
 test('lượt nửa giờ không có sheet nóng thì bỏ lượt và KHÔNG gọi claude', () => {
   const root = tmp('radar-cold-');
   const statePath = path.join(root, 'state.json');
-  fs.writeFileSync(statePath, JSON.stringify({ bugWatch: { s1: { heat: 'warm' } } }));
+  fs.writeFileSync(statePath, JSON.stringify({ bugWatch: { s1: { follow: true, heat: 'warm', lastPollAt: new Date(2026, 7, 10, 14, 0).toISOString() } } }));
   fs.utimesSync(statePath, 0, 0);
   let called = 0;
   const row = runTick({
@@ -238,7 +239,7 @@ test('lượt nửa giờ không có sheet nóng thì bỏ lượt và KHÔNG g�
 test('có sheet nóng ở lượt nửa giờ ⇒ chạy prompt bugwatch chứ không phải delta', () => {
   const root = tmp('radar-hot-');
   const statePath = path.join(root, 'state.json');
-  fs.writeFileSync(statePath, JSON.stringify({ bugWatch: { s1: { heat: 'hot' } } }));
+  fs.writeFileSync(statePath, JSON.stringify({ bugWatch: { s1: { follow: true, heat: 'hot' } } }));
   fs.utimesSync(statePath, 0, 0);
   const seen = [];
   runTick({
@@ -277,4 +278,298 @@ test('lượt XẢ hàng đợi không được báo là có việc mới', () =
   });
   assert.deepEqual(pendingDelta({}, { verified: 2, unverified: 1 }), { verified: 2, unverified: 1 });
   assert.deepEqual(pendingDelta({ verified: 2 }, { verified: 2 }), { verified: 0, unverified: 0 });
+});
+
+// ---------- dọn rác ghép vào lượt radar ----------
+
+const sweepRoot = () => {
+  const root = tmp('radar-sweep-');
+  const statePath = path.join(root, 'state.json');
+  fs.writeFileSync(statePath, JSON.stringify({ bugWatch: { s1: { follow: true, heat: 'warm', lastPollAt: new Date(2026, 7, 10, 14, 0).toISOString() } } }));
+  fs.utimesSync(statePath, 0, 0);
+  const junk = path.join(root, '.DS_Store');
+  fs.writeFileSync(junk, 'x');
+  return root;
+};
+const sweeps = (root) => {
+  try {
+    return fs.readFileSync(path.join(root, 'history', 'janitor.jsonl'), 'utf8').split('\n').filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+};
+
+test('lượt radar qua cổng thì dọn rác, kể cả lượt bỏ vì sheet nguội', () => {
+  const root = sweepRoot();
+  const row = runTick({ root, now: at(0, 14, 45), runClaude: () => ({ ok: true, ms: 1 }), notify: () => {} });
+  assert.equal(row.skipped, 'cold');
+  assert.equal(sweeps(root), 1);
+  assert.equal(fs.existsSync(path.join(root, '.DS_Store')), false);
+});
+
+test('dọn đúng một lần mỗi ngày, lượt sau trong ngày không dọn lại', () => {
+  const root = sweepRoot();
+  runTick({ root, now: at(0, 14, 45), runClaude: () => ({ ok: true, ms: 1 }), notify: () => {} });
+  runTick({ root, now: at(0, 15, 45), runClaude: () => ({ ok: true, ms: 1 }), notify: () => {} });
+  assert.equal(sweeps(root), 1);
+});
+
+test('lượt ngoài giờ im lặng tuyệt đối: không dọn, không ghi sổ', () => {
+  const root = sweepRoot();
+  runTick({ root, now: at(6, 3, 0), runClaude: () => ({ ok: true, ms: 1 }), notify: () => {} });
+  assert.equal(sweeps(root), 0);
+  assert.equal(fs.existsSync(path.join(root, '.DS_Store')), true);
+});
+
+test('lượt dọn có thứ cần bạn quyết thì báo ra thông báo hệ thống', () => {
+  const root = sweepRoot();
+  fs.mkdirSync(path.join(root, 'designs/GW-9/_raw'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'designs/GW-9/_raw/big.psd'), Buffer.alloc(600 * 1024 ** 2 + 1));
+  fs.writeFileSync(
+    path.join(root, 'state.json'),
+    JSON.stringify({ bugWatch: { s1: { follow: true, heat: 'warm' } }, issues: { 'GW-9': { phase: 'closed', lastSeenUpdated: '2026-06-01T00:00:00Z' } } }),
+  );
+  fs.utimesSync(path.join(root, 'state.json'), 0, 0);
+  const said = [];
+  runTick({ root, now: at(0, 14, 45), runClaude: () => ({ ok: true, ms: 1 }), notify: (t, m) => said.push(m) });
+  assert.equal(said.length, 1);
+  assert.match(said[0], /GW-9/);
+  assert.equal(fs.existsSync(path.join(root, 'designs/GW-9/_raw/big.psd')), true);
+});
+
+// ---------- thông báo BUG MỚI (trước 18/8 chưa từng có) ----------
+
+test('chỉ đếm bug mở TĂNG thêm — lượt vừa fix xong không thành tin báo có bug mới', () => {
+  assert.deepEqual(openDelta({ total: 2, mine: 1, unknown: 1 }, { total: 5, mine: 3, unknown: 2 }), {
+    total: 3,
+    chuaFix: 0,
+    choConfirm: 0,
+    mine: 2,
+    unknown: 1,
+    notMine: 0,
+  });
+  assert.deepEqual(openDelta({ total: 5, mine: 3, unknown: 2 }, { total: 1, mine: 0, unknown: 1 }), {
+    total: 0,
+    chuaFix: 0,
+    choConfirm: 0,
+    mine: 0,
+    unknown: 0,
+    notMine: 0,
+  });
+});
+
+test('có bug mới thì báo bug mới, không báo "có thay đổi" chung chung', () => {
+  assert.deepEqual(decideNotify({ ok: true, changed: true, openAdded: { total: 2, mine: 2 } }), {
+    send: true,
+    kind: 'newbug',
+  });
+});
+
+test('bug mới quan trọng hơn tin fix-xong-chờ-gật', () => {
+  assert.deepEqual(
+    decideNotify({ ok: true, openAdded: { total: 1, mine: 1 }, bugsAdded: { verified: 3 } }),
+    { send: true, kind: 'newbug' },
+  );
+});
+
+test('không có bug mới thì giữ nguyên hành vi cũ', () => {
+  assert.deepEqual(decideNotify({ ok: true, openAdded: { total: 0 }, bugsAdded: { verified: 1 } }), {
+    send: true,
+    kind: 'bugfix',
+  });
+  assert.deepEqual(decideNotify({ ok: true, openAdded: { total: 0 }, changed: true }), {
+    send: true,
+    kind: 'change',
+  });
+});
+
+test('phiên hết hạn vẫn thắng mọi tin khác', () => {
+  assert.deepEqual(
+    decideNotify({ ok: false, err: 'invalid api key', openAdded: { total: 9, mine: 9 } }),
+    { send: true, kind: 'auth' },
+  );
+});
+
+test('một lượt radar phát hiện bug mới thì bắn thông báo nêu số bug của mình', () => {
+  const root = tmp('radar-newbug-');
+  const statePath = path.join(root, 'state.json');
+  const write = (openBugs) =>
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify({
+        bugWatch: {
+          s1: {
+            follow: true,
+            heat: 'hot',
+            title: 'BugList CFL',
+            openBugs: openBugs.map((b) => ({ status: 'chua-fix', ...b })),
+            openBugsAt: at(0, 14, 45).toISOString(),
+          },
+        },
+      }),
+    );
+  write([]);
+  fs.utimesSync(statePath, 0, 0);
+
+  const said = [];
+  const row = runTick({
+    root,
+    now: at(0, 14, 45),
+    runClaude: () => {
+      write([
+        { bugId: '4', bucket: 'mine' },
+        { bugId: '5', bucket: 'unknown' },
+      ]);
+      return { ok: true, ms: 1 };
+    },
+    notify: (title, msg) => said.push(msg),
+  });
+
+  assert.equal(row.skipped, null);
+  assert.equal(row.openAdded.total, 2);
+  assert.equal(said.length, 1);
+  assert.match(said[0], /BugList CFL/);
+  assert.match(said[0], /2 chưa fix/);
+});
+
+// ---------- radar tự đóng dấu giờ poll: KHÔNG trông vào LLM như trường heat ----------
+
+const pollRoot = (bugWatch) => {
+  const root = tmp('radar-poll-');
+  const statePath = path.join(root, 'state.json');
+  fs.writeFileSync(statePath, JSON.stringify({ bugWatch }));
+  fs.utimesSync(statePath, 0, 0);
+  return root;
+};
+const stamps = (root) => {
+  const bw = JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8')).bugWatch;
+  return Object.fromEntries(Object.entries(bw).map(([k, e]) => [k, e.lastPollAt || null]));
+};
+
+test('sau lượt bugwatch, mọi sheet đang theo dõi được đóng dấu giờ poll', () => {
+  const root = pollRoot({ s1: { follow: true, heat: 'warm' }, s2: { follow: true, heat: 'warm' } });
+  runTick({ root, now: at(0, 14, 45), runClaude: () => ({ ok: true, ms: 1 }), notify: () => {} });
+  assert.deepEqual(stamps(root), {
+    s1: at(0, 14, 45).toISOString(),
+    s2: at(0, 14, 45).toISOString(),
+  });
+});
+
+test('sheet đã thôi theo dõi không bị đóng dấu — để bật lại là quét ngay', () => {
+  const root = pollRoot({ s1: { follow: true, heat: 'warm' }, s2: { follow: false } });
+  runTick({ root, now: at(0, 14, 45), runClaude: () => ({ ok: true, ms: 1 }), notify: () => {} });
+  assert.equal(stamps(root).s2, null);
+});
+
+test('lượt bugwatch HỎNG vẫn đóng dấu — không thì mỗi lượt lại bắn lại, đốt tiền', () => {
+  const root = pollRoot({ s1: { follow: true, heat: 'warm' } });
+  runTick({
+    root,
+    now: at(0, 14, 45),
+    runClaude: () => ({ ok: false, ms: 1, err: 'timeout' }),
+    notify: () => {},
+  });
+  assert.equal(stamps(root).s1, at(0, 14, 45).toISOString());
+});
+
+test('lượt delta không đóng dấu — nó không hề đọc sheet', () => {
+  const root = pollRoot({ s1: { follow: true, heat: 'warm' } });
+  const row = runTick({ root, now: at(0, 14, 10), runClaude: () => ({ ok: true, ms: 1 }), notify: () => {} });
+  assert.equal(row.prompt, '/daily delta');
+  assert.equal(stamps(root).s1, null);
+});
+
+// ---------- thông báo phải nói RÕ: buglist nào, chưa fix bao nhiêu, chờ confirm bao nhiêu ----------
+
+test('delta tách chưa-fix với chờ-confirm', () => {
+  assert.deepEqual(
+    openDelta({ total: 1, chuaFix: 1, choConfirm: 0 }, { total: 4, chuaFix: 2, choConfirm: 2 }),
+    { total: 3, chuaFix: 1, choConfirm: 2, mine: 0, unknown: 0, notMine: 0 },
+  );
+});
+
+const followRoot = (bugWatch) => {
+  const root = tmp('radar-notify-');
+  const statePath = path.join(root, 'state.json');
+  fs.writeFileSync(statePath, JSON.stringify({ bugWatch }));
+  fs.utimesSync(statePath, 0, 0);
+  return root;
+};
+
+test('thông báo nêu tên buglist + số chưa fix + số chờ confirm', () => {
+  const stamp = at(0, 14, 45).toISOString();
+  const root = followRoot({ s1: { follow: true, heat: 'hot', title: 'BugList CFL', openBugs: [], openBugsAt: stamp } });
+  const said = [];
+  runTick({
+    root,
+    now: at(0, 14, 45),
+    runClaude: () => {
+      fs.writeFileSync(
+        path.join(root, 'state.json'),
+        JSON.stringify({
+          bugWatch: {
+            s1: {
+              follow: true,
+              heat: 'hot',
+              title: 'BugList CFL',
+              openBugsAt: stamp,
+              openBugs: [
+                { bugId: '6', bucket: 'mine', status: 'chua-fix' },
+                { bugId: '1', bucket: 'mine', status: 'cho-confirm' },
+                { bugId: '5', bucket: 'unknown', status: 'cho-confirm' },
+              ],
+            },
+          },
+        }),
+      );
+      return { ok: true, ms: 1 };
+    },
+    notify: (t, m) => said.push(m),
+  });
+  assert.equal(said.length, 1);
+  assert.match(said[0], /BugList CFL/);
+  assert.match(said[0], /1 chưa fix/);
+  assert.match(said[0], /2 đã sửa, chờ QC confirm/);
+});
+
+test('sheet KHÔNG theo dõi thì không được lọt vào thông báo', () => {
+  const stamp = at(0, 14, 45).toISOString();
+  const root = followRoot({
+    on: { follow: true, heat: 'hot', title: 'Sheet BẬT', openBugs: [], openBugsAt: stamp },
+    off: { follow: false, title: 'Sheet TẮT', openBugs: [{ bugId: '9', bucket: 'mine', status: 'chua-fix' }], openBugsAt: stamp },
+  });
+  const said = [];
+  runTick({
+    root,
+    now: at(0, 14, 45),
+    runClaude: () => {
+      const s = JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8'));
+      s.bugWatch.on.openBugs = [{ bugId: '1', bucket: 'mine', status: 'chua-fix' }];
+      fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify(s));
+      return { ok: true, ms: 1 };
+    },
+    notify: (t, m) => said.push(m),
+  });
+  assert.match(said[0], /Sheet BẬT/);
+  assert.doesNotMatch(said[0], /Sheet TẮT/);
+});
+
+test('thông báo ghi rõ số liệu đọc cách đây bao lâu', () => {
+  const readAt = new Date(Number(at(0, 14, 45)) - 5.4e6).toISOString();
+  const root = followRoot({
+    s1: { follow: true, heat: 'hot', title: 'BugList CFL', openBugs: [], openBugsAt: readAt },
+  });
+  const said = [];
+  runTick({
+    root,
+    now: at(0, 14, 45),
+    runClaude: () => {
+      const s = JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8'));
+      s.bugWatch.s1.openBugs = [{ bugId: '6', bucket: 'mine', status: 'chua-fix' }];
+      fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify(s));
+      return { ok: true, ms: 1 };
+    },
+    notify: (t, m) => said.push(m),
+  });
+  assert.match(said[0], /đọc 90 phút trước/);
 });

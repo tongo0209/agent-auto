@@ -1,41 +1,44 @@
 {
   "_doc": "Mẫu cấu hình agent-auto. tools/install-skills.sh copy file này thành config.json (KHÔNG vào git — mỗi người một bản vì chứa đường dẫn máy mình). Sửa 3 chỗ bắt buộc: repos, cloudId, gitAuthor.",
-
   "cloudId": "<cloudId Jira của bạn — lấy bằng MCP Atlassian getAccessibleAtlassianResources>",
   "siteUrl": "https://vnggames.atlassian.net",
   "jql": "assignee = currentUser() AND statusCategory != Done ORDER BY duedate ASC",
   "jqlConfirmed": false,
   "jqlRecentDone": "assignee = currentUser() AND statusCategory = Done AND updated >= -45d ORDER BY updated DESC",
   "jqlRecentDoneNote": "Nhánh quét thứ 2: bắt ticket Jira đã đóng ở mốc HTML nhưng còn mốc test/release phía sau. Ticket ở nhánh này chỉ bỏ khỏi radar khi mốc MUỘN NHẤT trong milestones đã qua.",
-
   "repos": {
     "cdn-source": "<đường dẫn tuyệt đối tới repo cdn-source trên máy bạn>",
     "new-mainsite": "<đường dẫn tuyệt đối tới repo new-mainsite>",
     "gt-promotion-template": "<đường dẫn tuyệt đối tới repo gt-promotion-template>",
     "vportal2view": "<đường dẫn tuyệt đối tới repo vportal2view>"
   },
-
   "gitAuthor": "<email git của bạn, vd ten@vng.com.vn — dùng lọc commit của riêng bạn>",
   "notify": true,
-
   "bugSheets": {},
   "adhocCounter": 0,
   "dashboardUrl": "",
-
   "gameMap": {
-    "_doc": "nexusId (3 ký tự đầu tên folder gt-promotion) → mã game. Dùng chung cả team, bổ sung khi gặp game mới.",
     "221": "jxm",
     "496": "ddtank",
     "903": "taydu2",
+    "_doc": "nexusId (3 ký tự đầu tên folder gt-promotion) → mã game. Dùng chung cả team, bổ sung khi gặp game mới.",
     "A49": "cfl",
     "A70": "nghichthuyhan",
     "A78": "lan"
   },
-
   "radar": {
     "enabled": false,
-    "days": [1, 2, 3, 4, 5],
-    "hours": [8, 18],
+    "days": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "hours": [
+      8,
+      18
+    ],
     "graceMin": 3,
     "lockStaleMin": 15,
     "timeoutMin": 10,
@@ -44,7 +47,6 @@
     "timeoutMinBugwatch": 15,
     "_note": "everyMin = nhịp lượt ĐẦY ĐỦ, console suy ngưỡng chết = 2.5 nhịp từ số này — giữ 60 dù launchd đá 30' một lần. tickEveryMin = StartInterval thật trong tools/radar-agent.plist; lượt xen giữa chỉ chạy khi có sheet buglist đang nóng. Bật bằng tools/radar-install.sh."
   },
-
   "bugRadar": {
     "enabled": true,
     "coolAfterHours": 3,
@@ -52,6 +54,25 @@
     "freshFirstScanHours": 24,
     "autoFix": true,
     "backfilledAt": null,
-    "_note": "Radar buglist hậu bàn giao. Thiết kế: docs/specs/2026-08-17-bug-radar-design.md"
+    "_note": "Radar buglist hậu bàn giao. Thiết kế: docs/specs/2026-08-17-bug-radar-design.md · OPT-IN từ 18/8/2026: sheet mới vào sổ ở trạng thái CHƯA theo dõi, user tự bật bằng nút tab Bug hoặc `node tools/bug-radar.mjs watch <sheetId>` · autoFix = công tắc cho phép radar gọi /bug-fixer-lite (đọc ở skills/daily/SKILL.md bước 5, KHÔNG có code nào đọc — trước 18/8 nó là công tắc chết) · pollEveryHours = sau bao lâu không poll thì tự chạy 1 lượt bugwatch dù không sheet nào \"hot\"; thiếu nó là radar câm vĩnh viễn sau lượt cuối. Hạ số = tốn tiền hơn (~$1/lượt).",
+    "pollEveryHours": 3
+  },
+  "janitor": {
+    "enabled": true,
+    "donePhases": [
+      "closed",
+      "done-fe",
+      "reassigned"
+    ],
+    "graceDays": 7,
+    "heavyDirs": [
+      "_raw",
+      "_src"
+    ],
+    "cacheKeepDays": 14,
+    "backupsKeepPerFamily": 10,
+    "archiveKeepDays": 14,
+    "archiveAutoDelete": true,
+    "_note": "Dọn rác nặng, chạy ghép trong tools/radar-tick.mjs (1 lượt/ngày). CHỈ tự xoá thứ tải lại được từ SharePoint (có sp-manifest.json hoặc designLink); design.sourceIntegrity bắt đầu bằng BAD thì KHÔNG BAO GIỜ đụng (ca GW-660: nguồn hỏng, bản local là bản duy nhất). phase bugfix KHÔNG tính là đã xong — user chốt 18/8, đang fix bug là vẫn đang làm. Sổ hoàn tác: .janitor-log.jsonl. Xem trước: node tools/janitor.mjs --dry"
   }
 }

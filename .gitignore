@@ -43,3 +43,6 @@ knowledge/metrics.jsonl
 # Lock của radar nền (tools/radar-tick.mjs) — runtime, không versioned
 .locks/
 .cache/
+
+# Sổ hoàn tác của tools/janitor.mjs: đã xoá gì, bao nhiêu byte, tải lại từ đâu.
+.janitor-log.jsonl

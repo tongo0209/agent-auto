@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import {
+  bugStatus,
+  openBySheet,
+  followSheet,
+  unfollowSheet,
+  statusReadable,
+  openRows,
+  countOpen,
   extractSheetLinks,
   looksLikeBugSheet,
   matchSheetToTicket,
@@ -22,6 +29,7 @@ import {
   countPending,
   queueRow,
   mergeWatch,
+  isWatched,
 } from './bug-radar.mjs';
 
 /**
@@ -239,17 +247,24 @@ test('đầu giờ luôn chạy lượt delta đầy đủ', () => {
 });
 
 test('nửa giờ + có sheet nóng ⇒ lượt bugwatch nhẹ', () => {
-  const state = { bugWatch: { s1: { heat: 'hot' } } };
+  const state = { bugWatch: { s1: { follow: true, heat: 'hot' } } };
   assert.deepEqual(pickPrompt(state, T(9, 35)), { prompt: '/daily bugwatch', why: 'hot' });
 });
 
-test('nửa giờ + không sheet nào nóng ⇒ bỏ lượt, KHÔNG đốt token', () => {
-  const state = { bugWatch: { s1: { heat: 'warm' } } };
+test('nửa giờ + không sheet nóng + vừa poll xong ⇒ bỏ lượt, KHÔNG đốt token', () => {
+  const state = {
+    bugWatch: { s1: { follow: true, heat: 'warm', lastPollAt: new Date(Number(T(9, 35)) - 3.6e5).toISOString() } },
+  };
   assert.deepEqual(pickPrompt(state, T(9, 35)), { skip: 'cold' });
 });
 
+test('sheet nguội mà lâu chưa poll thì KHÔNG được bỏ lượt — đó là cách radar tự tỉnh lại', () => {
+  const state = { bugWatch: { s1: { follow: true, heat: 'warm' } } };
+  assert.deepEqual(pickPrompt(state, T(9, 35)), { prompt: '/daily bugwatch', why: 'stale' });
+});
+
 test('tắt bugRadar thì lượt nửa giờ im hẳn dù sheet đang nóng', () => {
-  const state = { bugWatch: { s1: { heat: 'hot' } } };
+  const state = { bugWatch: { s1: { follow: true, heat: 'hot' } } };
   assert.deepEqual(pickPrompt(state, T(9, 35), { enabled: false }), { skip: 'bugradar-off' });
 });
 
@@ -516,4 +531,426 @@ test('đếm hàng chờ tách theo grade — đây là thứ radar-tick so trư
   };
   assert.deepEqual(countPending(state), { total: 3, verified: 2, unverified: 1 });
   assert.deepEqual(countPending({}), { total: 0, verified: 0, unverified: 0 });
+});
+
+test('sheet bình thường thì còn trong vòng theo dõi', () => {
+  assert.equal(isWatched({ follow: true, keys: ['GW-660'] }), true);
+});
+
+test('ba kiểu rơi khỏi vòng poll: qua mốc, không phải buglist, chưa bật follow', () => {
+  assert.equal(isWatched({ follow: true, retired: true }), false);
+  assert.equal(isWatched({ follow: true, notBugSheet: true }), false);
+  assert.equal(isWatched({ follow: false }), false);
+});
+
+test('user tắt theo dõi tay thì có mốc thời gian và lý do để sau còn đọc lại', () => {
+  const entry = unfollowSheet({ keys: [], follow: true }, 'sheet mồ côi, QC không dùng nữa', T(10));
+  assert.equal(entry.follow, false);
+  assert.equal(entry.unfollowReason, 'sheet mồ côi, QC không dùng nữa');
+  assert.equal(entry.unfollowedAt, T(10).toISOString());
+});
+
+test('bật lại theo dõi thì xoá sạch cờ tắt, giữ nguyên bug đã thấy', () => {
+  const entry = followSheet(unfollowSheet({ seenBugs: { 3: 'h' } }, 'nhầm', T(10)), T(10));
+  assert.equal(entry.follow, true);
+  assert.equal(entry.unfollowedAt, undefined);
+  assert.equal(entry.unfollowReason, undefined);
+  assert.deepEqual(entry.seenBugs, { 3: 'h' });
+});
+
+test('sheet đã tắt theo dõi dù đang nóng cũng KHÔNG kéo được lượt bugwatch', () => {
+  const state = { bugWatch: { s1: { heat: 'hot', follow: false } } };
+  assert.deepEqual(pickPrompt(state, T(9, 35)), { skip: 'cold' });
+});
+
+// ---------- bug ĐANG MỞ: cái mà console và popup cần mà trước giờ không ai lưu ----------
+
+const row = (o) => ({ bugId: '1', type: 'functional', assignee: 'Mainsite', desc: 'nút chết', ...o });
+
+test('bug đang mở gồm CẢ dòng không đổi từ lượt trước — đây là chỗ diffRows bỏ sót', () => {
+  const rows = [row({ bugId: '1' }), row({ bugId: '2' })];
+  const seen = { 1: rowHash(rows[0]), 2: rowHash(rows[1]) };
+  assert.deepEqual(diffRows(seen, rows).actionable, []);
+  assert.deepEqual(
+    openRows(rows).map((r) => r.bugId),
+    ['1', '2'],
+  );
+});
+
+test('chỉ QC xác nhận mới rơi khỏi danh sách; dev ghi Done vẫn còn treo chờ confirm', () => {
+  const rows = [
+    row({ bugId: '1', recheck: 'Confirmed' }),
+    row({ bugId: '2', devStatus: 'Done' }),
+    row({ bugId: '3' }),
+  ];
+  assert.deepEqual(
+    openRows(rows).map((r) => [r.bugId, r.status]),
+    [
+      ['2', 'cho-confirm'],
+      ['3', 'chua-fix'],
+    ],
+  );
+});
+
+test('dòng QC mở lại thì vẫn mở dù dev ghi done', () => {
+  const rows = [row({ bugId: '1', devStatus: 'Done', recheck: 'Reopen' })];
+  assert.deepEqual(
+    openRows(rows).map((r) => r.bugId),
+    ['1'],
+  );
+});
+
+test('mỗi bug mở mang sẵn nhãn của ai, để console khỏi phải đoán lại', () => {
+  const open = openRows([
+    row({ bugId: '1', type: 'functional' }),
+    row({ bugId: '2', assignee: 'Game Studio' }),
+    row({ bugId: '3', type: 'gì đó lạ', assignee: '' }),
+  ]);
+  assert.deepEqual(
+    open.map((r) => [r.bugId, r.bucket]),
+    [
+      ['1', 'mine'],
+      ['2', 'not-mine'],
+      ['3', 'unknown'],
+    ],
+  );
+});
+
+test('summarize trả kèm danh sách bug đang mở', () => {
+  const found = summarize({}, REAL_SHEET);
+  assert.equal(Array.isArray(found.open), true);
+  assert.equal(
+    found.open.every((r) => r.bugId && r.bucket),
+    true,
+  );
+});
+
+test('đếm bug đang mở: chỉ tính sheet còn theo dõi', () => {
+  const fresh = new Date().toISOString();
+  const state = {
+    bugWatch: {
+      a: { follow: true, openBugsAt: fresh, openBugs: [{ bugId: '1', bucket: 'mine' }, { bugId: '2', bucket: 'unknown' }] },
+      b: { follow: true, openBugsAt: fresh, openBugs: [{ bugId: '9', bucket: 'not-mine' }] },
+      c: { retired: true, openBugsAt: fresh, openBugs: [{ bugId: '7', bucket: 'mine' }] },
+      d: { follow: false, openBugsAt: fresh, openBugs: [{ bugId: '8', bucket: 'mine' }] },
+    },
+  };
+  assert.deepEqual(countOpen(state), { total: 3, chuaFix: 3, choConfirm: 0, mine: 1, unknown: 1, notMine: 1 });
+});
+
+test('state chưa có openBugs thì đếm ra 0, không nổ', () => {
+  assert.deepEqual(countOpen({ bugWatch: { a: { follow: true, seenBugs: { 1: 'h' } } } }), {
+    total: 0,
+    chuaFix: 0,
+    choConfirm: 0,
+    mine: 0,
+    unknown: 0,
+    notMine: 0,
+  });
+});
+
+// ---------- vòng khoá chết: hot chỉ được đặt trong bugwatch, mà bugwatch lại đòi hot ----------
+
+const at45 = (h) => new Date(2026, 7, 18, h, 45);
+const hoursAgo = (n, from = at45(14)) => new Date(Number(from) - n * 3.6e6).toISOString();
+
+test('sheet lâu chưa poll thì tự tới lượt bugwatch, không cần ai đặt hot', () => {
+  const state = { bugWatch: { s1: { follow: true, lastPollAt: hoursAgo(5) } } };
+  assert.deepEqual(pickPrompt(state, at45(14)), { prompt: '/daily bugwatch', why: 'stale' });
+});
+
+test('vừa poll xong thì thôi, đừng đọc lại cho tốn tiền', () => {
+  const state = { bugWatch: { s1: { follow: true, lastPollAt: hoursAgo(1) } } };
+  assert.deepEqual(pickPrompt(state, at45(14)), { skip: 'cold' });
+});
+
+test('sheet chưa poll lần nào là tới lượt ngay', () => {
+  assert.deepEqual(pickPrompt({ bugWatch: { s1: { follow: true, title: 'mới thêm' } } }, at45(14)), {
+    prompt: '/daily bugwatch',
+    why: 'stale',
+  });
+});
+
+test('sheet đã thôi theo dõi thì có cũ mấy cũng không kéo bugwatch dậy', () => {
+  const state = {
+    bugWatch: {
+      s1: { follow: true, retired: true, lastPollAt: hoursAgo(99) },
+      s2: { follow: false, lastPollAt: hoursAgo(99) },
+      s3: { follow: true, notBugSheet: true, lastPollAt: hoursAgo(99) },
+    },
+  };
+  assert.deepEqual(pickPrompt(state, at45(14)), { skip: 'cold' });
+});
+
+test('hot vẫn thắng: sheet vừa đổi thì đọc ngay chứ không đợi hết chu kỳ', () => {
+  const state = { bugWatch: { s1: { follow: true, heat: 'hot', lastPollAt: hoursAgo(1) } } };
+  assert.deepEqual(pickPrompt(state, at45(14)), { prompt: '/daily bugwatch', why: 'hot' });
+});
+
+test('tắt bugRadar thì im hoàn toàn, kể cả sheet cũ mèm', () => {
+  const state = { bugWatch: { s1: { follow: true, lastPollAt: hoursAgo(99) } } };
+  assert.deepEqual(pickPrompt(state, at45(14), { enabled: false }), { skip: 'bugradar-off' });
+});
+
+// ---------- sheet thiếu cột trạng thái: KHÔNG được coi là bug đang mở ----------
+
+const SHEET_OK = `| BugID | Assignee Fix | Description | DEV Check Status | QC / GS Recheck | Bug Type |
+| :-: | :-: | :-: | :-: | :-: | :-: |
+| 1 | Mainsite | nút chết | Done | Confirmed fix | Functional |
+| 2 | Mainsite | chữ tràn |  |  | Visual |
+`;
+
+const SHEET_NO_STATUS = `| BugID | Device | Assignee Fix | Description |  | Notes | Bug Type |
+| :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| 1 | PC | Mainsite | đổi text EN |  |  |  |
+| 2 | PC | Mainsite | đổi banner |  |  |  |
+`;
+
+test('sheet có cột DEV Check Status thì đọc được trạng thái', () => {
+  assert.equal(statusReadable(SHEET_OK), true);
+});
+
+test('sheet để TRỐNG header cột trạng thái thì không đọc được, không dám phán', () => {
+  assert.equal(statusReadable(SHEET_NO_STATUS), false);
+});
+
+test('không đọc được trạng thái thì báo 0 bug mở, KHÔNG đoán là đang mở', () => {
+  const found = summarize({}, SHEET_NO_STATUS);
+  assert.equal(found.rowsTotal, 2);
+  assert.deepEqual(found.open, []);
+  assert.equal(found.statusUnreadable, true);
+});
+
+test('đọc được trạng thái thì loại dòng đã Done, giữ dòng còn trống', () => {
+  const found = summarize({}, SHEET_OK);
+  assert.equal(found.statusUnreadable, false);
+  assert.deepEqual(
+    found.open.map((r) => r.bugId),
+    ['2'],
+  );
+});
+
+test('cột QC recheck một mình cũng đủ để phán trạng thái', () => {
+  const onlyRecheck = `| BugID | Assignee Fix | Description | QC / GS Recheck |
+| :-: | :-: | :-: | :-: |
+| 1 | Mainsite | nút chết | Confirmed fix |
+| 2 | Mainsite | chữ tràn |  |
+`;
+  assert.equal(statusReadable(onlyRecheck), true);
+  assert.deepEqual(
+    summarize({}, onlyRecheck).open.map((r) => r.bugId),
+    ['2'],
+  );
+});
+
+// ---------- số liệu cũ KHÔNG được sinh thông báo (lỗi 18/8: backfill từ cache 21h rồi báo) ----------
+
+const NOW_OPEN = new Date(2026, 7, 18, 15, 0);
+const agoH = (h) => new Date(Number(NOW_OPEN) - h * 3.6e6).toISOString();
+
+test('chỉ đếm bug mở từ lượt đọc còn tươi', () => {
+  const state = {
+    bugWatch: {
+      tuoi: { follow: true, openBugsAt: agoH(1), openBugs: [{ bugId: '1', bucket: 'mine' }] },
+      cu: { follow: true, openBugsAt: agoH(21), openBugs: [{ bugId: '9', bucket: 'mine' }] },
+    },
+  };
+  assert.deepEqual(countOpen(state, NOW_OPEN), { total: 1, chuaFix: 1, choConfirm: 0, mine: 1, unknown: 0, notMine: 0 });
+});
+
+test('không có mốc thời gian đọc thì KHÔNG đếm — không biết cũ hay mới thì không báo', () => {
+  const state = { bugWatch: { a: { follow: true, openBugs: [{ bugId: '1', bucket: 'mine' }] } } };
+  assert.deepEqual(countOpen(state, NOW_OPEN), {
+    total: 0,
+    chuaFix: 0,
+    choConfirm: 0,
+    mine: 0,
+    unknown: 0,
+    notMine: 0,
+  });
+});
+
+test('ngưỡng tươi chỉnh được, mặc định 6 giờ', () => {
+  const state = { bugWatch: { a: { follow: true, openBugsAt: agoH(5), openBugs: [{ bugId: '1', bucket: 'unknown' }] } } };
+  assert.equal(countOpen(state, NOW_OPEN).total, 1);
+  assert.equal(countOpen(state, NOW_OPEN, 4).total, 0);
+});
+
+// ---------- dòng đánh số sẵn nhưng RỖNG không phải bug ----------
+
+const SHEET_TEMPLATE_ROWS = `| BugID | Assignee Fix | Description | DEV Check Status | QC / GS Recheck | Bug Type |
+| :-: | :-: | :-: | :-: | :-: | :-: |
+| 1 | Mainsite | nút chết |  |  | Functional |
+| 2 |  |  |  |  |  |
+| 3 |  |  |  |  |  |
+`;
+
+test('dòng chỉ có số thứ tự, không mô tả, không assignee thì KHÔNG phải bug', () => {
+  assert.deepEqual(
+    parseBugTable(SHEET_TEMPLATE_ROWS).map((r) => r.bugId),
+    ['1'],
+  );
+});
+
+test('khung trống không được biến thành bug đang mở — ca thật CFL: 6 bug, 66 dòng trống', () => {
+  assert.deepEqual(
+    openRows(parseBugTable(SHEET_TEMPLATE_ROWS)).map((r) => r.bugId),
+    ['1'],
+  );
+});
+
+test('dòng có mô tả mà chưa gán ai thì VẪN là bug', () => {
+  const md = `| BugID | Assignee Fix | Description | DEV Check Status |
+| :-: | :-: | :-: | :-: |
+| 9 |  | chữ tràn ở popup |  |
+`;
+  assert.deepEqual(
+    parseBugTable(md).map((r) => r.bugId),
+    ['9'],
+  );
+});
+
+// ---------- ĐỔI LUẬT 18/8: mặc định KHÔNG theo dõi, user tự bật cái mình follow ----------
+
+test('sheet mới vào sổ thì KHÔNG theo dõi — user phải tự bật', () => {
+  assert.equal(isWatched({ title: 'BugList vừa thấy trên Drive' }), false);
+});
+
+test('bật follow thì mới theo dõi', () => {
+  assert.equal(isWatched(followSheet({ title: 'x' })), true);
+});
+
+test('tắt follow thì thôi theo dõi và giữ lý do', () => {
+  const off = unfollowSheet(followSheet({ title: 'x' }), 'ticket đã xong');
+  assert.equal(isWatched(off), false);
+  assert.equal(off.unfollowReason, 'ticket đã xong');
+});
+
+test('máy tự chặn vẫn thắng follow: qua mốc release hoặc không phải buglist', () => {
+  assert.equal(isWatched({ follow: true, retired: true }), false);
+  assert.equal(isWatched({ follow: true, notBugSheet: true }), false);
+});
+
+test('bật follow thì dọn sạch dấu vết cờ muted đời cũ', () => {
+  const on = followSheet({ title: 'x', muted: true, mutedAt: 'hôm qua', muteReason: 'cũ' });
+  assert.equal(isWatched(on), true);
+  assert.equal('muted' in on, false);
+  assert.equal('muteReason' in on, false);
+});
+
+test('sheet chưa bật follow thì không được kéo bugwatch dậy dù chưa poll bao giờ', () => {
+  const state = { bugWatch: { s1: { title: 'chưa bật' } } };
+  assert.deepEqual(pickPrompt(state, at45(14)), { skip: 'cold' });
+});
+
+test('sheet đã bật follow mà lâu chưa poll thì mới tới lượt', () => {
+  const state = { bugWatch: { s1: { follow: true } } };
+  assert.deepEqual(pickPrompt(state, at45(14)), { prompt: '/daily bugwatch', why: 'stale' });
+});
+
+// ---------- 3 trạng thái thật của một bug (user chốt 18/8) ----------
+
+const r2 = (o) => ({ bugId: '1', type: 'functional', assignee: 'Mainsite', desc: 'nút chết', ...o });
+
+test('dev chưa ghi gì ⇒ chưa fix', () => {
+  assert.equal(bugStatus(r2({})), 'chua-fix');
+});
+
+test('dev ghi Done mà QC chưa recheck ⇒ ĐÃ SỬA, CHỜ CONFIRM (không phải xong)', () => {
+  assert.equal(bugStatus(r2({ devStatus: 'Done' })), 'cho-confirm');
+});
+
+test('QC confirm rồi ⇒ xong hẳn', () => {
+  assert.equal(bugStatus(r2({ devStatus: 'Done', recheck: 'Confirmed fix' })), 'xong');
+});
+
+test('QC mở lại thì về chưa fix, dù dev ghi Done', () => {
+  assert.equal(bugStatus(r2({ devStatus: 'Done', recheck: 'Reopen' })), 'chua-fix');
+});
+
+test('bug bị bỏ qua thì không nằm trong việc phải làm', () => {
+  assert.equal(bugStatus(r2({ recheck: 'not a bug' })), 'bo-qua');
+  assert.equal(bugStatus(r2({ devStatus: 'skip' })), 'bo-qua');
+});
+
+test('danh sách theo dõi = chưa fix + chờ confirm, bỏ xong và bỏ qua', () => {
+  const rows = [
+    r2({ bugId: '1', devStatus: 'Done' }),
+    r2({ bugId: '2', devStatus: 'Done', recheck: 'Confirmed fix' }),
+    r2({ bugId: '3' }),
+    r2({ bugId: '4', recheck: 'not a bug' }),
+  ];
+  assert.deepEqual(
+    openRows(rows).map((r) => [r.bugId, r.status]),
+    [
+      ['1', 'cho-confirm'],
+      ['3', 'chua-fix'],
+    ],
+  );
+});
+
+test('đếm tách chưa fix với chờ confirm — hai việc khác nhau', () => {
+  const state = {
+    bugWatch: {
+      a: {
+        follow: true,
+        openBugsAt: new Date().toISOString(),
+        openBugs: [
+          { bugId: '1', bucket: 'mine', status: 'chua-fix' },
+          { bugId: '2', bucket: 'unknown', status: 'chua-fix' },
+          { bugId: '3', bucket: 'mine', status: 'cho-confirm' },
+        ],
+      },
+    },
+  };
+  const c = countOpen(state);
+  assert.equal(c.chuaFix, 2);
+  assert.equal(c.choConfirm, 1);
+  assert.equal(c.total, 3);
+  assert.equal(c.mine, 2);
+});
+
+test('gom theo từng buglist để thông báo nói rõ sheet nào', () => {
+  const now = new Date();
+  const state = {
+    bugWatch: {
+      a: {
+        follow: true,
+        title: 'BugList CFL',
+        openBugsAt: now.toISOString(),
+        openBugs: [{ bugId: '6', bucket: 'unknown', status: 'chua-fix' }],
+      },
+      b: {
+        follow: true,
+        title: 'BugList LAN',
+        openBugsAt: now.toISOString(),
+        openBugs: [{ bugId: '1', bucket: 'mine', status: 'cho-confirm' }],
+      },
+      tat: { follow: false, title: 'không theo dõi', openBugsAt: now.toISOString(), openBugs: [{ bugId: '9', bucket: 'mine', status: 'chua-fix' }] },
+    },
+  };
+  assert.deepEqual(
+    openBySheet(state, now).map((s) => ({ title: s.title, chuaFix: s.chuaFix, choConfirm: s.choConfirm })),
+    [
+      { title: 'BugList CFL', chuaFix: 1, choConfirm: 0 },
+      { title: 'BugList LAN', chuaFix: 0, choConfirm: 1 },
+    ],
+  );
+});
+
+test('mỗi buglist trong thông báo mang theo mốc đọc, để số không bị hiểu là tức thời', () => {
+  const now = new Date(2026, 7, 18, 17, 30);
+  const state = {
+    bugWatch: {
+      a: {
+        follow: true,
+        title: 'BugList CFL',
+        openBugsAt: new Date(Number(now) - 5.4e6).toISOString(),
+        openBugs: [{ bugId: '6', bucket: 'unknown', status: 'chua-fix' }],
+      },
+    },
+  };
+  const [row] = openBySheet(state, now);
+  assert.equal(row.readAt, state.bugWatch.a.openBugsAt);
+  assert.equal(row.ageMin, 90);
 });

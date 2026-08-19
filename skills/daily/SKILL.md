@@ -104,7 +104,7 @@ Token đầu của `$ARGUMENTS`:
   (5) **xếp hàng quét lại design** — ticket phase chưa tới `wait-test` có `design.status =
   đã-giao-đã-tải` + nguồn là FOLDER SharePoint (có manifest): `design.lastScanAt` (fallback
   `downloadedAt`) quá 48h → set `design.scanDue = true` + 1 dòng board "design <KEY> chưa quét
-  lại N ngày — `/daily designwatch`". KHÔNG quét trong delta: `sp-scan.js` cần tab Chrome cùng
+  lại N ngày — lượt /daily kế tự quét (muốn ngay: `/daily designwatch`)". KHÔNG quét trong delta: `sp-scan.js` cần tab Chrome cùng
   origin SharePoint, phiên nền không có toolset chrome (whitelist radar chỉ Atlassian + Google
   Drive — `tools/radar-tick.mjs`). Riêng design host **Google Drive** thì quét được ngay tại
   đây: `get_file_metadata` so `modifiedTime` với `design.sourceModified` → mới hơn = designer
@@ -135,7 +135,8 @@ Token đầu của `$ARGUMENTS`:
   chạy được ở phiên CLI tương tác). Mode mặc định tự làm việc này ở Bước 0, nên hiếm khi phải
   gõ tay. Luật duyệt theo `grade`: xem mục "Chấm độ chắc" bên dưới.
 - `designwatch [<KEY>]` → quét lại NGUỒN design cho ticket có `design.scanDue` (hoặc KEY chỉ
-  định) — trả lời "designer có up bản mới không", câu mà coverage KHÔNG trả lời được (coverage
+  định). Mode mặc định TỰ xả hàng này ở Bước 0 nên hiếm khi phải gõ tay — gõ khi muốn quét
+  NGAY không đợi lượt /daily kế — trả lời "designer có up bản mới không", câu mà coverage KHÔNG trả lời được (coverage
   so local với manifest CŨ). Cần Chrome ⇒ chỉ phiên CLI, như `bugwrite`. Mỗi ticket:
   (1) `scripts/sp-scan.js` trên tab SharePoint → manifest mới `~/Downloads/sp-manifest-<KEY>.json`;
   (2) `node tools/sp-diff.mjs designs/<KEY>/sp-manifest.json <manifest mới>` (tên manifest local
@@ -167,7 +168,10 @@ Token đầu của `$ARGUMENTS`:
 `jqlConfirmed: false` → sau quét, xác nhận JQL với user 1 lần rồi set `true`.
 **Xả hàng đợi ghi sheet** (chỉ phiên CLI tương tác, mode mặc định): có
 `state.bugWatch[*].pendingSheetWrite` không rỗng → ghi lên sheet qua Chrome rồi dọn hàng đợi.
-Phiên nền không làm được việc này (không có toolset chrome) nên đừng thử.
+**Xả hàng quét design** (cùng điều kiện): có ticket `design.scanDue = true` → tự chạy luôn quy
+trình `designwatch` cho các ticket đó ngay tại đây — radar chỉ xếp hàng, lượt /daily thường tự
+quét, user KHÔNG phải gõ lệnh riêng (mirror nếp `pendingSheetWrite`).
+Phiên nền không làm được 2 việc này (không có toolset chrome) nên đừng thử.
 
 **Pull gt-promotion đầu phiên** (mode mặc định/plan/delta): `git -C <root> pull --ff-only`
 timeout 60s — fail/timeout → báo 1 dòng + đi tiếp (không chặn). Commit mới đụng folder

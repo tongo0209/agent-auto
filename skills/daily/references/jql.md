@@ -21,7 +21,8 @@ gọi connector Atlassian, cách xử lý key rớt khỏi query. `SKILL.md` gi�
 1. ToolSearch nạp `searchJiraIssuesUsingJql`, `getJiraIssue`. Lỗi auth → DỪNG SỚM, báo user
    bật connector Atlassian trong claude.ai settings.
 2. Chạy JQL trong config → so `updated` với state → nhãn MỚI / ĐỔI / CÒN DỞ.
-   Key biến mất khỏi query → `phase: closed`. Task CÒN DỞ phase ngoài mình (wait-test 🕐)
+   Key biến mất khỏi query → **KHÔNG mặc định là `closed`**: phân biệt `closed` vs `reassigned`
+   theo luật ở `SKILL.md` mục "Vòng đời task (PHASE)". Task CÒN DỞ phase ngoài mình (wait-test 🕐)
    → chỉ liệt kê 1 dòng, không xử lý lại.
 3. **Quét buglist**: ticket ĐỔI có comment mới chứa link `docs.google.com/spreadsheets`
    → ghi `state.issues[key].bugSheets = ["<url>"]` (tên field CỐ ĐỊNH — console đọc field này để
@@ -43,13 +44,3 @@ gọi connector Atlassian, cách xử lý key rớt khỏi query. `SKILL.md` gi�
      thấy 2/58 ticket).
    - Ticket không có duedate → bỏ khỏi snapshot (không đoán tháng).
    - Kết quả quá lớn cho 1 lần đọc → thu hẹp `fields` hoặc chia 2 khoảng 4-5 tháng.
-
-## Mode `delta` — JQL nhẹ
-
-`delta` → radar nhẹ, KHÔNG hỏi gì, chạy <1 phút: (1) JQL `assignee = currentUser() AND updated >= -4h`;
-(2) `git -C <gt-promotion> pull` + `git log --since` xem commit mới có đụng folder task đang theo dõi;
-(3) bóc link sheet mới trong comment → `state.issues[key].bugSheets`;
-(4) **refresh `history/months.json` nếu `generatedAt` ≠ hôm nay** (1 query snapshot ở mục trên,
-ghi đè + backup `.backups/months/`) — tab "Theo tháng" của console đọc thẳng file này, không suy
-từ `state.json`, nên bỏ bước này là console vẽ sai trạng thái/mốc dù state đã đúng.
-CHỈ báo thay đổi + cập nhật board/state. Không code.

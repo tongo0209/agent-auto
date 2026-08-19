@@ -189,10 +189,6 @@ cách KHÔNG ăn (đã thử, đừng lặp lại). `SKILL.md` giữ lại luậ
       Graph/MCP mù không có nghĩa là hết đường: SharePoint REST của CHÍNH site đó vẫn trả listing
       nếu browser đã có session mở được share link.
 
-      ⛔ **`scripts/sp-rest.sh` ĐÃ CHẾT — đừng gọi** (verify 3/8/2026): nó đọc tab bằng clipboard
-      (`Cmd+A`/`Cmd+C` qua System Events); trên máy này keystroke không ăn, clipboard giữ nguyên
-      nội dung cũ, script `exit 1`. Giữ file chỉ để tham chiếu lịch sử.
-
       **QUY TRÌNH CHUẨN — 4 bước, mỗi bước có công cụ riêng trong `scripts/`, KHÔNG làm tay:**
       1. **Cấp session**: `open -a "Microsoft Edge" "<share link>"` (chỉ cần 1 lần/folder), rồi
          `navigate` **bằng chính extension Claude in Chrome** tới một URL `/_api/…` của site đó

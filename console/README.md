@@ -27,7 +27,7 @@ console/
 ├── webpack.config.js        # build: entry src/index.js → dist/, alias @core @panels @components @terminal
 ├── server/                  # backend Express (không có logic UI)
 │   ├── index.js             # bootstrap: static dist + mount /api + attach WS /term
-│   ├── lib/
+│   ├── lib/                  # 25 module (test .mjs nằm cạnh, ls thấy 38 file)
 │   │   ├── paths.js         # MỌI đường dẫn tập trung ở đây (agent-auto, whitelist mở file)
 │   │   ├── fsutil.js        # readJSON / readJSONL / todayStr / daysBetween
 │   │   ├── board.js         # parse board markdown → { needYou, log } + readAllNeedYou (mọi board)
@@ -46,14 +46,27 @@ console/
 │   │   │                    #   HTML_TODO/DONE_PHASES, LATE_EXEMPT_PHASES... (nguồn vốn từ, không tự khai lại)
 │   │   ├── delta.js         # "có gì mới" — suy status/duedate/milestone/phase đổi từ 2 sổ history/*.jsonl
 │   │   ├── notify.js        # nhắc mốc RA NGOÀI trang qua macOS notification (best-effort, có test hàm thuần)
-│   │   └── forecast.js      # dự báo ngày xong phase hiện tại từ lead time thật (dưới minSamples → null, không bịa)
-│   ├── routes/
+│   │   ├── forecast.js      # dự báo ngày xong phase hiện tại từ lead time thật (dưới minSamples → null, không bịa)
+│   │   ├── phaselog.js      # CHỖ DUY NHẤT biết đọc history/phases.jsonl cho đúng (lọc dòng TRÙNG + NO-OP
+│   │   │                    #   do skill /daily và observer console cùng ghi) — delta.js + learn.js dùng chung
+│   │   ├── listen.js        # listen cổng có fallback: 4747 bận thì nhảy 4748 → 4749… (không sập EADDRINUSE)
+│   │   ├── ptyStore.js      # kho phiên pty sống LÂU HƠN WebSocket (neo theo sessionId, replay output đã lỡ)
+│   │   ├── radar.js         # trạng thái radar nền: đọc history/radar.jsonl, phân biệt "im vì yên" vs "im vì
+│   │   │                    #   chết" (deadMs); luật giờ lấy THẲNG từ tools/radar-tick.mjs, không chép lại
+│   │   ├── bugs.js          # bảng bug cho console — đọc state.bugWatch mà bug-radar nền ghi (hàng chờ duyệt
+│   │   │                    #   verified/unverified + trạng thái từng sheet: watching/muted/retired/not-buglist)
+│   │   ├── deliver.js       # HÀM THUẦN suy "đã bàn giao chưa" từ output git (bằng chứng = file đã push lên
+│   │   │                    #   gt-promotion-template); mọi lệnh git nằm ở chỗ gọi nên test không cần repo giả
+│   │   ├── promoScan.js     # phần I/O của việc kiểm bàn giao: chạy git + liệt kê `<promoFolder>/mainsite/`
+│   │   └── jira.js          # client Jira REST v3 CHỈ đủ để đánh Done 1 ticket — cố ý KHÔNG có hàm ghi
+│   │                        #   description/comment (chốt 10/08: không đụng bài của PM)
+│   ├── routes/              # 19 file
 │   │   ├── state.js         # GET /api/state    → tab Hôm nay + KPI (+ cờ có designs/questions)
 │   │   ├── git.js           # GET /api/git, /api/promotion
 │   │   ├── months.js        # GET /api/months   → gom history/months.json theo tháng
 │   │   ├── activity.js      # GET /api/activity, /api/activity/:key → hoạt động git per ticket
 │   │   ├── docs.js          # GET /api/boards, /board/:date, /brief/:key, /metrics
-│   │   ├── review.js        # GET /api/review, /review/diff, /gate/:key, /gates
+│   │   ├── review.js        # GET /api/review, /review/diff, /gates
 │   │   ├── ticket.js        # GET /api/ticket/:key, /design/:key/:name · POST /gate/run/:key
 │   │   ├── preview.js       # GET /preview/:key/* → serve dist/ thật của ticket (chỉ đọc)
 │   │   ├── board.js         # POST /api/board/check (tick) + /board/append (thêm dòng, giờ do server lấy)
@@ -63,13 +76,18 @@ console/
 │   │   ├── delta.js         # GET /api/delta?since=<ISO> → dòng "có gì mới từ HH:MM" tab Hôm nay
 │   │   ├── debt.js          # GET /api/debt → nợ "Cần bạn" ở board cũ (cache 30s) + số dòng lệch section
 │   │   ├── handoff.js       # GET/POST /api/handoff/:key[, /check] → checklist bàn giao phase reassigned
+│   │   ├── radar.js         # GET /api/radar (trạng thái radar nền, CHỈ ĐỌC) · POST /radar/toggle
+│   │   ├── bugs.js          # GET /api/bugs (hàng bug chờ duyệt, CHỈ ĐỌC) · POST /bugs/watch (bật/tắt 1 buglist)
+│   │   ├── jira.js          # GET /api/jira/delivery/:key · POST /jira/done/:key → ĐÁNH DONE ticket khi đã
+│   │   │                    #   bàn giao qua gt-promotion (đường DUY NHẤT console ghi ra Jira)
 │   │   └── open.js          # POST /api/open    → Finder/VS Code (có whitelist)
 │   └── ws/terminal.js       # WebSocket ↔ node-pty (1 WS = 1 shell thật)
 └── src/                     # frontend (jQuery + xterm, bundle bằng webpack)
     ├── index.html           # template (html-webpack-plugin)
     ├── index.js             # bootstrap: khởi tạo terminal, tab, poll
     ├── core/
-    │   ├── constants.mjs    # DẪN XUẤT từ schema/vocab.json (không tự khai phase) + TASK_GROUPS, COMMANDS, POLL_MS
+    │   ├── constants.mjs    # DẪN XUẤT từ schema/vocab.json (không tự khai phase) + TASK_GROUPS, COMMANDS,
+    │   │                    #   POLL_MS, IDLE, JIRA_SITE (site Jira — fallback khi response chưa kèm config.siteUrl)
     │   ├── icons.js         # bộ icon lucide — chỗ DUY NHẤT biết icon nào lấy từ file nào
     │   ├── api.js           # chỗ DUY NHẤT gọi backend
     │   ├── format.mjs       # hàm thuần: escape, ngày, severity, mốc kế, isLate
@@ -77,9 +95,11 @@ console/
     │   └── marks.mjs        # đặt nhãn mốc trên trục timeline, 2 lượt ưu tiên HTML trước (tách khỏi gantt.js để test được)
     ├── terminal/TerminalManager.js   # multi-tab pty, tự reconnect, gõ hộ lệnh
     ├── core/splitter.js     # thanh kéo đổi tỉ lệ 2 cột (nhớ trong localStorage)
-    ├── components/          # modal.js (showText + showDiff) · charts.js · gantt.js · activityLine.js
-    ├── panels/              # todayPanel, ticketPanel (drawer 1 ticket), reviewPanel, monthsPanel, gitPanel, historyPanel
-    └── styles/              # index.css import 14 file: tokens/base/layout/kpi/tabs/cards/table/alerts/drawer/review/gantt/charts/terminal/modal + responsive (CUỐI)
+    ├── components/          # modal.js (showText + showDiff) · charts.js · gantt.js · activityLine.js ·
+    │                        #   flashbar.js (chớp 1 dòng thông báo trong .flashbar — Review + drawer dùng chung)
+    ├── panels/              # todayPanel, ticketPanel (drawer 1 ticket), reviewPanel, bugPanel, monthsPanel,
+    │                        #   gitPanel, historyPanel
+    └── styles/              # index.css import 16 file: tokens/base/layout/kpi/tabs/cards/table/alerts/drawer/review/bugs/gantt/charts/terminal/modal + responsive (CUỐI)
 ```
 
 ## Tính năng cột trái
@@ -87,6 +107,8 @@ console/
 | Tab | Có gì |
 |---|---|
 | Hôm nay | KPI 4 ô (chỉ ô cần chú ý mới lên màu) · **dải cảnh báo** (mốc gấp/quá mốc/đứng yên/design chưa tải/**nợ đọng rơi radar**) · dải mốc 14 ngày + cảnh báo dồn deadline · **timeline mốc 4 tuần** (Gantt) · **bảng task** nhóm theo phase (`Ticket · Việc · Phase · Mốc kế · Gate · Push · Effort · Actions`, header sticky) · **ô lọc** · **ô Effort** = hoạt động git per ticket · **Cần bạn tick được** (ghi vào board) · **Nợ đọng từ board cũ** (tick ghi vào board GỐC) · log board (tô vàng dòng còn `HH:MM`) |
+| Review | Việc chờ **bạn** đẩy lên, gom theo ticket: badge `n file chưa commit` / `n commit chưa push` / `sạch · đã đẩy` · badge fe-gate (`/api/gates`, chưa chạy thì bấm để gõ lệnh) · danh sách file kèm `+/-`, bấm xem diff · nút gõ hộ `git add && commit -m "[leaf] subject" -m <trailer>` và `git push`. Console **không** commit/push: chỉ gõ vào terminal, **không** gửi Enter — số trên tab đếm ticket có việc thật |
+| Bug | Bug do **bug-radar nền** fix, chờ bạn gật trước khi ghi Done lên sheet QC. Hai nhóm: *đã verify* và *chưa verify được* (kèm lý do + gợi ý cách verify), badge treo bao lâu + chip ticket + link sheet. Dưới là **buglist đang theo dõi**: động tĩnh lượt quét cuối (bug mới/đổi/QC mở lại/không của mình) + nút bật-tắt theo dõi từng sheet (`POST /api/bugs/watch` — tắt thì lượt bugwatch thôi đọc sheet đó, mỗi lượt ~90s + token). Console **chỉ đọc**, ghi ngược sheet bằng `/daily bugwrite` (có nút gõ hộ) |
 | Theo tháng | Task nhóm theo **tháng của due date**, mặc định 3 tháng gần nhất (bấm xem tất cả); dấu tick = đã chuyển Done. Nguồn: `history/months.json` (snapshot real từ Jira do `/daily` ghi). Cuối tab: **board các ngày trước · gt-promotion commit mới nhất theo task · metrics ước lượng vs thực tế** (trước là tab "Lịch sử" riêng, chỉ 3 dòng nội dung nên đứng riêng thành màn trống) |
 | Git của tôi | Commit của chính bạn, **chọn theo tháng** (6 tháng gần nhất): bar từng ngày trong tháng, tổng theo repo, list commit kèm shortstat |
 

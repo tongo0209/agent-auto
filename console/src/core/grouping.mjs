@@ -1,7 +1,7 @@
 import { TASK_GROUPS } from './constants.mjs';
 
 /** Phase nằm trong nhóm đóng sẵn — suy từ TASK_GROUPS để ĐẾM và NHÓM không bao giờ lệch nhau */
-export const FOLDED_PHASES = new Set(TASK_GROUPS.filter((g) => g.collapsed).flatMap((g) => g.phases));
+const FOLDED_PHASES = new Set(TASK_GROUPS.filter((g) => g.collapsed).flatMap((g) => g.phases));
 
 /**
  * Chia nhóm + đếm cho bảng task. Hàm THUẦN (không DOM) để test được — ngày 3/8 hai bug

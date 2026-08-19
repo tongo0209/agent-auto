@@ -112,9 +112,7 @@ export function initTicketPanel({ terminals }) {
   });
 }
 
-function flash(text) {
-  $('#drawer-flash').text(text).stop(true, true).show().delay(3500).fadeOut(300);
-}
+const flash = (text) => $('#drawer-flash').text(text).stop(true, true).show().delay(3500).fadeOut(300);
 
 /* ─────────────────────────── mở / đóng ─────────────────────────── */
 

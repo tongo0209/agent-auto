@@ -24,10 +24,6 @@ body {
   vertical-align: -0.135em;
   stroke-width: 1.75;
 }
-.ic.big {
-  width: 1.15em;
-  height: 1.15em;
-}
 
 /* Nhãn chỉ dành cho screen reader */
 .sr {

@@ -136,6 +136,8 @@
   background: var(--raise);
   padding: 0 2px;
   border-radius: 2px;
+  font: 600 var(--fs-xs) var(--font-mono);
+  color: var(--muted);
 }
 .gmark i {
   width: var(--dot);
@@ -145,10 +147,6 @@
   box-shadow: 0 0 0 2px var(--raise);
   display: inline-block;
   flex: 0 0 auto;
-}
-.gmark b {
-  font: 600 var(--fs-xs) var(--font-mono);
-  color: var(--muted);
 }
 .gmark.key {
   --dot: 10px;

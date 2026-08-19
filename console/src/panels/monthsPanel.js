@@ -3,8 +3,8 @@ import { api } from '@core/api';
 import { escapeHtml, shortDate } from '@core/format.mjs';
 import { icon } from '@core/icons';
 import { monthStackedBars } from '@components/charts';
+import { JIRA_SITE } from '@core/constants.mjs';
 
-const JIRA = 'https://vnggames.atlassian.net';
 let showAll = false; // mặc định 3 tháng gần nhất (backend quyết), bấm để xem hết
 
 /**
@@ -56,7 +56,7 @@ export async function loadMonths() {
           <div class="keys">${m.issues
             .map(
               (i) =>
-                `<a class="kchip ${i.done ? 'ok' : 'open'}" href="${JIRA}/browse/${escapeHtml(i.key)}" target="_blank" rel="noopener"
+                `<a class="kchip ${i.done ? 'ok' : 'open'}" href="${JIRA_SITE}/browse/${escapeHtml(i.key)}" target="_blank" rel="noopener"
                    title="${escapeHtml(i.summary || '')} — ${escapeHtml(i.status || '')} · due ${escapeHtml(i.duedate || '')}"
                    >${icon(i.done ? 'check' : 'dot')}<span>${escapeHtml(i.key)}</span>${
                      i.duedate ? `<em>${shortDate(i.duedate)}</em>` : ''

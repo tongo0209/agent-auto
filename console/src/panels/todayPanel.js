@@ -9,6 +9,7 @@ import {
   MILESTONE_LABEL,
   DESIGN_STATUS,
   designDeliveredNotLocal,
+  JIRA_SITE,
 } from '@core/constants.mjs';
 import { icon } from '@core/icons';
 import { escapeHtml, inlineMd, shortDate, severityByDays, nextMilestone, isLate, daysUntil } from '@core/format.mjs';
@@ -19,7 +20,6 @@ import { openTicket } from '@panels/ticketPanel';
 import { ganttTimeline } from '@components/gantt';
 import { effortCell, activityDetail } from '@components/activityLine';
 
-const JIRA_FALLBACK = 'https://vnggames.atlassian.net';
 const ACTIVITY_REFRESH_MS = 30000;
 const ALERT_REFRESH_MS = 60000;
 /** Mốc "đã xem" của dòng delta — lưu localStorage (sống qua reload), lần đầu mặc định 12h trước */
@@ -419,7 +419,7 @@ function renderAlerts() {
 /** Tab "Hôm nay": cảnh báo · KPI · dải mốc · timeline · bảng task · Cần bạn · log */
 export function renderToday(data) {
   const today = data.today;
-  const site = data.config?.siteUrl || JIRA_FALLBACK;
+  const site = data.config?.siteUrl || JIRA_SITE;
   // KHÔNG lọc phase ở đây nữa: bảng cần cả `closed`/`reassigned` (nhóm "Đã xong / ra khỏi tay"
   // thu gọn ở cuối) — mất dấu ticket là mất luôn đường tra lại. Chỗ nào chỉ được tính việc
   // CÒN CỦA MÌNH thì tự lọc `OFF_MY_PLATE_PHASES`: KPI (renderKpis) và timeline (dưới).

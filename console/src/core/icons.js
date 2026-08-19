@@ -36,11 +36,9 @@ import close from 'lucide-static/icons/x.svg';
 import check from 'lucide-static/icons/check.svg';
 import dot from 'lucide-static/icons/circle.svg';
 import goal from 'lucide-static/icons/circle-check-big.svg';
-import calendar from 'lucide-static/icons/calendar-days.svg';
 import diff from 'lucide-static/icons/git-compare.svg';
 import push from 'lucide-static/icons/cloud-upload.svg';
 import radar from 'lucide-static/icons/radar.svg';
-import trend from 'lucide-static/icons/trending-up.svg';
 import boxOff from 'lucide-static/icons/square.svg';
 import boxOn from 'lucide-static/icons/square-check-big.svg';
 import sheet from 'lucide-static/icons/file-spreadsheet.svg';
@@ -74,11 +72,9 @@ const RAW = {
   check,
   dot,
   goal,
-  calendar,
   diff,
   push,
   radar,
-  trend,
   'box-off': boxOff,
   'box-on': boxOn,
   sheet,
@@ -105,11 +101,11 @@ function normalize(svg) {
 const CACHE = Object.fromEntries(Object.entries(RAW).map(([name, svg]) => [name, normalize(svg)]));
 
 /**
- * `icon('coding')` → string SVG đã gắn class .ic (+ class phụ nếu truyền).
+ * `icon('coding')` → string SVG đã gắn class .ic.
  * Tên chưa khai báo → trả '' (không phá layout, không throw giữa lúc render).
  */
-export function icon(name, cls = '') {
+export function icon(name) {
   const svg = CACHE[name];
   if (!svg) return '';
-  return svg.replace(CLS_SLOT, `class="ic${cls ? ' ' + cls : ''}" aria-hidden="true" focusable="false"`);
+  return svg.replace(CLS_SLOT, 'class="ic" aria-hidden="true" focusable="false"');
 }

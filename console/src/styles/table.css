@@ -146,11 +146,7 @@
   background: var(--sev, var(--line));
   opacity: 0.85;
 }
-.trow.odd {
-  background: rgba(255, 255, 255, 0.016);
-}
-.trow:hover,
-.trow.odd:hover {
+.trow:hover {
   background: var(--surface);
 }
 .trow.late .c-due {
@@ -281,9 +277,6 @@
 }
 .eff .plus {
   color: var(--s1);
-}
-.eff .minus {
-  color: var(--s2);
 }
 .eff:hover b,
 .eff:hover {

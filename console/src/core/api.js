@@ -30,7 +30,6 @@ export const api = {
 
   // Gate chất lượng (hệ con ③)
   gates: () => getJSON('/api/gates'),
-  gate: (key) => getJSON('/api/gate/' + key),
 
   // Drawer chi tiết 1 ticket
   ticket: (key) => getJSON('/api/ticket/' + encodeURIComponent(key)),
@@ -44,6 +43,7 @@ export const api = {
   radarToggle: (enabled) => postJSON('/api/radar/toggle', { enabled }),
   /** Hàng bug chờ bạn duyệt + động tĩnh buglist (radar nền ghi state.bugWatch) */
   bugs: () => getJSON('/api/bugs'),
+  bugWatch: (sheetId, watching) => postJSON('/api/bugs/watch', { sheetId, watching }),
   /** Nợ "Cần bạn" ở board CŨ mà hôm nay không ai nhắc lại — tick bằng `boardCheck` với `date` gốc */
   debt: () => getJSON('/api/debt'),
   // Hợp đồng state.json vs schema/vocab.json (Task 5) — trộn vào dải cảnh báo

@@ -25,17 +25,6 @@ router.get('/review/diff', async (req, res) => {
   res.type('text/plain').send(out.text);
 });
 
-/**
- * GET /api/gate/:key — báo cáo fe-gate lần cuối của 1 ticket.
- * Nguồn: `knowledge/gates/<KEY>.json` do `tools/fe-gate.mjs --json` ghi.
- */
-router.get('/gate/:key', (req, res) => {
-  const key = String(req.params.key || '').replace(/[^A-Za-z0-9-]/g, '');
-  const p = path.join(dir.gates, key + '.json');
-  if (!fs.existsSync(p)) return res.status(404).json({ error: 'chưa có báo cáo gate cho ' + key });
-  res.json(readJSON(p, { error: 'file gate hỏng' }));
-});
-
 /** GET /api/gates — tổng hợp gate của mọi ticket đã từng chạy */
 router.get('/gates', (_req, res) => {
   // Không cần khởi tạo `[]`: nhánh catch return ngay, nên tới dòng `.map` bên dưới

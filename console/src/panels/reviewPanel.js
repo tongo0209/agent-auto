@@ -56,9 +56,7 @@ export function initReviewPanel({ terminals }) {
 const cssId = (s) => s.replace(/[^A-Za-z0-9]/g, '');
 const repoPath = (repo) => (ctx.repos || {})[repo] || repo;
 
-function flash(text) {
-  $('#review-flash').text(text).stop(true, true).show().delay(4000).fadeOut(300);
-}
+const flash = (text) => $('#review-flash').text(text).stop(true, true).show().delay(4000).fadeOut(300);
 
 export async function loadReview() {
   let data;

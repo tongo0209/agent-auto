@@ -150,7 +150,9 @@ export const COMMANDS = [
 ];
 
 export const POLL_MS = 3000;
-export const WEEK_HORIZON_DAYS = 14;
+
+/** Site Jira của team — fallback khi response chưa kèm `config.siteUrl` (/api/bugs, /api/months) */
+export const JIRA_SITE = 'https://vnggames.atlassian.net';
 
 /** Ngưỡng coi 1 tab terminal là "vừa xong việc" — xem TerminalManager.watchIdle */
 export const IDLE = { busyGapMs: 3000, idleMs: 5000, minBusyMs: 30000, tickMs: 1000 };

@@ -703,35 +703,34 @@
         <div class="cards">
           <div class="card step">
             <em>Mối 1 · mã game</em>
-            <h3>Đọc mã trong tiêu đề ticket</h3>
-            <p>Tiêu đề <code class="k">[A86.TF_VN][Total Football]</code> → tra bảng
-              <code class="k">gameMap</code> → <code class="k">products/totalfootball</code>.</p>
-            <p>Bảng này <b>học dần</b>: gặp mã mới thì ghi thêm một dòng, <b>lần sau khỏi đoán lại</b>.</p>
+            <h3>Nhìn mã game trên tiêu đề</h3>
+            <p>Tiêu đề ticket luôn mở đầu bằng mã game (<code class="k">[A86…]</code>) —
+              tra bảng mã đã học là ra folder game.</p>
+            <p>Gặp mã mới thì <b>ghi thêm vào bảng</b>, lần sau khỏi đoán.</p>
             <span class="foot">Hiện có 7 mã: 221 · 496 · 903 · A49 · A70 · A78 · A86</span>
           </div>
           <div class="card step">
-            <em>Mối 2 · nexusId</em>
-            <h3>Khớp số hiệu ticket với tên folder</h3>
-            <p>Ticket có <code class="k">nexusId 58799</code>; folder bên repo bàn giao đặt tên kèm
-              đúng số đó — <code class="k">…_58799</code>.</p>
-            <p>Số khớp thì <b>gần như chắc</b>. Nhưng <b>có ca số lệch</b>, nên không dừng ở đây.</p>
-            <span class="foot">Đúng thì nhanh, sai thì phải xuống mối 3</span>
+            <em>Mối 2 · số hiệu</em>
+            <h3>So số hiệu ticket với tên folder</h3>
+            <p>Mỗi ticket có một số hiệu (<code class="k">58799</code>); folder bàn giao thường
+              đặt tên kèm đúng số đó (<code class="k">…_58799</code>).</p>
+            <p>Khớp số là <b>gần như chắc</b> — nhưng từng gặp ca lệch, nên chưa dừng.</p>
+            <span class="foot">Đúng thì nhanh · lệch thì xuống mối 3</span>
           </div>
           <div class="card step">
             <em>Mối 3 · đọc file</em>
-            <h3>Mở file ra xác nhận, không đoán</h3>
-            <p>Mở HTML trong repo bàn giao, xem nó nạp <code class="k">dist/&lt;game&gt;.css|js</code>
-              của folder nào bên <code class="k">cdn-source</code>.</p>
-            <p>Nó trỏ tới đâu thì đó chính là folder cần sửa — <span class="hl">bằng chứng, không phải suy đoán</span>.</p>
-            <span class="foot">Chốt xong ghi pathsConfirmed, lần sau khỏi dò lại</span>
+            <h3>Mở file ra xem — bằng chứng cuối</h3>
+            <p>Mở trang HTML đang chạy, xem nó <b>nạp asset từ folder nào</b> —
+              nó trỏ đâu, folder cần sửa ở đó.</p>
+            <p><span class="hl">File không nói dối</span> — hai mối trên lệch nhau thì tin mối này.</p>
+            <span class="foot">Chốt xong ghi vào sổ, lần sau khỏi dò lại</span>
           </div>
         </div>
         <div class="band">
           <b>Khi ba mối không khớp</b>
-          <p>Chuyện thường gặp: tên trên ticket, tên folder trong repo và số hiệu <strong>không
-            trùng nhau</strong> — mỗi bên đặt tên theo thói quen của mình. Lúc đó mối 3 là chỗ gỡ:
-            <strong>file luôn nói thật</strong> nó đang dùng asset của folder nào. Chốt xong thì ghi
-            lại vào state, lần sau khỏi dò từ đầu.</p>
+          <p>Chuyện thường gặp — mỗi bên đặt tên theo thói quen riêng nên tên ticket, tên folder,
+            số hiệu <strong>không trùng nhau</strong>. Lúc đó <strong>tin mối 3</strong>: file đang
+            chạy luôn nói thật nó dùng folder nào.</p>
         </div>
       </div>
       <p class="note">Chưa nối được folder thì các bước sau không có chỗ nào để sửa cho đúng — nên đây

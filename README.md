@@ -42,9 +42,9 @@ build) hoặc browserpilot (phải build, nhưng ít call hơn hẳn). Có sẵn
 
 ## Cài đặt (member mới)
 
-Bản phát hành đi kèm **cdn-source** (`products/tontagent/`) gồm: agent-auto, browserpilot,
-bug-fixer bản gọn, bug-fixer-lite. ⚠ **CHƯA gồm `/code-developer` + `/design-analyst`** — xem
-mục "Skill ngoài repo" về kênh cài. Đã pull cdn-source là chạy được phần dưới:
+Bản phát hành đi kèm **cdn-source** (`products/tontagent/`): agent-auto (từ 19/8 đã gồm đủ
+`/code-developer`, `/bug-fixer`, `/code-audit`, `/website-audit`, `/commit` + 4 agent),
+browserpilot, bug-fixer-lite. Đã pull cdn-source là chạy được phần dưới:
 
 ```bash
 bash <cdn-source>/products/tontagent/agent-auto/tools/install-skills.sh
@@ -142,6 +142,15 @@ Các thư mục dữ liệu vẫn còn sau khi clone nhờ `.gitkeep`, chỉ là
 | `/check-design` | soát design đủ chưa — ghi `tasks/<KEY>/design-gap.md`, `state.issues[].design` |
 | `/ui-check` | check output `dist/` — Bước 0a gọi `tools/fe-gate.mjs` của repo này |
 | `/clean-code` | dọn code theo `rules/code-style.md` (R-CS-*) — cùng nguồn luật với hook `guard-style.sh` trong repo này |
+| `/code-developer` | manager dựng UI (analyst → dev → checker) — `/daily` Bước 4 gọi thật; kèm 4 agent trong `agents/` |
+| `/bug-fixer` | manager xử lý buglist bản full — routing global trỏ buglist QC vào đây |
+| `/code-audit` | soi source trước merge/push — không sửa code |
+| `/website-audit` | audit trước production (validation, ảnh, font, SEO) — bảng lệnh Bước 04 |
+| `/commit` | chuẩn commit VNG (Conventional Commits + co-author) — bảng lệnh Bước 05 |
+
+5 skill dưới + `agents/` copy về từ bản gốc cá nhân 19/8/2026 — **bản trong repo này là bản
+team dùng** (installer symlink từ đây); bản gốc trên máy người bảo trì giữ nguyên làm nơi thử
+nghiệm, sửa cho team thì sửa Ở ĐÂY.
 
 `hooks/` là 4 guard + test của chúng: `guard-bash.sh` (PreToolUse, chặn lệnh nguy hiểm) ·
 `guard-read.sh` (PreToolUse, chặn đọc secret) · `guard-style.sh` (PostToolUse `Write|Edit`, đếm
@@ -152,11 +161,10 @@ ngay sau mỗi lần `state.json` đổi). Chúng bảo vệ chính `boards/` ·
 
 | Skill | Repo | `/daily` dùng thế nào |
 |---|---|---|
-| `/code-developer` | `promptAgent/` — ⚠ **chưa có kênh cài public** (repo không có remote, bản phát hành cdn-source không kèm); member mới cần thì hỏi người bảo trì | **gọi thật** qua tool Skill (`skills/daily/SKILL.md` mục *"Bước 4 — Thực thi"*) — thiếu là bước giao việc code gãy |
 | `/bug-fixer-lite` | `cdn-source/products/tontagent/` — cài theo README ở đó | **soạn lệnh ra board** (mục *"Bước 3 — Phân loại + trình kế hoạch"*), và được radar buglist gọi thật ở mục *"Bug-radar"* khi qua đủ 4 cổng sở hữu |
-| `/bug-fixer` (bản full) | `cdn-source/products/tontagent/bug-fixer` — `bash install.sh` (bản tách gọn, KHÔNG kèm code-developer) | bảng routing global trỏ buglist QC vào đây; chưa cài thì dùng `/bug-fixer-lite` |
+| `/check-promotion` | `gt-promotion-template/standard-html-templates/ai-template-check-skill` (repo git team) | bảng lệnh Bước 04 — soát popup theo 39 loại promotion trước khi giao QA |
 
-`install-skills.sh --check` kiểm hộ 2 skill đầu (mục "Liên kết ngoài repo"). Phần quét Jira · suy phase · dò design ·
+`install-skills.sh --check` kiểm hộ bug-fixer-lite (mục "Liên kết ngoài repo"). Phần quét Jira · suy phase · dò design ·
 ghi board · `/daily plan|week|status|doctor` **không phụ thuộc** hai skill trên.
 `/daily` chưa có nhánh xử lý riêng cho ca thiếu skill — mất `/code-developer` thì lỗi nổi lên ở
 tầng tool, chưa được nuốt gọn thành cảnh báo.

@@ -75,6 +75,16 @@ for f in "$REPO"/hooks/*.sh; do
 done
 say ""
 
+# ── Agent definitions (~/.claude/agents/) — code-developer/bug-fixer cần chúng ─
+say "Agent (~/.claude/agents/)"
+[ "$CHECK_ONLY" = 1 ] || mkdir -p "$CLAUDE_DIR/agents"
+for f in "$REPO"/agents/*.md; do
+  [ -f "$f" ] || continue
+  link "$f" "$CLAUDE_DIR/agents/$(basename "$f")"
+done
+[ -d "$REPO/agents/references" ] && link "$REPO/agents/references" "$CLAUDE_DIR/agents/references"
+say ""
+
 # ── config.json + state.json: riêng từng người, không vào git ────────────────
 say "Dữ liệu riêng từng người"
 seed() { # seed <tên file> <ghi chú khi tạo mới>
@@ -116,9 +126,6 @@ if [ -f "$CLAUDEMD" ] && { grep -qF "$REPO/rules" "$CLAUDEMD" || grep -q "rules/
   good "CLAUDE.md — đã trỏ rules/"
 else
   bad "CLAUDE.md chưa trỏ $REPO/rules/ — agent sẽ không đọc luật R-* (khối dán sẵn in ở cuối)"
-fi
-if [ -e "$CLAUDE_DIR/skills/code-developer" ]; then good "skill code-developer — có"
-else bad "skill code-developer CHƯA có — /daily Bước 4 (giao việc code) sẽ gãy; hỏi người bảo trì (chưa có kênh cài public)"
 fi
 if [ -e "$CLAUDE_DIR/skills/bug-fixer-lite" ]; then good "skill bug-fixer-lite — có"
 elif grep -q '"autoFix": *true' "$REPO/config.json" 2>/dev/null; then

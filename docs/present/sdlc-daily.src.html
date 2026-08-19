@@ -649,34 +649,34 @@
               <tr>
                 <th style="width:22%">Đọc từ đâu</th>
                 <th style="width:34%">Lấy được gì</th>
-                <th style="width:44%">Bẫy đã gặp thật</th>
+                <th style="width:44%">Bỏ qua nguồn này thì dính gì — ca thật</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td class="src">Description ticket Jira</td>
                 <td>Việc phải làm, timeline, <b>link DESIGN</b></td>
-                <td class="trap">Máy từng <b>đi search SharePoint theo tên event</b> thay vì đọc dòng DESIGN có sẵn — báo nhầm “chưa có design” cho ticket đã giao, người phải tự bắt lỗi.</td>
+                <td class="trap">Đọc lướt description, bỏ sót dòng DESIGN → <b>báo nhầm “chưa có design”</b> cho ticket mà designer đã giao xong.</td>
               </tr>
               <tr>
                 <td class="src">File .docx / .xlsx kèm design</td>
                 <td><b>Cơ chế chi tiết</b>, công thức tính điểm, cột bảng xếp hạng</td>
-                <td class="trap">Chi tiết hơn Jira. Ticket ghi “03/08”, docx ghi “03~04/08” — <b>đó là khoảng, hạn là ngày cuối</b>.</td>
+                <td class="trap">Chỉ tin ngày trên Jira → <b>hiểu sai deadline</b>: Jira ghi “03/08” nhưng docx ghi “03~04/08”, hạn thật là ngày cuối.</td>
               </tr>
               <tr>
                 <td class="src">Attachment trong ticket</td>
                 <td>Có khi design <b>giao thẳng dạng file</b>, không phải link SharePoint</td>
-                <td class="trap">Một ca design 92 MB đính kèm ngay trong ticket — <b>tìm trên SharePoint không bao giờ ra</b>.</td>
+                <td class="trap">Chỉ đi tìm trên SharePoint → <b>bỏ sót nguyên bộ design 92 MB</b> đính thẳng trong ticket.</td>
               </tr>
               <tr>
                 <td class="src">Comment + chat với PM</td>
                 <td><span class="hl">Phạm vi chốt thật</span>, thường khác mô tả ban đầu</td>
-                <td class="trap">Một câu chat “clone luôn cái H5 và web ra thay header” <b>đổi phạm vi từ 1 bản thành 2 bản</b>.</td>
+                <td class="trap">Chỉ đọc mô tả ban đầu → <b>làm thiếu 1 bản</b>: một câu chat của PM đã đổi phạm vi từ 1 bản thành 2 bản.</td>
               </tr>
               <tr>
                 <td class="src">Code đang chạy</td>
                 <td>Đối chiếu xem <b>việc nào thật ra đã có sẵn</b></td>
-                <td class="trap">Mở twig ra xem thì phần lớn “điểm khác” bản cũ đã có ⇒ <b>việc còn lại chỉ là thay header + đổi bảng xếp hạng</b>.</td>
+                <td class="trap">Không xem code cũ → <b>ước lượng thừa cả trang</b>, trong khi bản cũ đã có gần hết — việc thật chỉ là thay header + đổi bảng xếp hạng.</td>
               </tr>
             </tbody>
           </table>

@@ -9,6 +9,17 @@ lẫn dòng `> ⚠️` ngay dưới tiêu đề spec cũ. Spec là tài liệu L
 Riêng khối **chép lại nội dung file khác** (`schema/vocab.json`, schema `metrics.jsonl`, danh sách mã
 luật) thì xoá và thay bằng 1 dòng trỏ nguồn — chép là chắc chắn lệch.
 
+## Tài liệu người dùng (đi kèm bản public)
+
+| File | Nội dung |
+|---|---|
+| [`install.md`](install.md) | Phụ thuộc, MCP, bảng `config.json`, 4 ca `settings.json`, radar nền, gỡ cài, lỗi thường gặp |
+| [`skills.md`](skills.md) | 11 skill + mode, 5 agent, 4 hook |
+| [`architecture.md`](architecture.md) | Cấu trúc repo, cái gì vào git, cổng chất lượng, guardrail, ranh giới an toàn |
+
+Ba file trên **có** trong bản public; `specs/`, `present/` và chính file index này thì **không**
+(xem `publish/manifest.txt`). Quy trình xuất bản: [`../publish/README.md`](../publish/README.md).
+
 ## Spec
 
 | Spec | Nói về | Trạng thái |

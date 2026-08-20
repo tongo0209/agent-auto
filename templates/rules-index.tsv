@@ -1,0 +1,10 @@
+# <file rules>	<cột "Chạm tới">	<cột "Đọc TRƯỚC khi sửa">
+# installer chỉ in dòng nào có file thật trong rules/ — bản public thiếu file thì dòng đó biến mất.
+rules/pm-contract.md	File có `pm__` (mọi repo)	`rules/pm-contract.md` — R-PM-1..6
+rules/repo-new-mainsite.md	`.twig` trong **new-mainsite**	`rules/repo-new-mainsite.md` — R-TWIG-1..7. **Máy KHÔNG có php/docker ⇒ không build/render được, cấm claim "đã verify runtime"**
+rules/repo-vportal2view.md	`.twig` trong **vportal2view**	`rules/repo-vportal2view.md` — R-VP2-1..6. 37.718 file, nhánh `master`, cũng không render được ở local
+rules/repo-gt-promotion.md	**gt-promotion-template**	`rules/repo-gt-promotion.md` — R-GTP-1..6. Fix phải soát CẢ `Promotion/` LẪN `mainsite/`
+rules/cdn-source-standard.md	**`cdn-source`** (viết/sửa bất cứ gì)	`rules/cdn-source-standard.md` — R-CDN-1..14 (thế hệ assets-flat vs legacy, config.js, px tuyệt đối, cấm `@media` tay, engine gameplay) **+ R-SPR-1..9 (sprite: `@include sprite()`, cấm gõ `background-position` tay)** + `rules/pm-contract.md`
+rules/popup-library.md	**Popup bất kỳ** (landing/skin/promotion)	`rules/popup-library.md` — R-POP-1..9. Popup là design system: extends `base.html.twig`, dùng module có sẵn, cổng `/check-promotion` trước khi báo xong
+rules/html-handoff.md	**Đưa HTML sang `gt-promotion-template` / `new-mainsite`**	`rules/html-handoff.md` — R-HO-1..11 (URL CDN tuyệt đối, giữ `<% MODULE_CONTENT %>`, soát cả 2 thư mục)
+rules/code-style.md	**Viết code bất kỳ** (mọi repo, mọi ngôn ngữ)	`rules/code-style.md` — R-CS-1..7 (bản rút gọn ở mục "Code style" dưới, đủ dùng; đọc file khi cần ví dụ ❌/✅)

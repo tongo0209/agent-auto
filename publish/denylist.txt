@@ -1,0 +1,24 @@
+# Chạy SAU redaction. Còn hit là export dừng, không sinh commit.
+cdn-source
+new-mainsite
+gt-promotion-template
+vportal2view
+vnggames
+VNGGames
+vng\.com\.vn
+vngms
+sp\.vng
+git-vng
+lap17727
+GW-
+tont@
+tongo0209
+meichen220498
+meiochan03939
+\bGW\b
+\bVNG\b
+tontagent
+promptAgent
+Tam Tiêu
+nexus
+NEXUS

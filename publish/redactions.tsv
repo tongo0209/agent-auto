@@ -1,0 +1,52 @@
+# mode	pattern	replacement
+# mode = str (thay chuỗi thuần) | re (regex Python, \1 = nhóm bắt)
+# Thứ tự QUAN TRỌNG: dòng cụ thể hơn đứng trước. Cặp nào thay 0 lần sẽ bị cảnh báo
+# (thường là do đã gõ sai pattern, không phải do repo sạch).
+str	/Users/lap17727/VNG/agent-auto	<agent-auto>
+str	~/VNG/agent-auto	<agent-auto>
+str	/Users/lap17727/VNG/git-vng	<repos>
+str	~/VNG/git-vng	<repos>
+str	/Users/lap17727/VNG	<repos>
+str	~/VNG	<repos>
+str	/Users/lap17727	$HOME
+str	lap17727	you
+str	git-vng	repos
+str	vnggames.atlassian.net	your-company.atlassian.net
+str	vngms-my.sharepoint.com	<tenant>-my.sharepoint.com
+str	sp.vng.com.vn	<sharepoint-host>
+str	vnggames.com	your-company.com
+str	vng.com.vn	your-company.com
+str	path.join(HOME, 'VNG')	path.join(HOME, 'work')
+str	VNG_ROOT	WORK_ROOT
+str	/Users/x/VNG	/Users/x/work
+str	Tây Du VNG	Game A
+str	Tam Tiêu	Event B
+str	Nương Nương	Item C
+str	promptAgent	prompt-agent
+str	tontagent	ai-tooling
+str	VNG	Acme
+str	vng	acme
+str	VNGGames	Acme
+str	vnggames	acme
+str	{"496":"ddtank","A49":"cfl",...}	{"496":"game-a","A49":"game-b",...}
+str	A49-CFL/h5rungkybi-56985	A49-GAMEA/h5campaign-56985
+str	nexusId	promoId
+str	nexus.	promo-admin.
+str	nexus	promo-admin
+str	NEXUS	PROMO_ADMIN
+str	tont@	you@
+str	tongo0209	yourname
+str	meiochan03939@gmail.com	qc1@example.com
+str	meichen220498@gmail.com	qc2@example.com
+str	gt-promotion-template	promo-template
+str	gtPromotion	promoTemplate
+str	cdn-source	web-assets
+str	cdnSource	webAssets
+str	new-mainsite	web-main
+str	newMainsite	webMain
+str	vportal2view: path.join	'portal-view': path.join
+str	vportal2view	portal-view
+str	\bGW-\d+	\bPRJ-\d+
+re	\bGW-([0-9]+)	PRJ-\1
+re	\bGW-	PRJ-
+re	\bGW\b	PRJ

@@ -1,0 +1,15 @@
+# <đường dẫn trong repo này>	<nguồn gốc trên máy tác giả>
+# cột 3 = "patched": đã sửa có chủ ý so với bản gốc (ở đây: cổng popup trỏ sang skills/check-promotion
+#            đã bundle, thay vì đường dẫn tuyệt đối sang repo khác).
+# tools/check-drift.sh diff 2 bên khi máy có repo gốc; máy không có thì bỏ qua im lặng.
+skills/bug-fixer	~/VNG/promptAgent/skills/bug-fixer
+skills/code-developer	~/VNG/promptAgent/skills/code-developer
+skills/code-audit	~/VNG/review-verify-code/skills/code-audit
+skills/website-audit	~/VNG/tool/checking-optimize-website/skills/website-audit
+skills/check-promotion	~/VNG/git-vng/gt-promotion-template/standard-html-templates/ai-template-check-skill
+skills/bug-fixer-lite/SKILL.md	~/VNG/git-vng/cdn-source/products/tontagent/bug-fixer-lite/skills/bug-fixer-lite/SKILL.md	patched
+agents/bug-analyst.md	~/VNG/promptAgent/agents/bug-analyst.md
+agents/design-analyst.md	~/VNG/promptAgent/agents/design-analyst.md
+agents/design-checker.md	~/VNG/promptAgent/agents/design-checker.md
+agents/frontend-developer.md	~/VNG/promptAgent/agents/frontend-developer.md
+agents/bug-lane.md	~/VNG/git-vng/cdn-source/products/tontagent/bug-fixer-lite/agents/bug-lane.md

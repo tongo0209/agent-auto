@@ -1,0 +1,46 @@
+# Whitelist cho tools/export-public.sh. Luật khớp: đường dẫn hoặc tiền tố thư mục,
+# dòng nào khớp TRƯỚC thì thắng. File nào không khớp dòng nào ⇒ export DỪNG.
+# Vì sao chặt vậy: thêm file mới mà quên phân loại thì mặc định là "chưa quyết định",
+# không phải "cho ra ngoài".
+
+# ── RA: nội dung nội bộ, không genericize được ───────────────────────────────
+- rules/pm-contract.md            # hợp đồng class platform, spec nội bộ
+- rules/cdn-source-standard.md    # chuẩn build repo nội bộ
+- rules/popup-library.md          # design system popup nội bộ
+- rules/html-handoff.md           # quy trình bàn giao giữa 2 repo nội bộ
+- rules/repo-new-mainsite.md      # đặc thù 1 repo nội bộ
+- rules/repo-vportal2view.md      # đặc thù 1 repo nội bộ
+- rules/repo-gt-promotion.md      # đặc thù 1 repo nội bộ
+- skills/code-audit/references/pm-contract.md # hợp đồng class platform, bản thứ 2 của rules/pm-contract.md
+- docs/specs/                     # 19 spec: dày chi tiết vận hành thật
+- docs/present/                   # slide thuyết trình nội bộ
+- docs/README.md                  # chỉ mục của docs/specs, mất đích khi specs ra ngoài
+- knowledge/lessons.md            # bài học kèm tên ticket/khách hàng thật
+- tools/sync-to-cdn.sh            # phát hành sang repo nội bộ
+- tools/radar-agent.plist         # ghi cứng đường dẫn máy người tạo
+- .janitor-log.jsonl              # log vận hành máy cá nhân
+- templates/CLAUDE.internal.md    # luật riêng nền tảng nội bộ
+- publish/                        # chính bộ export này, người ngoài không cần
+- tools/export-public.sh          # việc của người bảo trì, cần publish/ mới chạy
+- tools/export-public.test.sh     # cùng lý do
+- tools/check-drift.sh            # cần publish/bundled-sources.tsv
+
+# ── VÀO ──────────────────────────────────────────────────────────────────────
++ README.md
++ .gitignore
++ config.example.json
++ state.example.json
++ dashboard.html
++ templates/
++ rules/
++ schema/
++ skills/
++ agents/
++ tools/
++ hooks/
++ console/
++ docs/
++ knowledge/
++ tasks/
++ boards/
++ history/

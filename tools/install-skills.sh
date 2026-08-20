@@ -6,6 +6,7 @@
 #
 #   bash tools/install-skills.sh            # cài
 #   bash tools/install-skills.sh --check    # chỉ kiểm tra, không đụng gì
+#   bash tools/install-skills.sh --print-claude-md   # in luật chung để dán tay vào CLAUDE.md
 #
 # Script KHÔNG xoá gì. settings.json chỉ được ghi khi bạn gọi --write-hooks và chỉ ở ca
 # an toàn (chưa có hook nào); ca khác in khối JSON để gộp tay. Gặp thư mục thật trùng tên
@@ -15,12 +16,13 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-CHECK_ONLY=0; WRITE_HOOKS=0
+CHECK_ONLY=0; WRITE_HOOKS=0; PRINT_CLAUDEMD=0
 for a in "$@"; do
   case "$a" in
-    --check)       CHECK_ONLY=1 ;;
-    --write-hooks) WRITE_HOOKS=1 ;;
-    *) echo "Tham số lạ: $a  (dùng: --check | --write-hooks)" >&2; exit 2 ;;
+    --check)           CHECK_ONLY=1 ;;
+    --write-hooks)     WRITE_HOOKS=1 ;;
+    --print-claude-md) PRINT_CLAUDEMD=1 ;;
+    *) echo "Tham số lạ: $a  (dùng: --check | --write-hooks | --print-claude-md)" >&2; exit 2 ;;
   esac
 done
 
@@ -50,6 +52,34 @@ link() {
   [ "$CHECK_ONLY" = 1 ] && { bad "$name — chưa cài"; return; }
   ln -s "$target" "$linkpath"; add "$name"
 }
+
+# Dựng ~/.claude/CLAUDE.md từ templates/: điền đường dẫn repo, và chỉ in dòng rules nào
+# có FILE THẬT — bản không mang rules nội bộ thì dòng đó tự biến mất thay vì trỏ vào hư không.
+render_claude_md() {
+  local repo_esc tbl
+  repo_esc="${REPO//&/\\&}"
+  tbl="$(mktemp)"
+  {
+    printf '| Chạm tới | Đọc TRƯỚC khi sửa |\n|---|---|\n'
+    while IFS="$(printf '\t')" read -r file touchcol readcol; do
+      case "$file" in ('' | '#'*) continue ;; esac
+      [ -f "$REPO/$file" ] || continue
+      printf '| %s | %s |\n' "$touchcol" "$readcol"
+    done < "$REPO/templates/rules-index.tsv"
+  } > "$tbl"
+  # awk -v KHÔNG nhận biến nhiều dòng (awk của macOS báo "newline in string") — phải đọc từ file
+  awk -v repo="$repo_esc" -v tblfile="$tbl" '
+    { if ($0 == "<!-- RULES-TABLE -->") {
+        while ((getline line < tblfile) > 0) print line
+        close(tblfile); next }
+      gsub(/<AGENT_AUTO>/, repo); print }
+  ' "$REPO/templates/CLAUDE.md"
+  # Luật riêng của nền tảng nội bộ — có file thì nối vào cuối, không có thì bỏ qua.
+  [ -f "$REPO/templates/CLAUDE.internal.md" ] && { printf '\n'; cat "$REPO/templates/CLAUDE.internal.md"; }
+  rm -f "$tbl"
+}
+
+if [ "$PRINT_CLAUDEMD" = 1 ]; then render_claude_md; exit 0; fi
 
 say "agent-auto → $REPO"
 say "Claude Code → $CLAUDE_DIR"
@@ -119,22 +149,21 @@ else
 fi
 say ""
 
-# ── Liên kết ngoài repo: thiếu là gãy đúng 1 nhánh, kiểm hộ luôn ─────────────
-say "Liên kết ngoài repo"
+# ── Luật chung (~/.claude/CLAUDE.md) ────────────────────────────────────────
+# Vì sao phải cài: skill là "làm thế nào", CLAUDE.md là "khi nào dùng cái nào" + luật ngôn ngữ,
+# code style, git, verify. Thiếu nó thì cài đủ skill mà agent vẫn xử sự khác hẳn.
+say "Luật chung (CLAUDE.md)"
 CLAUDEMD="$CLAUDE_DIR/CLAUDE.md"
-if [ -f "$CLAUDEMD" ] && { grep -qF "$REPO/rules" "$CLAUDEMD" || grep -q "rules/pm-contract.md" "$CLAUDEMD"; }; then
-  good "CLAUDE.md — đã trỏ rules/"
+if [ ! -f "$CLAUDEMD" ]; then
+  if [ "$CHECK_ONLY" = 1 ]; then bad "CLAUDE.md chưa có — cài xong sẽ tạo từ templates/CLAUDE.md"
+  else mkdir -p "$CLAUDE_DIR"; render_claude_md > "$CLAUDEMD"; add "CLAUDE.md — tạo từ templates/CLAUDE.md"
+  fi
+elif grep -q "## Rules có ID" "$CLAUDEMD" && grep -qF "$REPO/rules" "$CLAUDEMD"; then
+  good "CLAUDE.md — đã có luật chung, trỏ đúng repo"
 else
-  bad "CLAUDE.md chưa trỏ $REPO/rules/ — agent sẽ không đọc luật R-* (khối dán sẵn in ở cuối)"
-fi
-if [ -e "$CLAUDE_DIR/skills/bug-fixer-lite" ]; then good "skill bug-fixer-lite — có"
-elif grep -q '"autoFix": *true' "$REPO/config.json" 2>/dev/null; then
-  bad "bugRadar.autoFix=true mà bug-fixer-lite chưa cài → radar sẽ gọi skill không tồn tại. Cài từ cdn-source/products/tontagent, hoặc đặt autoFix=false"
-else
-  say "  · bug-fixer-lite chưa cài — chỉ cần khi bật bugRadar.autoFix"
-fi
-if [ -e "$CLAUDE_DIR/skills/check-promotion" ]; then good "skill check-promotion — có"
-else say "  · check-promotion chưa cài — bước soát popup (Bước 04) cần; lấy từ repo gt-promotion-template"
+  # KHÔNG đè: đây là file của người dùng, có thể đã có luật riêng.
+  bad "CLAUDE.md đã có nhưng thiếu luật chung của agent-auto — xem phần cần dán:"
+  say "      bash tools/install-skills.sh --print-claude-md"
 fi
 say ""
 
@@ -162,24 +191,26 @@ hooks_state="$(node -e '
 ' "$SETTINGS" "$CLAUDE_DIR/hooks/guard-bash.sh" 2>/dev/null || echo badjson)"
 
 write_hooks_now() {
+  local bash_bin; bash_bin="$(command -v bash)"
   node -e '
     const fs=require("fs"), p=process.argv[1], dir=process.argv[2];
     const j = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p,"utf8")||"{}") : {};
     // backup chỉ ghi 1 lần — chạy lần 2 mà đè thì bản gốc trước agent-auto mất luôn
     if (fs.existsSync(p) && !fs.existsSync(p+".bak-before-agent-auto")) fs.copyFileSync(p, p+".bak-before-agent-auto");
+    const sh = process.argv[4];
     j.hooks = j.hooks || {};
     j.hooks.PreToolUse = [
-      { matcher:"Bash",       hooks:[{type:"command",command:"/bin/bash",args:[dir+"/hooks/guard-bash.sh"],timeout:5}] },
-      { matcher:"Read|Grep",  hooks:[{type:"command",command:"/bin/bash",args:[dir+"/hooks/guard-read.sh"],timeout:5}] },
+      { matcher:"Bash",       hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-bash.sh"],timeout:5}] },
+      { matcher:"Read|Grep",  hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-read.sh"],timeout:5}] },
     ];
     j.hooks.PostToolUse = [
-      { matcher:"Write|Edit|MultiEdit",      hooks:[{type:"command",command:"/bin/bash",args:[dir+"/hooks/guard-style.sh"],timeout:5}] },
-      { matcher:"Write|Edit|MultiEdit|Bash", hooks:[{type:"command",command:"/bin/bash",args:[dir+"/hooks/guard-state.sh"],timeout:10}] },
+      { matcher:"Write|Edit|MultiEdit",      hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-style.sh"],timeout:5}] },
+      { matcher:"Write|Edit|MultiEdit|Bash", hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-state.sh"],timeout:10}] },
     ];
     if (!j.statusLine) j.statusLine = { type:"command", command:"node "+process.argv[3]+"/tools/statusline.mjs" };
     fs.mkdirSync(require("path").dirname(p),{recursive:true});
     fs.writeFileSync(p, JSON.stringify(j,null,2)+"\n");
-  ' "$SETTINGS" "$CLAUDE_DIR" "$REPO"
+  ' "$SETTINGS" "$CLAUDE_DIR" "$REPO" "$bash_bin"
 }
 
 case "$hooks_state" in
@@ -193,21 +224,22 @@ case "$hooks_state" in
     fi ;;
 esac
 if [ "$hooks_state" = other ] || [ "$hooks_state" = badjson ]; then
+  BASH_BIN="$(command -v bash)"
   cat <<JSON
     { "matcher": "Bash",
-      "hooks": [{ "type": "command", "command": "/bin/bash",
+      "hooks": [{ "type": "command", "command": "$BASH_BIN",
                   "args": ["$CLAUDE_DIR/hooks/guard-bash.sh"], "timeout": 5 }] },
     { "matcher": "Read|Grep",
-      "hooks": [{ "type": "command", "command": "/bin/bash",
+      "hooks": [{ "type": "command", "command": "$BASH_BIN",
                   "args": ["$CLAUDE_DIR/hooks/guard-read.sh"], "timeout": 5 }] }
 JSON
   say "  … và trong PostToolUse:"
   cat <<JSON
     { "matcher": "Write|Edit|MultiEdit",
-      "hooks": [{ "type": "command", "command": "/bin/bash",
+      "hooks": [{ "type": "command", "command": "$BASH_BIN",
                   "args": ["$CLAUDE_DIR/hooks/guard-style.sh"], "timeout": 5 }] },
     { "matcher": "Write|Edit|MultiEdit|Bash",
-      "hooks": [{ "type": "command", "command": "/bin/bash",
+      "hooks": [{ "type": "command", "command": "$BASH_BIN",
                   "args": ["$CLAUDE_DIR/hooks/guard-state.sh"], "timeout": 10 }] }
 JSON
 fi
@@ -222,24 +254,10 @@ say "1) Kết nối MCP (gõ /mcp): Atlassian (bắt buộc — /daily quét Jir
 say "   buglist sheet + design host Drive) · Microsoft 365 (dò SharePoint)."
 say "2) Sửa $REPO/config.json — 3 chỗ: 'cloudId' (hỏi Claude: \"cho tôi cloudId Jira\" — cần MCP"
 say "   bước 1), 'gitAuthor' (= git config user.email), 'repos' (đường dẫn tuyệt đối máy bạn)."
-if [ -f "$CLAUDEMD" ] && { grep -qF "$REPO/rules" "$CLAUDEMD" || grep -q "rules/pm-contract.md" "$CLAUDEMD"; }; then
-  say "3) CLAUDE.md → rules/: đã trỏ ✓"
+if [ -f "$CLAUDEMD" ] && grep -q "## Rules có ID" "$CLAUDEMD"; then
+  say "3) Luật chung trong CLAUDE.md: đã có ✓"
 else
-  say "3) Dán khối sau vào cuối ~/.claude/CLAUDE.md (đường dẫn đã điền sẵn):"
-  cat <<RULES
-
-   ## Rules có mã (đọc theo nhu cầu — KHÔNG nạp sẵn; MUST = chặn, SHOULD = cảnh báo)
-   | Chạm tới | Đọc TRƯỚC khi sửa |
-   |---|---|
-   | File có class \\`pm__\\` | $REPO/rules/pm-contract.md |
-   | .twig trong new-mainsite | $REPO/rules/repo-new-mainsite.md |
-   | .twig trong vportal2view | $REPO/rules/repo-vportal2view.md |
-   | gt-promotion-template | $REPO/rules/repo-gt-promotion.md |
-   | cdn-source (viết/sửa bất cứ gì) | $REPO/rules/cdn-source-standard.md |
-   | Popup bất kỳ | $REPO/rules/popup-library.md |
-   | Đưa HTML sang repo bàn giao | $REPO/rules/html-handoff.md |
-   | Viết code bất kỳ | $REPO/rules/code-style.md |
-RULES
+  say "3) Dán luật chung vào ~/.claude/CLAUDE.md: bash tools/install-skills.sh --print-claude-md"
 fi
 say "4) Ghép Claude in Chrome: gõ /chrome → Enabled by default. Extension ghép theo ACCOUNT Claude"
 say "   — 1 profile browser/1 account; Edge trên macOS chưa hiện trong danh sách."

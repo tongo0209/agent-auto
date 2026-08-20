@@ -83,6 +83,8 @@ $visible-days: 3;
 - `R-CS-3` và `R-CS-6` KHÔNG được viện ra để bỏ bớt phạm vi user yêu cầu. Cắt phần dư ≠ cắt việc.
 - Viết code trong `cdn-source` → còn phải theo [`cdn-source-standard.md`](cdn-source-standard.md) (R-CDN-*)
   và [`popup-library.md`](popup-library.md) (R-POP-*). Đưa HTML sang platform → [`html-handoff.md`](html-handoff.md) (R-HO-*).
+- 4 file vừa nhắc là đặc tả riêng của nền tảng, **không có trong bản phát hành công khai** — link sẽ
+  trỏ vào chỗ trống. Cách tự bù: [`README.md`](README.md) cùng thư mục này.
 
 ## Commit (chốt 19/8/2026 — hết đá nhau)
 - **Repo đẩy lên git VNG** (`cdn-source`, `gt-promotion-template`, `new-mainsite`, `vportal2view`): theo skill

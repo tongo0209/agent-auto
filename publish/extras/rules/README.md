@@ -20,7 +20,8 @@ nền tảng trước khi sửa file. Muốn dùng đầy đủ thì có hai đ�
 2. **Tự viết luật của bạn.** Giữ đúng khuôn: mỗi luật một mã (`R-<NHÓM>-<số>`), một severity
    (`MUST`/`SHOULD`), một câu nói rõ hậu quả khi vi phạm. Rồi khai vào `templates/rules-index.tsv`
    (cột 1 = đường dẫn file, cột 2 = "chạm tới cái gì", cột 3 = "đọc file nào") và chạy lại
-   installer.
+   installer. Chi tiết cách khai + cách thêm cả một khối luật riêng:
+   [`../templates/README.md`](../templates/README.md).
 
 Khuôn có mã như vậy để khi báo lỗi thì **trích mã luật** thay vì diễn giải lại, và khi giao việc
 cho subagent thì chỉ cần trỏ file.

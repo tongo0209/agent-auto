@@ -24,6 +24,7 @@ Repo này chứa **11 skill**, **5 agent**, **4 hook guardrail**, **console web 
 | **Node.js ≥ 18** | `brew install node` | tải ở nodejs.org |
 | **Bash** | có sẵn | **Git for Windows** — mọi lệnh dưới đây gõ trong **Git Bash** |
 | **Python 3 + psd-tools** (chỉ cho `/check-design`) | `pip3 install psd-tools` | `pip install psd-tools` |
+| **Plugin `superpowers`** | `/plugin marketplace add obra/superpowers` rồi `/plugin` → cài `superpowers` | như macOS |
 | **Đã clone sẵn các repo code** bạn làm việc trên đó | | |
 
 > **Windows — symlink:** Git Bash mặc định *copy* thay vì tạo symlink, khi đó `git pull` sẽ **không**

@@ -138,6 +138,12 @@ if command -v python3 >/dev/null && python3 -c 'import psd_tools' 2>/dev/null; t
 else
   bad "thiếu python3/psd-tools — /check-design gãy ở bước dump PSD. Cài: pip3 install psd-tools"
 fi
+# 3 dòng routing trong CLAUDE.md gọi skill của plugin superpowers — repo này không chứa chúng.
+if ls "$CLAUDE_DIR"/plugins/cache/*/superpowers >/dev/null 2>&1; then
+  good "plugin superpowers — đã cài"
+else
+  bad "chưa có plugin superpowers → 3 dòng routing trong CLAUDE.md (test-driven-development, verification-before-completion, systematic-debugging) trỏ vào skill không tồn tại. Cài: /plugin marketplace add obra/superpowers"
+fi
 if [ -d "$REPO/console/node_modules" ]; then
   good "console/node_modules — đã cài"
 else

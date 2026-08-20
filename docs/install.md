@@ -10,6 +10,7 @@ bảng `config.json` đầy đủ, 4 ca của `settings.json`, radar nền, và 
 | **Claude Code bản CLI** | skill + hook là cơ chế của Claude Code | panel VS Code không nạp toolset Chrome ⇒ bước ghi ngược sheet của `/bug-fixer-lite` fail |
 | **Node.js ≥ 18** | console, `state-doctor`, statusline, các tool đo | installer báo ngay dòng "chưa có node"; bỏ qua luôn bước ghi hook |
 | **Python 3 + `psd-tools`** | `/check-design` dump cây layer PSD/PSB trước khi dám kết luận "thiếu design" | `/check-design` gãy ở bước dump: `ModuleNotFoundError: psd_tools` — không phải lỗi design |
+| **Plugin `superpowers`** | 3 dòng routing trong `~/.claude/CLAUDE.md` gọi skill `test-driven-development`, `verification-before-completion`, `systematic-debugging` của plugin này — repo agent-auto **không** chứa chúng | agent làm việc tooling/debug theo bản năng thay vì theo quy trình; không có thông báo nào cho biết |
 | **Đã clone sẵn repo code** | `config.repos` phải trỏ vào chúng | `/daily doctor` báo `W7 repos[...] không có trên đĩa`; không suy được phase từ commit |
 | **Quyền vào folder design** của designer | có quyền mới search/tải được | `/daily` báo chưa tải được design, không chết |
 | **Browser mặc định đã login SSO** | nhánh tải design dùng session sẵn có của bạn | tải về tab trắng, rơi xuống fallback "mở tay" |

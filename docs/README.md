@@ -13,6 +13,7 @@ luật) thì xoá và thay bằng 1 dòng trỏ nguồn — chép là chắc ch�
 
 | Spec | Nói về | Trạng thái |
 |---|---|---|
+| `2026-08-20-public-export-readme-design.md` | Xuất bản công khai (repo mới history trắng) + README cài macOS/Windows | ✅ hiệu lực |
 | `2026-08-19-cdn-source-standard-design.md` | Chuẩn code `cdn-source` cho cả bộ skill — 3 file luật mới trong `rules/`, sửa `R-CS-1`, cổng `/check-promotion` | ✅ hiệu lực |
 | `2026-08-18-bug-verify-console-design.md` | Bug đã fix → báo user, user verify, ghi ngược sheet | ✅ hiệu lực |
 | `2026-08-17-bug-radar-design.md` | Radar theo dõi buglist QC sau bàn giao | ✅ hiệu lực |

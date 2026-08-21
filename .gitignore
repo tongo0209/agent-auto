@@ -46,3 +46,6 @@ knowledge/metrics.jsonl
 
 # Sổ hoàn tác của tools/janitor.mjs: đã xoá gì, bao nhiêu byte, tải lại từ đâu.
 .janitor-log.jsonl
+
+# Skill riêng từng máy — không phải đồ dùng chung của repo này
+skills/psd-cut/

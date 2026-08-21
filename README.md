@@ -103,7 +103,6 @@ Skill, hook, console, `/daily`, các tool đo đều chạy. Bốn nhánh sau **
 | Thông báo desktop của console | dùng `osascript` | đọc dải cảnh báo trên console |
 | Radar nền tự chạy theo giờ | job `launchd` | gọi `/daily delta` khi cần |
 | Tải design cả folder tự động | mở browser bằng `open -a` | tải tay về `designs/<KEY>/` |
-| `tools/psd-export.py` | `osascript` | export ảnh từ Photoshop tay |
 
 > ⚠ Nhánh Windows **chưa được chạy thử trên máy Windows thật** — nếu bạn là người đầu tiên cài trên
 > Windows, báo lại chỗ vướng để sửa README này.

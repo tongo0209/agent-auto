@@ -59,8 +59,8 @@ cách KHÔNG ăn (đã thử, đừng lặp lại). `SKILL.md` giữ lại luậ
       KHÔNG ĂN, đừng thử lại: `<webUrl>?download=1` (tab trắng) · share link folder
       `/:f:/g/personal/…&download=1` (SharePoint bỏ qua param) · MCP `read_resource`
       (chặn cứng >100MB, design zip thường 300-400MB).
-    - Nguồn khác: xem bảng **URL tải trực tiếp theo nguồn** dưới. Nguồn không có direct URL
-      (Canva/Figma/ổ mạng) → bỏ nấc 1, giữ luật 📎 mở tay.
+    - Nguồn khác: xem bảng **URL tải trực tiếp theo nguồn** dưới. Canva/Figma nay đi qua MCP
+      (xem bảng); còn ổ mạng thì bỏ nấc 1, giữ luật 📎 mở tay.
     - **AN TOÀN trước khi `open`:** pin cứng browser Chromium (Edge/Chrome) — **KHÔNG dùng
       `open` trần / Safari** (Safari "Open safe files" tự BUNG zip thành folder rồi xoá zip →
       mọi check `*.zip` fail dù tải thành công). Chỉ mở host trong allowlist
@@ -177,7 +177,7 @@ cách KHÔNG ăn (đã thử, đừng lặp lại). `SKILL.md` giữ lại luậ
     | Dropbox (file VÀ folder) | link gốc giữ nguyên `rlkey` + `&dl=1` → folder ra .zip | doc (nguồn duy nhất tải được cả folder bằng 1 URL) |
     | Box | dùng **MCP Box** (`authenticate` rồi lấy link tải) — link `/shared/static/<hash>.<ext>` chính chủ thì dùng nguyên văn; KHÔNG dựng URL tay từ `/s/<token>` | doc — folder KHÔNG có |
     | Ổ mạng `X:\` (SMB) | không phải HTTP → `open "smb://<user>@<server>/<share>"` mount rồi `cp -R`/`rsync` | doc — nguồn duy nhất copy cả cây thư mục gọn |
-    | Canva / Figma | KHÔNG có URL tải → giữ luật 📎 mở tay. Muốn auto thì nối **MCP chính thức** (`https://mcp.canva.com/mcp`, `https://mcp.figma.com/mcp` — OAuth mở browser 1 lần, Figma không cần PAT): tool export/download_assets trả link tải rồi `curl` về. ĐỀ XUẤT cho user, KHÔNG tự nối. | — |
+    | Canva / Figma | **ĐÃ NỐI MCP 20/8/2026** (`claude.ai Canva` = `https://mcp.canva.com/mcp` · `claude.ai Figma` = `https://mcp.figma.com/mcp`). Luồng: `ToolSearch "+canva"` / `"+figma"` → tool nghiệp vụ thì export/download_assets rồi `curl` về; chỉ thấy `…__authenticate` thì phiên chưa OAuth — **gọi nó KHÔNG tự xác thực được**, nó chỉ trả câu "ask the user to run /mcp". Ra 1 dòng "Cần bạn: `/mcp` → chọn server" rồi đi tiếp. 📎 mở tay chỉ còn là nấc CUỐI sau khi đã OAuth mà vẫn không lấy được. | — |
     - **FOLDER (nguồn hay giao dạng folder!):** `download.aspx` và Drive `uc?export` CHỈ tải
       1 FILE; **không có URL GET nào zip được folder** (SharePoint dùng POST nội bộ
       `mediap.svc.ms/transform/zip` — không dùng được; Drive folder cũng không) → đường duy

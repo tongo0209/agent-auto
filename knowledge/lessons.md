@@ -462,3 +462,70 @@ mỗi khi spritesmith xếp lại atlas.
 ảnh lẻ trong `images/sprite/` trên toàn repo.
 
 **Nguồn:** khảo sát sprite 19/8/2026 · đã tự kiểm lại bằng `sed`/`grep`, không tin báo cáo agent
+
+## 20/8/2026 — Tên folder `products/` không suy được từ tên game: `gn` là Gunny **PC**
+
+**Chuyện gì:** `/daily link GW-723` (3 LDP Gunny: Origin + Mobi + PC). Đoán theo trực giác tên folder
+thì `gn` = Gunny (Mobi) và `gnmobinew` = bản mobi mới — **sai cả hai**. Đọc `config.js` field `name`
+của campaign `2026-worldcup` (có mặt ở đúng 3 folder này) mới ra thật:
+`gno`=`Gunnyorigin` · `gn`=`Gunnypc` · `gnmobinew`=`Gunnymobi`.
+
+**Vì sao lọt:** `SKILL.md` mục suy `<game>` đã cảnh báo "tên chữ thì không ổn định" (ca `496_GNOTH` →
+folder thật `ddtank`), nhưng chỉ cấm tin **tag ticket**. Ca này tên FOLDER cũng lừa, mà folder là thứ
+mình hay tin nhất vì nó nằm trên đĩa.
+
+**Lưới chặn (rẻ, 1 lệnh):** trước khi nhận một folder products/ là của game X, đọc chính nó khai gì —
+`grep -h "name:" products/<game>/landing/*/config.js | sort -u`. Field `name` là tên bundle build ra
+(`site.css/js`) nên designer/dev bắt buộc điền đúng game; nó đáng tin hơn tên folder và hơn tag Jira.
+Chọn campaign cùng series ở nhiều folder (ở đây `2026-worldcup`) thì so được 1 lượt ra cả bộ mapping.
+
+**Nguồn:** `/daily link GW-723` 20/8/2026 · `products/{gno,gn,gnmobinew}/landing/2026-worldcup/config.js:2`
+
+---
+
+## Tick radar mù connector vẫn báo `ok` — im lặng đúng chỗ nguy hiểm nhất (21/8/2026)
+
+**Bắt được gì:** lượt launchd `/daily bugwatch` 09:55 ngày 21/8 chạy trong một phiên **không có tool
+connector claude.ai nào** — `ToolSearch select:mcp__claude_ai_Google_Drive__list_recent_files` và
+`select:mcp__claude_ai_Atlassian__searchJiraIssuesUsingJql` đều trả *No matching deferred tools found*.
+Không có Drive ⇒ không poll được `modifiedTime` ⇒ **toàn bộ bug-radar mất đầu vào**.
+
+**Nguyên nhân:** MCP claude.ai là connector OAuth tương tác; nó **không register** vào phiên headless
+lúc process khởi động (lý do transient — `claude mcp list` báo `✔ Connected`, và một `claude -p` mới
+nạp được `list_recent_files` ra FOUND trong 5.6s). Tức không phải sai `--allowedTools`
+(`radar-tick.mjs:139-145` truyền đủ 7 tên), cũng không phải đường headless chết.
+
+**Vì sao lọt:** `radar-tick.mjs` chỉ đo lượt thành-công/thất-bại theo exit code + số dòng mới trong
+`history/*.jsonl`. Phiên mù thì `claude` vẫn exit 0 và vẫn không có gì mới ⇒ ghi
+`{"ok":true,"changed":false}` — **trùng khít với chữ ký của một lượt khoẻ mà sheet không ai chạm**.
+Nhìn `radar.jsonl` không phân biệt được. Nghi ngờ hồi tố: 13 lượt bugwatch trước đó cũng toàn
+`changed:false`, không có cách nào biết lượt nào thật sự đã poll được Drive.
+
+**Lưới chặn (đề xuất, chưa làm — chờ user chốt):** đầu mỗi tick gọi
+`ToolSearch select:mcp__claude_ai_Google_Drive__list_recent_files`; MISSING ⇒ ghi
+`err: "mcp-not-registered"` + bắn popup, **không** ghi `ok`. Lượt mù phải trông khác lượt yên tĩnh,
+nếu không thì radar càng im càng dễ tin là "không có bug".
+
+**Đường phụ đã dùng được ngay trong lượt này:** uỷ thác riêng bước gọi Drive cho một `claude -p` con
+(`--allowedTools ToolSearch,mcp__claude_ai_Google_Drive__*`, `--output-format json`) rồi parse dòng
+JSON nó trả về. Lấy `modifiedTime` 2 sheet mất 13s/$0.38; `list_recent_files` 17 sheet mất 41s/$0.68.
+Rẻ hơn hẳn bỏ trắng cả lượt.
+
+**Nguồn:** `history/radar.jsonl` 13 dòng `/daily bugwatch` · `ps aux` pid 16857 (dòng lệnh đầy đủ) ·
+`tools/radar-tick.mjs:139-145,154` · `boards/2026-08-21.md` log 10:03–10:08
+
+## 2026-08-21 — Snapshot tháng: `fields` KHÔNG cắt được payload, phải đọc từ file kết quả
+- **Bắt được gì:** bước 4 của `/daily delta` (refresh `history/months.json`) gọi
+  `searchJiraIssuesUsingJql` với `fields: [summary,status,duedate,resolutiondate]` đúng như
+  `skills/daily/references/jql.md` dặn, vẫn trả **288.005 ký tự** cho 66 ticket và bị chặn
+  *"exceeds maximum allowed tokens"*. Lượt delta phình từ ~3' lên **52'**.
+- **Nguyên nhân:** `fields` của connector Atlassian là danh sách MỞ RỘNG, không phải whitelist —
+  mỗi node vẫn kèm `expand`, `self`, `id`, và `issuetype` đầy đủ (description + 2 URL avatar).
+  66 ticket × ~4KB rác = vượt trần, không liên quan số ticket nhiều hay ít.
+- **Lưới chặn:** đừng query lại và đừng chia nhỏ khoảng ngày trước — kết quả quá cỡ **tự lưu ra**
+  `…/tool-results/mcp-…-searchJiraIssuesUsingJql-<ts>.txt`. Đọc THẲNG file đó bằng node/jq để
+  dựng `months.json` (`d.issues.nodes[].fields.{summary,status,duedate,resolutiondate}` +
+  `status.statusCategory.key === "done"`). Chia khoảng chỉ là phương án cuối.
+- **Vì sao phải ghi ra đây:** lượt radar nền có trần `radar.timeoutMin` = 10' — gặp đúng bước này
+  là **chết trần, đốt trọn 10' mà không ra kết quả**, và `months.json` là nguồn DUY NHẤT của tab
+  "Theo tháng" nên console lặng lẽ vẽ số cũ. Đo 21/8: query 2026-02-01→2026-09-30 = 66 ticket.

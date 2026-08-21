@@ -161,7 +161,9 @@ Báo cáo cho user (tiếng Việt) gồm:
 - **KHÔNG** đổi `state.issues[KEY].phase` — quyền đó của `/daily`.
 - **KHÔNG** `git commit` / `git push` (luật global: hỏi user từng lần).
 - **KHÔNG** ghi ngược Jira, không comment lên ticket.
-- **KHÔNG** đoán khi không mở được design: Canva/Figma/link chưa tải ⇒ mọi item liên quan
-  `CHƯA-CHẮC` + 📎 "cần mở tay", không bịa nội dung design.
+- **KHÔNG** đoán khi không mở được design ⇒ mọi item liên quan `CHƯA-CHẮC` + 📎 "cần mở tay",
+  không bịa nội dung design. Nhưng Canva/Figma **đã có MCP từ 20/8/2026**: phải thử
+  `ToolSearch "+canva"` / `"+figma"` TRƯỚC, chỉ khi server chưa OAuth (chỉ ra tool
+  `…__authenticate`) mới được hạ về `CHƯA-CHẮC` + 1 dòng "Cần bạn: `/mcp`".
 - **KHÔNG** sửa file trong `designs/<KEY>/` (kho design là bản gốc, chỉ đọc). Ảnh cắt lát để ở
   `/tmp`.

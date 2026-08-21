@@ -174,7 +174,11 @@ quét, user KHÔNG phải gõ lệnh riêng (mirror nếp `pendingSheetWrite`).
 Phiên nền không làm được 2 việc này (không có toolset chrome) nên đừng thử.
 
 **Pull gt-promotion đầu phiên** (mode mặc định/plan/delta): `git -C <root> pull --ff-only`
-timeout 60s — fail/timeout → báo 1 dòng + đi tiếp (không chặn). Commit mới đụng folder
+— ⚠ **CẤM bọc lệnh git trong `timeout N`**: macOS không có `timeout` (thiếu coreutils), shell
+trả `command not found` và lệnh git **không chạy dòng nào** ⇒ `git log` sau đó chỉ đọc ref local,
+tái diễn đúng bẫy 19/8 "log local ≠ remote". Cần chặn treo thì dùng `timeout` của tool Bash
+(tham số `timeout`), không phải lệnh shell. Đã đạp 2 lượt delta liền 20/8 (13:07 và 15:29).
+Fail/treo thật → báo 1 dòng + đi tiếp (không chặn). Commit mới đụng folder
 `<game>/<slug>-<nexusId>/` của task đang theo dõi → dòng "📦 promotion vừa cập nhật <task>"
 + tóm tắt file đổi.
 
@@ -251,7 +255,15 @@ tóm tắt việc, timeline milestones, link design, link nexus (bóc nexusId), 
 - Chi tiết dò/tải design qua SharePoint (và các nguồn khác — Google Drive, Dropbox, Box, Canva/
   Figma): công thức `download.aspx?SourceUrl=`, script pipeline `scripts/sp-*`, danh sách cách
   KHÔNG ăn (đã thử, đừng lặp lại) → `references/sharepoint.md`.
-- Canva/Figma → ghi link + 📎 cần mở tay. KHÔNG chặn luồng, KHÔNG đoán design.
+- **Canva/Figma — CÓ kênh máy từ 20/8/2026** (user đã nối MCP `claude.ai Canva` + `claude.ai Figma`).
+  Thứ tự bắt buộc, KHÔNG được nhảy thẳng xuống 📎:
+  ① `ToolSearch` tìm tool thật (`+canva`, `+figma`). Ra tool nghiệp vụ ⇒ **đọc thẳng như nguồn khác**,
+     ghi mức `đã-giao-đã-tải` / `đã-giao-tải-một-phần` theo đúng thang 5 mức ở trên.
+  ② Chỉ thấy `mcp__claude_ai_{Canva,Figma}__authenticate` ⇒ phiên chưa OAuth. Gọi tool đó **không tự
+     xác thực được** (connector claude.ai chỉ trả lời nhắc) — ra 1 dòng "Cần bạn: `/mcp` → chọn
+     `claude.ai Canva`/`claude.ai Figma`" rồi ĐI TIẾP, không chặn luồng.
+  ③ Đã OAuth mà vẫn không lấy được (design ở team/account khác) → mới rơi về 📎 mở tay.
+  Vẫn giữ: KHÔNG đoán design. Nhưng cấm ghi "phải mở tay" khi chưa chạy ①.
 - Ticket có mốc Design CHƯA TỚI và **không có link DESIGN trong ticket** → phase `waiting-design`,
   KHÔNG vào kế hoạch chạy; lần /daily đầu tiên SAU mốc phải tự nhắc + dò lại.
   **Ngoại lệ `scaffold-only` (19/8):** ticket `waiting-design` là task dựng MỚI + suy được game

@@ -114,7 +114,7 @@ grep -q '\*\*/\.claude/' .gitignore 2>/dev/null && echo "gitignore ✓" || echo 
 | `learn` | quét code mới của user → cập nhật `base/` + mục lục `base-structure.md` | Học lại base structure khi user báo base đã đổi |
 
 > **Phổ lệnh:** `quick` (manager tự làm, 0 subagent) < `mid` (1 dev, manager verify) < `code` (không review) < `fix` (review nhanh 1 vòng) < `full` (review đủ, ≤2 vòng). `batch` = N task nhỏ gộp 1 lần chạy, mỗi task tự rơi vào quick hoặc dev.
-> **Gate đo:** `full` + `compare` BẮT BUỘC qua gate `soát bằng ĐO` (mục 📏 dưới; trừ đuôi `· scaffold-only` — dừng trước pipeline, chưa có gì để đo) — `heights` trước dev, `sections`/`match` ở vòng CHỐT. `fix`/`code`/`quick` chỉ đo khi có ảnh design và điểm sửa là toạ độ/nội dung.
+> **Gate đo:** `full` + `compare` BẮT BUỘC qua gate `soát bằng ĐO` (mục 📏 dưới; trừ đuôi `· scaffold-only` — dừng trước pipeline, chưa có gì để đo) — `heights` trước dev, `sections`/`match` ở vòng CHỐT. `fix`/`mid`/`code`/`quick` CÓ ảnh design → BẮT BUỘC tối thiểu 1 lần `sections` trên build cuối trước khi báo xong (<1s, không browser); không có ảnh mới được miễn (chốt 27/8 — bịt đường lỗi UI lọt ở mode nhỏ).
 > **Mức check mặc định:** full checklist + test chức năng toàn trang CHỈ ở mode `full` vòng 1 (dựng mới). `check`/`compare` mặc định mức NHẸ (recipe verify-nhẹ của checker, ~5-6 tool-call) — user nói "check đầy đủ" mới chạy full checklist.
 
 \* Quy tắc mode `code` có ảnh: task ≥ 2 component hoặc cả màn hình → chạy analyst trước; task 1 component nhỏ → cho dev đọc ảnh trực tiếp để nhanh.
@@ -167,7 +167,7 @@ Ghi spec vào: <ctx>/specs/<slug>.md
 Knowledge dự án: <ctx>/knowledge/
 Repo hiện tại: <cwd> — khảo sát design system trước khi viết spec.
 CẤM kết luận "giống/khớp/tái dùng được" từ TÊN FILE, tên section hay tên folder — chỉ từ nội dung ảnh đã đọc; cần số thì đo bằng `python3 ~/.claude/scripts/design-diff.py`, không đo tay.
-Ngân sách: tối đa 20 tool-call — chạm ngưỡng → DỪNG, ghi spec phần đã chắc + dồn phần thiếu vào "Câu hỏi mở", báo "dừng vì hết ngân sách".
+Ngân sách: tối đa 20 tool-call (màn ≥6 section/popup: 30) — chạm ngưỡng → DỪNG, ghi spec phần đã chắc + dồn phần thiếu vào "Câu hỏi mở", báo "dừng vì hết ngân sách".
 [Task ≤ 2 component: thêm dòng "SPEC COMPACT — chỉ mục 0, 1, 4, 8".]
 ```
 
@@ -206,7 +206,7 @@ Ghi report vào: <ctx>/reports/<slug>-check-<n>.md
 
 **Không bước nào chạy vô hạn — kẹt thì thoát có báo cáo, không retry vô tội vạ.**
 
-- Mọi prompt giao việc PHẢI kèm dòng `Ngân sách: tối đa <N> tool-call...`. Mặc định: analyst 20 · dev v1 60, fix 25 · mid 40 · checker full 20, quick/re-check 12. Chạm ngưỡng → tự dừng + report trung thực — **report dở còn hơn treo**.
+- Mọi prompt giao việc PHẢI kèm dòng `Ngân sách: tối đa <N> tool-call...`. Mặc định: analyst 20 (màn ≥6 section/popup: 30 — analyst giờ tự đo máy) · dev v1 60, fix 25 · mid 40 · checker full 20, quick/re-check 12. Chạm ngưỡng → tự dừng + report trung thực — **report dở còn hơn treo**.
 - **Checker kẹt hạ tầng** (browser chết/treo, không mở được trang) → re-dispatch tối đa **1 LẦN**; lần 2 vẫn kẹt → nhận verdict hạ cấp (build + console + check tĩnh CSS) và báo user, KHÔNG grind.
 - Agent chạy quá **~10 phút** không có kết quả → khi nó về, KHÔNG giao thêm vòng mới; chốt tình trạng với user (report hiện có + các lựa chọn).
 - Full checklist + test chức năng toàn trang CHỈ ở mode `full` vòng 1 — mọi vòng/mode khác dùng quick / re-check / verify-nhẹ.

@@ -72,6 +72,17 @@ check deny 'git push -f origin dev'
 check deny 'php bin/console doctrine:database:drop --force'
 check deny 'mysql -u root -e "DROP TABLE users"'
 
+# 27/8/2026: nới theo guard.log (85 ca G-GIT-3 + 49 ca G-DATA-1 ask oan ở auto-mode) — các ngoại lệ PHẢI allow:
+check allow 'git checkout -- dist/'
+check allow 'git checkout -- dist/fonts dist/optimized'
+check allow 'rm -rf dist/assets && git checkout -- dist/ 2>/dev/null; npm run build-optimize 2>&1 | tail -15'
+check allow 'git restore --staged assets/main/main.scss'
+check allow 'rm -rf designs/GW-777/_auto-export/reward'
+check allow 'ls .backups/state | sort | head -n -30 | while read f; do rm ".backups/state/$f"; done'
+check allow 'rm -f A1.png B1.png && python3 crop.py designs/GW-777/_src reward'
+check allow "grep -n 'process.env' src/main.js"
+check allow "grep -rn 'API_URL' src/ && sed -n '3p' webpack.config.js"
+
 # --- Phải ASK: việc của con người, agent không tự quyết ---
 check ask 'git push origin feature/gw-660'
 check ask 'git push --force-with-lease origin feature/gw-660'
@@ -82,6 +93,11 @@ check ask './mergeDevToMain.sh'
 check ask 'bash bin/create-merge-request.sh'
 check ask 'rm -rf designs/GW-660'
 check ask 'rm -f state.json'
+check ask 'cd ~/VNG/agent-auto && rm -rf designs/GW-660'
+check ask 'rm -rf .backups'
+check ask 'git checkout -- products/ananta/landing/2026-landing-register/'
+check ask 'git checkout -- dist/ src/'
+check ask 'git restore assets/main/main.scss'
 
 printf '\n%d pass · %d fail\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

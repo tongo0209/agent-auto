@@ -12,7 +12,7 @@ Sự thật phải nắm: **fan-out KHÔNG giảm token — nó TĂNG token.** M
 
 **Luật bắt buộc khi fan-out:**
 
-1. **Model tier per-lane** — lane **nặng nhất** giữ model mặc định phiên (opus); **mọi lane còn lại `sonnet`**. Chạy N lane opus song song là chỗ đắt nhất có thể mắc.
+1. **Model tier per-lane** — lane **nặng nhất** chạy `opus` (gõ tường minh, KHÔNG inherit phiên); **mọi lane còn lại `sonnet`**. Chạy N lane opus song song là chỗ đắt nhất có thể mắc.
 2. **Cân lane theo KHỐI LƯỢNG**, không chia đều số lượng: analyst theo số ảnh + độ phức tạp vùng; dev theo số file + độ khó; checker theo số mục cần verify. **Chênh > 2× → gộp lại còn ít lane hơn.** Đo thật: 2 lane lệch 63m40s vs 32m29s ⇒ wall-clock bị lane dài chặn, phần lợi mất sạch.
 3. **⚠ Browser contention — checker song song:** manager **BẮT BUỘC** ghi dòng `đang chạy SONG SONG với checker khác` vào prompt MỌI lane. Thiếu dòng này, checker sẽ `session reset` và **giết browser của lane kia** (chung 1 instance) — recovery ≈ 474s. Có dòng này checker mới dùng `session new_tab isolated`.
 4. **CẤM fan-out** khi: <3 vùng (checker: <2) · vùng chia sẻ file dùng chung (`libraryMainsite`, `main/`) · tổng việc nhỏ hơn chi phí dispatch.

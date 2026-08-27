@@ -59,7 +59,13 @@ fi
 #   Chỉ tính khi có LỆNH ĐỌC thật. `| grep` là lọc stdout (vd `ls -a | grep '^\.env'`) → không tính.
 if [[ $low =~ (^|[[:space:];&|])(cat|less|more|head|tail|strings|xxd|base64|cp|scp|rsync|open|sed|awk|dd)[[:space:]] ]] \
    || { [[ $low =~ (^|[[:space:];&])(grep|rg|ag)[[:space:]] ]] && [[ ! $low =~ \|[[:space:]]*(grep|rg|ag)[[:space:]] ]]; }; then
-  if is_secret_path "$cmd"; then
+  # Chỉ có sed/awk/grep (không verb đọc-file): chuỗi trong quote là pattern/script chứ không phải path —
+  # 27/8 vá chặn oan `grep -n 'process.env'` (deny thật ở auto-mode 26/8; cat/head giữ nguyên vì quote là path thật).
+  secret_scan="$cmd"
+  if [[ ! $low =~ (^|[[:space:];&|])(cat|less|more|head|tail|strings|xxd|base64|cp|scp|rsync|open|dd)[[:space:]] ]]; then
+    secret_scan=$(printf '%s' "$cmd" | sed -E "s/'[^']*'//g" | sed -E 's/"[^"]*"//g')
+  fi
+  if is_secret_path "$secret_scan"; then
     decide deny G-SECRET-1 "doc hoac copy file credential - .env.test/.env.example thi duoc, ban nay khong"
   fi
 fi
@@ -92,11 +98,26 @@ if [[ $low =~ (^|[[:space:];&|])git[[:space:]]+push([[:space:]]|$) ]]; then
 fi
 
 # G-GIT-3 · xoá diff chưa commit — cả 3 skill đều để user tự review diff, mất là mất thật
-if [[ $low =~ git[[:space:]]+reset[[:space:]]+--hard ]] \
-   || [[ $low =~ git[[:space:]]+checkout[[:space:]]+--[[:space:]] ]] \
-   || [[ $low =~ git[[:space:]]+restore[[:space:]]+ ]] \
-   || [[ $low =~ git[[:space:]]+clean[[:space:]]+-[a-z]*f ]] \
-   || [[ $low =~ git[[:space:]]+stash[[:space:]]+(drop|clear) ]]; then
+# Ngoại lệ 27/8 (đo guard.log: 85/86 ca ask ở auto-mode là các ca này): restore CHỈ nhắm dist/*
+# (output build, `npm run build` sinh lại được) và `restore --staged` (chỉ unstage, không đụng worktree).
+g3=""
+[[ $low =~ git[[:space:]]+reset[[:space:]]+--hard ]] && g3=1
+[[ $low =~ git[[:space:]]+clean[[:space:]]+-[a-z]*f ]] && g3=1
+[[ $low =~ git[[:space:]]+stash[[:space:]]+(drop|clear) ]] && g3=1
+if [ -z "$g3" ] && { [[ $low =~ git[[:space:]]+checkout[[:space:]]+--[[:space:]] ]] || [[ $low =~ git[[:space:]]+restore[[:space:]]+ ]]; }; then
+  while IFS= read -r seg; do
+    tail_paths=$(printf '%s' "$seg" | sed -E 's/^git +(checkout +--|restore) +//')
+    [[ $tail_paths =~ --staged ]] && [[ ! $tail_paths =~ --worktree ]] && continue
+    dist_only=1
+    for t in $tail_paths; do
+      [[ $t =~ ^[0-9]*[\<\>] ]] && continue
+      [[ $t == --* ]] && continue
+      [[ $t =~ ^(\./)?dist(/|$) ]] || dist_only=""
+    done
+    [ -n "$dist_only" ] || g3=1
+  done < <(printf '%s' "$low" | grep -oE 'git +(checkout +--|restore) +[^;&|]*')
+fi
+if [ -n "$g3" ]; then
   decide ask G-GIT-3 "lenh nay xoa thay doi chua commit - ban xac nhan da review diff chua"
 fi
 
@@ -106,9 +127,20 @@ if [[ $low =~ (mergedevtomain|commitstaging|create-merge-request)\.sh ]]; then
 fi
 
 # G-DATA-1 · xoá dữ liệu vận hành agent-auto (designs 5.1GB, board, state, metrics)
-if [[ $low =~ (^|[[:space:];&|])rm[[:space:]] ]] \
-   && [[ $cmd =~ (designs/|\.backups/|state\.json|boards/|history/|knowledge/) ]]; then
-  decide ask G-DATA-1 "xoa du lieu van hanh agent-auto - designs tai lai rat lau"
+# 27/8: chỉ xét PHÂN ĐOẠN lệnh chứa rm (hết chặn oan khi designs/ nằm trong lệnh khác cùng chuỗi);
+# miễn hỏi 2 đích sinh-lại-được: designs/*/_auto-export/ (psd-cut re-export) và file BÊN TRONG
+# .backups/ (rotate giữ-30 là thiết kế) — xoá nguyên thư mục .backups vẫn hỏi.
+if [[ $low =~ (^|[[:space:];&|])rm[[:space:]] ]]; then
+  gdata=""
+  while IFS= read -r seg; do
+    [[ $seg =~ (^|[[:space:]])rm[[:space:]] ]] || continue
+    part=${seg#*rm }
+    part=$(printf '%s' "$part" | sed -E "s#[^[:space:]\"']*_auto-export/[^[:space:]\"']*##g; s#\.backups/[^[:space:]\"']+##g")
+    printf '%s' "$part" | grep -qE 'designs/|state\.json|boards/|history/|knowledge/|\.backups' && gdata=1
+  done < <(printf '%s\n' "$cmd" | tr ';&|' '\n\n\n')
+  if [ -n "$gdata" ]; then
+    decide ask G-DATA-1 "xoa du lieu van hanh agent-auto - designs tai lai rat lau"
+  fi
 fi
 
 exit 0

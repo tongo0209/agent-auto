@@ -15,6 +15,7 @@
      (`POSIX file` bắt buộc đường dẫn TUYỆT ĐỐI. Máy có `pngpaste` thì dùng `pngpaste <file>` gọn hơn.)
      Sau khi lưu: **Read file và ĐỐI CHIẾU với ảnh dán trong chat** (manager nhìn được cả hai) — khớp mới dùng; lệch nghĩa là clipboard đã bị đè → coi như fail. User dán NHIỀU ảnh trong 1 message → clipboard chỉ giữ ảnh CUỐI, chỉ vớt được 1 — các ảnh còn lại đi đường fallback.
      **Fallback** (osascript lỗi / clipboard không có ảnh / đối chiếu lệch / nhiều ảnh): giải thích ngắn và đề nghị user lưu ảnh ra file (gợi ý: `design/<slug>/`) hoặc kéo-thả file ảnh vào cửa sổ chat (tự chèn đường dẫn) rồi đưa path.
+   - **`.psd`/`.psb` (máy này)**: có skill riêng `/psd-cut` (`~/.claude/skills/psd-cut`) bóc bằng Photoshop thành asset đã verify + `coords.json` — nếu skill đó tồn tại trên máy thì DÙNG NÓ TRƯỚC, chỉ rơi xuống nhánh `sips` dưới khi không có. Task có `.psd/.psb` trong `designs/<KEY>/` mà chưa có `_auto-export/<slug>/assets/` → chạy `/psd-cut <KEY>` xong mới giao việc; asset + toạ độ lấy từ `coords.json` (x,y,w,h theo canvas gốc, dùng thẳng cho px tuyệt đối R-CDN-4).
    - User đưa **file design gốc** (`.psd`, `.ai`, `.sketch`, `.fig`) → subagent không xem được trực tiếp. Manager TỰ convert bằng Bash trước khi giao việc:
      ```bash
      mkdir -p design/<slug> && sips -s format png <file>.psd --out design/<slug>/<tên>.png

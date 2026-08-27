@@ -47,7 +47,7 @@ Báo đúng 1 dòng kèm tín hiệu quyết định: `⚡ Gate: <QUICK|MID> (<t
 **Làn `quick`** — manager TỰ sửa trong phiên: 0 subagent, 0 spec, 0 report, 0 knowledge, 0 state. Verify = build one-shot PASS (lệnh của repo — luật "verify build thật" giữ nguyên); browser/console check chỉ khi user yêu cầu. Tổng kết 3 dòng (đã sửa / build / giới hạn). BỎ QUA Bước 0.5.
 
 **Làn `mid`** — 1 dev, manager verify, 0 checker (Bước 0.5 VẪN CHẠY — cần RUN_START + Chi phí):
-- 1 `frontend-developer` duy nhất, model `sonnet` (mô tả nặng bất thường → nâng inherit, ghi lý do 1 dòng). Có ảnh → dev đọc ảnh trực tiếp, KHÔNG analyst.
+- 1 `frontend-developer` duy nhất, model `sonnet` (mô tả nặng bất thường → nâng `opus`, ghi lý do 1 dòng). Có ảnh → dev đọc ảnh trực tiếp, KHÔNG analyst.
 - Template giao việc = template dev chuẩn, dòng ngân sách đổi thành: `tối đa 40 tool-call`.
 - Manager tự verify: build one-shot + fe-gate + `design-diff sections/match` khi có ảnh design và điểm sửa là toạ độ/nội dung. Browser check chỉ khi user yêu cầu.
 - 1 vòng dev; verify FAIL → đúng 1 vòng fix (25 tool-call); vẫn FAIL → DỪNG hỏi user. Không có vòng 3.
@@ -129,15 +129,16 @@ Luật cấm giữ tại đây: idempotent (đích tồn tại → SKIP) · guar
 
 ## Chọn model theo độ khó (khi gọi agent)
 
-Agent không khai model cứng — **bạn quyết model từng lần gọi** qua tham số `model` của tool Agent (ưu tiên cao hơn frontmatter). Quy tắc:
+Frontmatter agent đã pin mặc định (chốt 27/8/2026): analyst/dev/checker `model: opus` + `effort: high` — **CHỈ dùng opus/sonnet, CẤM inherit/fable/haiku** (phiên chính có thể chạy model/effort khác, không để agent ăn theo). **Bạn vẫn quyết model từng lần gọi** qua tham số `model` của tool Agent (thắng frontmatter; effort KHÔNG override per-call được):
 
 | Độ khó | Model | Tiêu chí |
 |---|---|---|
-| **Nặng** | mặc định phiên (inherit — thường opus) | analyst với ≥3 ảnh hoặc cả màn hình; dev task mới ≥2 component, có logic JS phức tạp (game/animation/API); tổng hợp `learn` |
-| **Vừa** | `sonnet` | dev vòng fix (vòng 2, phạm vi hẹp, đã có report liệt kê đúng chỗ sửa); dev mode `fix` (diff scope hẹp, gate đã loại phức tạp); checker mọi vòng (đã có spec checklist); analyst 1 ảnh component đơn |
+| **Nặng** | `opus` | analyst ≥3 ảnh hoặc cả màn hình (lần đầu của màn hình LUÔN Nặng — spec sai là sai dây chuyền); dev task mới ≥2 component, logic JS phức tạp (game/animation/API); checker vòng CHỐT mode `full`; tổng hợp `learn` |
+| **Vừa** | `sonnet` | dev vòng fix (phạm vi hẹp, report đã liệt kê đúng chỗ sửa); dev mode `fix` (diff scope hẹp, gate đã loại phức tạp); checker vòng GIỮA + quick check; analyst 1 ảnh component đơn |
 
-- **dev round-1 mode `full`:** mặc định **Nặng (opus)**; chỉ hạ **sonnet** khi registry PHỦ gameplay-type spec đã khai AND `Novel-JS = no` AND ≤ vài component standard. Bất kỳ NOVEL / Novel-JS=yes / registry MISS / analyst không chắc → giữ opus.
-- Phân vân → chọn **Nặng**. Analyst lần đầu của màn hình luôn Nặng — spec sai là sai dây chuyền. Ghi model từng bước vào Tổng kết.
+- **dev round-1 mode `full`:** mặc định **opus**; chỉ hạ **sonnet** khi registry PHỦ gameplay-type spec đã khai AND `Novel-JS = no` AND ≤ vài component standard. Bất kỳ NOVEL / Novel-JS=yes / registry MISS / analyst không chắc → giữ opus.
+- **Leo thang 1 chiều LÊN:** đang `sonnet` mà lộ khó (spec mơ hồ, dev báo ⚠ ngoài kiến thức, fix FAIL vòng 1) → vòng sau nâng `opus` + ghi lý do 1 dòng. Không tự hạ giữa chừng.
+- Phân vân → chọn **Nặng**. Ghi model từng bước vào Tổng kết.
 
 ## 🚦 Ngân sách OUTPUT của manager (nút thắt tốc độ số 1)
 
@@ -179,6 +180,7 @@ Knowledge dự án: <ctx>/knowledge/
 Phạm vi: <thư mục/file được phép đụng>
 Chuẩn BẮT BUỘC đọc trước khi viết dòng đầu: ~/VNG/agent-auto/rules/cdn-source-standard.md (R-CDN-1..14) + popup-library.md (R-POP-1..9) [+ html-handoff.md nếu đưa HTML sang gt-promotion/new-mainsite]. Chốt thế hệ assets-flat vs legacy src-setup trước khi code · popup phải extends base.html.twig + dùng module có sẵn · cấm @media tay · không tự viết engine gameplay · sprite dùng @include sprite($tên), cấm gõ background-position tay / url() PNG lẻ / sửa *generated.scss (R-SPR-*).
 Code style: đọc ~/VNG/agent-auto/rules/code-style.md (R-CS-1..7). Comment tối giản 1 dòng, đúng 3 loại (hợp đồng platform / hack / logic bí ẩn) — cấm mô tả lại code, banner, JSDoc nhiều dòng · không phòng thủ thừa · không tách hàm cho thứ dùng 1 lần · tên thay comment. Hook guard-style.sh báo R-CS-1 thì gỡ ngay trong lượt đó.
+Dev Report BẮT BUỘC có mục `Rules đã áp:` — mã luật đã áp/kiểm theo nhóm file (vd `R-SPR-1 sprite.scss · R-CDN-6 config.js · R-CS-1..5 main.js`). Thiếu mục = report không hợp lệ.
 Ngân sách: tối đa 60 tool-call (vòng fix: 25) — chạm ngưỡng → DỪNG, ghi Dev Report phần đã làm + mục "Dừng vì hết ngân sách: còn thiếu gì".
 ```
 
@@ -188,6 +190,7 @@ Task: <slug> — vòng <n>
 Chuẩn so sánh: <ctx>/specs/<slug>.md   (hoặc ảnh: <paths> / hoặc mô tả yêu cầu: "<text>")
 Knowledge dự án: <ctx>/knowledge/
 Phạm vi code: <thư mục/file>
+Chuẩn: đọc ~/VNG/agent-auto/rules/cdn-source-standard.md + popup-library.md + code-style.md — lệch chuẩn báo theo MÃ LUẬT (R-CDN-…/R-POP-…/R-CS-…), đối chiếu mục `Rules đã áp` trong Dev Report.
 Vai trò vòng này: GIỮA (được tái dụng artifact Self-smoke trong <ctx>/reports/<slug>-dev-<n>.md) | CHỐT (BẮT BUỘC tự build COLD + read_signals độc lập)
 CẤM kết luận "khớp/lệch" từ TÊN FILE ảnh, tên section, tên class hay cảm giác "trông giống" — mỗi verdict phải dựa vào giá trị đọc được (CSS/DOM/số đo) hoặc quan hệ nhìn thấy trong ảnh. Manager chạy phần đo pixel (gate 📏), bạn KHÔNG cần đo — nhưng cũng KHÔNG được phán thay bằng suy luận.
 Đã cold-build vòng trước: có | không
@@ -212,7 +215,7 @@ Ghi report vào: <ctx>/reports/<slug>-check-<n>.md
 
 > **Cap 2 vòng** (giảm từ 3 — ưu tiên nắm tình hình sớm, tránh tốn time/phức tạp): vòng 1 build → vòng 2 fix theo check-1; FAIL sau vòng 2 → DỪNG + báo user (không grind tiếp, để user quyết). `fix` vẫn 1 vòng; `code` không review.
 
-- Dev phải báo **Self-smoke PASS** + đủ khối **artifact** (exit code build, đuôi log, selector đã assert, console, viewport) trước khi manager giao design-checker. Thiếu artifact → yêu cầu dev bổ sung, KHÔNG giao checker.
+- Dev phải báo **Self-smoke PASS** + đủ khối **artifact** (exit code build, đuôi log, selector đã assert, console, viewport) **+ mục `Rules đã áp`** trước khi manager giao design-checker. Thiếu artifact/mục Rules → yêu cầu dev bổ sung, KHÔNG giao checker.
 - Vòng ≥2: giao checker kèm Check Report trước + danh sách file dev đã sửa, cờ **RE-CHECK** (checker re-test có mục tiêu, không full lại).
 - Full mode, check đầu: giao **checker-prep** song song lúc giao dev vòng 1 (prep dựng checklist skeleton); sau khi build xong giao **checker-run**.
 - **Vai trò vòng checker (chống làm trùng):** vòng nào còn khả năng FAIL → `GIỮA`, checker tái dụng artifact Self-smoke thay vì chạy lại build/console/2-viewport. Vòng nào sắp kết luận PASS → `CHỐT`, checker BẮT BUỘC tự build COLD + `read_signals` độc lập. **Cap 2 vòng nghĩa là vòng 2 luôn là `CHỐT`.** Mode `fix` chỉ có 1 vòng → luôn `CHỐT`.

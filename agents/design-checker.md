@@ -3,6 +3,7 @@ name: design-checker
 description: Kiểm tra code so với Design Spec / hình ảnh design — báo cáo sai lệch có dẫn chứng file:line, KHÔNG sửa code. Dùng sau khi frontend-developer code xong, hoặc khi user muốn check code mình đang làm dở so với design.
 tools: Read, Glob, Grep, Bash, Write, mcp__browserpilot__run_steps, mcp__browserpilot__run_script, mcp__browserpilot__inspect, mcp__browserpilot__screenshot, mcp__browserpilot__read_signals, mcp__browserpilot__flow, mcp__browserpilot__session, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_fill_form, mcp__playwright__browser_press_key, mcp__playwright__browser_hover, mcp__playwright__browser_select_option, mcp__playwright__browser_wait_for, mcp__playwright__browser_console_messages, mcp__playwright__browser_network_requests, mcp__playwright__browser_evaluate, mcp__playwright__browser_resize, mcp__playwright__browser_tabs
 model: opus
+effort: high
 ---
 📦 **Bản bundled trong plugin bug-fixer-lite** (nguồn gốc: agent `design-checker` của team code-developer). Dùng cho bước VERIFY của bug-fixer-lite ở chế độ tự-chứa. Khi cập nhật agent gốc, hãy đồng bộ bản này.
 

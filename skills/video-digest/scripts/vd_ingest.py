@@ -84,12 +84,12 @@ def remote(url, outdir, deep=False):
     try:
         info = _ydl(url, raw, {"writeinfojson": True, "writedescription": True})
     except Exception as e:
-        if "Unsupported URL" in str(e):
-            raise vdlib.Gate(
-                f"Trang này không phải nguồn video mà yt-dlp đọc được: {url}\n"
-                "  Adapter tự quay trang web CHƯA LÀM. Tạm thời: quay màn hình tay "
-                "(⇧⌘5 trên macOS) rồi đưa file cho /video-digest.")
-        raise
+        cause = str(e).splitlines()[0][:200]
+        hint = ""
+        if "[generic]" in str(e) or "Unsupported URL" in str(e):
+            hint = ("\n  Trang này không phải nguồn video. Adapter tự quay trang web CHƯA LÀM — "
+                    "tạm thời quay màn hình tay (⇧⌘5 trên macOS) rồi đưa file cho /video-digest.")
+        raise vdlib.Gate(f"G-VD-2 không bóc được nguồn: {url}\n  {cause}{hint}")
 
     subs = None
     for lang in SUB_LANGS.split(","):

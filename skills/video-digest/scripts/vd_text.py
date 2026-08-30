@@ -14,7 +14,7 @@ EMPTY_WARN_RATIO = 0.9
 EDGE_BUSY = 6.0
 LINE_GAP = 12
 SAME_SCREEN = 0.7
-TS_RE = re.compile(r"(\d\d):(\d\d):(\d\d)[.,](\d{1,3})\s*-->")
+TS_RE = re.compile(r"(?:(\d+):)?(\d\d):(\d\d)[.,](\d{1,3})\s*-->")
 TAG_RE = re.compile(r"<[^>]+>")
 
 
@@ -31,7 +31,8 @@ def subs_to_md(sub_path):
                     out.append((cur_t, text))
                     last = text
             h, mi, s, ms = m.groups()
-            cur_t = int(h) * 3600 + int(mi) * 60 + int(s) + int(ms.ljust(3, "0")) / 1000
+            cur_t = (int(h or 0) * 3600 + int(mi) * 60 + int(s)
+                     + int(ms.ljust(3, "0")) / 1000)
             buf = []
         elif line and not line.isdigit() and not line.startswith("WEBVTT"):
             buf.append(TAG_RE.sub("", line))

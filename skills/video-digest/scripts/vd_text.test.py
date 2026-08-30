@@ -57,4 +57,4 @@ if FAIL:
     for f in FAIL:
         print(" -", f)
     sys.exit(1)
-print("✅ vd_text: pass")
+print("✅ vd_text (gồm gom dòng OCR): pass")

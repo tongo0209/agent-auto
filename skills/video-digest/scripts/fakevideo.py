@@ -57,3 +57,23 @@ def encode_dir(framedir, mp4, fps):
     names = sorted(n for n in os.listdir(framedir) if n.endswith(".png"))
     vdav.encode([Image.open(os.path.join(framedir, n)) for n in names], mp4, fps)
     return mp4
+
+
+FONTS = ["/System/Library/Fonts/Menlo.ttc", "/System/Library/Fonts/Supplemental/Courier New.ttf"]
+
+
+def text_frame(path, lines, w=900, h=260, size=30, dark=True):
+    """Frame chữ nền tối kiểu editor — để đo OCR trên đúng thứ khó nhất của screencast."""
+    from PIL import ImageFont
+    bg, fg = ((20, 22, 28), (220, 224, 230)) if dark else ((250, 250, 250), (20, 20, 20))
+    font = None
+    for f in FONTS:
+        if os.path.exists(f):
+            font = ImageFont.truetype(f, size)
+            break
+    img = Image.new("RGB", (w, h), bg)
+    d = ImageDraw.Draw(img)
+    for i, ln in enumerate(lines):
+        d.text((24, 24 + i * int(size * 1.5)), ln, fill=fg, font=font)
+    img.save(path)
+    return path

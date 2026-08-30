@@ -1,4 +1,5 @@
 """Chặng text: phụ đề + OCR chữ trên màn hình + gộp cụm code gõ dần thành snippet."""
+import difflib
 import os
 import re
 import sys
@@ -11,6 +12,8 @@ OCR_UPSCALE = 3
 DARK_MEAN = 128
 EMPTY_WARN_RATIO = 0.9
 EDGE_BUSY = 6.0
+LINE_GAP = 12
+SAME_SCREEN = 0.7
 TS_RE = re.compile(r"(\d\d):(\d\d):(\d\d)[.,](\d{1,3})\s*-->")
 TAG_RE = re.compile(r"<[^>]+>")
 
@@ -50,14 +53,64 @@ def _prep(path, tmpdir):
     return dst
 
 
+_ENGINE = None
+
+
+def backend():
+    """tesseract nếu máy có; không thì RapidOCR (wheel PyPI, không cần binary hệ thống)."""
+    if vdlib.have("tesseract"):
+        return "tesseract"
+    try:
+        import rapidocr_onnxruntime  # noqa: F401
+        return "rapidocr"
+    except ImportError:
+        return None
+
+
+def group_lines(result):
+    """RapidOCR trả từng ô chữ rời — gom lại thành dòng theo toạ độ y rồi mới nối trái→phải."""
+    if not result:
+        return ""
+    boxes = sorted(((min(p[1] for p in box), min(p[0] for p in box), text)
+                    for box, text, _score in result))
+    lines, cur, line_y = [], [], None
+    for y, x, text in boxes:
+        if line_y is not None and y - line_y > LINE_GAP:
+            lines.append(" ".join(t for _, t in sorted(cur)))
+            cur, line_y = [], None
+        if line_y is None:
+            line_y = y
+        cur.append((x, text))
+    if cur:
+        lines.append(" ".join(t for _, t in sorted(cur)))
+    return "\n".join(lines)
+
+
+def _rapidocr_text(path):
+    global _ENGINE
+    if _ENGINE is None:
+        from rapidocr_onnxruntime import RapidOCR
+        _ENGINE = RapidOCR()
+    result, _ = _ENGINE(path)
+    return group_lines(result)
+
+
 def ocr_frames(frames):
-    vdlib.gate_binaries("tesseract")
+    engine = backend()
+    if engine is None:
+        raise vdlib.Gate("G-VD-1 chưa có OCR — cài 1 trong 2:\n"
+                         "  brew install tesseract tesseract-lang   (cần mạng tới ghcr.io)\n"
+                         "  python3 -m pip install --user rapidocr-onnxruntime")
     rows = []
     with tempfile.TemporaryDirectory(prefix="vdocr-") as tmp:
         for fr in frames:
-            rc, out, _ = vdlib.run(["tesseract", _prep(fr["path"], tmp), "-",
-                                    "--psm", "6", "-c", "preserve_interword_spaces=1"])
-            rows.append({"t": fr["t"], "text": out.rstrip()})
+            if engine == "tesseract":
+                rc, out, _ = vdlib.run(["tesseract", _prep(fr["path"], tmp), "-",
+                                        "--psm", "6", "-c", "preserve_interword_spaces=1"])
+                text = out.rstrip()
+            else:
+                text = _rapidocr_text(fr["path"])
+            rows.append({"t": fr["t"], "text": text})
     return rows
 
 
@@ -103,3 +156,17 @@ def _grew(prev, cur):
 if __name__ == "__main__":
     for t, text in subs_to_md(sys.argv[1]):
         print(f"[{int(t) // 60:02d}:{t % 60:06.3f}] {text}")
+
+
+def screen_changes(rows):
+    """Chữ trên màn đổi hẳn = sang màn mới. Bền hơn dựa vào cắt cảnh, vì ngưỡng cắt cảnh phải
+    hiệu chỉnh theo từng kiểu video còn 'chữ khác đi' thì đúng với mọi tutorial thao tác."""
+    out = []
+    for r in rows:
+        text = r["text"].strip()
+        if not text:
+            continue
+        if out and difflib.SequenceMatcher(None, out[-1]["text"], text).ratio() > SAME_SCREEN:
+            continue
+        out.append({"t": float(r["t"]), "text": text})
+    return out

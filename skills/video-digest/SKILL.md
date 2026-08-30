@@ -22,7 +22,7 @@ hơn vừa chính xác hơn, và dán thẳng vào code được.
 - Digest nặng: `designs/<KEY>/_auto-video/<slug>/` (ngoài git) — không `--key` thì `designs/_inbox-video/`
 - Chữ đã chắt: `knowledge/video/<slug>/notes.md` (vào git)
 - Thiết kế: `docs/specs/2026-08-30-video-digest-design.md`
-- Yêu cầu máy: **PyAV** (`pip install --user av` — wheel có sẵn FFmpeg bên trong, KHÔNG cần cài ffmpeg) · numpy + PIL · `yt-dlp` (nguồn URL) · `tesseract` (OCR, tuỳ chọn)
+- Yêu cầu máy: **PyAV** (`pip install --user av` — wheel có sẵn FFmpeg bên trong, KHÔNG cần cài ffmpeg) · numpy + PIL · `yt-dlp` (nguồn URL) · OCR **tuỳ chọn, 2 lựa chọn**: `pip install --user rapidocr-onnxruntime` (không cần binary hệ thống — dùng được khi mạng chặn ghcr.io) hoặc `brew install tesseract tesseract-lang`
 
 ## Cách gọi
 
@@ -73,6 +73,8 @@ Chỉ `study-notes` cần AI, và đúng một lần cho mỗi video.
    `sheets/` khi thật sự cần nhìn bố cục.
 5. Video dạy code: **luôn xem `source/*.description` trước** — thường có link GitHub/CodePen,
    `git clone` cho code chính xác 100%, khỏi OCR.
+6. Chạy chặng nào là do **lens yêu cầu**, không do `classify.guess`. `guess` chỉ chọn lens mặc
+   định khi không truyền `--lens`; đoán sai thì ép tay, không có gì hỏng.
 
 ## Cổng kiểm cơ học
 

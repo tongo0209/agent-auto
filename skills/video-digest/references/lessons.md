@@ -64,3 +64,31 @@ easing đo ra 560ms/`unfit` thay vì 640ms/`easeOutQuint`.
 
 **Chữa:** so với `nxt - step*1e-3`. Bài học chung: mọi so sánh mốc giây trong pipeline này
 phải có dung sai, đừng bao giờ so bằng hoặc so nhỏ hơn trần trụi.
+
+## 8. Ngưỡng phân loại phải ĐO rồi mới đặt (30/8/2026)
+
+Bộ phân loại đầu tiên chấm một clip **toàn chữ, đứng yên** thành `motion` 0.35 — vì nó cộng
+"điểm thưởng" 0.3 cho `density < 0.15`, mà thang density mới (mật độ cạnh) chỉ chạy trong
+khoảng 0.002–0.031, không bao giờ chạm 0.15.
+
+**Số đo thật:** màn chữ `density 0.031 / energy 0.0022`; animation `density 0.002 / energy 0.018`.
+Cách nhau 15× và 8× — thừa sức phân biệt, chỉ là ngưỡng đặt sai chỗ.
+
+**Chữa:** chấm theo TỈ LỆ so với ngưỡng đo được (`density/DENSITY_TEXT`), bỏ hết điểm thưởng
+tuỳ tiện. Đổi thang đo mà không đo lại ngưỡng là công thức để sai âm thầm.
+
+## 9. Đừng để phỏng đoán điều khiển việc chạy chặng nào (30/8/2026)
+
+`vd_run` từng bỏ qua OCR khi `guess == "motion"`. Hệ quả dây chuyền: đoán sai loại video ⇒
+không OCR ⇒ `step-list` in ra "chưa chạy OCR" dù người dùng gọi đúng lens đó.
+
+**Chữa:** chạy chặng nào là do **lens yêu cầu**, không do phỏng đoán. Phỏng đoán chỉ được phép
+làm đúng một việc: chọn lens MẶC ĐỊNH khi người dùng không chỉ định.
+
+## 10. Cắt cảnh đo bằng TỈ LỆ pixel đổi, và phải loại khỏi năng lượng chuyển động
+
+Độ lệch trung bình không phân biệt được "đổi cả màn" với "một phần tử to chạy qua". Dùng
+`tỉ lệ pixel đổi > 12%` mới đúng nghĩa cắt cảnh.
+
+Và phải **loại frame cut ra khỏi `motion_energy`** — nếu không, video nhiều cảnh nào cũng bị
+chấm là lắm chuyển động, `walkthrough` không bao giờ thắng nổi `motion`.

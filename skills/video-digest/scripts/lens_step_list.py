@@ -1,6 +1,11 @@
-"""Lens step-list: cắt cảnh + chữ trên màn → danh sách bước có mốc giây. 0 token."""
+"""Lens step-list: chữ trên màn đổi = sang bước mới. 0 token.
+
+Phân đoạn theo THAY ĐỔI CHỮ chứ không theo cắt cảnh: ngưỡng cắt cảnh phải hiệu chỉnh theo
+từng kiểu video, còn "chữ trên màn khác đi" thì đúng với mọi tutorial thao tác.
+"""
 import os
 import sys
+import vd_text
 import vdlib
 
 MAX_LINES = 4
@@ -11,22 +16,18 @@ def _mmss(t):
 
 
 def render(digest_dir):
+    onscreen = os.path.join(digest_dir, "text", "onscreen.csv")
+    if not os.path.exists(onscreen):
+        return ("# Danh sách bước\n\nDigest này chưa chạy OCR — không dựng được bước.\n"
+                "Chạy lại với `--lens step-list` và cài OCR "
+                "(`python3 -m pip install --user rapidocr-onnxruntime`).\n")
+    steps = vd_text.screen_changes(vdlib.csv_load(onscreen))
     d = vdlib.jload(os.path.join(digest_dir, "digest.json"))
-    onscreen_p = os.path.join(digest_dir, "text", "onscreen.csv")
-    if not os.path.exists(onscreen_p):
-        return "# Danh sách bước\n\nDigest này chưa chạy OCR — không dựng được bước.\n"
-    rows = vdlib.csv_load(onscreen_p)
-    cuts = [0.0] + d["signals"].get("cut_times", [])
-
-    out = ["# Danh sách bước", "", f"{len(cuts)} màn · {d['media']['duration']}s", ""]
-    for t in cuts:
-        near = min(rows, key=lambda r: abs(float(r["t"]) - t), default=None)
-        if not near:
-            continue
-        lines = [ln.strip() for ln in near["text"].split("\n") if ln.strip()][:MAX_LINES]
-        out.append(f"**{_mmss(t)}** — " + (lines[0] if lines else "(không đọc được chữ)"))
-        for ln in lines[1:]:
-            out.append(f"  - {ln}")
+    out = ["# Danh sách bước", "", f"{len(steps)} màn · {d['media']['duration']}s", ""]
+    for s in steps:
+        lines = [ln.strip() for ln in s["text"].split("\n") if ln.strip()][:MAX_LINES]
+        out.append(f"**{_mmss(s['t'])}** — {lines[0]}")
+        out += [f"  - {ln}" for ln in lines[1:]]
     return "\n".join(out) + "\n"
 
 

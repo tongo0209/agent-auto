@@ -62,7 +62,9 @@ def main(argv=None):
     guess = p["classify"]["guess"]
     print(f"  loại đoán: {guess} {p['classify']['scores']}")
 
-    dense = guess == "motion" or "motion-spec" in args.lens
+    lens_names = [x.strip() for x in (args.lens or DEFAULT_LENS[guess]).split(",") if x.strip()]
+    dense = "motion-spec" in lens_names
+    wants_text = any(n in ("step-list", "bug-list", "study-notes") for n in lens_names)
     frames_dir = os.path.join(d, "frames")
     kept, stride, sample_warn = vd_sample.extract(src["path"], frames_dir,
                                                   dense=dense, fps=p["media"]["fps"])
@@ -72,7 +74,7 @@ def main(argv=None):
     print(f"  frame: {len(kept)} ({'dense' if dense else 'dedupe'}) · sheet: {len(sheets)}")
 
     warn = None
-    if vdlib.have("tesseract") and guess != "motion":
+    if wants_text and vd_text.backend():
         step = max(1, -(-len(frames) // OCR_MAX_FRAMES))
         rows = vd_text.ocr_frames(frames[::step])
         vdlib.csv_dump(os.path.join(d, "text", "onscreen.csv"), rows, ["t", "text"])
@@ -96,7 +98,7 @@ def main(argv=None):
               "beats": [{"i": i + 1, "t0": s["t0"], "t1": s["t1"], "region": s["region"]}
                         for i, s in enumerate(specs)]}
     vdlib.jdump(os.path.join(d, "digest.json"), digest)
-    return finish(d, digest, args.lens or DEFAULT_LENS[guess])
+    return finish(d, digest, ",".join(lens_names))
 
 
 def finish(d, digest, lens_arg):

@@ -139,7 +139,7 @@ Chặn rác ngay tại chỗ sinh ra, thay vì để lens nhận dữ liệu h�
 |---|---|---|
 | `G-VD-1` | binary có mặt (`ffmpeg`/`ffprobe` luôn; `tesseract` khi OCR; `yt-dlp` khi nguồn URL) | dừng, in lệnh `brew install` cần chạy |
 | `G-VD-2` | decode được: ≥1 video stream, `duration > 0` | dừng |
-| `G-VD-3` | dedupe hợp lý: số frame còn lại ∈ `[1, min(600, duration*2)]` | dừng — vượt trần nghĩa là tham số `mpdecimate` hỏng |
+| `G-VD-3` | dedupe ra 0 frame | dừng. **Vượt trần thì lấy thưa + cảnh báo, không dừng** — screencast dày thao tác vẫn có thể còn nhiều frame thật, chặn cứng là chặn nhầm việc hợp lệ |
 | `G-VD-4` | OCR không rỗng bất thường: ≥90% frame ra rỗng trong khi mật độ cạnh cao | cảnh báo, ghi vào `digest.json`, không dừng |
 | `G-VD-5` | vùng motion ổn định: region phải sống ≥3 frame liên tiếp mới được ghi nhận | loại region nhiễu |
 | `G-VD-6` | easing trung thực: RMSE > 0.03 → `unfit` | không xuất bezier |

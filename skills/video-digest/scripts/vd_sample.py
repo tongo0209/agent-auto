@@ -37,16 +37,19 @@ def extract(video, outdir, dense=False, fps=None, max_frames=MAX_FRAMES):
     for leftover in os.listdir(raw):
         os.remove(os.path.join(raw, leftover))
     os.rmdir(raw)
-    gate_count(kept, dense)
-    return kept, stride
+    warn = gate_count(kept, len(files), dense)
+    return kept, stride, warn
 
 
-def gate_count(kept, dense):
-    """G-VD-3 — dedupe ra 0 frame là hỏng; ra quá trần đã bị stride chặn trước đó."""
+def gate_count(kept, raw_count, dense):
+    """G-VD-3 — 0 frame là hỏng thật, dừng. Dedupe kém hiệu quả chỉ cảnh báo: screencast dày
+    đặc thao tác vẫn có thể còn nhiều frame thật, chặn cứng ở đây là chặn nhầm việc hợp lệ."""
     if not kept:
         raise vdlib.Gate("G-VD-3 sau khi lọc không còn frame nào — tham số mpdecimate hỏng")
-    if not dense and len(kept) > MAX_FRAMES:
-        raise vdlib.Gate(f"G-VD-3 còn {len(kept)} frame sau dedupe, vượt trần {MAX_FRAMES}")
+    if not dense and raw_count > MAX_FRAMES:
+        return (f"G-VD-3 dedupe chỉ còn {raw_count} frame (trần {MAX_FRAMES}) — đã lấy thưa, "
+                f"kiểm lại nếu video lẽ ra phải tĩnh")
+    return None
 
 
 def contact_sheets(frames, outdir):

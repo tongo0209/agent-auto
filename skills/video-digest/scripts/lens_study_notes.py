@@ -22,10 +22,10 @@ def render(digest_dir):
            f"- Thời lượng: {d['media']['duration']}s · {d['media']['w']}×{d['media']['h']}",
            f"- Loại đoán được: {d['classify']['guess']}", ""]
 
-    for ch in d.get("chapters", []):
-        out.append(f"  - {_mmss(ch['start'])} {ch['title']}")
-    if d.get("chapters"):
-        out.insert(len(out) - len(d["chapters"]), "## Chương")
+    chapters = d.get("chapters", [])
+    if chapters:
+        out.append("## Chương")
+        out += [f"  - {_mmss(ch['start'])} {ch['title']}" for ch in chapters]
 
     subs_p = os.path.join(digest_dir, "text", "subs.csv")
     if os.path.exists(subs_p):

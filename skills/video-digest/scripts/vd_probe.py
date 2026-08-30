@@ -49,11 +49,20 @@ def _probe_frames(video, outdir):
     return sorted(os.path.join(outdir, f) for f in os.listdir(outdir) if f.endswith(".png"))
 
 
+def _lavfi_path(path):
+    """movie= của lavfi coi \\ : , ' [ ] là ký tự điều khiển — đường dẫn Downloads có dấu cách
+    và dấu phẩy là vỡ filter, nên phải thoát trước khi nhét vào."""
+    out = path.replace("\\", "\\\\")
+    for ch in ":,'[]":
+        out = out.replace(ch, "\\" + ch)
+    return out
+
+
 def scene_cuts(video):
     """Số lần cắt cảnh — ffmpeg tự chấm điểm, mình chỉ đếm dòng."""
     rc, out, _ = vdlib.run([
         "ffprobe", "-v", "error", "-f", "lavfi",
-        "-i", f"movie={video},select=gt(scene\\,{SCENE_CUT})",
+        "-i", f"movie={_lavfi_path(video)},select=gt(scene\\,{SCENE_CUT})",
         "-show_entries", "frame=pkt_pts_time", "-of", "csv=p=0"])
     return [round(float(x), 3) for x in out.split() if x.strip().replace(".", "", 1).isdigit()]
 

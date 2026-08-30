@@ -56,8 +56,11 @@ def render(digest_dir):
                        f"{round((s['t0'] - base) * 1000)}ms; }}")
         out += ["```", "", "## GSAP", "", "```js", "const tl = gsap.timeline();"]
         for s in fit:
-            props = [f"x: {s['dx']:+.0f}" for _ in (1,) if abs(s["dx"]) >= 1]
-            props += [f"y: {s['dy']:+.0f}" for _ in (1,) if abs(s["dy"]) >= 1]
+            props = []
+            if abs(s["dx"]) >= 1:
+                props.append(f"x: {s['dx']:+.0f}")
+            if abs(s["dy"]) >= 1:
+                props.append(f"y: {s['dy']:+.0f}")
             out.append(f"tl.from('.{s['region']}', {{ {', '.join(props)}, "
                        f"duration: {s['dur_ms'] / 1000:.2f}, "
                        f"ease: '{easing.GSAP_NAME.get(s['ease'], 'none')}' }}, "

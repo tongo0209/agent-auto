@@ -64,8 +64,8 @@ def main(argv=None):
 
     dense = guess == "motion" or "motion-spec" in args.lens
     frames_dir = os.path.join(d, "frames")
-    kept, stride = vd_sample.extract(src["path"], frames_dir,
-                                     dense=dense, fps=p["media"]["fps"])
+    kept, stride, sample_warn = vd_sample.extract(src["path"], frames_dir,
+                                                  dense=dense, fps=p["media"]["fps"])
     frames = vdlib.list_frames(frames_dir)
     vdlib.csv_dump(os.path.join(d, "frames.csv"), kept, ["t", "file"])
     sheets = vd_sample.contact_sheets(frames, os.path.join(d, "sheets"))
@@ -92,7 +92,7 @@ def main(argv=None):
     digest = {"schema": 1, "slug": slug, "source": src, "media": p["media"],
               "signals": p["signals"], "classify": p["classify"],
               "chapters": src.get("chapters", []),
-              "sheets": sheets, "warnings": [warn] if warn else [],
+              "sheets": sheets, "warnings": [w for w in (warn, sample_warn) if w],
               "beats": [{"i": i + 1, "t0": s["t0"], "t1": s["t1"], "region": s["region"]}
                         for i, s in enumerate(specs)]}
     vdlib.jdump(os.path.join(d, "digest.json"), digest)

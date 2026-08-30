@@ -68,7 +68,7 @@ Chỉ `study-notes` cần AI, và đúng một lần cho mỗi video.
 |---|---|
 | `G-VD-1` | thiếu binary → in đúng lệnh `brew install`, dừng |
 | `G-VD-2` | video không decode được / thời lượng 0 → dừng |
-| `G-VD-3` | dedupe ra 0 frame hoặc vượt trần → dừng |
+| `G-VD-3` | dedupe ra 0 frame → dừng; vượt trần → lấy thưa + ghi cảnh báo |
 | `G-VD-4` | OCR rỗng gần hết mà ảnh nhiều chi tiết → cảnh báo vào `digest.json` |
 | `G-VD-5` | vùng chuyển động sống < 3 frame → loại, coi là nhiễu |
 | `G-VD-6` | RMSE > 0.03 → `unfit`, cấm xuất bezier |

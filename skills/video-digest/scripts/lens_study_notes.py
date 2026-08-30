@@ -19,7 +19,8 @@ def render(digest_dir):
     d = vdlib.jload(os.path.join(digest_dir, "digest.json"))
     out = [f"# Brief để viết notes — {d['slug']}", "",
            f"- Nguồn: {d['source'].get('url') or d['source'].get('path')}",
-           f"- Thời lượng: {d['media']['duration']}s · {d['media']['w']}×{d['media']['h']}",
+           f"- Thời lượng: {d['media']['duration']:.0f}s"
+           + (f" · {d['media']['w']}×{d['media']['h']}" if d['media']['w'] else ""),
            f"- Loại đoán được: {d['classify']['guess']}", ""]
 
     chapters = d.get("chapters", [])

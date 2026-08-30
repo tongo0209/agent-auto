@@ -101,6 +101,8 @@ def remote(url, outdir, deep=False):
 
     return {"kind": "youtube", "path": video, "url": url, "sha256": None,
             "title": info.get("title") or url, "subs": subs,
+            "duration": float(info.get("duration") or 0),
+            "uploader": info.get("uploader"),
             "description": (info.get("description") or "")[:4000],
             "chapters": [{"start": c.get("start_time", 0), "title": c.get("title", "")}
                          for c in (info.get("chapters") or [])]}

@@ -180,8 +180,10 @@ không framework.
 ## Yêu cầu máy
 
 ```bash
-python3 -m pip install --user av yt-dlp
+python3 -m pip install --user av yt-dlp rapidocr-onnxruntime
 ```
+
+Cả ba đều là wheel PyPI — **không cần `brew`, không cần binary hệ thống nào.**
 
 **Không cần cài `ffmpeg`.** Máy này chặn `ghcr.io` (và `github.com`) nên brew không tải nổi
 bottle; PyPI thì thông, mà wheel của **PyAV đã đóng gói sẵn thư viện FFmpeg bên trong**.
@@ -190,8 +192,9 @@ bottle; PyPI thì thông, mà wheel của **PyAV đã đóng gói sẵn thư vi�
 parse `showinfo` lẫn bước thoát chuỗi `lavfi`** — hai chỗ đã từng sinh lỗi thật.
 
 `numpy` + `PIL` đã có sẵn trên `python3` hệ thống (2.0.2 / 11.3.0).
-OCR (`tesseract`) là **tuỳ chọn**: thiếu nó thì `bug-list`/`step-list` chỉ mất cột chữ trên màn,
-`motion-spec` không ảnh hưởng gì.
+OCR có **2 backend**, tự chọn cái nào có: `tesseract` (nếu máy cài được) hoặc
+`rapidocr-onnxruntime` (wheel PyPI, không cần binary). Thiếu cả hai thì `bug-list`/`step-list`
+mất cột chữ trên màn; `motion-spec` không ảnh hưởng gì.
 
 ## Không làm (YAGNI)
 

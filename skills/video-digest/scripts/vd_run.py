@@ -51,7 +51,8 @@ def main(argv=None):
 
     if not src["path"]:
         digest = {"schema": 1, "slug": slug, "source": src,
-                  "media": {"duration": 0, "w": 0, "h": 0, "fps": 0, "has_audio": True},
+                  "media": {"duration": src.get("duration", 0), "w": 0, "h": 0, "fps": 0,
+                            "has_audio": True},
                   "signals": {"subs": True, "cut_times": []},
                   "classify": {"guess": "talking", "scores": {}},
                   "chapters": src.get("chapters", [])}

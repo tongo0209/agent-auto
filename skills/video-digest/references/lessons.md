@@ -92,3 +92,18 @@ làm đúng một việc: chọn lens MẶC ĐỊNH khi người dùng không ch
 
 Và phải **loại frame cut ra khỏi `motion_energy`** — nếu không, video nhiều cảnh nào cũng bị
 chấm là lắm chuyển động, `walkthrough` không bao giờ thắng nổi `motion`.
+
+## 11. yt-dlp: dùng API Python, và tách lượt (30/8/2026)
+
+Ba cái bẫy gặp liên tiếp khi bóc YouTube:
+
+1. **`pip install --user` để script ngoài PATH** ⇒ `shutil.which("yt-dlp")` không thấy dù module
+   `yt_dlp` import được. Dùng API Python là hết chuyện.
+2. **YouTube từ chối player client mặc định** — `ERROR: The page needs to be reloaded`. Client
+   `android` qua được; để cả chuỗi `android → ios → tv → web_safari` cho chắc.
+3. **Một thứ tiếng phụ đề hỏng làm chết cả lượt ingest.** Gặp `HTTP 429` khi thử `vi` là mất
+   luôn metadata. Phải tách 3 lượt độc lập: metadata · phụ đề (thử từng tiếng, hỏng thì bỏ qua)
+   · video. Metadata là thứ luôn phải lấy được.
+
+Ngoài ra `--convert-subs srt` cần ffmpeg — không có thì đọc thẳng `.vtt`, nhớ regex mốc giây
+phải nhận cả dạng thiếu giờ `MM:SS.mmm` mà video ngắn hay dùng.

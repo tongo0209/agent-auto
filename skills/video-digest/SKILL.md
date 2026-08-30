@@ -22,7 +22,12 @@ hơn vừa chính xác hơn, và dán thẳng vào code được.
 - Digest nặng: `designs/<KEY>/_auto-video/<slug>/` (ngoài git) — không `--key` thì `designs/_inbox-video/`
 - Chữ đã chắt: `knowledge/video/<slug>/notes.md` (vào git)
 - Thiết kế: `docs/specs/2026-08-30-video-digest-design.md`
-- Yêu cầu máy: **PyAV** (`pip install --user av` — wheel có sẵn FFmpeg bên trong, KHÔNG cần cài ffmpeg) · numpy + PIL · `yt-dlp` (nguồn URL) · OCR **tuỳ chọn, 2 lựa chọn**: `pip install --user rapidocr-onnxruntime` (không cần binary hệ thống — dùng được khi mạng chặn ghcr.io) hoặc `brew install tesseract tesseract-lang`
+- Cài một lần, **không cần `brew`**:
+  ```bash
+  python3 -m pip install --user av yt-dlp rapidocr-onnxruntime
+  ```
+  `av` mang sẵn FFmpeg trong wheel · `rapidocr` là OCR không cần binary (máy này chặn `ghcr.io`
+  nên `brew install ffmpeg/tesseract` bất lực) · numpy + PIL đã có sẵn.
 
 ## Cách gọi
 

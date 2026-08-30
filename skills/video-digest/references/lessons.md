@@ -43,3 +43,24 @@ cao hơn → cắt vụn khi tác giả xoá vài dòng giữa chừng.
 Filter `mpdecimate,setpts=N/FRAME_RATE/TB` đánh số lại timestamp thành đều tăm tắp ⇒ **mất
 thông tin frame gốc nằm ở giây nào**. Bỏ `setpts`, chỉ `mpdecimate` + `showinfo` + `-vsync vfr`,
 rồi parse `pts_time:` từ stderr để đặt tên file.
+
+## 6. Máy này chặn ghcr.io ⇒ đừng trông vào brew (30/8/2026)
+
+`brew install ffmpeg` chết ở `curl: (28) Failed to connect to ghcr.io port 443` — bottle của
+Homebrew nằm trên ghcr.io, và mạng công ty chặn cả `ghcr.io` lẫn `github.com`. PyPI thì thông.
+
+**Đường đi được:** `pip install --user av` — wheel PyAV có sẵn thư viện FFmpeg bên trong.
+Hoá ra lại tốt hơn CLI: timestamp lấy thẳng từ container, bỏ được cả `showinfo` lẫn `lavfi`.
+
+**Bẫy phụ:** `brew install ... | tail -5` trả về mã thoát của `tail`, **không** phải của brew —
+lệnh hỏng mà báo exit 0. Muốn biết brew có chạy được không thì đừng nối pipe, hoặc dùng
+`PIPESTATUS`.
+
+## 7. Lấy thưa frame bằng mốc giây phải có EPS (30/8/2026)
+
+`if t < nxt: continue` với `nxt = t + 1/fps` làm rơi oan **5/28 frame**: sai số số thực khiến
+`0.24000000000000002 < 0.24000000000000004`. Hậu quả không lộ ra dưới dạng crash — chỉ là
+easing đo ra 560ms/`unfit` thay vì 640ms/`easeOutQuint`.
+
+**Chữa:** so với `nxt - step*1e-3`. Bài học chung: mọi so sánh mốc giây trong pipeline này
+phải có dung sai, đừng bao giờ so bằng hoặc so nhỏ hơn trần trụi.

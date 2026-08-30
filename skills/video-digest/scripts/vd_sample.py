@@ -1,43 +1,35 @@
 """Chặng sample: tách frame + bỏ frame trùng, tên file mang luôn mốc giây."""
 import os
-import re
 import sys
 from PIL import Image
+import vdav
 import vdlib
 
-DEDUPE_FILTER = "mpdecimate=hi=768:lo=320:frac=0.33"
+DEDUPE_DIFF = 1.2
 DENSE_FPS_CAP = 30
 MAX_FRAMES = 600
 SHEET_COLS, SHEET_ROWS, SHEET_TILE_W = 4, 4, 384
-PTS_RE = re.compile(r"pts_time:([0-9.]+)")
 
 
 def extract(video, outdir, dense=False, fps=None, max_frames=MAX_FRAMES):
-    """dense=True giữ mọi frame (cần cho đo animation); mặc định bỏ frame trùng (screencast)."""
-    vdlib.gate_binaries("ffmpeg")
+    """dense=True giữ mọi frame (cần cho đo animation); mặc định bỏ frame gần như y hệt
+    frame trước — quay màn hình đứng yên 90% thời lượng thì bỏ được gần hết."""
     os.makedirs(outdir, exist_ok=True)
-    vf = f"fps={min(fps or DENSE_FPS_CAP, DENSE_FPS_CAP)}" if dense else DEDUPE_FILTER
-    raw = os.path.join(outdir, "_raw")
-    os.makedirs(raw, exist_ok=True)
-    rc, _, err = vdlib.run(["ffmpeg", "-v", "info", "-i", video, "-vf", f"{vf},showinfo",
-                            "-vsync", "vfr", "-f", "image2", os.path.join(raw, "%06d.png")])
-    times = [float(m) for m in PTS_RE.findall(err)]
-    files = sorted(f for f in os.listdir(raw) if f.endswith(".png"))
-    if rc != 0 or not files:
-        raise vdlib.Gate(f"G-VD-2 tách frame thất bại:\n{err.strip()[-400:]}")
-    if len(times) != len(files):
-        times = [i / (fps or DENSE_FPS_CAP) for i in range(len(files))]
-    stride = max(1, -(-len(files) // max_frames))
+    cap = min(fps or DENSE_FPS_CAP, DENSE_FPS_CAP)
+    picked, last, seen = [], None, 0
+    for t, g in vdav.frames(video, max_fps=cap if dense else None):
+        seen += 1
+        if not dense and last is not None and vdav.mean_abs_diff(g, last) < DEDUPE_DIFF:
+            continue
+        last = g
+        picked.append((t, g))
+    stride = max(1, -(-len(picked) // max_frames))
     kept = []
-    for i in range(0, len(files), stride):
-        t = times[i]
-        dst = os.path.join(outdir, vdlib.frame_name(t))
-        os.replace(os.path.join(raw, files[i]), dst)
-        kept.append({"t": round(t, 3), "file": os.path.basename(dst)})
-    for leftover in os.listdir(raw):
-        os.remove(os.path.join(raw, leftover))
-    os.rmdir(raw)
-    warn = gate_count(kept, len(files), dense)
+    for t, g in picked[::stride]:
+        name = vdlib.frame_name(t)
+        Image.fromarray(g).save(os.path.join(outdir, name))
+        kept.append({"t": round(t, 3), "file": name})
+    warn = gate_count(kept, len(picked), dense)
     return kept, stride, warn
 
 
@@ -45,7 +37,7 @@ def gate_count(kept, raw_count, dense):
     """G-VD-3 — 0 frame là hỏng thật, dừng. Dedupe kém hiệu quả chỉ cảnh báo: screencast dày
     đặc thao tác vẫn có thể còn nhiều frame thật, chặn cứng ở đây là chặn nhầm việc hợp lệ."""
     if not kept:
-        raise vdlib.Gate("G-VD-3 sau khi lọc không còn frame nào — tham số mpdecimate hỏng")
+        raise vdlib.Gate("G-VD-3 sau khi lọc không còn frame nào — video rỗng hoặc decode hỏng")
     if not dense and raw_count > MAX_FRAMES:
         return (f"G-VD-3 dedupe chỉ còn {raw_count} frame (trần {MAX_FRAMES}) — đã lấy thưa, "
                 f"kiểm lại nếu video lẽ ra phải tĩnh")
@@ -62,13 +54,13 @@ def contact_sheets(frames, outdir):
         thumbs = []
         for fr in chunk:
             im = Image.open(fr["path"])
-            th = im.resize((SHEET_TILE_W, max(1, round(im.height * SHEET_TILE_W / im.width))))
-            thumbs.append(th)
-        tw, thh = thumbs[0].size
+            thumbs.append(im.resize((SHEET_TILE_W,
+                                     max(1, round(im.height * SHEET_TILE_W / im.width)))))
+        tw, th = thumbs[0].size
         rows = -(-len(thumbs) // SHEET_COLS)
-        sheet = Image.new("RGB", (SHEET_COLS * tw, rows * thh), (20, 20, 24))
-        for i, th in enumerate(thumbs):
-            sheet.paste(th, ((i % SHEET_COLS) * tw, (i // SHEET_COLS) * thh))
+        sheet = Image.new("RGB", (SHEET_COLS * tw, rows * th), (20, 20, 24))
+        for i, t in enumerate(thumbs):
+            sheet.paste(t.convert("RGB"), ((i % SHEET_COLS) * tw, (i // SHEET_COLS) * th))
         name = f"sheet-{len(sheets) + 1:02d}.png"
         sheet.save(os.path.join(outdir, name))
         sheets.append({"file": name, "t0": chunk[0]["t"], "t1": chunk[-1]["t"],
@@ -77,5 +69,5 @@ def contact_sheets(frames, outdir):
 
 
 if __name__ == "__main__":
-    kept, stride = extract(sys.argv[1], sys.argv[2], dense="--dense" in sys.argv)
-    print(f"{len(kept)} frame (stride {stride})")
+    kept, stride, warn = extract(sys.argv[1], sys.argv[2], dense="--dense" in sys.argv)
+    print(f"{len(kept)} frame (stride {stride})" + (f" ⚠ {warn}" if warn else ""))

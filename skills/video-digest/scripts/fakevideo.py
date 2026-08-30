@@ -49,3 +49,11 @@ def static_clip(outdir, w=320, h=180, fps=25, secs=4):
     for i in range(fps * secs):
         img.save(os.path.join(outdir, frame_name(i / fps)))
     return {"fps": fps, "count": fps * secs}
+
+
+def encode_dir(framedir, mp4, fps):
+    """Đóng gói frame đã sinh thành video không nén — test phải đo trên video THẬT."""
+    import vdav
+    names = sorted(n for n in os.listdir(framedir) if n.endswith(".png"))
+    vdav.encode([Image.open(os.path.join(framedir, n)) for n in names], mp4, fps)
+    return mp4

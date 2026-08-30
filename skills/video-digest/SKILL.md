@@ -22,7 +22,7 @@ hơn vừa chính xác hơn, và dán thẳng vào code được.
 - Digest nặng: `designs/<KEY>/_auto-video/<slug>/` (ngoài git) — không `--key` thì `designs/_inbox-video/`
 - Chữ đã chắt: `knowledge/video/<slug>/notes.md` (vào git)
 - Thiết kế: `docs/specs/2026-08-30-video-digest-design.md`
-- Yêu cầu máy: `ffmpeg` · `tesseract` (OCR) · `yt-dlp` (nguồn URL) · numpy + PIL
+- Yêu cầu máy: **PyAV** (`pip install --user av` — wheel có sẵn FFmpeg bên trong, KHÔNG cần cài ffmpeg) · numpy + PIL · `yt-dlp` (nguồn URL) · `tesseract` (OCR, tuỳ chọn)
 
 ## Cách gọi
 
@@ -78,7 +78,7 @@ Chỉ `study-notes` cần AI, và đúng một lần cho mỗi video.
 
 | Mã | Chặn gì |
 |---|---|
-| `G-VD-1` | thiếu binary → in đúng lệnh `brew install`, dừng |
+| `G-VD-1` | thiếu PyAV/binary → in đúng lệnh cài, dừng |
 | `G-VD-2` | video không decode được / thời lượng 0 → dừng |
 | `G-VD-3` | dedupe ra 0 frame → dừng; vượt trần → lấy thưa + ghi cảnh báo |
 | `G-VD-4` | OCR rỗng gần hết mà ảnh nhiều chi tiết → cảnh báo vào `digest.json` |

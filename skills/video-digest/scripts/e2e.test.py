@@ -9,8 +9,10 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vdlib
 
-if not vdlib.have("ffmpeg"):
-    print("⏭  e2e: SKIP — chưa có ffmpeg")
+try:
+    import av  # noqa: F401
+except ImportError:
+    print("⏭  e2e: SKIP — chưa có PyAV (python3 -m pip install --user av)")
     sys.exit(0)
 
 import fakevideo
@@ -28,11 +30,9 @@ tmp = tempfile.mkdtemp(prefix="vde2e-")
 try:
     src = os.path.join(tmp, "src")
     gt = fakevideo.moving_box(src, ease="easeOutQuint", dur_ms=640, x0=100, x1=420, fps=25)
-    mp4 = os.path.join(tmp, "clip.mp4")
-    rc, _, err = vdlib.run(["ffmpeg", "-v", "error", "-framerate", str(gt["fps"]),
-                            "-pattern_type", "glob", "-i", os.path.join(src, "t*.png"),
-                            "-c:v", "libx264", "-crf", "12", "-pix_fmt", "yuv420p", mp4])
-    ok(rc == 0 and os.path.exists(mp4), f"dựng mp4 thất bại: {err[-300:]}")
+    mp4 = os.path.join(tmp, "clip.mkv")
+    fakevideo.encode_dir(src, mp4, gt["fps"])
+    ok(os.path.exists(mp4) and os.path.getsize(mp4) > 1000, "dựng video thất bại")
 
     d = os.path.join(tmp, "digest")
     rc = vd_run.main([mp4, "--out", d, "--lens", "motion-spec"])

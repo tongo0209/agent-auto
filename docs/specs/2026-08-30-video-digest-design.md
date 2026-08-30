@@ -53,8 +53,8 @@ Mỗi chặng chạy độc lập được (`--only <chặng>`), đầu ra chặ
 | Chặng | Làm gì | Đẻ ra |
 |---|---|---|
 | `ingest` | adapter theo nguồn; YouTube lấy metadata/chapters/phụ đề/description trước khi nghĩ tới tải video | `source.json`, `video.mp4` (nếu cần) |
-| `probe` | `ffprobe`: fps, khổ, thời lượng, có tiếng; điểm scene từng frame; `freezedetect`, `blackdetect` | `probe.json`, `signals/scene.csv`, `signals/events.csv` |
-| `sample` | `mpdecimate` bỏ frame trùng, tên file = mốc giây; contact sheet | `frames/t0012.480.png`, `frames.csv`, `sheets/sheet-NN.png` |
+| `probe` | PyAV: fps, khổ, thời lượng, có tiếng; cắt cảnh + năng lượng chuyển động + mật độ chữ tính bằng numpy | `digest.json` (`media`, `signals`) |
+| `sample` | PyAV decode + numpy bỏ frame gần trùng, tên file = mốc giây; contact sheet | `frames/t0012.480.png`, `frames.csv`, `sheets/sheet-NN.png` |
 | `text` | phụ đề → md có mốc; OCR frame; gộp cụm code tăng dần thành snippet | `text/subs.md`, `text/onscreen.csv`, `snippets/` |
 | `motion` | dò vùng biến động bằng phương sai theo thời gian; bám quỹ đạo; cắt nhịp | `motion/regions.json`, `motion/track-r1.csv`, `motion/beats.csv` |
 
@@ -180,11 +180,18 @@ không framework.
 ## Yêu cầu máy
 
 ```bash
-brew install ffmpeg tesseract tesseract-lang yt-dlp
+python3 -m pip install --user av yt-dlp
 ```
 
-Python: `numpy` + `PIL` (đã có sẵn trên `python3` hệ thống — 2.0.2 / 11.3.0).
-Không dùng `opencv`/`pyscenedetect`: filter của `ffmpeg` làm gần hết, nhẹ hơn nhiều.
+**Không cần cài `ffmpeg`.** Máy này chặn `ghcr.io` (và `github.com`) nên brew không tải nổi
+bottle; PyPI thì thông, mà wheel của **PyAV đã đóng gói sẵn thư viện FFmpeg bên trong**.
+
+Đổi sang PyAV còn gọn hơn dùng CLI: timestamp lấy thẳng từ container nên **bỏ được cả bước
+parse `showinfo` lẫn bước thoát chuỗi `lavfi`** — hai chỗ đã từng sinh lỗi thật.
+
+`numpy` + `PIL` đã có sẵn trên `python3` hệ thống (2.0.2 / 11.3.0).
+OCR (`tesseract`) là **tuỳ chọn**: thiếu nó thì `bug-list`/`step-list` chỉ mất cột chữ trên màn,
+`motion-spec` không ảnh hưởng gì.
 
 ## Không làm (YAGNI)
 

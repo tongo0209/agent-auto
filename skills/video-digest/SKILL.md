@@ -49,6 +49,18 @@ bash run.sh <file|url> [--lens a,b] [--key GW-760] [--deep] [--out DIR]
 
 Chỉ `study-notes` cần AI, và đúng một lần cho mỗi video.
 
+## Luồng học nghề (lens `study-notes`)
+
+Đây là lens duy nhất có AI tham gia, và chỉ đúng một lượt:
+
+1. `bash run.sh <url>` — chỉ lấy phụ đề/chapters/description, chưa tải video. Phần lớn video
+   giảng bằng lời dừng ở đây là đủ.
+2. Không có phụ đề, hoặc là screencast gõ code → chạy lại với `--deep` để bóc hình + OCR.
+3. **Đọc `out/study-notes.md`** (bản đã nén) — KHÔNG mở video, không duyệt frame.
+4. Viết `~/VNG/agent-auto/knowledge/video/<slug>/notes.md` theo đúng 5 mục:
+   **Ý chính · Kỹ thuật dùng được · Code rút ra · Bẫy tác giả nhắc · Mốc cần xem lại**.
+5. Lần sau cần tới video này: **đọc `notes.md`**, không bóc lại. ~2k token thay vì ~28k.
+
 ## Luật khi dùng kết quả
 
 1. **`unfit` là câu trả lời hợp lệ.** Lens ghi `unfit` nghĩa là quỹ đạo không khớp easing chuẩn

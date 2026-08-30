@@ -43,6 +43,9 @@ bash run.sh <file|url> [--lens a,b] [--key GW-760] [--deep] [--out DIR]
 | `/video-digest <url> --deep` | tải video thật để bóc hình |
 | `/video-digest clip.mp4 --lens bug-list,motion-spec` | clip lai: bóc 1 lần, đọc 2 đường |
 
+**Chưa làm:** adapter tự quay trang web đang chạy (CodePen/Awwwards) và adapter Drive/SharePoint
+có đăng nhập. Hai nguồn đó tạm thời: tải/quay tay rồi đưa file local.
+
 ## Bốn kính đọc
 
 | Lens | Cho loại video | Đẻ ra | Token |

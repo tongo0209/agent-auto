@@ -81,7 +81,15 @@ def remote(url, outdir, deep=False):
     raw = os.path.join(outdir, "source")
     os.makedirs(raw, exist_ok=True)
 
-    info = _ydl(url, raw, {"writeinfojson": True, "writedescription": True})
+    try:
+        info = _ydl(url, raw, {"writeinfojson": True, "writedescription": True})
+    except Exception as e:
+        if "Unsupported URL" in str(e):
+            raise vdlib.Gate(
+                f"Trang này không phải nguồn video mà yt-dlp đọc được: {url}\n"
+                "  Adapter tự quay trang web CHƯA LÀM. Tạm thời: quay màn hình tay "
+                "(⇧⌘5 trên macOS) rồi đưa file cho /video-digest.")
+        raise
 
     subs = None
     for lang in SUB_LANGS.split(","):

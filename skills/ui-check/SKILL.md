@@ -48,6 +48,25 @@ node ~/VNG/agent-auto/tools/fe-gate.mjs <dist> [--design ~/VNG/agent-auto/design
 browser để đi tìm ảnh 404: chậm hơn và **vẫn bỏ sót** — CSS trỏ font không tồn tại thì browser
 fallback im lặng, ảnh chụp trông vẫn "đúng" (ca GW-654: 2 checker PASS trong khi thiếu 8 font).
 
+Có `--design` thì gate chấm thêm hai trục ăn theo `psd-cut`:
+`ref-image-used` (ERROR — ảnh trong `_ref-co-chu/` hoặc tên `-CO-CHU` bị bê vào dist; đó là bản
+CHỈ để mắt đối chiếu, font trong nó thường chưa cài) và `design-asset-unused` (WARN — asset đã
+trim mà dist không dùng: quên code một mảng, hoặc rác cần dọn; chỉ soi thư mục có `coords.json`).
+
+## Bước 0a-bis — Chữ lồng chữ (chỉ khi task có `job.json` của psd-cut)
+
+```bash
+python3 ~/VNG/agent-auto/tools/baked-text-guard.py --job <job.json> [--job ...] --dist <dist>
+```
+
+Bắt chuỗi vừa **bake trong ảnh** vừa render lại bằng HTML — hai lớp chữ lệch vài px, trông như
+bóng đổ nên build xanh, console sạch, checker vẫn qua (ca GW-760: subtitle 4 ngôn ngữ). Nó đọc
+`job.json` nên danh sách "đã bake" khớp ảnh thật, không phải khai tay. Không có `job.json` (design
+không qua `/psd-cut`) → bỏ qua bước này và ghi rõ trong phần Giới hạn.
+
+Ngược chiều với nó là cổng **C7** của `/psd-cut`, chặn từ khâu bóc: chữ designer đang TẮT bị
+`showPath` bật cưỡng chế rồi nướng đè lớp raster (ca GW-814, 4 ảnh title phải bóc lại tay).
+
 Gate ERROR → sửa trước, chưa cần mở browser. Gate PASS → sang bước 0 và check HIỂN THỊ (việc mà
 gate tĩnh không làm được: tràn ngang, chữ bị cắt, lệch design).
 

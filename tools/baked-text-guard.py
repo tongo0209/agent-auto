@@ -49,6 +49,22 @@ def texts_under(layer):
             yield from texts_under(child)
 
 
+def show_keys(state):
+    """Path của state → khoá "A/B" như index_tree sinh ra, nuốt cả 2 đời schema job.
+
+    Job đời đầu ghi `show` là chuỗi sẵn; psd-plan nay ghi `showPath` là list segment (và
+    `bakePath` cho leaf blend-lạ gửi nhờ nướng với nền — cũng góp pixel nên chữ trong đó
+    vẫn nằm trong ảnh giao). Chỉ đọc `show` là tool chết KeyError trên mọi job mới.
+    """
+    raw = list(state.get("showPath") or state.get("show") or []) + list(state.get("bakePath") or [])
+    keys = []
+    for p in raw:
+        if p == "*":
+            continue
+        keys.append("/".join(p) if isinstance(p, (list, tuple)) else p)
+    return keys
+
+
 def baked_strings(job_path):
     job = json.load(open(job_path, encoding="utf-8"))
     nodes = {}
@@ -57,9 +73,7 @@ def baked_strings(job_path):
     for state in job["states"]:
         if state["name"].startswith("_"):
             continue
-        for path in state["show"]:
-            if path == "*":
-                continue
+        for path in show_keys(state):
             layer = nodes.get(path)
             if layer is None:
                 print(f"  ⚠ job trỏ layer không có thật: {path}", file=sys.stderr)

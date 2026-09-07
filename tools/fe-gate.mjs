@@ -284,6 +284,7 @@ for (const f of htmlFiles) {
 }
 
 const FONT_EXT = ['.ttf', '.otf', '.woff', '.woff2', '.eot'];
+const IMG_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
 const exists = (candidates) => candidates.some((c) => isFile(c));
 
 /* ── check 1: @font-face trỏ file không tồn tại ── */
@@ -333,11 +334,48 @@ if (DESIGN) {
 }
 
 /* ── check 5: ảnh nặng ── */
-const IMG_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
 const HEAVY = 500 * 1024;
 for (const img of walk(DIST, IMG_EXT)) {
   const s = size(img);
   if (s > HEAVY) add('WARN', 'image-heavy', `${(s / 1024 / 1024).toFixed(2)}MB — ${rel(img)}`);
+}
+
+/* ── check 7: ảnh bản đối chiếu lọt vào production ──
+   psd-cut để bản CÓ CHỮ trong `_ref-co-chu/` chỉ để mắt so — font trong đó thường chưa cài,
+   chữ raster sai nét. Bê nhầm sang dist là chữ hỏng mà build vẫn xanh. */
+for (const r of refs) {
+  if (!/(^|[-/_])(_ref|ref-co-chu)|-CO-CHU/i.test(r.url)) continue;
+  add('ERROR', 'ref-image-used', `ảnh chỉ-để-đối-chiếu đang dùng thật: ${r.url}`, rel(r.from));
+}
+
+/* ── check 8: asset design bóc ra mà dist không dùng ──
+   Anh em với check 4 nhưng cho ẢNH: hoặc quên code một mảng, hoặc là rác cần dọn.
+   Chỉ soi thư mục CÓ `coords.json` — đó là bản psd-cut đã trim và giao; ảnh thô ngoài đó,
+   `bg-sections/`, `_control` là vật liệu trung gian, kể vào chỉ tổ đẻ nhiễu (đo GW-814: 467 → 4).
+   WARN chứ không ERROR — asset thay bằng module popup dùng chung là chuyện bình thường. */
+if (DESIGN) {
+  const nm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const usedImgs = nm([...refs.map((r) => path.basename(cleanUrl(r.url))), ...walk(DIST, IMG_EXT).map((f) => path.basename(f))].join(' '));
+  const SIDECAR = /(^|\/)(.*backup.*|.*-base)(\/|$)/i;
+  const shipped = new Set(walk(DESIGN).filter((f) => path.basename(f) === 'coords.json').map((f) => path.dirname(f)));
+  const perDir = new Map();
+  for (const f of walk(DESIGN, IMG_EXT)) {
+    const dir = path.dirname(f);
+    if (!shipped.has(dir) || SIDECAR.test(path.relative(DESIGN, dir))) continue;
+    const base = path.basename(f, path.extname(f));
+    if (base.startsWith('_')) continue; // _control/_scope là ảnh tham chiếu của psd-cut
+    const key = path.relative(DESIGN, dir);
+    const g = perDir.get(key) || { total: 0, unused: [] };
+    g.total++;
+    if (!usedImgs.includes(nm(base))) g.unused.push(base);
+    perDir.set(key, g);
+  }
+  for (const [dir, g] of perDir) {
+    if (!g.unused.length) continue;
+    const head = g.unused.slice(0, 5).join(', ');
+    add('WARN', 'design-asset-unused',
+        `${g.unused.length}/${g.total} asset bóc ra nhưng dist không dùng: ${head}${g.unused.length > 5 ? ` … +${g.unused.length - 5}` : ''}`, dir);
+  }
 }
 
 /* ── check 6: dist cũ hơn source ── */

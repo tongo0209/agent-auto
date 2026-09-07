@@ -149,6 +149,41 @@ console.log('\nfe-gate self-test\n');
   expect('ảnh > 500KB → WARN image-heavy', checks(r).includes('image-heavy'), JSON.stringify(checks(r)));
 }
 
+/* ── ca 9: ảnh _ref-co-chu (bản đối chiếu, font chưa cài) lọt vào production ── */
+{
+  const dist = cleanFixture('ref-co-chu');
+  w(path.join(dist, 'images/btn-rut-01-CO-CHU.png'));
+  w(path.join(dist, 'extra.css'), `.btn{background:url("images/btn-rut-01-CO-CHU.png")}`);
+  fs.appendFileSync(path.join(dist, 'index.html'), `<link rel="stylesheet" href="extra.css">`);
+  const r = runGate(dist, ['--quiet']);
+  expect('ảnh -CO-CHU dùng thật → ERROR ref-image-used', checks(r).includes('ref-image-used'), JSON.stringify(checks(r)));
+}
+
+/* ── ca 10: asset design bóc ra mà dist không dùng ── */
+{
+  const dist = cleanFixture('asset-unused');
+  const design = path.join(ROOT, 'asset-unused-src');
+  w(path.join(design, 'assets/hero.png'));
+  for (const n of ['qua-f1-14-ngay', 'qua-f1-10-ngay', 'scroll-bar', 'tieude'])
+    w(path.join(design, `assets/${n}.png`));
+  w(path.join(design, 'assets-backup-1757/rac-cu.png'));
+  w(path.join(design, 'assets-base/nen-goc.png'));
+  w(path.join(design, 'assets/coords.json'), '{"canvas":[10,10],"assets":[]}');
+  w(path.join(design, 'tho-truoc-trim.png'));            // bản thô ngoài assets/
+  w(path.join(design, 'assets/_control.png'));           // ảnh render tham chiếu
+  w(path.join(design, 'bg-sections/nen-goc-designer.png'));
+  const r = runGate(dist, ['--quiet', '--design', design]);
+  const un = r.findings.filter((x) => x.check === 'design-asset-unused');
+  expect('asset design không dùng → WARN', un.some((x) => x.message.includes('qua-f1-14-ngay')), JSON.stringify(checks(r)));
+  expect('asset design ĐÃ dùng không bị kết oan', !un.some((x) => x.message.includes('hero')), JSON.stringify(un.map((x) => x.message)));
+  expect('GOM 1 dòng/thư mục, không đẻ 1 WARN mỗi asset', un.length === 1, `${un.length} finding: ${JSON.stringify(un.map((x) => x.message))}`);
+  expect('nêu SỐ LƯỢNG để đọc là biết quy mô', /4\/5/.test(un[0]?.message || ''), un[0]?.message);
+  expect('bỏ qua thư mục backup', !un.some((x) => x.message.includes('rac-cu')), JSON.stringify(un.map((x) => x.message)));
+  expect('bỏ qua thư mục -base (bản nền, không phải asset giao)', !un.some((x) => x.message.includes('nen-goc')), JSON.stringify(un.map((x) => x.message)));
+  expect('chỉ xét thư mục có coords.json — bản thô ngoài assets/ không tính', !un.some((x) => x.message.includes('tho-truoc-trim')), JSON.stringify(un.map((x) => x.message)));
+  expect('_control là ảnh tham chiếu, không phải asset giao', !un.some((x) => x.message.includes('_control')), JSON.stringify(un.map((x) => x.message)));
+}
+
 /* ── dọn ── */
 fs.rmSync(ROOT, { recursive: true, force: true });
 

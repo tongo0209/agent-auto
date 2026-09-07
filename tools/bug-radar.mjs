@@ -310,6 +310,18 @@ export function updateHeat(entry = {}, modifiedTime, now = new Date(), cfg = {})
   };
 }
 
+/**
+ * `changed:false` KHÔNG chứng minh nội dung mới đã được đọc: lượt bugwatch hỏng vẫn đóng dấu
+ * `lastPollAt`/`modifiedTime` (radar-tick cố ý làm vậy để không bắn lại), nên cửa đọc đóng vĩnh
+ * viễn dù cache còn là bản cũ. Đo thật 24/8/2026: lượt nền 09:45 `ok:false`, hai sheet đang theo
+ * dõi có modifiedTime 21/8 và 23/8 mà cache còn bản 19/8 và 20/8.
+ */
+export function cacheStale(cacheMtime, modifiedTime) {
+  if (!modifiedTime) return false;
+  if (!cacheMtime) return true;
+  return Date.parse(modifiedTime) > Date.parse(cacheMtime);
+}
+
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function lastMilestone(milestones = {}) {
@@ -541,10 +553,16 @@ function cli([cmd, sheetId, payload]) {
     const { changed, ...updated } = updateHeat(current, payload, new Date(), cfg);
     state.bugWatch = { ...state.bugWatch, [sheetId]: updated };
     saveState(statePath, state);
+    const cache = path.join(CACHE, `${sheetId}.md`);
+    const cacheMtime = fs.existsSync(cache) ? fs.statSync(cache).mtime.toISOString() : null;
+    const stale = cacheStale(cacheMtime, updated.modifiedTime);
     return {
       sheetId,
       modifiedTime: updated.modifiedTime,
       changed,
+      mustRead: changed || stale,
+      cacheStale: stale,
+      cacheMtime,
       heat: updated.heat,
       lastChangeAt: updated.lastChangeAt,
       lastPollAt: updated.lastPollAt,

@@ -85,7 +85,12 @@ Token đầu của `$ARGUMENTS`:
 - `add <link|text>` → intake ngoài Jira: nhận link nexus/sheet/URL bất kỳ/text dán → tạo
   `tasks/ADHOC-<n>/brief.md` (n = `config.adhocCounter`+1, ghi lại config) + dòng board +
   phân loại như task thường (buglist → đường bug, việc code → đường code). ADHOC cũng có phase.
-- `delta` → radar nhẹ, KHÔNG hỏi gì, chạy <1 phút: (1) JQL `assignee = currentUser() AND updated >= -4h`;
+- `delta` → radar nhẹ, KHÔNG hỏi gì, chạy <1 phút: (1) JQL `assignee = currentUser() AND
+  updated >= "<state.lastRun lùi 30 phút, format yyyy-MM-dd HH:mm>"` — fallback `-4h` chỉ khi
+  state thiếu `lastRun`. ⚠ CẤM quay về `-4h` cứng: cửa sổ cố định hụt mọi thay đổi rơi vào khe
+  giữa lúc JQL của lượt trước chạy và `lastRun` nếu 2 lượt cách nhau >4h — ca thật GW-805:
+  COMPLETED 26/8 15:50, JQL lượt 26/8 chạy ~15:37 rồi ghi lastRun 15:56, lượt kế 27/8 14:56
+  quét -4h chỉ với tới 10:56 ⇒ ticket done mà board vẫn `waiting-design`, user phải tự báo;
   (2) `git -C <gt-promotion> pull` + `git log --since` xem commit mới có đụng folder task đang theo dõi;
   **(2b) `git fetch --quiet` rồi `git log --since --all` (KHÔNG merge) cho MỌI repo còn lại trong
   `config.repos`** — `cdn-source`, `new-mainsite`, `vportal2view`: task mainsite/landing sống ở đó
@@ -109,6 +114,11 @@ Token đầu của `$ARGUMENTS`:
   Drive — `tools/radar-tick.mjs`). Riêng design host **Google Drive** thì quét được ngay tại
   đây: `get_file_metadata` so `modifiedTime` với `design.sourceModified` → mới hơn = designer
   up bản mới → set `design.sourceChanged` + báo như bản mới (luồng SO CŨ↔MỚI).
+  ⚠ **So theo TỪNG FILE con trong `design.files`, CẤM so `modifiedTime` của FOLDER.** Folder Drive
+  chỉ đổi `modifiedTime` khi thêm/xoá con trực tiếp, sửa nội dung file con KHÔNG chạm nó — đo thật
+  3/9/2026 GW-814: folder `3FK_Landing Page` = 19/8 08:35 trong khi PSD bên trong = 26/8 07:01, so
+  mốc folder với `sourceModified` (26/8) ra "cũ hơn" ⇒ kết luận ngược. Mốc nguồn = **max** của các
+  file con.
   ⚠ Nguồn **ZIP SharePoint** thì CHƯA có watcher — designer đè zip mới chỉ lộ khi
   `sharepoint_search` lại thấy `lastModifiedDateTime` mới; lỗ ghi nhận, đừng tưởng bước này cover.
   CHỈ báo thay đổi + cập nhật board/state. Không code.
@@ -460,9 +470,15 @@ Mỗi lượt `bugwatch`:
 
 1. `list_recent_files(orderBy:lastModified)` — 1 call lấy `modifiedTime`; sheet rớt trang đầu thì
    `get_file_metadata` bù.
-2. `node tools/bug-radar.mjs heat <sheetId> <modifiedTime>` → `changed: false` ⇒ DỪNG, không đọc nội dung.
-   Đây là chỗ giữ chi phí.
-3. Đổi ⇒ `read_file_content(sheetId)` → ghi nguyên văn khối bảng có cột BugID vào
+2. `node tools/bug-radar.mjs heat <sheetId> <modifiedTime>` → đọc **`mustRead`**, KHÔNG đọc `changed`
+   suông. `mustRead: false` ⇒ DỪNG, không đọc nội dung — đây là chỗ giữ chi phí.
+   ⚠ `changed: false` KHÔNG chứng minh nội dung mới đã đọc: lượt bugwatch **hỏng** vẫn đóng dấu
+   `lastPollAt`/`modifiedTime` (radar-tick cố ý, để không bắn lại mỗi lượt ~$1) nên cửa đọc đóng
+   vĩnh viễn dù cache còn bản cũ. `mustRead = changed || cacheStale` bịt chỗ đó bằng cách so
+   `modifiedTime` với mtime cache. Đo thật 24/8/2026: lượt nền 09:45 `ok:false`, sheet CFL
+   modifiedTime 21/8 mà cache còn 19/8 (mù 1.7 ngày), LightAndNight 23/8 vs cache 20/8 (mù 3.3 ngày)
+   — lượt tay cùng ngày thấy 6/6 bug CFL đã sang `Done`, tin mà `changed:false` đã che.
+3. `mustRead` ⇒ `read_file_content(sheetId)` → ghi nguyên văn khối bảng có cột BugID vào
    `.cache/bugsheets/<sheetId>.md`. Tối đa `bugRadar.maxSheetReadsPerTick` sheet MỚI mỗi lượt (mặc
    định 3, ưu tiên `modifiedTime` mới nhất) — 1 lần đọc ~90s.
 4. `node tools/bug-radar.mjs scan <sheetId>` — **máy phán, không phải LLM**. Đọc `toSkill`.

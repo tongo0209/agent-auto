@@ -529,3 +529,200 @@ Rẻ hơn hẳn bỏ trắng cả lượt.
 - **Vì sao phải ghi ra đây:** lượt radar nền có trần `radar.timeoutMin` = 10' — gặp đúng bước này
   là **chết trần, đốt trọn 10' mà không ra kết quả**, và `months.json` là nguồn DUY NHẤT của tab
   "Theo tháng" nên console lặng lẽ vẽ số cũ. Đo 21/8: query 2026-02-01→2026-09-30 = 66 ticket.
+
+## 2026-08-24 — `changed:false` của bug-radar KHÔNG chứng minh nội dung mới đã được đọc
+- **Bắt được gì:** lượt `/daily bugwatch` 11:00 gọi `bug-radar heat` cho 2 sheet đang theo dõi, cả
+  hai trả `changed:false`. Theo luật bước 2 (bản cũ) là DỪNG, không đọc nội dung — và nếu dừng thật
+  thì bỏ lọt: đọc tay ra **6/6 bug sheet CFL (GW-660) đã sang `DEV Check Status = Done`** trong khi
+  state còn ghi 4 bug đang mở, và sheet GW-525 đổi lúc 02:42 sáng hoá ra chỉ là tab account test
+  (đúng là 0 bug, nhưng phải đọc mới biết — mốc TC review là chính hôm đó).
+- **Nguyên nhân:** `radar-tick.mjs` cố ý đóng dấu `lastPollAt`/`modifiedTime` **kể cả lượt hỏng**
+  (để không bắn lại ~$1 mỗi lượt). Lượt bugwatch nền 09:45 `ok:false` (`num_turns:1`,
+  `output_tokens:0`) đã "tiêu" mốc mà chưa đọc gì ⇒ lượt sau so mốc thấy bằng nhau, kết luận
+  "không có gì mới", cửa đọc đóng vĩnh viễn. Cùng họ với bẫy "commit sớm nuốt mất bug": trạng thái
+  tiến lên trước khi việc thật xong.
+- **Lưới chặn (máy, không phải trí nhớ):** `cacheStale(cacheMtime, modifiedTime)` trong
+  `tools/bug-radar.mjs` — so `modifiedTime` của Drive với **mtime file cache**. Lệnh `heat` nay trả
+  `mustRead = changed || cacheStale` (+ `cacheStale`, `cacheMtime`); `skills/daily/SKILL.md` bước 2
+  của bugwatch đọc `mustRead`, cấm đọc `changed` suông. Cache là bằng chứng vật lý "đã đọc tới đâu",
+  còn `modifiedTime` chỉ là bằng chứng "đã so tới đâu" — hai thứ khác nhau.
+- **Số đo mù:** CFL `modifiedTime` 21/8 07:32Z vs cache 19/8 15:39 = **1.7 ngày**; LightAndNight
+  23/8 19:42Z vs cache 20/8 11:58 = **3.3 ngày**.
+- **Nguồn:** `history/radar.jsonl` dòng `2026-08-24T02:45:16.778Z` (`ok:false`, prompt
+  `/daily bugwatch`) · `ls -la .cache/bugsheets/` · `tools/bug-radar.mjs` `updateHeat`/`cacheStale` ·
+  `node --test tools/bug-radar.test.mjs` 120/120 pass.
+
+## 2026-08-24 · Font PSD chưa cài ⇒ 38 asset chữ sai nét, và asset "cục gộp" bị dùng vì không đọc cờ plan
+
+- **Bắt được gì:** GW-723 (3 LDP Gunny Trung Thu). Chạy `/psd-cut` trên `GNM_Trungthu_PC_Optimized.psd`,
+  export tới 38/49 state thì **user phát hiện bằng mắt**: nhiều asset "dính nhiều hình 1 cục", và chữ
+  bị cắt thành ảnh. Truy ra `survey.json` ghi `fontVerdicts` = **6/6 font MISSING** — Photoshop render
+  bằng font thay thế ⇒ **mọi PNG có chữ sai nét, không dùng được**. Font thì nằm ngay trong kho design
+  (`designs/GW-723/_src/Fonts/`, 9 file) — chỉ là chưa ai cài.
+- **Nguyên nhân 1 (máy im lặng):** `psd-survey.py` ĐÃ đo `fontVerdicts` nhưng không chỗ nào chặn;
+  `psd-plan.py` chỉ dùng nó để hạ verdict text xuống `CHƯA-CHẮC: font chưa cài`. Tín hiệu có, cổng không
+  ⇒ pipeline chạy tiếp 1 tiếng Photoshop rồi mới lộ. Cùng họ với "`updateHeat` được export mà không ai gọi".
+- **Nguyên nhân 2 (người bỏ qua cảnh báo):** `psd-plan.py` in đúng cờ `TEXT(sống được — render i18n,
+  đừng dùng ảnh)` cho `1-misc`..`4-misc` và `DATA-ZONE(chữ mẫu bind backend — chỉ cắt khung/nền)` cho
+  `frame-3`, nhưng manager vẫn copy chúng vào repo thành `point-1..4.png`, `ten.png`, `score.png`. Cờ
+  đúng mà không ai đọc = như không có.
+- **Lưới chặn (máy):** thêm `gate_font_installed()` vào `skills/psd-cut/scripts/psd-plan.py` — có font
+  `MISSING` thì **DỪNG ở nấc plan**, in danh sách font thiếu + tự dò `Fonts/` trong kho design + in sẵn
+  lệnh `cp … ~/Library/Fonts/` kèm nhắc **RESTART Photoshop**. Muốn chạy tiếp phải khai
+  `--allow-missing-font` (có dấu vết). Test 2 chiều: survey font OK → không chặn; survey font MISSING → chặn.
+- **Lưới chặn (quy trình):** trước khi copy BẤT KỲ asset vào repo, đọc cờ của state đó trong output plan.
+  Cờ `TEXT(...)` hoặc `DATA-ZONE(...)` ⇒ **cấm dùng làm ảnh**, chỉ bóc phần `khung`/nền, text render từ twig.
+- **Bẫy kèm theo, đã trả giá cùng lượt:**
+  1. `pkill -f 'psd-export.py'` để dừng job của mình đã **giết luôn job psd-cut của phiên khác**
+     (`Button_Download_Transparent.psd`, project ananta). Dừng job phải theo **PID lấy từ đường dẫn
+     `job.json` của chính mình**, không pkill theo tên script.
+  2. **Đọc tên/nhãn từ ẢNH là không đủ tin.** Đọc ảnh ra "PHỐ TRẠNG NGUYÊN", tên layer PSD ghi
+     **"PHỐ TRĂNG NGUYỆN"**. Text trong PSD là nguồn chính xác (`survey.json` nodes `kind=="type"`,
+     tên layer = nội dung chữ) — dùng nó, ảnh chỉ để xem bố cục.
+  3. Mọi nút trong PSD này có cặp `nor`/`hov` ⇒ nút phải bóc **2 state**, thiếu `hov` là mất hover.
+- **Nguồn:** `designs/GW-723/_auto-export/gnm-trungthu-pc-optimized/survey.json` (`fontVerdicts` 6 MISSING)
+  vs `survey-v2.json` sau khi cài font (4 OK, còn `GS3TTSupermolotNeue-SemiBold` + `FS-Diavlo-Book` thiếu
+  thật — kho không có) · `job-v1-fontsai.json` · output `psd-plan.py` với cờ TEXT/DATA-ZONE.
+
+## 2026-08-24 (chiều) · 4 lỗi khi verify landing local — chẩn đoán sai vì không biết cơ chế
+
+Cùng lượt GW-723, sau khi đã sửa vụ font PSD. Bốn lỗi này đều là **kết luận sai từ triệu chứng đúng**:
+
+1. **Popup copy từ campaign khác mang theo `{% set status = 'active' %}`.**
+   Copy `popup_register.html.twig` từ `2026-worldcup` sang, không soát dòng `status` ⇒ popup **mở sẵn ngay khi load trang**, che toàn màn hình. Lane dev báo là *"popup đăng nhập platform (`loginType: mto`) che màn, không tắt được vì thiếu backend"* và bỏ luôn phần chụp layout — chẩn đoán sai hoàn toàn, mất 1 vòng verify.
+   ⇒ **Lưới chặn:** copy bất kỳ module popup nào thì soát ngay `{% set status = ... %}` — chỉ popup CHỦ ĐỘNG mở lúc load mới được `'active'`. Grep 1 phát sau khi copy: `grep -n "set status" html/module/*.twig`.
+
+2. **Ảnh `data-src` + `MJ__lazyload` KHÔNG load khi mở local** (lib `libraryMainsite` không init vì không có platform) ⇒ trang trắng ảnh, dễ kết luận oan "thiếu asset".
+   Đo thật: `curl` từng path ra **200** trong khi screenshot trắng. ⇒ Trước khi chụp/đo layout local, PHẢI ép nạp:
+   `document.querySelectorAll('img[data-src]').forEach(el=>{el.src=el.getAttribute('data-src');el.classList.remove('MJ__lazyload')})`
+   rồi mới screenshot. Số ảnh vỡ thật lấy từ `document.images` với `naturalWidth===0`.
+
+3. **Font caps-only dùng cho khối text thường.** `SVN_Bango` là font CHỈ CÓ CHỮ HOA; khối text giấy phép footer đặt font đó ⇒ render in hoa toàn bộ (design là chữ thường) **và** wrap thêm 1 dòng ⇒ dòng cuối bị cắt khỏi section. Sửa: khối body-text dùng sans thường (`Arial, Helvetica, sans-serif`), font display chỉ cho title/nhãn.
+   ⇒ Dấu hiệu nhận ra sớm: render in hoa mà design chữ thường = **font sai**, không phải `text-transform`.
+
+4. **Hai lane dev dùng browserpilot cùng lúc thì tranh session.** Lane Footer tốn **54 tool-call** (ngân sách 25) chỉ để gỡ rối vì lane Frame4 đang chiếm browser; phải mở tab isolated mới xem đúng section của mình.
+   ⇒ Luật đã có cho checker ("≥2 checker phải ghi dòng `đang chạy SONG SONG với checker khác`") **phải áp cho cả lane DEV nào có bước browser**. Manager tôi chỉ ghi dòng đó cho 1 trong 2 lane — đó là lỗi điều phối, không phải lỗi dev.
+
+**Đo được sau khi sửa:** license 5 dòng đúng design (trước 6 dòng, bị cắt) · 7 nhãn social `overlap: []`, `Discordbook` 136px vs design 135px, khe nhỏ nhất 16px · `footerH` 473 = 493 × 0.96 (scale 1920/2000) — **đừng coi lệch do scale là bug**.
+
+## gate-asset-missing-font-undeclared-2026-08-24
+- Bắt được: 12 ERROR (asset-missing, font-undeclared) trên dist — font-family "GS3TTOctosquaresCondensed" dùng 3 chỗ nhưng KHÔNG có @font-face nào khai (browser sẽ fallback im lặng)
+- Nguyên nhân: design GỐC bỏ trống artwork "Quả Hồn-Sơ" (GNPC phố 3 quà 2) — export/tooltips/popup đều không có hình; dev cắt asset không có gì để cắt nên bỏ qua im lặng. Xử lý 24/8: đặt PNG trong suốt cùng size (khớp design đang trống) + đòi PM artwork.
+- Lưới chặn: fe-gate check asset-missing, font-undeclared (đã bắt được, giữ nguyên trong luồng code-developer)
+- Nguồn: 2026-trung-thu · 2026-08-24
+
+## 24/8/2026 — GW-723: 1px lệch hệ thống, mất chữ âm thầm, và 3 bẫy quy trình
+
+**Bối cảnh:** đã báo user "mọi dải ≤ 8" nhưng user tự nhìn ra "từ Frame2 đổ đi vẫn còn đầy chỗ lỗi". Đo lại mới lộ.
+
+1. **Lệch 1px toàn trang ăn 5–6 điểm mean|diff| MỖI DẢI.** `margin-top: -1px` thêm vào section iframe để bịt mạch nền đã kéo Frame2→Footer lên 1px. Bỏ ra: toàn trang **9.89 → 3.78**, 5/5 dải về ≤ 8. ⇒ Mọi dải cùng lệch 10–14 mà layout trông đúng thì **quét dịch render ±1..4px TRƯỚC** khi sửa phần tử. Và **không vá mạch nền bằng margin âm**.
+2. **Dải thô pass ≠ đúng design.** Sau khi 5 dải đạt, phải quét ô nhỏ (250×100) tìm ổ > 8 rồi crop render↔design ghép trên–dưới mà NHÌN. Cách này lộ: pill nền của `.note` (cao 36 vs 50 thật), plaque bị khung đè, tiêu đề BXH mất hẳn.
+3. **Chữ mất âm thầm.** Asset "khung" xuất ra rỗng chữ là ĐÚNG (cờ TEXT/DATA-ZONE) nhưng phải render chữ bù bằng HTML. Quét: mọi layer `kind=="type"` trong `survey.json` so với HTML build — **strip `alt`/`title` trước khi so**, vì alt làm chữ trông như đã có. Lộ 6 chỗ ở GW-723.
+4. **Font caps-only đặt cho cả section** (`#Frame4 { font-family: "SVN_Bango" }`) → mọi chữ in hoa + tràn. Kiểm bằng computed `fontFamily`, đừng đoán theo tên biến.
+5. **Thứ tự data phải khớp thứ tự Ô TRÊN DESIGN, không khớp thứ tự layer PSD.** Vòng quay GNO/GNPC bị xếp theo layer order ⇒ ô số 1 gắn tên quà của ô số 9. Map bằng **toạ độ** (`coords.json` so `$itemPos`), không bằng tên/thứ tự.
+6. **`_control.png` thiếu ⇒ `psd-trim` SKIP TOÀN BỘ** (C5 không có tham chiếu). `psd-export.py` bỏ qua state có `showPath: []`. Lối ra hợp lệ: dựng `_control.png` từ chính ảnh design khi canvas khớp — đã verify ncc 1.0000 giữa asset export và ảnh design.
+7. **CẤM `osascript quit Photoshop` khi còn job đang chạy** — suýt giết job GNPC 20 state. Muốn font mới có hiệu lực thì chờ hàng chờ rỗng.
+8. **Đọc file lúc launchd radar đang `git pull --autostash`** thấy file bị revert tạm (Frame4.scss 271 dòng → 123 dòng rồi tự về). Trước khi báo "mất code" phải đọc lại + so `git hash-object` với `HEAD`/stash.
+9. **Xếp nhiều job Photoshop phải TUẦN TỰ bằng file cờ** (`touch /tmp/chainN.done`), không dùng nhiều vòng `while pgrep psd-export` song song — khi job hiện tại xong, mọi waiter cùng bung một lúc.
+
+## 24/8/2026 — GW-723: vì sao so-pixel toàn trang MÙ, và bộ dò thay thế
+
+User chỉ ra 8 lỗi **nhìn là thấy** trên trang đã báo "mọi dải ≤ 8". Truy nguyên: `design-diff sections` mù 4 loại lỗi, mỗi loại có cách đo riêng — **không có cách nào là nhìn ảnh trung bình**.
+
+| Loại lỗi | Vì sao mù | Máy dò đúng |
+|---|---|---|
+| Tooltip / popup | `display:none` khi tải → KHÔNG có trong ảnh; và design tooltip là **file PNG riêng** (`*_tooltips.png`) | force-show rồi so với ảnh design riêng: `#Frame2 .dao .tooltip{display:block!important}` |
+| Phần tử cuộn theo `position:fixed` | ảnh full-page **làm phẳng** fixed; design composite không diễn tả hành vi | liệt kê con của container `fixed` (`tools/ui-defect-scan.js` mục `inFixed`) |
+| Chữ tràn khung | vài trăm px² bị pha loãng trong trung bình dải | `scrollWidth > clientWidth` từng phần tử text |
+| 2 khối chữ đè nhau | màu gần giống nên diff thấp | giao diện tích 2 `getBoundingClientRect` > 120px² |
+| Asset trắng trơn | `naturalWidth>0` nên không phải "ảnh vỡ", vùng design cũng sáng | `tools/asset-blank-scan.mjs` — độ lệch màu < 6 |
+
+**Công cụ mới (dùng lại cho mọi landing):** `tools/ui-defect-scan.js` (chạy trong `page.evaluate`, trả `overflow/collide/inFixed/hiddenByDesign`) và `tools/asset-blank-scan.mjs`. Copy `ui-defect-scan.js` vào `dist/` rồi `fetch('/_scan.js')` — build xoá `dist` nên phải copy lại sau mỗi lần build.
+
+**Lỗi thật lộ ra nhờ 2 máy dò + soi mắt (8 cái, không cái nào bị `sections` bắt):**
+1. **Font body sai cả trang** — Frame2/3/4 dùng `GS3_Harmoniqu_Bold` trong khi `fontVerdicts` của PSD chỉ có FS Diavlo / GS3TTSupermolotNeue / SVN Bango. ⇒ **Luôn đối chiếu `font-family` với `fontVerdicts` trong survey**, đừng tin font của scaffold.
+2. **ĐĂNG NHẬP + XIN CHÀO nằm trong `#float_right`** (fixed) nên cuộn theo nav — design vẽ chúng ở Frame1.
+3. Chữ tràn: `.note` Frame4 +10px, `.badge-name` +8px (đổi font rộng hơn là tràn ngay).
+4. `.bxh-prize` dùng `opacity:0` vẫn chiếm chỗ → đè chữ tiêu đề BXH. Tooltip phải `display:none`.
+5. **CSS bảng của campaign cũ còn trong `base.scss`** (93 dòng, `#cd422d`) với selector sâu hơn nên đè CSS mới. Xoá scaffold trước khi viết mới.
+6. **Data nhân đôi ở 2 file** (`body.html.twig` + `body-diemdanh.html.twig`) → sửa 1 nơi, trang kia vẫn sai. Gộp về 1 file 2 chế độ (`pageMode`).
+7. **Thứ tự quà tooltip lệch ô** — cùng bệnh vòng quay: data theo thứ tự brief, không theo Ô trên design. Lấy thứ tự ô từ **layer CHỮ** (`kind=="type"`) sắp theo bbox, KHÔNG dùng layer icon (ô thiếu icon sẽ làm lệch cả dãy).
+8. **Layer nằm trong nhóm `chibi` bị nền che** — `Frame 3/chibi/Layer 77` (thỏ+bánh) design vẽ TRÊN khung info, nhưng gộp vào `bg` nên bị `.info` phủ. Phải tách thành overlay riêng có `z-index`.
+
+**Sản phẩm phụ:** design GNM mốc 140 tự nó **đổi icon giữa ô 1 và ô 3** (icon "Lì xì nhỏ" mang nhãn "Cỏ Khô Thú Cưỡi"). Theo CHỮ, không theo icon, và báo PM.
+
+## gate-asset-missing-2026-08-24
+- Bắt được: 1 ERROR (asset-missing) trên dist — ref không tồn tại: assets/Frame2/images/item/gnpc/item-3-2.png
+- Nguyên nhân: design GỐC bỏ trống artwork "Quả Hồn-Sơ" (GNPC phố 3 quà 2) — export/tooltips/popup đều không có hình; dev cắt asset không có gì để cắt nên bỏ qua im lặng. Xử lý 24/8: đặt PNG trong suốt cùng size (khớp design đang trống) + đòi PM artwork.
+- Lưới chặn: fe-gate check asset-missing (đã bắt được, giữ nguyên trong luồng code-developer)
+- Nguồn: 2026-trung-thu · 2026-08-24
+
+
+## fix-round-gw723-2026-08-24 — 7 bài học từ vòng compare+fix trung-thu (user chỉ 10+ lỗi bằng screenshot)
+
+| # | Lỗi | Bài học chống lặp |
+|---|---|---|
+| 1 | Chữ footer BÓNG ĐÔI — label bake sẵn trong sprite icon (120×141 gồm cả chữ), HTML render text sống đè lên lệch 2-3px | Trước khi render text sống lên vùng có asset: MỞ asset đo size — icon 120 nhưng cao 141 là dấu hiệu có chữ bake. Thí nghiệm chốt: ẩn element mà chữ vẫn còn = có bản bake. Đã tốn 3 vòng nghi font (PIL render cả 2 font đều sạch) trước khi tìm ra |
+| 2 | Vòng quay chết + 0 ô quà: twig loop `g.wheel` nhưng data chỉ khai `wheelSlots` — build XANH, trang câm | Sau build: grep dist đếm phần tử của MỌI vòng loop twig (`gr_effect--item` = 0 là chết). Loop over key undefined không lỗi, không cảnh báo |
+| 3 | NẠP XU MB trôi theo nav fixed — ĐÚNG bệnh lesson cũ "ĐĂNG NHẬP trong #float_right" đã ghi mà chỉ fix 1 nút | Lesson ghi cho 1 phần tử thì phải quét HẾT SIBLING cùng container ngay lúc đó (grep cả block #float_right xem nút nào design để tĩnh) |
+| 4 | Cụm mốc Frame4 lệch cả cụm 30-40px dù agent match ncc 0.86-0.89 "khớp" — chỉ đo KHOẢNG CÁCH nội bộ, không chốt anchor tuyệt đối | Match cụm nhiều phần tử: đo toạ độ TUYỆT ĐỐI ≥1 phần tử neo vào design + render rồi so vector, không chỉ so dx/dy nội bộ |
+| 5 | Loạt màu chữ sai (score-label #fbe6a2 vs #a56c31, .point, .num, .moc-point...) — dev đoán màu bằng mắt từ ảnh thu nhỏ | Màu chữ trên nền asset: sample glyph pixel từ design full-res (Counter màu tối/sáng phổ biến), cấm eyeball |
+| 6 | Đo sections viewport 1920 trong khi scaleWidthPC=2000 → drift tuyến tính giả 52-95 toàn dải | Chụp đo = viewport đúng scaleWidth; assert `#MS__wrapper` transform matrix(1). Chi tiết: knowledge code-developer entry đo-khớp-design mục 9 |
+| 7 | User thấy lỗi trên bản build CŨ (label thiếu icon strip, wheel cắt) → 2 vòng truy nguyên lỗi KHÔNG tồn tại | Trước khi truy lỗi user báo: rebuild + so screenshot bản MỚI trước; lỗi chỉ có trên bản cũ thì trả lời "đã fix ở build X" kèm crop, khỏi đào |
+
+- Nguồn: 2026-trung-thu GW-723 · 2026-08-24 · phiên compare→fix full
+
+## spin-contract-3-lop-2026-08-24 — vòng quay lib promotion chết im: 3 hợp đồng ngầm
+Lib `promotion2.js` (libraryMainsite 1.3.0) có 3 hợp đồng KHÔNG có trong doc, vi phạm là chết im (không log console vì lỗi nằm trong handler):
+1. Số lượt phải nằm ở class **`.spoint`** (lib đọc `el.cp` mặc định) — chỉ có `pm__point` thì `NaN >= 1` = false, không bao giờ gọi API.
+2. Phải khai **`var currentPool;`** global (lib gửi biến này trong getData) — thiếu là ReferenceError.
+3. Lib tra **`names[$('body').attr('class')]`** — body CHỈ được mang mã ngôn ngữ (`class="vn"`); marker `game-*`/`page-*` phải đặt trên `<html>`.
+Pattern chuẩn: `products/gpn/landing/2026-he-ruc-ro`. Test local: x10 chạy (mock lib có getdatax5/x10), x1 KHÔNG có mock (knowledge librarymainsite-x1-spin-debug-limit), ô dừng cố định vì mock trả 1 key — random do BE.
+- Nguồn: 2026-trung-thu GW-723 · 2026-08-24
+
+## bg-cat-tu-anh-design-phang-2026-08-25
+Cắt lại nền section (`bg.jpg`) mà lấy nguồn là **ảnh design phẳng** (`*_PC.png` composite) thì bake luôn tiêu đề/nút/BXH/chữ chú thích vào nền → chữ sống render đè = **lồng chữ**, và không phát hiện được bằng `design-diff sections` (chữ đè chữ giống nhau nên mean|diff| vẫn thấp, thậm chí ĐẸP hơn).
+- Nguồn ĐÚNG là layer nền sạch đã bóc sẵn: `_auto-export/<slug>/bg.png` (full canvas, chỉ nền).
+- Cách phát hiện rẻ nhất: mở thẳng file `bg.jpg` vừa cắt và NHÌN — thấy chữ/nút trong đó là sai. Đừng tin số đo band.
+- Cùng họ với bẫy `fix-round-gw723` (chữ bake trong sprite Footer): **trước khi thêm/sửa text sống, kiểm ảnh nền/sprite bên dưới đã có chữ đó chưa.**
+- Brief cho subagent cắt lại nền PHẢI chỉ đích danh file nguồn nền sạch, đừng để agent tự chọn giữa `bg.png` và `*_PC.png`.
+
+## font-thieu-glyph-advance-0-2026-08-25
+`FS-Diavlo-Black.ttf` thiếu glyph `Ộ` (U+1ED8): trình duyệt render advance width = **0** nên ký tự KẾ TIẾP vẽ đè lên → mất chữ ("KHAI LỘC" thành "KHAI LỘ"). Không phải clip/overflow: `scrollWidth == clientWidth`.
+- Cách đo: canvas `measureText(ch).width === 0` quét cả bảng chữ hoa tiếng Việt cho từng font đã khai `@font-face`; hoặc `Range` từng ký tự trong DOM để thấy ký tự width 0.
+- Fix 1 dòng, không đổi font đang dùng: khai thêm `@font-face` CÙNG family, `src` trỏ bản Bold, `unicode-range: U+1ED8`, đặt SAU khai báo gốc (rule sau thắng trong vùng giao).
+- Quét font trước khi dựng landing tiếng Việt: `Ộ Ợ Ự Ẫ Ặ` là nhóm hay thiếu ở font FS/GS3 do studio giao.
+
+## popup-chon-font-bang-iou-mask-2026-08-25
+Chọn font cho chữ trên design KHÔNG được đoán theo tên file. Cách đo đã dùng và ăn tiền:
+1. Bóc mask chữ trên design (ngưỡng độ sáng, tránh vùng deco/nút gây nhiễu — kiểm bằng cách in bbox từng dòng, các dòng ra CÙNG bề rộng = đang bắt nhầm nền).
+2. Với mỗi file trong `assets/main/fonts/`, render cùng chuỗi bằng PIL, quét size để bề rộng khớp design, resize về đúng khung rồi tính **IoU** với mask design.
+3. Font thắng phải hơn hẳn (vd popup Trung Thu: SVN-Bango 0.634 vs FS-Diavlo-Black 0.443 — kiểm chéo bằng chuỗi thứ 2 ở popup khác trước khi áp).
+Dấu hiệu SAI FONT (không phải sai size): render và design **bằng bề rộng** nhưng render **cao hơn và nét mảnh hơn** (đo `ink px`, tỉ lệ design/render ≈ 1.2 là lệch typeface).
+Suy size từ ink khi không bóc được mask sạch: `size ≈ size_hiện_tại / sqrt(ink_render / ink_design)`.
+
+## popup-thu-tu-import-base-scss-2026-08-25
+`scss/base.scss` mà `@import` module ở ĐẦU file rồi mới định nghĩa `.base { .box / .content }` thì mọi rule module cùng độ đặc hiệu (`.popup_x .box` = `.base .box`) **thua theo thứ tự nguồn** → module chết âm thầm, không lỗi build.
+Fix gốc: dời cụm `@import` module xuống CUỐI base.scss (đã làm cho campaign trung-thu). Fix cục bộ: viết `.base.popup_x .box`.
+Soát nhanh: `grep -n '^\.popup_' scss/module/*.scss` — rule nào đè `.box`/`.content` mà không có `.base.` phía trước là nghi phạm.
+
+## popup-ngat-dong-thu-cong-2026-08-25
+Chữ 2 dòng trên design mà 2 dòng gần bằng nhau (vd 437 vs 504 px) thì KHÔNG ép được chỗ ngắt bằng `width`: ngưỡng cắt dòng 1 luôn cắt luôn dòng 2. Đo bằng `canvas.measureText` trong trình duyệt để chứng minh, rồi ngắt bằng `<br>` trong markup và ghi chú BE bơm chuỗi khác sẽ tự xuống dòng. Đừng chỉnh font-size cho "vừa" — làm sai cả typeface.
+
+## popup-base-btn-input-de-rule-module-2026-08-25
+`base.scss` của libraryMainsite-t-popup có `.base .box .content .btn` (0,4,0) và rule cho `input` — mọi rule module viết `.popup_x .btn` (0,2,0) hay `.popup_x .content .btn` (0,3,0) đều THUA, đổi sprite/nền không ăn mà build vẫn xanh.
+Muốn đổi phải bám `.base.popup_x .box .content .btn` (0,5,0). Dấu hiệu nhận ra nhanh: computed width vẫn là 229x84 (sprite `$btn` mặc định) dù module đã `@include sprite($btn-nhan)`.
+Kèm: CSS lib đặt `::placeholder` màu đỏ — ghi đè `color` cho input KHÔNG đổi placeholder, phải viết `&::placeholder { color: …; opacity: 1 }`.
+Kiểm nhanh cả bộ popup: đếm font-family thực tế của mọi leaf node có text (`getComputedStyle`) — thấy `Arial` là dấu hiệu element chưa được style (option/button), thấy 2 font khác nhau trên `th` vs `td` là bảng đang lệch.
+
+## gate-font-undeclared-2026-08-26
+- Bắt được: 1 ERROR (font-undeclared) trên dist — font-family "PSL034PRO" dùng 2 chỗ nhưng KHÔNG có @font-face nào khai (browser sẽ fallback im lặng)
+- Nguyên nhân: (điền — vì sao lọt tới đây)
+- Lưới chặn: fe-gate check font-undeclared (đã bắt được, giữ nguyên trong luồng code-developer)
+- Nguồn: 2026-tinh-quang-chi-da · 2026-08-26
+
+## 2026-08-27 — Delta mù ticket đổi trong "khe" giữa JQL và lastRun
+- **Bắt được gì:** GW-805 COMPLETED trên Jira 26/8 15:50 nhưng delta 27/8 14:56 vẫn báo `waiting-design`; user phải tự báo "task 805 tôi done rồi mà".
+- **Nguyên nhân:** delta quét `updated >= -4h` CỐ ĐỊNH. Lượt 26/8 chạy JQL ~15:37 (trước sự kiện 15:50) rồi ghi `lastRun` 15:56 (sau sự kiện). Lượt kế cách >4h nên cửa sổ -4h không với ngược tới 15:50 ⇒ thay đổi rơi vào khe, mù vĩnh viễn.
+- **Lưới chặn:** SKILL.md mục `delta` đã đổi công thức: quét từ `state.lastRun` lùi 30 phút (đệm cho chính khe JQL→lastRun), fallback -4h chỉ khi thiếu lastRun.
+- **Nguồn:** boards/2026-08-27.md log 15:03 · history/phases.jsonl GW-805 waiting-design→closed.

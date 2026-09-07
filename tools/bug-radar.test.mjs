@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import {
   bugStatus,
+  cacheStale,
   openBySheet,
   followSheet,
   unfollowSheet,
@@ -953,4 +954,11 @@ test('mỗi buglist trong thông báo mang theo mốc đọc, để số không 
   const [row] = openBySheet(state, now);
   assert.equal(row.readAt, state.bugWatch.a.openBugsAt);
   assert.equal(row.ageMin, 90);
+});
+
+test('cache cũ hơn sheet thì phải đọc lại, dù heat báo changed:false', () => {
+  assert.equal(cacheStale('2026-08-19T08:39:00.000Z', '2026-08-21T07:32:59.729Z'), true);
+  assert.equal(cacheStale('2026-08-21T08:00:00.000Z', '2026-08-21T07:32:59.729Z'), false);
+  assert.equal(cacheStale(null, '2026-08-21T07:32:59.729Z'), true, 'chưa có cache = chắc chắn phải đọc');
+  assert.equal(cacheStale('2026-08-19T08:39:00.000Z', null), false, 'không biết mốc sheet thì không kết luận');
 });

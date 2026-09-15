@@ -4,7 +4,8 @@ description: >
   Dùng SAU khi đã code + build xong trong repo cdn-source (landing/skin VNGGames) để kiểm tra
   output build cuối (dist/) có lỗi giao diện hoặc lệch design không — hoặc khi user nhắc:
   "check UI", "check giao diện", "kiểm tra dist", "ảnh vỡ", "ảnh 404", "chữ bị cắt",
-  "tràn ngang", "lệch design", "so output với design", "kiểm tra trước khi giao QC".
+  "tràn ngang", "lệch design", "so output với design", "kiểm tra trước khi giao QC". Cờ `--autofix`: tự sửa
+  vị trí asset lệch so với coords.json (psd-cut/figma-cut) trong SCSS rồi build + đo lại.
   Chạy trên OUTPUT đã build qua browser thật, không phải đọc source chay. Skill này OPT-IN —
   chỉ chạy khi được gọi, không tự động sau mỗi build.
 ---
@@ -160,6 +161,49 @@ phân loại nguyên nhân → đề xuất fix cụ thể trong report.
 sai đuôi png/webp, rename có match hiển nhiên) → rebuild → chạy lại check để confirm →
 liệt kê từng chỗ sửa. KHÔNG rename/xóa file asset, KHÔNG sửa khi ≥2 ứng viên, KHÔNG đụng
 file user tự đặt vào project.
+
+## `--autofix` — đóng vòng bắt → sửa → đo lại (geometry theo `coords.json`)
+
+Chỉ chạy khi user gọi kèm `--autofix`. Sửa DUY NHẤT `left/top/right/bottom` trong rule SCSS đã
+map được; không fix size/màu, không thêm dòng mới, không đụng twig. Spec + quyết định đã chốt:
+`docs/specs/2026-09-15-ui-check-autofix-design.md`. Tool: `tools/geo-fix.mjs` (test 37 ca).
+
+Vòng (tối đa 2), `<geo>` = thư mục tạm của task:
+1. Bước Build → Serve → Lớp 1 như trên.
+2. `node ~/VNG/agent-auto/tools/geo-fix.mjs plan --campaign <dir> --coords <coords.json>… --out <geo>/plan.json`
+   — coords mặc định: mọi `_auto-export/*/assets/coords.json` của task. Group `unmapped` > 5
+   asset → ghi report "map thủ công", không chạy template-match.
+3. Đo — tab đang ở đúng viewport (PC cho group `pc`; MB 768 + reload cho group `mb`; H5 chỉ PC),
+   `run_script` thân sau (đổi `pc`/`mb` và 2 đường dẫn `<geo>`):
+   ```js
+   const fs = await import('node:fs');
+   const plan = JSON.parse(fs.readFileSync('<geo>/plan.json', 'utf8'));
+   plan.groups = plan.groups.filter(g => g.viewport === 'pc');
+   const src = fs.readFileSync('/Users/lap17727/VNG/agent-auto/skills/ui-check/scripts/geometry-measure.js', 'utf8').replace('/*__PLAN__*/ null', JSON.stringify(plan));
+   const measure = await new (Object.getPrototypeOf(async function () {}).constructor)('page', src)(page);
+   fs.writeFileSync('<geo>/measure.pc.json', JSON.stringify(measure));
+   return measure.assets.length;
+   ```
+   Popup ẩn được ép hiện tạm (`.MS__popup` + class `active`, nạp `data-src`) rồi trả lại y cũ —
+   không cần biết trigger. Đo tương đối theo asset gốc (`bg`) nên không phụ thuộc engine scale.
+4. `geo-fix diff --plan <geo>/plan.json --measure <geo>/measure.pc.json --out <geo>/findings.json`
+   (ngưỡng 2px; waiver đọc `.claude/knowledge/waivers.md` của campaign).
+   `abort: uniform-offset` → DỪNG, báo "≥50% asset lệch cùng vector = sai quy đổi, không phải
+   bug", không apply.
+5. `geo-fix apply --findings <geo>/findings.json --out <geo>/applied.json` → `npm run build-dev`
+   → quay lại 3. Vòng 2 vẫn còn `position` → dừng, để lại cho người.
+6. Report: `fixed` (tên · file:line · from→to) · `remaining` · rồi mỗi nhóm 1 dòng:
+   `no-declaration` (rule không khai left/top cho viewport đó — MB phải nằm trong `@include mobile`),
+   `ambiguous` (selector khớp >1 phần tử), `not-measured` (ẩn trong tab chưa mở), `unmapped`,
+   `waived`, `size-mismatch` (asset cắt sai hoặc sprite sai — chỉ báo).
+
+Guard trong tool (không cần tự nhớ): rule bị ≥2 asset cùng nhận (4 `<img class="mh-art">`) → gỡ
+rule, chỉ đo; con cùng delta với cha → chỉ fix cha; `<img>` trong dist đổi đuôi `optimized/….webp`
+→ so theo stem `/<tên>.`.
+
+Bằng chứng đã chạy 15/9/2026: fixture wrapper `scale(0.96)` + popup ẩn đo đúng ±0.1px, tiêm lệch
+10px → `left 687→677`; campaign thật tqht `2026-trung-thu-menh-hon` (copy scratch) tiêm
+`left 1008→1018` ở `.mh-frame`, build, `--autofix` trả về 1008 đúng dòng 134.
 
 ## Common mistakes
 

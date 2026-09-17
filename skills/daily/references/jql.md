@@ -44,3 +44,36 @@ gọi connector Atlassian, cách xử lý key rớt khỏi query. `SKILL.md` gi�
      thấy 2/58 ticket).
    - Ticket không có duedate → bỏ khỏi snapshot (không đoán tháng).
    - Kết quả quá lớn cho 1 lần đọc → thu hẹp `fields` hoặc chia 2 khoảng 4-5 tháng.
+
+## Fallback REST qua Chrome (khi connector Atlassian chết)
+
+Thêm 17/9/2026 sau ca `CONNECT_TIMEOUT`: connector `claude.ai Atlassian` không nạp được tool, lượt
+`delta` suýt báo "0 ticket đổi" trong khi GW-796 vừa chuyển COMPLETED 13:09. Dùng khi — và chỉ khi —
+`ToolSearch` không ra `searchJiraIssuesUsingJql`.
+
+**Cách chạy** (cần toolset `claude-in-chrome` ⇒ chỉ phiên CLI tương tác):
+1. `navigate` tới `https://vnggames.atlassian.net/jira/software/c/projects/GW/issues` (tab mới).
+2. Dán trọn `scripts/jira-via-chrome.js` qua `javascript_tool` → có `window.JIRA`. Nạp **1 lần/phiên**,
+   sau đó chỉ gọi lệnh ngắn.
+3. `await JIRA.delta('<state.lastRun lùi 30 phút, yyyy-MM-dd HH:mm>')` → trả `{changed[], open[],
+   recentDone[]}`; `changed` đã kèm `subs` (subtask + status) và `sheets` (link buglist bóc sẵn từ
+   description + comment) nên **không phải gọi thêm `getJiraIssue`**.
+   `await JIRA.months('2026-03-01','2026-10-31')` → snapshot tab "Theo tháng", cùng cấu trúc
+   `history/months.json`.
+4. Xong thì `tabs_close_mcp`.
+
+**3 luật cứng:**
+- **CHỈ GET.** Không POST/PUT/DELETE qua đường này. Luật "KHÔNG ghi gì lên Jira" không có ngoại lệ,
+  và cookie session của user thì ghi được thật — đó chính là lý do phải ghi luật ra đây.
+- **Không phải JSON = LỖI, không phải "0 ticket".** `get()` ném khi status ≠ 2xx hoặc body không mở
+  đầu bằng `{`/`[` (trang login/SSO trả HTML kèm 200). Im lặng nuốt ca này là biến sự cố đăng nhập
+  thành báo cáo sai — cùng họ với luật "search SharePoint trắng không phải bằng chứng".
+- **Output của `javascript_tool` BỊ CẮT** (đo thật: ~2.5 KB thì `[TRUNCATED]`). Tập lớn thì **so
+  ngay trong trang** rồi chỉ trả phần lệch, đừng mang 73 dòng ra ngoài.
+
+**Đã đo tương đương connector** (17/9 13:4x): `JIRA.months('2026-03-01','2026-10-31')` ra **73 ticket
+/ 7 tháng**, so `key|duedate|status|resolved|hash(summary)` với bản connector sinh 09:56 cùng ngày →
+**lệch đúng 1 dòng**: `GW-796 To Do → COMPLETED`, tức chính thay đổi thật lúc 13:09. Fallback không
+làm nghèo dữ liệu.
+
+**Giới hạn còn lại:** cần tab Chrome ⇒ **radar nền headless vẫn mù Jira** khi connector chết.

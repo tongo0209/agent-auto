@@ -65,6 +65,17 @@ xem mục handoff) và `closed` (Done thật).
   ⇒ `reassigned` (việc ra khỏi tay mình nhưng còn nợ bàn giao — mốc thôi tính cho mình). Nhầm
   2 ca này là đúng lỗi thật sáng 3/8: ghi `reassigned` mà console chưa biết phase đó ⇒ ticket vừa
   lọt timeline vừa mất khỏi bảng task.
+- **Tự đóng ticket hết việc — MÁY làm, không phải LLM phán** (14/9/2026, user chốt). Hết mốc
+  tương lai **VÀ** Jira status ∈ `vocab.doneStatuses` ⇒ `phase = closed` + `closedAuto: true` +
+  `closedReason`. Chạy bằng `node tools/autoclose.mjs` (thêm `--apply` để ghi); `radar-tick` gọi
+  `runAutoClose()` mỗi lượt nên thường không phải gõ tay. **Jira status là chốt an toàn của con
+  người: quá mốc mà Jira còn `To Do` thì KHÔNG đóng** — mốc trôi qua không chứng minh việc xong.
+  Mốc cuối rơi ĐÚNG hôm nay cũng chưa đóng (cùng luật với `shouldRetire` của bug-radar).
+  Vì sao cần: phase không bao giờ tự tiến khi mốc trôi qua, mà `console/src/core/marks.mjs:120`
+  giữ vô điều kiện mọi phase chưa `done-fe`/`closed` ⇒ ticket nằm lại timeline vĩnh viễn và vẫn
+  bị đếm "đang làm". Đo 14/9 trước khi sửa: GW-660 quá mốc **19 ngày** còn `bugfix`, GW-477 **14
+  ngày** còn `wait-test`, GW-723 **4 ngày** còn `bugfix` — user phải tự nhìn ra và báo.
+
 - Ticket chuyển sang `reassigned` → BẮT BUỘC sinh `tasks/<KEY>/handoff.md` dạng checklist
   (`- [ ] việc bàn giao...`) liệt kê việc còn nợ ngoài repo (vd: báo lại BE, bàn giao QC).
   Console hiện checklist này trong drawer ticket và tick được; thiếu file mà phase đã
@@ -90,7 +101,16 @@ Token đầu của `$ARGUMENTS`:
   state thiếu `lastRun`. ⚠ CẤM quay về `-4h` cứng: cửa sổ cố định hụt mọi thay đổi rơi vào khe
   giữa lúc JQL của lượt trước chạy và `lastRun` nếu 2 lượt cách nhau >4h — ca thật GW-805:
   COMPLETED 26/8 15:50, JQL lượt 26/8 chạy ~15:37 rồi ghi lastRun 15:56, lượt kế 27/8 14:56
-  quét -4h chỉ với tới 10:56 ⇒ ticket done mà board vẫn `waiting-design`, user phải tự báo;
+  quét -4h chỉ với tới 10:56 ⇒ ticket done mà board vẫn `waiting-design`, user phải tự báo.
+  ⚠ **JQL KHÔNG chạy được (connector Atlassian chưa nạp tool / lỗi auth) ⇒ CẤM ghi `lastRun` mới.**
+  Cửa sổ quét suy từ `lastRun`, nên đóng dấu `lastRun` cho một lượt chưa hỏi Jira câu nào là tự tay
+  mở lại đúng khe mù của GW-805: khoảng giữa mốc cũ và lúc này không lượt nào quét nữa. Giữ nguyên
+  `lastRun` cũ, ghi board "bước (1)+(3) BỎ TRỐNG — quét bù từ `<mốc>`", rồi đi tiếp phần git/state
+  (những phần này không phụ thuộc Jira). **Trước khi chịu bỏ trống, phải thử fallback REST qua
+  Chrome** (`scripts/jira-via-chrome.js`, xem Bước 1) — phiên CLI tương tác gần như luôn đi được.
+  Đã đạp 17/9/2026 13:16: connector *still connecting* 4 lượt rồi *No matching deferred tools found*,
+  `/mcp` xác nhận `CONNECT_TIMEOUT`; lượt đó giữ `lastRun` nên 13:26 quét bù bằng fallback vẫn bắt
+  kịp GW-796 chuyển COMPLETED lúc 13:09 — nếu đã đóng dấu `lastRun` thì mất hẳn;
   (2) `git -C <gt-promotion> pull` + `git log --since` xem commit mới có đụng folder task đang theo dõi;
   **(2b) `git fetch --quiet` rồi `git log --since --all` (KHÔNG merge) cho MỌI repo còn lại trong
   `config.repos`** — `cdn-source`, `new-mainsite`, `vportal2view`: task mainsite/landing sống ở đó
@@ -102,7 +122,14 @@ Token đầu của `$ARGUMENTS`:
   delta 16:58 báo "cdn-source 0 commit mới sau `e00fab746` 15:46" — đúng với repo local nhưng trên
   remote đã có `bda7e54f3` 16:27 + `e945b465b` 16:45 của vunbpp, sửa ĐÚNG folder của ticket GW-779
   vừa assign cho mình lúc 16:55. Chỉ lộ khi user tự `git pull` lúc 17:03 (reflog). `fetch` là
-  read-only, không đụng working tree ⇒ an toàn cho mọi repo, kể cả repo có thay đổi chưa commit;
+  read-only, không đụng working tree ⇒ an toàn cho mọi repo, kể cả repo có thay đổi chưa commit.
+  ⚠ **In giờ commit BẮT BUỘC `--date=format-local:` (hoặc `--date=local`), CẤM `--date=format:`**:
+  `--date=format:` render theo timezone CỦA COMMIT, nên commit ghi `+0000` (bot CMS new-mainsite,
+  merge commit GitLab) hiện sớm 7 tiếng so với giờ mình. Bản thân `--since` vẫn đúng (nó so mốc
+  tuyệt đối) — chỗ sai là khi so/lọc theo CHUỖI giờ vừa in ra. Ca thật 9/9: lượt delta 16:12 báo
+  "0 commit mới" trong khi new-mainsite `cb348d441` đã có lúc **16:06 local** (in ra `09:06`);
+  cùng lượt, merge `32e9e8b9e` 16:43 hiện `09:43`. Lần đó commit rơi vào `templates/vltk20/…`
+  không thuộc ticket nào nên vô hại — nhưng đúng cơ chế này che được commit vào folder của mình;
   (3) bóc link sheet mới trong comment → `state.issues[key].bugSheets`;
   (4) **refresh `history/months.json` khi `generatedAt` ≠ hôm nay** — 1 query snapshot theo
   `references/jql.md` mục "Snapshot theo tháng", ghi đè (backup sang `.backups/months/`);
@@ -199,6 +226,13 @@ trong comment; ghi snapshot tháng cho tab "Theo tháng". Công thức JQL đầ
 và luật đo `done` (KHÔNG lọc theo `resolutiondate` — nhiều ticket `COMPLETED` không có field này):
 `references/jql.md`.
 
+⚠ **Connector chết ⇒ đi FALLBACK, đừng bỏ trống lượt.** `ToolSearch` không nạp được
+`searchJiraIssuesUsingJql` (báo *still connecting* rồi *No matching deferred tools found*, hoặc
+`/mcp` báo `CONNECT_TIMEOUT`) thì chạy `scripts/jira-via-chrome.js` — REST Jira qua tab Chrome đã
+đăng nhập, dùng cookie session, **chỉ GET**. Cách dùng + 3 luật cứng: `references/jql.md` mục
+"Fallback REST qua Chrome". Chỉ khi fallback cũng không chạy (phiên nền không có toolset chrome,
+hoặc chưa đăng nhập Jira) mới bỏ trống bước (1)+(3) — và khi đó **CẤM ghi `lastRun` mới**.
+
 Rút gọn: so `updated` với state → nhãn MỚI/ĐỔI/CÒN DỞ; comment/description mới có link
 `docs.google.com/spreadsheets` → `state.issues[key].bugSheets` (tên field CỐ ĐỊNH, console đọc
 field này) + vào `state.bugWatch`.
@@ -273,6 +307,10 @@ tóm tắt việc, timeline milestones, link design, link nexus (bóc nexusId), 
      xác thực được** (connector claude.ai chỉ trả lời nhắc) — ra 1 dòng "Cần bạn: `/mcp` → chọn
      `claude.ai Canva`/`claude.ai Figma`" rồi ĐI TIẾP, không chặn luồng.
   ③ Đã OAuth mà vẫn không lấy được (design ở team/account khác) → mới rơi về 📎 mở tay.
+  **Figma nay có 2 kênh** — MCP (① ở trên) chỉ để đọc nhanh/xem cấu trúc; task cần **bóc asset
+  thật** (PC/mobile, coords) thì chạy `/figma-cut`, KHÔNG phải `/psd-cut`. MCP `get_metadata`
+  từng liệt kê THIẾU page (GW-796: MCP thấy 1 page, REST thấy 2) — muốn chắc danh sách
+  page/frame thì dùng `/figma-cut` (REST) thay vì tin số page của MCP.
   Vẫn giữ: KHÔNG đoán design. Nhưng cấm ghi "phải mở tay" khi chưa chạy ①.
 - Ticket có mốc Design CHƯA TỚI và **không có link DESIGN trong ticket** → phase `waiting-design`,
   KHÔNG vào kế hoạch chạy; lần /daily đầu tiên SAU mốc phải tự nhắc + dò lại.
@@ -378,7 +416,8 @@ Mode `plan`/`week` dừng tại đây.
 - **Phase deliver** (task có kênh promotion, code đã verify): chép output HTML/asset vào
   `<gt-promotion>/<game>/<slug>-<nexusId>/mainsite/` — theo `~/VNG/agent-auto/rules/html-handoff.md`
   (R-HO-1 URL CDN tuyệt đối · R-HO-2 giữ `<% MODULE_CONTENT %>` ở bản `Promotion/` · R-HO-5 soát cả
-  `Promotion/` lẫn `mainsite/`) → liệt kê file đã chép vào board →
+  `Promotion/` lẫn `mainsite/` bằng `python3 ~/VNG/agent-auto/tools/check-handoff-sync.py --folder <game>/<slug>-<nexusId>`)
+  → liệt kê file đã chép + kết quả so 2 nửa vào board →
   nhắc user review + TỰ push (KHÔNG tự commit/push). Trước khi chép: bản trên git MỚI HƠN
   local (promotion vừa sửa) → báo diff, hỏi user hướng merge (đây là ca "kẹt thật" được phép hỏi).
 - Buglist: soạn lệnh `claude "/bug-fixer-lite <sheet> <project>"` vào board + báo cáo.

@@ -900,3 +900,35 @@ trong lượt radar/daily, coi MỌI `/usr/bin/<tool>` của Apple là không đ
 sửa file thì dùng `node -` (node không dính), chạy git thì dùng
 `/Library/Developer/CommandLineTools/usr/bin/git`. Và **exit code 0 không chứng minh lệnh đã chạy**
 — phải kiểm dấu hiệu tác động thật (chuỗi xác nhận do chính script in ra, hoặc `grep` lại file).
+
+## 2026-09-17 — Connector Jira chết thì CẤM đóng dấu `lastRun`
+
+**Bắt được gì.** Lượt `/daily delta` 13:16 không nạp được `searchJiraIssuesUsingJql`: connector
+*claude.ai Atlassian* báo *still connecting* 4 lượt `ToolSearch` liên tiếp rồi chuyển hẳn sang
+*No matching deferred tools found*. Bước (1) quét Jira và (3) bóc link buglist trong comment không
+chạy được dòng nào.
+
+**Nguyên nhân sẽ gây hại.** Cửa sổ JQL của lượt sau = `lastRun` lùi 30'. Nếu vẫn ghi `lastRun` theo
+nếp Bước 6 cho một lượt chưa hỏi Jira câu nào, khoảng **11:50 → 13:16** vĩnh viễn không lượt nào
+quét — đúng cơ chế đã làm mù GW-805 (ticket COMPLETED mà board còn `waiting-design`, user phải tự
+báo). Nguy hiểm vì lượt vẫn "chạy xong bình thường": git có kết quả, board có log, doctor sạch, nên
+không gì phát tín hiệu hỏng.
+
+**Lưới chặn.** `skills/daily/SKILL.md` mục `delta`, ngay cạnh luật GW-805: JQL không chạy được ⇒
+giữ nguyên `lastRun` cũ, ghi board "bước (1)+(3) BỎ TRỐNG — quét bù từ `<mốc>`" (nói rõ **bỏ trống**,
+KHÔNG được viết "0 ticket đổi" — hai thứ đó khác nhau về bằng chứng), rồi đi tiếp phần git/state vì
+chúng không phụ thuộc Jira.
+
+**Nguồn.** Board `boards/2026-09-17.md` log 13:16.
+
+**Hậu kiểm cùng ngày (13:26–13:5x): luật này đã trả cổ tức ngay.** Giữ `lastRun` xong, tôi quét bù
+bằng fallback REST qua Chrome và bắt được **GW-796 chuyển COMPLETED lúc 13:09** (comment *"em push
+HTML lên rồi nha anh"*) ⇒ phase `deliver → wait-test`. Nếu lượt 13:16 đóng dấu `lastRun` theo nếp
+cũ thì thay đổi này rơi đúng vào khe mù và không lượt nào quét lại. ⇒ **Bỏ trống một bước không
+phải thất bại; đóng dấu như thể đã làm mới là thất bại.**
+
+**Lưới chặn bổ sung.** `skills/daily/scripts/jira-via-chrome.js` + `references/jql.md` mục
+"Fallback REST qua Chrome": connector chết thì đi đường REST qua tab Chrome đã đăng nhập (chỉ GET).
+Đã đo tương đương connector trên toàn tập — 73 ticket/7 tháng, so `key|duedate|status|resolved|
+hash(summary)` chỉ lệch đúng dòng GW-796 vừa đổi thật. Giới hạn: cần tab Chrome nên **radar nền
+headless vẫn mù Jira** khi connector chết.

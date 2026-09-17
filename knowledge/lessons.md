@@ -717,7 +717,7 @@ Kiểm nhanh cả bộ popup: đếm font-family thực tế của mọi leaf no
 
 ## gate-font-undeclared-2026-08-26
 - Bắt được: 1 ERROR (font-undeclared) trên dist — font-family "PSL034PRO" dùng 2 chỗ nhưng KHÔNG có @font-face nào khai (browser sẽ fallback im lặng)
-- Nguyên nhân: (điền — vì sao lọt tới đây)
+- Nguyên nhân: bản copy `assets/libraryMainsite-t-popup/scss/base.scss` mang theo khối `.th .base .box .content { font-family: "PSL034PRO" }` của khung clone (cùng khối với jxm/jx2 `2026-ma-dao-vinh-hoa`, `2026-vo-lam-tinh-tu-subweb`; khối `.th` lặp 2 lần trong file = đúng "2 chỗ"). PSL034PRO là font Thái lib đời 1.1–1.2 (`products/libraryMainsite/prod-source/1.2.1/assets/main/font/`), lib 1.3.0 không còn ship; project chỉ có bản tiếng Việt, `main.scss` chỉ khai font của design ⇒ rule sót khai suông. Gỡ trước commit đầu `d15581f23` (27/8); cùng ngày còn dính `7dc868e09` (lib khai trùng tên family làm nút mất dấu) — cả 2 đều do font của lib/khung clone không được đối chiếu với font project.
 - Lưới chặn: fe-gate check font-undeclared (đã bắt được, giữ nguyên trong luồng code-developer)
 - Nguồn: 2026-tinh-quang-chi-da · 2026-08-26
 
@@ -726,3 +726,177 @@ Kiểm nhanh cả bộ popup: đếm font-family thực tế của mọi leaf no
 - **Nguyên nhân:** delta quét `updated >= -4h` CỐ ĐỊNH. Lượt 26/8 chạy JQL ~15:37 (trước sự kiện 15:50) rồi ghi `lastRun` 15:56 (sau sự kiện). Lượt kế cách >4h nên cửa sổ -4h không với ngược tới 15:50 ⇒ thay đổi rơi vào khe, mù vĩnh viễn.
 - **Lưới chặn:** SKILL.md mục `delta` đã đổi công thức: quét từ `state.lastRun` lùi 30 phút (đệm cho chính khe JQL→lastRun), fallback -4h chỉ khi thiếu lastRun.
 - **Nguồn:** boards/2026-08-27.md log 15:03 · history/phases.jsonl GW-805 waiting-design→closed.
+
+## gate-font-undeclared-2026-09-07
+- Bắt được: 1 ERROR (font-undeclared) trên dist — font-family "Barlow-Regular" dùng 2 chỗ nhưng KHÔNG có @font-face nào khai (browser sẽ fallback im lặng)
+- Nguyên nhân: `libraryMainsite-t-popup` clone từ `taydu2/2026-tam-gioi-ky-ngo` (`scss/module/condition.scss` giống 100%) kéo theo đúng 2 rule `font-family: "Barlow-Regular"` (`base.scss` bảng lịch sử + `condition.scss` span) trong khi `main.scss` project chỉ khai Roboto/Beaufort/Philosopher/Cambria/UVN/UTM. Gỡ rule trước commit đầu `6e1698905` (16:49; gate chạy 12:11), class `MS__Barlow-Regular` trên `<tbody>` popup lịch sử vẫn còn. **Lưu ý khi đọc gate:** fe-gate chỉ soi `dist/`, không đọc CSS lib trên CDN — mà lib tự khai `.MS__Barlow-Regular` + `@font-face Barlow-Regular` (cả 1.1.1 landing này nạp lẫn 1.3.0 — xem `products/libraryMainsite/prod-source/<ver>/assets/main/scss/fonts.scss`), nên trên production font này vẫn có; font trong danh sách đó bị gate báo thì đối chiếu `fonts.scss` trước khi gỡ rule, còn font ngoài danh sách (như PSL034PRO) là fallback thật.
+- Lưới chặn: fe-gate check font-undeclared (đã bắt được, giữ nguyên trong luồng code-developer)
+- Nguồn: 2026-dang-nhap-nhan-qua · 2026-09-07
+
+## psd-layer-an-cu-hon-png-export-2026-09-07
+
+**Bắt được:** GW-727 — dump layer `NL-PC.psd` thấy nhóm `day 14` có `[type] Title = "NGÀY 12"` và danh sách item trùng khít `day 12`. Kết luận vội: "design lỗi, designer copy day 12 chưa sửa". Mở ảnh `popup-pc/day 14.png` (bản designer export) thì tiêu đề ghi đúng **"NGÀY 14"** và 6 item khác hẳn day 12 (Vàng 500 · Bạc 1000K · Quân Công 2K · Chiến Tích 500k · Hồn Tướng 1000K · Quân Lệnh 100).
+
+**Nguyên nhân gốc:** designer sửa nội dung rồi export PNG, nhưng **layer PSD ẩn không được cập nhật theo**. Nhóm `day N` trong PSD hầu hết `HIDDEN` với bbox `0x0` — chúng là bản nháp cũ, không phải thứ đã giao.
+
+**Lưới chặn:** khi design có CẢ PSD lẫn ảnh PNG/JPG export cho cùng một hạng mục ⇒ **PNG/JPG export là bản CHUẨN**, PSD chỉ dùng để đo toạ độ/bóc asset. Mâu thuẫn giữa hai bên: tin PNG, và chỉ báo "design lỗi" khi **chính PNG** sai. Layer `HIDDEN` bbox `0x0` là dấu hiệu mạnh của bản nháp lỗi thời — đừng rút text từ đó.
+
+**Ngược lại vẫn đúng:** PSD hữu ích khi PNG đọc không ra chữ. Cùng ca này, item vị trí 5 mốc ngày 10 dev đọc nhầm thành "Nhân Sâm 300" từ ảnh 306×260; layer text PSD ghi rõ **"Chu Quả / 300"** và phóng to PNG xác nhận đúng là Chu Quả (icon quả táo đỏ). ⇒ PSD để ĐỌC CHỮ KHÓ, PNG để CHỐT NỘI DUNG.
+
+**Phạm vi:** mọi dự án có design giao kèm cả PSD lẫn ảnh preview.
+
+## R-HO-5 — `Promotion/` và `mainsite/` phân kỳ vì có người sửa song song (2026-09-07)
+
+**Bắt được gì.** GW-525 (Trung Thu LAN, `gt-promotion-template/LAN/h5trungthu-53730/`) phân kỳ 2 bản
+bàn giao **lần thứ 2 trong 2 tuần**:
+- Lần 1 — 24/8: marker `data-tt-boost-line` có ở `mainsite/index-{vn,en,th}.html` (3/3), **0/3** ở `Promotion/`.
+- Lần 2 — 7/9: commit của tôi `5f72b924` 12:05 chỉ sửa `mainsite/` (bug 33/35/40); `huylba` commit
+  `7638e094` 16:30 bù 3 fix đó sang `Promotion/` **nhưng kèm đổi số lượng quà chỉ ở một bên**:
+  `Chòm Sao Tiểu Hùng` x1→×20, `Mến Mộ` x2→x1. `mainsite/` vẫn x1/x2.
+
+**Nguyên nhân.** Hai chỗ độc lập: (a) tôi sửa nửa này, đồng nghiệp sửa nửa kia, không ai soát cặp;
+(b) commit của người khác **không đáng tin theo message** — `7638e094` ghi *"update gunny pc"* mà thật
+ra sửa folder LAN, nên đọc log bằng mắt là bỏ sót. Chỉ `--name-only` mới lộ.
+
+**Lưới chặn.**
+1. Sau MỌI lần sửa 1 trong 2 nửa, so ngay nửa còn lại — đừng tin message commit, đọc `--name-only`:
+   `git show HEAD:<folder>/Promotion/index-vn.html` vs `.../mainsite/index-vn.html`.
+2. Delta phải map commit → task bằng **đường dẫn file**, không bằng tên/message tác giả.
+3. Phân kỳ số liệu (số lượng quà, mốc giờ) **KHÔNG tự đồng bộ** — chưa biết bên nào đúng thì hỏi
+   PM/buglist. Chọn bừa một bên là tự tạo bug mới.
+4. Máy so thay mắt (9/9/2026): `python3 ~/VNG/agent-auto/tools/check-handoff-sync.py [--folder <game>/<request>]`
+   — so chữ nhìn thấy theo từ, ghép cặp kiểu "×20 ↔ x1", bỏ qua khác markup/thứ tự block; chạy sau mọi lần
+   sửa 1 nửa, dán kết quả vào board. Exit 1 = có chữ lệch.
+
+**Nguồn.** Board `boards/2026-09-07.md` log lượt delta 3 · `state.issues['GW-525'].handoffGap`
+(`occurrence: 2`) · `rules/html-handoff.md` R-HO-5.
+
+## 2026-09-08 · psd-export: toggle visibility theo DELTA, không set lại cả cây
+
+**Bắt được gì:** bóc PSD chậm tới mức không dùng được — 29,4 giây/ảnh, 676 state còn lại của
+GW-745 ước ~6,2 giờ. Đo trên `gunpow-pc-optimized` (799 layer, 140 state).
+
+**Nguyên nhân:** `psd-export.py` sinh JSX gán lại visibility cho **toàn bộ** layer ở MỌI state
+(`set` = mọi node trong `NODES`). Photoshop toggle visibility qua DOM scripting rất chậm, mà
+hai state liên tiếp thường chỉ khác ~22 layer. Đo thật: 111.860 lệnh toggle cho 140 state,
+trong khi delta chỉ cần 3.147 — **98% là lệnh thừa**. Nút thắt KHÔNG phải ghi file: PNG
+full-canvas chỉ 0,3 MB/ảnh.
+
+**Lưới chặn:** `psd-export.py` nay nén `states[i].set` thành delta so với state trước
+(state đầu giữ full set). Ngữ nghĩa không đổi vì `doc` giữ nguyên visibility giữa hai lần
+`saveAs`. Cờ `--full-set` để quay lại cách cũ khi cần đối chứng.
+
+**Bằng chứng an toàn (làm trước khi bật mặc định):** xuất lại bằng `--full-set` rồi so
+**hash pixel** (PIL, RGBA) chứ không so byte — PNG khác byte do timestamp metadata nhưng pixel
+y hệt. Kết quả 26/26 ảnh `gunpow-popup` + 8/8 mẫu ngẫu nhiên `gunpow-pc` **giống hệt pixel**.
+Thời gian thật sau khi bật: 140 state 3 phút (trước ~70 phút), 111 state 74 giây (trước ~54 phút).
+
+**Bẫy kèm theo:** gọi thẳng `psd-export.py` với đường dẫn TƯƠNG ĐỐI thì JSX nhận path tương
+đối và `doc.saveAs` chết với `Error 8800: General Photoshop error` — `run.sh` mới là chỗ chuẩn
+hoá `out`/`psd` về tuyệt đối. Chạy tay thì phải tự sửa `job.json` sang path tuyệt đối trước.
+Và sau `pkill -9` Photoshop thì phải `open -a` lại + chờ nó lên, không thì export im lặng ra
+0 ảnh với `_ps.log` rỗng.
+
+## 2026-09-09 · git log: `--date=format:` in giờ theo timezone của COMMIT, không phải của mình
+
+**Bắt được gì:** lượt `/daily delta` 16:12 báo "0 commit mới sau 15:08" ở cả 4 repo, nhưng
+new-mainsite đã có `cb348d441` lúc **16:06 giờ local** — trước cả lượt quét. Lượt 17:16 mới lộ.
+
+**Nguyên nhân:** sweep dùng `git log --date=format:'%m-%d %H:%M'`, mà `--date=format:` render
+theo timezone **ghi trong commit**. Bot CMS new-mainsite và merge commit GitLab đều ghi `+0000`
+⇒ hiện sớm 7 tiếng: `cb348d441` 16:06 in ra `09:06`, merge `32e9e8b9e` 16:43 in ra `09:43`.
+Bản thân `--since='… 15:00'` vẫn lọc đúng (nó so mốc tuyệt đối); chỗ sai là bước sau — so/lọc
+theo **chuỗi giờ vừa in**, nên commit `+0000` bị xếp về buổi sáng và rụng khỏi cửa sổ.
+
+**Lưới chặn:** `skills/daily/SKILL.md` bước (2b) nay ghi rõ bắt buộc `--date=format-local:`
+(hoặc `--date=local`) khi in/so giờ commit, cấm `--date=format:`.
+
+**Vì sao đáng ghi dù lần này vô hại:** commit rớt lưới nằm ở `templates/vltk20/…`, không thuộc
+`paths` ticket nào. Nhưng cơ chế che là cơ chế chung — đúng họ với bẫy `-4h` cứng (GW-805) và
+bẫy `git log` không `fetch` (19/8): cả ba đều làm delta báo "0 commit mới" một cách tự tin.
+
+**Nguồn:** board `boards/2026-09-09.md` log 17:16; đối chứng `git log --date=local` vs
+`--date=format:` trên `cb348d441` / `2e8062f7a` / `32e9e8b9e`.
+
+## 2026-09-11 · `git status` trên folder UNTRACKED gộp 1 dòng — không đo được "có động tay không"
+
+**Bắt được gì:** 3 lượt `/daily delta` liền (09:16 · 12:25 · 13:28) đều báo GW-796
+"`products/zsm/landing/2026-dua-co-hoi-h5` vẫn untracked, **0 file đổi** sau 09:16 ⇒ chưa động
+lại". Thực tế trong đúng khoảng đó có **46 file** đổi: asset sprite thật 11:52–13:46, 7 popup
+module twig+scss 13:12–13:24, build lại 13:48. Tức skill báo task đứng yên trong khi nó đang
+chạy mạnh nhất ngày.
+
+**Nguyên nhân:** folder chưa `git add` bao giờ ⇒ `git status --short` cố ý gộp cả cây thành
+ĐÚNG MỘT dòng `?? products/zsm/landing/2026-dua-co-hoi-h5/`. Dòng đó không đổi dù bên trong
+thêm/sửa bao nhiêu file, nên đọc nó ra "0 file đổi" là đọc sai ý nghĩa của output — cùng họ với
+bẫy `--date=format:` (9/9) và `git log` không `fetch` (19/8): công cụ trả lời đúng câu nó được
+hỏi, câu hỏi mới là chỗ sai.
+
+**Lưới chặn:** task đã scaffold mà CHƯA commit lần nào (`git status` chỉ ra dòng `?? <folder>/`)
+thì đo động tĩnh bằng mtime, không bằng git:
+`find <folder> -type f -not -path '*/node_modules/*' -newermt '<mốc lượt trước>'`.
+Cùng lý do, `metrics.jsonl` (số đo lấy từ git) cũng mù với task này — folder vào git rồi mới
+đếm được.
+
+**Nguồn:** board `boards/2026-09-11.md` log 09:16/12:25/13:28 (kết luận sai) vs log 14:33
+(`find -newermt` ra 46 file, `stat` từng mốc).
+
+## 2026-09-14 · Ảnh trạng thái "active" nung sẵn nội dung riêng của MỘT phần tử, dùng chung cho cả nhóm
+
+**Bắt được gì:** GW-745 (622 Bomber) đã bàn giao từ 8/9 và mọi số đo đều xanh — bản giao trùng
+từng byte với `dist2/index.html`, 0 URL tương đối, CDN live `cmp` khớp git HEAD 6/6 file,
+optimize-report 0 lỗi 0 cảnh báo, render PC 0 ảnh vỡ 0 tràn ngang. Nhưng nhìn bằng mắt thì
+stepper COS **hiện sai số mốc ở 3/4 mốc**: mốc nào đang active cũng ra `II`.
+
+**Nguyên nhân:** trạng thái active làm bằng cách ẩn `step-<N>.webp` (`opacity:0`) và hiện
+`step-active.webp` (`opacity:1`). `step-active.webp` lại là ảnh **cố định của mốc 2** — nung sẵn
+cả số `II` lẫn nhãn "Nhận Hỗ Trợ Cho Bombie". 4 ảnh nguồn `step-1..4.webp` đều đúng `I·II·III·IV`;
+lỗi nằm ở chỗ chỉ có MỘT ảnh cho trạng thái active của CẢ nhóm. Gốc rễ: design thiếu 3 ảnh active
+cho mốc 1/3/4 (nợ "3 nhãn stepper COS chờ PM"), dev lấy tạm ảnh mốc 2 dùng chung — nợ design biến
+thành lỗi hiển thị, không còn là "thiếu nhãn".
+
+**Lưới chặn:** asset trạng thái (`*-active`, `*-on`, `*-hover`, `*-selected`) mà **một** file phục
+vụ **nhiều** phần tử ⇒ file đó CHỈ được chứa phần chung (khung/nền/hiệu ứng), cấm chứa số thứ tự,
+nhãn, hay bất cứ nội dung riêng của một phần tử. Kiểm nhanh: đếm phần tử dùng nó vs số biến thể
+nội dung — `[...document.querySelectorAll('.x__on')].map(i=>i.src)` ra 1 src duy nhất trong khi
+`.x__num` có N src khác nhau ⇒ nghi ngay. Và: thiếu asset design thì để TRỐNG + ghi "Cần bạn",
+đừng mượn asset của anh em cùng nhóm — mượn xong là lỗi im lặng, số đo không bắt được.
+
+**Nguồn:** board `boards/2026-09-14.md` log 10:36; đo trên `products/ovensmash/landing/2026-request-landing-convert/dist2`
+(`opacity` từng `.cos-stepper__num`/`__on` theo scroll + zoom ảnh `step-active.webp`).
+Cùng họ với bài học "so pixel toàn trang không đủ" và "verify phải NHÌN, không chỉ đo số".
+
+## 2026-09-16 · `git` chết vì Xcode license — mọi bước git của /daily và console gãy im lặng
+
+**Bắt được gì:** lượt `/daily delta` 12:23 chạy `git -C <gt-promotion> pull` thì nhận
+`You have not agreed to the Xcode license agreements` thay vì output git. Đây KHÔNG phải lỗi repo:
+`/usr/bin/git` chỉ là shim gọi `xcrun` sang `/Applications/Xcode.app`, nên khi Xcode.app vừa
+cập nhật (license reset) thì **mọi** lệnh git trên máy chết, kể cả `git --version`. Cùng máy đó
+lúc 10:20 vẫn commit được ⇒ license reset trong khoảng 10:20–12:23 cùng ngày.
+
+**Nguyên nhân:** shim `/usr/bin/git` → `xcrun` → Xcode.app (đang đòi ký license). Bản git THẬT của
+Command Line Tools vẫn nguyên và chạy được: `/Library/Developer/CommandLineTools/usr/bin/git`
+(2.50.1, Apple Git-155) — đo thật trong lượt này, `pull` + `fetch` 4 repo đều ăn.
+
+**Vì sao nguy hiểm hơn vẻ ngoài:** lỗi này in ra stderr rồi trả rỗng, nên các bước "đếm commit mới"
+ra **0 dòng** — trông y hệt "không có commit mới". Cùng cơ chế với bẫy `git log` local ≠ remote
+(19/8) và bẫy `--date=format:` (9/9): radar nền vẫn `ok=true`, board vẫn sạch, mà thực chất mù.
+Ảnh hưởng rộng hơn skill: `console/server/lib/git.js:10` gọi `execFile('git', …)` **tên trần** ⇒
+console mất nguồn git luôn (suy phase từ commit, `learn.js` ghi metrics, promoScan, deliver).
+
+**Lưới chặn:** lệnh git trong lượt radar/daily mà stderr có `Xcode license` HOẶC `git --version`
+không in ra chuỗi `git version` ⇒ **CẤM kết luận "0 commit mới"**, phải đổi sang đường tuyệt đối
+`/Library/Developer/CommandLineTools/usr/bin/git` rồi chạy lại; chốt bằng `log -1 --all` mỗi repo
+để chứng minh git còn đọc được (commit mới nhất phải có thật), rồi mới được nói 0 commit.
+Fix gốc cần user: `sudo xcodebuild -license accept` (cần password ⇒ phiên nền không tự làm được).
+
+**Nguồn:** board `boards/2026-09-16.md` log 12:23–12:31; đo trên cả 4 repo trong `config.repos`.
+
+**Bổ sung 2026-09-17 (ngày thứ 2 chưa ký, lượt delta 10:09):** bẫy này **rộng hơn git** —
+`/usr/bin/python3` cũng là shim đi qua `xcode-select -p` nên cũng trả đúng câu license và
+**không chạy một dòng nào**. Đã đạp trong chính lượt này: heredoc `python3` sửa board in ra câu
+license, exit 0, board **không được ghi** — suýt báo "đã cập nhật board" mà thật ra chưa. Rút ra:
+trong lượt radar/daily, coi MỌI `/usr/bin/<tool>` của Apple là không đáng tin khi license chưa ký;
+sửa file thì dùng `node -` (node không dính), chạy git thì dùng
+`/Library/Developer/CommandLineTools/usr/bin/git`. Và **exit code 0 không chứng minh lệnh đã chạy**
+— phải kiểm dấu hiệu tác động thật (chuỗi xác nhận do chính script in ra, hoặc `grep` lại file).

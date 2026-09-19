@@ -932,3 +932,41 @@ phải thất bại; đóng dấu như thể đã làm mới là thất bại.**
 Đã đo tương đương connector trên toàn tập — 73 ticket/7 tháng, so `key|duedate|status|resolved|
 hash(summary)` chỉ lệch đúng dòng GW-796 vừa đổi thật. Giới hạn: cần tab Chrome nên **radar nền
 headless vẫn mù Jira** khi connector chết.
+
+## 2026-09-17 · Sửa tay file do generator sinh = mất trắng ở lần chạy sau
+
+**Bắt được gì.** GW-806: tôi sửa tay `nav.html.twig` (3 link chết) và `muc-luc.html.twig` (+4 thẻ),
+commit, push, deploy xong xuôi. Sau đó chạy `gen-twig.py` để sinh trang mới — `gen_shell()` **ghi đè
+đúng hai file đó** từ bảng `NAV`/`HUB` trong script, nơi vẫn giữ dạng gạch nối và 10 mục. Kịp phát
+hiện trước khi chạy nên chỉ mất công sửa gốc.
+
+**Lưới chặn.** Trước khi sửa tay bất kỳ file nào trong `vportal2view/mwly/**/ngoa-long-wiki/` hoặc
+thư mục tương tự: `grep -rl "<tên file>" ~/VNG/GW-806-ngoa-long-wiki/tools/`. Có generator thì **sửa
+generator rồi sinh lại**, đừng sửa file đầu ra. Dấu hiệu nhận ra file do máy sinh: hàng loạt file
+cùng khuôn, cùng thụt lề, id đặt theo công thức (`nlw-<page>-<part>`).
+
+**Chốt chặn thứ hai (đã dùng thật).** Sau khi sửa generator, xoá sạch thư mục đầu ra rồi sinh lại và
+đọc `git status`: **13 trang cũ 0 dòng đổi** ⇒ generator khớp bản đang chạy, an toàn. Nếu trang cũ
+cũng đổi thì generator đã trượt khỏi thực tế, phải soát trước khi commit.
+
+## 2026-09-17 · Bỏ dấu tiếng Việt bằng NFD làm MẤT chữ Đ
+
+**Bắt được gì.** `slug()` dùng `unicodedata.normalize('NFD', s).encode('ascii','ignore')`. NFD tách
+được dấu thanh nhưng **Đ/đ là ký tự riêng, không phân tách**, nên bị `ignore` xoá thẳng: "Đạo Cụ" ra
+`ao-cu` (đọc thành "Áo Cũ" — sai nghĩa hẳn), "Tổ Đội" ra `to-doi` thiếu thành `to-oi`, "Đơn Đấu" ra
+`on-au`. Ba tên file sai nằm trong bản đã chạy production từ trước, không ai để ý.
+
+**Lưới chặn.** Thay `Đ`→`D`, `đ`→`d` **trước** khi normalize. Test nhanh sau khi sửa hàm slug:
+`Vấn Đỉnh → van-dinh` · `Quy Đổi Bảo Vật → quy-doi-bao-vat` · `Chiến Dịch Tổ Đội → chien-dich-to-doi`.
+Áp cho mọi chỗ sinh slug tiếng Việt, không riêng repo này.
+
+## 2026-09-17 · Đo ảnh vỡ bằng Image() nhiều luồng trong browser cho số SAI
+
+**Bắt được gì.** Probe 1940 ảnh bằng 40 `new Image()` song song trong tab: báo **40–50% vỡ**. Đo lại
+bằng `curl` HEAD 12 luồng: **146/1940 = 7,5%**, và con số 146 khớp chính xác số ảnh thiếu trong git.
+Browser hết tài nguyên (`ERR_INSUFFICIENT_RESOURCES`) thì bắn `onerror` y như 404 — không phân biệt
+được, nên số vỡ phình theo mức độ song song.
+
+**Lưới chặn.** Đếm ảnh vỡ thì đo từ ngoài browser (`curl`/`urllib` HEAD, ≤12 luồng, có retry). Dùng
+browser chỉ để **nhìn** ảnh vỡ trên một màn hình, không để đếm. Nếu buộc phải probe trong trang thì
+hạ xuống ≤6 luồng và đối chiếu lại một mẫu bằng curl trước khi báo số.

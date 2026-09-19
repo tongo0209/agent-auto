@@ -48,6 +48,7 @@ Các thư mục dữ liệu vẫn còn sau khi clone nhờ `.gitkeep`, chỉ là
 | `tools/build-dashboard.mjs` | Sinh khối `DATA` của `dashboard.html` **từ `state.json`** | có |
 | `tools/psd-tree.py` | Dump cây layer PSD/PSB — `/check-design` gọi ở bước soát tầng file | — |
 | `tools/baked-text-guard.py` | Bắt lỗi **chữ lồng chữ**: text vừa bake trong ảnh vừa render bằng HTML. Build PASS, console sạch, checker qua — chỉ mắt người mới thấy | — |
+| `tools/check-handoff-sync.py` | So **chữ 2 nửa bàn giao** `Promotion/` ↔ `mainsite/` của gt-promotion-template theo từ, ghép cặp kiểu "×20 ↔ x1", bỏ qua khác markup/thứ tự block (R-HO-5) | 6 nhóm |
 | `tools/sp-diff.mjs` | So 2 manifest cũ ↔ mới để biết designer sửa/thêm/xoá file gì | — |
 
 ## Cổng chất lượng trước khi báo xong

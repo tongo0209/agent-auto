@@ -1,0 +1,403 @@
+<title>Cổng soát PSD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600&family=Be+Vietnam+Pro:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper: #eef1f5;
+    --surface: #ffffff;
+    --surface-2: #f6f8fb;
+    --ink: #10161d;
+    --muted: #55636f;
+    --line: #d2dbe5;
+    --line-strong: #b6c3d1;
+    --accent: #1b4b8f;
+    --accent-ink: #123566;
+    --ok: #1c6b45;
+    --ok-soft: #e0efe6;
+    --miss: #a3241b;
+    --miss-soft: #f6e3e0;
+    --unsure: #8c5c14;
+    --unsure-soft: #f7ecd9;
+    --na: #66727e;
+    --na-soft: #e8ecf0;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0d131a;
+      --surface: #141d26;
+      --surface-2: #18232e;
+      --ink: #e7edf3;
+      --muted: #94a3b2;
+      --line: #26333f;
+      --line-strong: #354655;
+      --accent: #74aae9;
+      --accent-ink: #a9cbf1;
+      --ok: #56b382;
+      --ok-soft: #12291f;
+      --miss: #e37a6d;
+      --miss-soft: #2c1917;
+      --unsure: #d7a349;
+      --unsure-soft: #2a2113;
+      --na: #8e9aa7;
+      --na-soft: #1c252e;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #0d131a;
+    --surface: #141d26;
+    --surface-2: #18232e;
+    --ink: #e7edf3;
+    --muted: #94a3b2;
+    --line: #26333f;
+    --line-strong: #354655;
+    --accent: #74aae9;
+    --accent-ink: #a9cbf1;
+    --ok: #56b382;
+    --ok-soft: #12291f;
+    --miss: #e37a6d;
+    --miss-soft: #2c1917;
+    --unsure: #d7a349;
+    --unsure-soft: #2a2113;
+    --na: #8e9aa7;
+    --na-soft: #1c252e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1000px; margin: 0 auto; padding-inline: max(18px, 4vw); padding-block: 0 64px; }
+
+  h1, h2 { font-family: "IBM Plex Serif", Georgia, serif; font-weight: 600; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+  h1 { font-size: clamp(27px, 4.6vw, 40px); line-height: 1.14; }
+  h2 { font-size: clamp(20px, 2.8vw, 25px); line-height: 1.25; }
+  p { margin: 0; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent);
+  }
+  .lead { font-size: clamp(16.5px, 2vw, 18px); color: var(--muted); font-weight: 300; max-width: 60ch; }
+
+  header.masthead {
+    border-bottom: 1px solid var(--line);
+    background-color: var(--surface);
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-position: -1px -1px;
+  }
+  header.masthead .wrap { padding-block: clamp(28px, 5vw, 48px) clamp(22px, 3.5vw, 34px); }
+  .masthead-inner { display: flex; flex-direction: column; gap: 12px; max-width: 64ch; }
+
+  .stamp {
+    align-self: flex-start;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    padding: 4px 10px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  }
+  .stamp b { color: var(--ink); font-weight: 500; }
+
+  section { margin-top: clamp(36px, 5.5vw, 56px); }
+  .sec-head { display: flex; flex-direction: column; gap: 7px; max-width: 62ch; }
+  .sec-head p { color: var(--muted); font-size: 15.5px; }
+  .layers { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 20px; }
+  .layer { background: var(--surface); border: 1px solid var(--line); border-radius: 3px; padding: 15px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .layer .n { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  .layer h3 { font-family: "Be Vietnam Pro", sans-serif; font-size: 15px; font-weight: 600; margin: 0; }
+  .layer p { font-size: 14.5px; color: var(--muted); }
+  .layer p b { color: var(--ink); font-weight: 500; }
+  .verdict-line { margin-top: 18px; max-width: 64ch; font-size: 15.5px; border-left: 3px solid var(--accent); padding-left: 14px; }
+
+  .v {
+    display: inline-block; font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; font-weight: 500; letter-spacing: .05em;
+    padding: 2px 6px; border-radius: 2px; white-space: nowrap; border: 1px solid transparent;
+  }
+  .v-ok { color: var(--ok); background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 30%, transparent); }
+  .v-miss { color: var(--miss); background: var(--miss-soft); border-color: color-mix(in srgb, var(--miss) 30%, transparent); }
+  .v-unsure { color: var(--unsure); background: var(--unsure-soft); border-color: color-mix(in srgb, var(--unsure) 30%, transparent); }
+  .v-na { color: var(--na); background: var(--na-soft); border-color: color-mix(in srgb, var(--na) 30%, transparent); }
+
+  .table-scroll { overflow-x: auto; margin-top: 18px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 600px; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 500;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+    background: var(--surface-2); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  code, .mono { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+
+  .code {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 3px;
+    overflow-x: auto; padding: 12px 14px; margin-top: 18px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px; line-height: 1.6;
+    white-space: pre;
+  }
+  .code .c { color: var(--muted); }
+  .code .hl { color: var(--miss); font-weight: 500; }
+  .code .ok { color: var(--ok); font-weight: 500; }
+  figure { margin: 0; }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); max-width: 64ch; }
+
+  .split { display: grid; grid-template-columns: repeat(auto-fit, minmax(262px, 1fr)); gap: 18px; margin-top: 20px; align-items: start; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 3px; padding: 16px; }
+  .panel .name { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  .panel ul { margin: 9px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 14.5px; color: var(--muted); }
+  .panel ul b { color: var(--ink); font-weight: 500; }
+  .sheet { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; line-height: 1.7; margin-top: 10px; white-space: pre-wrap; }
+  .sheet .tot { color: var(--ink); font-weight: 500; }
+  .sheet .q { color: var(--muted); }
+
+  footer { margin-top: clamp(40px, 6vw, 60px); border-top: 1px solid var(--line); padding-top: 16px; font-size: 13.5px; color: var(--muted); }
+  footer .mono { color: var(--ink); }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="masthead-inner">
+      <span class="eyebrow">Soát bộ design vừa nhận</span>
+      <h1>Bộ design này đã đủ để dựng chưa</h1>
+      <p class="lead">Một lệnh: đọc yêu cầu từ mọi nguồn, mở ảnh design và mở cả file PSD, rồi trả về phiếu nói từng hạng mục <strong>có hay không</strong> — mỗi dòng kèm chỗ chỉ được tận tay.</p>
+      <span class="stamp">Ba lớp bằng chứng: <b>yêu cầu · ảnh · PSD</b> — một lớp không kết luận được</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Dùng thế nào</span>
+      <h2>Một lệnh, chạy hôm design về</h2>
+      <p>Không cần mở Photoshop, không cần đọc trước yêu cầu. Chạy lại hôm sau thì nó tự so với lần trước.</p>
+    </div>
+    <div class="layers">
+      <div class="layer">
+        <span class="n">gõ</span>
+        <h3><code>/check-design GW-777</code></h3>
+        <p>Thêm <code>--fast</code> nếu chỉ cần soát nhanh trên ảnh, chưa muốn chờ mở PSD nặng.</p>
+      </div>
+      <div class="layer">
+        <span class="n">nó tự làm</span>
+        <h3>Đọc yêu cầu → nhìn ảnh → mở PSD</h3>
+        <p>Chỉ mở PSD cho hạng mục nhìn ảnh chưa kết luận được. Ảnh dài tự cắt lát để thấy rõ chi tiết.</p>
+      </div>
+      <div class="layer">
+        <span class="n">nhận về</span>
+        <h3>Phiếu + block gửi PM</h3>
+        <p>Đếm 4 mức · màn nào dựng được ngay · block copy gửi PM đã kèm câu nguồn. Lần sau có thêm dòng <b>“vẫn thiếu sang ngày thứ N”</b>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Làm được gì</span>
+      <h2>Những câu nó trả lời được, kèm bằng chứng</h2>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Câu hỏi</th><th>Trả lời bằng cái gì</th></tr></thead>
+        <tbody>
+          <tr><td>Yêu cầu đòi X, trong design có X chưa?</td><td>đối chiếu từng dòng yêu cầu với ảnh và với cây layer — không có thì trích luôn câu đòi nó</td></tr>
+          <tr><td><strong>Đủ số lượng chưa?</strong> 8 mốc thưởng, 15 hạng mục cửa hàng, 5 menu</td><td>đếm layer/ô thật trong PSD: “8 rương + 8 nút”, “10 slot + scroll đủ cho 15 hạng mục”, “36/37 ô rỗng icon”</td></tr>
+          <tr><td>Popup có <strong>ruột</strong> hay chỉ có <strong>vỏ</strong>?</td><td>vỏ (nền mờ + khung + nút đóng) và nội dung từng popup là hai hạng mục tách riêng</td></tr>
+          <tr><td>Màn đang tìm có nằm trong <strong>layer bị tắt</strong> không?</td><td>đọc cả layer HIDDEN, rồi bật lên render thành PNG để xem thật</td></tr>
+          <tr><td>Có bản <strong>mobile</strong>, có <strong>hover/disabled</strong>, có trạng thái <strong>rỗng/lỗi</strong> chưa?</td><td>tìm nhóm layer theo từ khoá (<code>mb</code>, <code>hover</code>, <code>active</code>) + soát ảnh mobile</td></tr>
+          <tr><td>Chữ trong design là <strong>nội dung thật</strong> hay Lorem?</td><td>đọc chữ thật trong layer text — Lorem thì thành câu hỏi cho PM, không tick đủ</td></tr>
+          <tr><td>Design dùng <strong>font gì</strong>, đã có file font chưa?</td><td>đọc tên font ghi trong PSD từng khối chữ, đối chiếu font đang có trong dự án</td></tr>
+          <tr><td>Kích thước, toạ độ, khoảng cách thật là bao nhiêu?</td><td>đo trên PSD: ô 300×380, pitch cột 310 / hàng 385, nút 293×68 @(855,1072)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Nhìn vào đâu</span>
+      <h2>Ba lớp bằng chứng — thiếu lớp nào cũng không dám nói “đủ”</h2>
+      <p>Đây là chỗ hay bị hiểu là “tool đọc PSD”. Đọc PSD chỉ là lớp thứ ba.</p>
+    </div>
+    <div class="layers">
+      <div class="layer">
+        <span class="n">lớp 1</span>
+        <h3>Nguồn yêu cầu</h3>
+        <p>Brief, note dev của PM (<code>.docx</code>), spec game (<code>.xlsx</code>), Jira description <b>và toàn bộ comment</b>. Lớp này quyết định <b>phải kiểm cái gì</b> — và chỉ nó mới sinh ra được chữ “thiếu”.</p>
+      </div>
+      <div class="layer">
+        <span class="n">lớp 2</span>
+        <h3>Ảnh design</h3>
+        <p>Ảnh preview cắt lát để nhìn rõ nút, chữ nhỏ, chỉ báo slider. Thấy gì thì ghi kèm <b>toạ độ trên ảnh gốc</b> (<code>y≈2400–3100</code>) để người khác mở lại đúng chỗ. Nhưng ảnh chỉ là <b>một trạng thái hiển thị</b> của PSD.</p>
+      </div>
+      <div class="layer">
+        <span class="n">lớp 3</span>
+        <h3>File PSD</h3>
+        <p>Cây layer (kể cả layer tắt) + <b>bật layer ẩn render lại thành PNG</b> + đo kích thước, đếm số ô. Cây layer chỉ nói “có layer tên vậy”; render mới nói nội dung đúng chưa, đủ chưa, dàn trang xong chưa.</p>
+      </div>
+    </div>
+    <figure>
+      <div class="code">[group] popup thuong moc  (268,89 1464x1008)  <span class="hl">HIDDEN</span>
+  [group] images  (402,509 1195x582)
+    [smartobject] moc-6  (402,509 1195x582)     <span class="hl">← 1 ảnh cho 8 mốc</span>
+  [group] button  (859,901 288x91)  <span class="hl">HIDDEN</span>
+    [type] nhận ngay  (889,921 228x51)          <span class="ok">← có, chỉ bị tắt</span></div>
+      <figcaption>Cây layer đọc ra được: tên · vị trí · kích thước · có bị tắt hiển thị không · chữ thật. Đây là chỗ thấy được cả “thiếu thật” và “tưởng thiếu mà có”.</figcaption>
+    </figure>
+
+    <p class="verdict-line">Nên một hạng mục được tick <span class="v v-ok">ĐỦ</span> khi <strong>ba lớp giao nhau</strong>: nguồn có đòi · nhìn thấy được · đếm/đo ra đúng số lượng. Chỉ đọc ảnh thì báo thiếu oan; chỉ đọc tên layer thì báo đủ oan.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Vì sao phải cả ba lớp</span>
+      <h2>Bốn ca một lớp nói sai</h2>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Hạng mục yêu cầu đòi</th><th>Chỉ nhìn ảnh</th><th>Chỉ đọc tên layer</th><th>Bật + render + đếm</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>3 trang con: danh sách · chi tiết · xếp hạng</td>
+            <td>ảnh chỉ có 1/3 ⇒ báo thiếu 2 trang</td>
+            <td>có <code>/page detail</code>, <code>/page xep hang</code></td>
+            <td>render ra đủ 2 trang, chỉ bị tắt hiển thị ⇒ <span class="v v-ok">ĐỦ</span></td>
+          </tr>
+          <tr>
+            <td>Popup thưởng 8 mốc, mốc 600 có 7 món</td>
+            <td>popup hiện ra đầy đủ ⇒ tick đủ</td>
+            <td>có group ảnh quà ⇒ tick đủ</td>
+            <td>trong group chỉ 1 ảnh cho 8 mốc, 36/37 ô rỗng icon ⇒ <span class="v v-miss">THIẾU</span></td>
+          </tr>
+          <tr>
+            <td>Nút nhận thưởng trong popup mốc</td>
+            <td>bản render không thấy nút ⇒ báo thiếu</td>
+            <td>—</td>
+            <td>bật group nút: 288×91, nhãn “nhận ngay” ⇒ <span class="v v-ok">ĐỦ</span></td>
+          </tr>
+          <tr>
+            <td>Popup kết quả 1 quà (khác bản 10 quà)</td>
+            <td>không thấy ⇒ báo thiếu</td>
+            <td>có 1 item quà ⇒ tick đủ</td>
+            <td>render ra: item lệch trục giữa, là item designer để tạm ⇒ <span class="v v-unsure">CHƯA-CHẮC</span>, hỏi lại designer</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Cần cài gì</span>
+      <h2>Không cần Photoshop để soát</h2>
+    </div>
+    <div class="layers">
+      <div class="layer">
+        <span class="n">đủ để soát</span>
+        <h3><code>psd-tools</code> + <code>pillow</code></h3>
+        <p>Python thuần, mở thẳng <code>.psd</code> và <code>.psb</code> nhiều trăm MB: đọc cây layer, bật layer ẩn, render group cần xem thành PNG.</p>
+      </div>
+      <div class="layer">
+        <span class="n">khi nào cần photoshop</span>
+        <h3>Lúc bóc asset đi dựng</h3>
+        <p>Bản render của <code>psd-tools</code> <b>không có layer effects</b> (bóng đổ, gradient chữ) — đủ để đếm và đo, không đủ để cắt asset giao dev. Khâu đó là việc khác, làm sau khi phiếu đã xong.</p>
+      </div>
+      <div class="layer">
+        <span class="n">thứ tự nhìn</span>
+        <h3>Layer trước, ảnh sau</h3>
+        <p>Cây layer nói có gì → render đúng group đó → mới nhìn để xác nhận nội dung. Nhìn ảnh là <b>lớp xác nhận</b>, không phải lớp phán.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Ảnh đúng và đủ</span>
+      <h2>Đo cơ học, vì mắt sẽ bỏ sót</h2>
+      <p>Năm phép dưới đây chạy bằng số, không phụ thuộc người soát hôm đó tinh mắt hay không.</p>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Đảm bảo điều gì</th><th>Đo bằng gì</th></tr></thead>
+        <tbody>
+          <tr><td>Đủ <strong>số lượng</strong></td><td>đếm layer/ô trong group rồi so con số trong spec — spec ghi 8 mốc thì phải đếm ra 8</td></tr>
+          <tr><td>Đúng <strong>kích thước và dàn trang</strong></td><td>toạ độ + kích thước từng layer: ô 300×380, pitch cột 310 / hàng 385 — item lệch trục giữa là thấy ngay</td></tr>
+          <tr><td>Không phải <strong>ảnh chép tạm</strong></td><td>md5 + so pixel giữa các ảnh cùng bộ — 6 ảnh quà mà trùng nhau nghĩa là designer để tạm 1 ảnh</td></tr>
+          <tr><td>Không có <strong>asset rỗng</strong></td><td>quét ảnh trắng trơn / trong suốt — loại lỗi mà mở lên vẫn thấy “có ảnh”</td></tr>
+          <tr><td>File <strong>không hỏng, không đổi đuôi</strong></td><td>kiểm kiểu file thật theo byte đầu + dung lượng so với nơi design giao (23/23 file · 132 MB)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="verdict-line">Ngoài năm phép đó thì không tick <span class="v v-ok">ĐỦ</span>: ảnh là ảnh thật hay ảnh mẫu, chữ đã chốt chưa, chất lượng có đủ để phóng to — mấy cái này chỉ thành <strong>câu hỏi cho PM</strong>, mức cao nhất là <span class="v v-unsure">CHƯA-CHẮC</span>.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Bốn mức trên phiếu</span>
+      <h2>Mức nào cũng phải kèm bằng chứng, không thì bị hạ</h2>
+      <p>Luật này do script nhận phiếu cưỡng chế, không phải tự giác: khai <strong>ĐỦ</strong> mà không chỉ được layer/vùng nào, hay khai <strong>THIẾU</strong> mà chưa mở PSD, đều bị tự động hạ xuống <strong>CHƯA-CHẮC</strong>. Hạng mục nguồn không đòi thì bị đẩy khỏi danh sách thiếu, thành câu hỏi cho PM.</p>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Mức</th><th>Nghĩa</th><th>Bằng chứng phải kèm</th></tr></thead>
+        <tbody>
+          <tr><td><span class="v v-ok">ĐỦ</span></td><td>dựng được, không phải đòi gì thêm</td><td>chỉ ra chỗ thấy: <code>"…_PC.jpg y≈2400–3100"</code> hoặc <code>"/popup thuong moc/images/moc-6"</code></td></tr>
+          <tr><td><span class="v v-miss">THIẾU</span></td><td>nguồn có đòi, design chưa có ⇒ đòi PM/designer</td><td>danh sách file đã soi, <strong>phải có file PSD/PSB</strong> trong đó</td></tr>
+          <tr><td><span class="v v-unsure">CHƯA-CHẮC</span></td><td>chưa kết luận được, không được đoán</td><td>kẹt vì cái gì: file chưa tải xong, PSB không mở nổi, layer để tạm chưa dàn trang</td></tr>
+          <tr><td><span class="v v-na">KHÔNG-ÁP-DỤNG</span></td><td>nguồn đòi nhưng không cần asset riêng</td><td>câu nguồn nói rõ làm bằng CSS/JS: <em>“hover scale + brightness”</em></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Đầu ra · giới hạn</span>
+      <h2>Phiếu để đối chiếu, và những gì phiếu không biết</h2>
+    </div>
+    <div class="split">
+      <div class="panel">
+        <span class="name">phiếu soát</span>
+        <div class="sheet"><span class="tot">GW-777 · 26/08 — ĐỦ 21 · THIẾU 3 · CHƯA CHẮC 1 · hỏi thêm 8</span>
+tầng file: 23/23 · 132,0 MB
+dựng được ngay: màn chính, cửa hàng, 6 popup
+
+<span class="q">THIẾU</span> icon quà popup mốc — 36/37 ô rỗng
+   nguồn: spec xlsx “mốc 600: Nguyệt Thạch 80 · …”
+   đã soi: popup.psd (cây layer) + 6 ảnh mốc + render lại
+<span class="q">CHƯA-CHẮC</span> popup kết quả 1 quà — item lệch trục
+   giữa, chưa dàn trang ⇒ cần designer xác nhận</div>
+      </div>
+      <div class="panel">
+        <span class="name">phiếu không biết</span>
+        <ul>
+          <li><b>Đẹp/xấu, bố cục hợp lý.</b> Phiếu nói “có”, không nói “nên”.</li>
+          <li><b>Nội dung chốt.</b> Đọc ra Lorem thì biết là tạm, nhưng bản chữ thật là gì thì phải hỏi PM.</li>
+          <li><b>Nguồn viết thiếu.</b> Nguồn không đòi thì phiếu không thấy — nên checklist nghề phải lớn dần theo từng ca trả giá.</li>
+          <li><b>Giao diện đã dựng.</b> So code với design là việc khác, làm sau khi dev dựng xong.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Chạy dưới dạng skill <span class="mono">/check-design &lt;mã ticket&gt;</span>: dump cây layer bằng <span class="mono">psd-tools</span>, cắt ảnh bằng <span class="mono">pillow</span>, phiếu do script chốt để không tự phong mức. Mọi con số và câu trích trong trang lấy từ phiếu soát thật của hai ticket subweb và promotion vòng quay.
+  </footer>
+
+</div>

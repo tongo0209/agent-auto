@@ -125,7 +125,9 @@ function root(cfg = {}) {
   const d = tmp('radar-root-');
   fs.mkdirSync(path.join(d, 'history'), { recursive: true });
   fs.mkdirSync(path.join(d, 'boards'), { recursive: true });
+  fs.mkdirSync(path.join(d, 'schema'), { recursive: true });
   fs.writeFileSync(path.join(d, 'config.json'), JSON.stringify({ radar: { ...DEFAULTS, ...cfg } }));
+  fs.writeFileSync(path.join(d, 'schema/vocab.json'), JSON.stringify({ doneStatuses: ['done', 'completed'] }));
   fs.writeFileSync(path.join(d, 'state.json'), '{}');
   fs.utimesSync(path.join(d, 'state.json'), new Date(0), new Date(0)); // cũ sẵn, khỏi vướng cổng ③
   return d;
@@ -572,4 +574,47 @@ test('thông báo ghi rõ số liệu đọc cách đây bao lâu', () => {
     notify: (t, m) => said.push(m),
   });
   assert.match(said[0], /đọc 90 phút trước/);
+});
+
+
+test('lượt radar tự đóng ticket hết mốc + Jira Done, ghi vào sổ lượt', () => {
+  const d = root();
+  fs.writeFileSync(
+    path.join(d, 'state.json'),
+    JSON.stringify({ issues: { 'GW-660': { phase: 'bugfix', status: 'COMPLETED', milestones: { release: '2026-07-20' } } } })
+  );
+  fs.utimesSync(path.join(d, 'state.json'), new Date(0), new Date(0));
+
+  const row = runTick({ root: d, now: monday, runClaude: () => ({ ok: true, ms: 1 }), notify: () => {} });
+
+  assert.equal(JSON.parse(fs.readFileSync(path.join(d, 'state.json'), 'utf8')).issues['GW-660'].phase, 'closed');
+  assert.deepEqual(row.closed, ['GW-660']);
+});
+
+test('lượt radar KHÔNG đóng ticket Jira còn To Do dù quá mốc', () => {
+  const d = root();
+  fs.writeFileSync(
+    path.join(d, 'state.json'),
+    JSON.stringify({ issues: { 'GW-745': { phase: 'wait-test', status: 'To Do', milestones: { release: '2026-07-20' } } } })
+  );
+  fs.utimesSync(path.join(d, 'state.json'), new Date(0), new Date(0));
+
+  const row = runTick({ root: d, now: monday, runClaude: () => ({ ok: true, ms: 1 }), notify: () => {} });
+
+  assert.equal(JSON.parse(fs.readFileSync(path.join(d, 'state.json'), 'utf8')).issues['GW-745'].phase, 'wait-test');
+  assert.equal(row.closed, undefined);
+});
+
+test('--dry KHÔNG được ghi state dù có ticket đủ điều kiện đóng', () => {
+  const d = root();
+  fs.writeFileSync(
+    path.join(d, 'state.json'),
+    JSON.stringify({ issues: { 'GW-660': { phase: 'bugfix', status: 'COMPLETED', milestones: { release: '2026-07-20' } } } })
+  );
+  fs.utimesSync(path.join(d, 'state.json'), new Date(0), new Date(0));
+  const before = fs.readFileSync(path.join(d, 'state.json'), 'utf8');
+
+  runTick({ root: d, now: monday, argv: ['--dry'], runClaude: () => ({ ok: true, ms: 1 }), notify: () => {} });
+
+  assert.equal(fs.readFileSync(path.join(d, 'state.json'), 'utf8'), before);
 });

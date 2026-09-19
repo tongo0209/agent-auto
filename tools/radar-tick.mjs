@@ -19,6 +19,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { countPending, countOpen, openBySheet, pickPrompt, isWatched } from './bug-radar.mjs';
 import { dueToday, runJanitor, sweepAlert } from './janitor.mjs';
+import { runAutoClose } from './autoclose.mjs';
 
 export const DEFAULTS = {
   enabled: true,
@@ -300,12 +301,15 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
   const sweepMsg = swept && sweepAlert(swept);
   if (sweepMsg) notify('Dọn rác — agent-auto', sweepMsg);
 
+  // Phải chạy TRƯỚC khi đọc state bên dưới, không thì lượt này còn thấy phase cũ.
+  const closed = runAutoClose({ root, now, dry: argv.includes('--dry') }).closed.map((c) => c.key);
+
   const state = readJSON(path.join(root, 'state.json'), { bugWatch: {} });
   const bugCfg = readJSON(path.join(root, 'config.json'), {}).bugRadar || {};
   const pendingBefore = countPending(state);
   const openBefore = countOpen(state, now);
   const choice = argv.includes('--force') ? { prompt: '/daily delta', why: 'forced' } : pickPrompt(state, now, bugCfg);
-  if (choice.skip) return { at: stamp(), skipped: choice.skip, swept };
+  if (choice.skip) return { at: stamp(), skipped: choice.skip, swept, closed: closed.length ? closed : undefined };
 
   fs.mkdirSync(path.dirname(lock), { recursive: true });
   fs.writeFileSync(lock, JSON.stringify({ pid: process.pid, atMs: Number(now) }));
@@ -353,6 +357,7 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
       costUsd: res.costUsd,
       err: res.err,
       swept,
+      closed: closed.length ? closed : undefined,
       openAdded,
       openSheets,
     });

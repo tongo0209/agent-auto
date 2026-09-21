@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { icon } from '@core/icons';
 import { IDLE } from '@core/constants.mjs';
 import { loadTabs, saveTabs, newSessionId } from '@terminal/sessionStore.mjs';
+import { gridFor, visiblePanes, loadLayout, saveLayout } from '@terminal/gridLayout.mjs';
 
 const THEME = {
   background: '#0A100F',
@@ -12,19 +13,26 @@ const THEME = {
   selectionBackground: '#2A4C46',
 };
 const RECONNECT_MS = 2000;
+/** Dưới ngưỡng này bảng/diff của Claude Code wrap xấu → đầu pane hiện số cols để user bớt ô */
+const READABLE_COLS = 80;
+const FIT_DEBOUNCE_MS = 80;
 
 /**
  * Quản lý NHIỀU tab terminal, mỗi tab = 1 pty thật qua WebSocket.
  * Cho phép chạy song song: tab code, tab bug-fixer-lite, tab shell tự do.
  */
 export class TerminalManager {
-  constructor({ termsSelector, tabsSelector, onStatusChange, onIdle }) {
+  constructor({ termsSelector, tabsSelector, onStatusChange, onIdle, onLayout }) {
     this.$terms = $(termsSelector);
     this.$tabs = $(tabsSelector);
     this.onStatusChange = onStatusChange || (() => {});
     this.onIdle = onIdle || (() => {});
+    this.onLayout = onLayout || (() => {});
     this.sessions = [];
     this.activeIndex = -1;
+    this.layout = loadLayout(window.localStorage);
+    this.gridModeBeforeAll = 'auto';
+    this.fitTimer = null;
     this.watchIdle();
 
     this.$tabs.on('click', '[data-close]', (e) => {
@@ -32,7 +40,25 @@ export class TerminalManager {
       this.close(Number($(e.currentTarget).data('close')));
     });
     this.$tabs.on('click', '[data-tab-index]', (e) => this.activate(Number($(e.currentTarget).data('tab-index'))));
-    $(window).on('resize', () => this.fitActive());
+    this.$terms.on('click', '[data-pane-close]', (e) => {
+      e.stopPropagation();
+      this.close(this.indexOfWrap($(e.currentTarget).closest('.tw')));
+    });
+    this.$terms.on('click', '[data-pane-back]', (e) => {
+      e.stopPropagation();
+      this.setZoom(false);
+    });
+    this.$terms.on('mousedown', '.tw', (e) => {
+      const index = this.indexOfWrap($(e.currentTarget));
+      if (index !== this.activeIndex) this.activate(index);
+    });
+    // Ở chế độ "xem tất cả", bấm vào ô nào là phóng to ô đó (vẫn phiên pty cũ, không dựng lại)
+    this.$terms.on('click', '.tw', () => {
+      if (this.isOverview) this.setZoom(true);
+    });
+
+    $(window).on('resize', () => this.scheduleFit());
+    new window.ResizeObserver(() => this.scheduleFit()).observe(this.$terms[0]);
   }
 
   /**
@@ -48,7 +74,15 @@ export class TerminalManager {
   }
 
   create(label, id) {
-    const $wrap = $('<div class="tw"></div>').appendTo(this.$terms);
+    const $wrap = $(`<div class="tw">
+        <div class="phead">
+          <span class="dot"></span><span class="pname"></span>
+          <span class="pcols" title="Số cột — dưới ${READABLE_COLS} thì Claude Code đọc xấu"></span>
+          <button type="button" class="pback" data-pane-back title="Về lưới tất cả terminal">${icon('grid')} tất cả</button>
+          <button type="button" class="px" data-pane-close title="Đóng terminal">${icon('close')}</button>
+        </div>
+        <div class="pbody"></div>
+      </div>`).appendTo(this.$terms);
     const term = new Terminal({
       fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
       fontSize: 13,
@@ -58,7 +92,7 @@ export class TerminalManager {
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
-    term.open($wrap[0]);
+    term.open($wrap.find('.pbody')[0]);
 
     const session = {
       term,
@@ -127,9 +161,14 @@ export class TerminalManager {
     return this.sessions[this.activeIndex];
   }
 
+  indexOfWrap($wrap) {
+    return this.sessions.findIndex((s) => s.$wrap[0] === $wrap[0]);
+  }
+
   activate(index) {
     this.activeIndex = index;
     this.sessions.forEach((s, i) => s.$wrap.toggleClass('active', i === index));
+    this.applyGrid();
     this.renderTabs();
     const session = this.active;
     if (session) {
@@ -138,6 +177,54 @@ export class TerminalManager {
         session.term.focus();
       }, 30);
     }
+  }
+
+  get gridMode() {
+    return this.layout.mode;
+  }
+  get zoomed() {
+    return this.layout.zoomed;
+  }
+  /** Đang bung tất cả terminal ra lưới (chưa phóng to ô nào) — lúc này bấm vào ô là zoom */
+  get isOverview() {
+    return this.layout.mode === 'all' && !this.layout.zoomed;
+  }
+  setGridMode(mode) {
+    this.layout = { ...this.layout, mode, zoomed: false };
+    saveLayout(window.localStorage, this.layout);
+    this.applyGrid();
+  }
+  setZoom(on) {
+    this.layout = { ...this.layout, zoomed: on };
+    saveLayout(window.localStorage, this.layout);
+    this.applyGrid();
+  }
+  toggleAll() {
+    if (this.layout.zoomed) return this.setZoom(false);
+    if (this.layout.mode === 'all') return this.setGridMode(this.gridModeBeforeAll);
+    this.gridModeBeforeAll = this.layout.mode;
+    this.setGridMode('all');
+  }
+
+  get fullWidth() {
+    return this.layout.fullWidth;
+  }
+  setFullWidth(on) {
+    this.layout = { ...this.layout, fullWidth: on };
+    saveLayout(window.localStorage, this.layout);
+    this.scheduleFit();
+  }
+
+  applyGrid() {
+    const zoom = this.layout.zoomed;
+    const { cols, rows, cells } = zoom
+      ? { cols: 1, rows: 1, cells: 1 }
+      : gridFor(this.layout.mode, this.sessions.length);
+    const shown = new Set(zoom ? [this.activeIndex] : visiblePanes(this.sessions.length, cells, this.activeIndex));
+    this.$terms.css({ '--tg-cols': cols, '--tg-rows': rows }).toggleClass('zoomed', zoom).toggleClass('overview', this.isOverview);
+    this.sessions.forEach((s, i) => s.$wrap.toggleClass('show', shown.has(i)));
+    this.scheduleFit();
+    this.onLayout({ mode: this.layout.mode, zoomed: zoom });
   }
 
   close(index) {
@@ -165,16 +252,23 @@ export class TerminalManager {
   }
 
   fit(session) {
-    if (!session || !session.$wrap.hasClass('active')) return;
+    if (!session || !session.$wrap.hasClass('show')) return;
     try {
       session.fit.fit();
     } catch {
       return;
     }
     this.send(session, { type: 'resize', cols: session.term.cols, rows: session.term.rows });
+    const cols = session.term.cols;
+    session.$wrap.find('.pcols').text(cols < READABLE_COLS ? cols + 'c' : '');
   }
-  fitActive() {
-    this.fit(this.active);
+  fitVisible() {
+    for (const session of this.sessions) this.fit(session);
+  }
+  /** Kéo splitter bắn onResize liên tục — gộp nhịp, không thì mỗi pane fit hàng chục lần/giây */
+  scheduleFit() {
+    clearTimeout(this.fitTimer);
+    this.fitTimer = setTimeout(() => requestAnimationFrame(() => this.fitVisible()), FIT_DEBOUNCE_MS);
   }
 
   /**
@@ -235,6 +329,10 @@ export class TerminalManager {
       )
       .join('');
     this.$tabs.html(html);
+    for (const s of this.sessions) {
+      s.$wrap.find('.pname').text(s.label);
+      s.$wrap.find('.phead .dot').attr('class', 'dot ' + (s.alive ? 'on' : 'off'));
+    }
 
     const alive = this.sessions.filter((s) => s.alive).length;
     this.onStatusChange({ alive, total: this.sessions.length });

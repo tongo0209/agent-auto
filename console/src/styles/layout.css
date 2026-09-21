@@ -1,6 +1,8 @@
 .shell {
   display: grid;
   grid-template-columns: var(--left-w, 46%) 5px 1fr;
+  /* thiếu dòng này thì hàng lưới phình theo max-content của cột dài nhất → cả trang cuộn */
+  grid-template-rows: minmax(0, 1fr);
   height: 100vh;
 }
 
@@ -64,7 +66,7 @@ h1 {
 }
 .sub {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-md);
   margin-top: 1px;
 }
 .conn.ok {
@@ -82,14 +84,14 @@ h1 {
 .links a {
   color: var(--accent);
   text-decoration: none;
-  font-size: 12px;
+  font-size: var(--fs-md);
 }
 .links a:hover {
   text-decoration: underline;
 }
 
 h2 {
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -110,7 +112,7 @@ h2 {
   margin-top: auto;
   padding-top: 13px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 /* ---- Cột phải ---- */
@@ -135,4 +137,17 @@ h2 {
   .right {
     height: 52vh;
   }
+}
+
+/* Chế độ toàn màn: ẩn cột trái + gutter, lưới terminal chiếm trọn (nút #fullwide) */
+body.fullterm .shell {
+  grid-template-columns: 1fr;
+  height: 100vh;
+}
+body.fullterm .left,
+body.fullterm .gutter {
+  display: none;
+}
+body.fullterm .right {
+  height: 100vh;
 }

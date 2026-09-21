@@ -54,11 +54,11 @@
           </button>
         </div>
       </div>
-      <div class="week" id="week"></div>
+      <div class="week" id="week"><span class="empty-note">Đang đọc mốc…</span></div>
       <div id="weekwarn"></div>
 
       <h2>Timeline mốc <span class="srcnote">4 tuần · vạch xanh = hôm nay · mốc HTML tô đậm</span></h2>
-      <div class="chartbox" id="gantt-box"></div>
+      <div class="chartbox" id="gantt-box"><span class="empty-note">Đang đọc timeline…</span></div>
 
       <div class="rowline">
         <h2>Task đang theo dõi <span class="count" id="task-count"></span></h2>
@@ -70,7 +70,7 @@
           </span>
         </div>
       </div>
-      <div id="tasks"></div>
+      <div id="tasks"><span class="empty-note">Đang đọc dữ liệu… chưa lên thì server console chưa chạy, hoặc hôm nay chưa chạy <code>/daily</code>.</span></div>
 
       <div class="rowline">
         <h2>Cần bạn <span class="count" id="need-count"></span>
@@ -176,16 +176,23 @@
 
   <!-- ==================== CỘT PHẢI: terminal ==================== -->
   <main class="right">
-    <div class="termtabs">
+    <div class="termbar">
       <div class="ttabs" id="ttabs"></div>
       <button type="button" class="btn ghost small" id="tab-add" title="Mở terminal mới">+ tab</button>
-      <span class="spacer"></span>
+      <button type="button" class="btn ghost small" id="view-all" aria-pressed="false" title="Xem tất cả terminal cùng lúc — bấm vào 1 ô để phóng to"></button>
+      <label class="gridpick" title="Bố cục lưới terminal">
+        <span class="sr">Bố cục lưới terminal</span>
+        <select id="grid-mode"></select>
+      </label>
+      <div class="cmds" id="toolbar-cmds" title="Nút = gõ hộ lệnh vào pane đang gõ"></div>
+      <div class="cmdmore">
+        <button type="button" class="btn ghost small" id="cmd-more" aria-expanded="false" title="Lệnh ít dùng">⋯ lệnh</button>
+        <div class="cmdmenu" id="cmd-menu" hidden></div>
+      </div>
+      <span class="sep"></span>
       <button type="button" class="btn ghost small mono" id="ctrlc" title="Gửi Ctrl+C">^C</button>
       <button type="button" class="btn ghost small" id="clear" title="Xoá màn hình">clear</button>
-    </div>
-    <div class="toolbar">
-      <div class="cmds" id="toolbar-cmds"></div>
-      <span class="hint">nút = gõ hộ lệnh vào tab đang mở</span>
+      <button type="button" class="btn ghost small" id="fullwide" aria-pressed="false" title="Ẩn cột trái — terminal chiếm trọn màn"></button>
     </div>
     <div class="terms" id="terms"></div>
   </main>

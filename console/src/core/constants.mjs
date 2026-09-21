@@ -129,14 +129,14 @@ function buildGroups() {
 
 export const TASK_GROUPS = buildGroups();
 
-/** Nút "gõ hộ" lệnh vào tab terminal đang mở (`icon` tuỳ chọn) */
+/** Nút "gõ hộ" lệnh vào tab terminal đang mở (`icon` tuỳ chọn · `menu`: dồn vào menu "⋯ lệnh") */
 export const COMMANDS = [
   { cmd: 'claude', label: 'claude', icon: 'play', primary: true, title: 'Khởi động Claude Code trong tab đang mở' },
   { cmd: '/daily', label: '/daily', title: 'Trọn luồng sáng: quét → duyệt 1 lần → chạy' },
-  { cmd: '/daily plan', label: 'plan', title: 'Chỉ quét + kế hoạch, không thực thi' },
-  { cmd: '/daily week', label: 'week', title: 'Kế hoạch tuần + cảnh báo dồn mốc' },
-  { cmd: '/daily wrap', label: 'wrap', title: 'Chốt ngày + standup + metrics' },
-  { cmd: '/daily status', label: 'status', title: 'Xem nhanh board' },
+  { cmd: '/daily plan', label: 'plan', menu: true, title: 'Chỉ quét + kế hoạch, không thực thi' },
+  { cmd: '/daily week', label: 'week', menu: true, title: 'Kế hoạch tuần + cảnh báo dồn mốc' },
+  { cmd: '/daily wrap', label: 'wrap', menu: true, title: 'Chốt ngày + standup + metrics' },
+  { cmd: '/daily status', label: 'status', menu: true, title: 'Xem nhanh board' },
   {
     // Radar nền 60' do launchd lo (tools/radar-tick.mjs) — nút này chỉ để quét TAY 1 lượt ngay,
     // không phải đợi hết nhịp. Ghi chú cũ ở đây nói cron không có token connector Jira: ĐÃ ĐO

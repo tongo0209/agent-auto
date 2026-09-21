@@ -45,6 +45,10 @@ import sheet from 'lucide-static/icons/file-spreadsheet.svg';
 import question from 'lucide-static/icons/circle-help.svg';
 import gate from 'lucide-static/icons/shield-check.svg';
 import lesson from 'lucide-static/icons/lightbulb.svg';
+import panelHide from 'lucide-static/icons/panel-left-close.svg';
+import panelShow from 'lucide-static/icons/panel-left-open.svg';
+import more from 'lucide-static/icons/ellipsis.svg';
+import grid from 'lucide-static/icons/grid-2x2.svg';
 
 const RAW = {
   wait,
@@ -81,6 +85,10 @@ const RAW = {
   question,
   gate,
   lesson,
+  'panel-hide': panelHide,
+  'panel-show': panelShow,
+  more,
+  grid,
 };
 
 const CLS_SLOT = '__ICON_CLASS__';

@@ -6,6 +6,7 @@ import { api } from '@core/api';
 import { COMMANDS, POLL_MS } from '@core/constants.mjs';
 import { icon } from '@core/icons';
 import { TerminalManager } from '@terminal/TerminalManager';
+import { GRID_MODES } from '@terminal/gridLayout.mjs';
 import { initSplitter } from '@core/splitter';
 import { initModal } from '@components/modal';
 import { initTodayPanel, renderToday } from '@panels/todayPanel';
@@ -64,6 +65,12 @@ $(function boot() {
         .text(alive ? `${alive}/${total} terminal đã nối` : 'mất kết nối — tự thử lại')
         .attr('class', 'conn ' + (alive ? 'ok' : 'bad'));
     },
+    onLayout: ({ mode, zoomed }) => {
+      $('#grid-mode').val(mode);
+      $('#view-all')
+        .attr('aria-pressed', String(mode === 'all'))
+        .html(icon(zoomed ? 'close' : 'grid') + (zoomed ? ' về lưới' : ' tất cả'));
+    },
     // Heuristic: tab chạy ≥30s rồi im ≥5s = vừa xong 1 lượt. KHÔNG suy ra "thành công".
     onIdle: ({ label, busySec }) => {
       if (document.hasFocus()) return;
@@ -73,29 +80,63 @@ $(function boot() {
   // Dựng lại tab của lần trước và nối vào phiên pty cũ (reload không giết claude đang chạy)
   terminals.restore();
 
-  // Kéo đổi tỉ lệ 2 cột — terminal fit lại sau mỗi lần đổi
-  initSplitter({ onResize: () => terminals.fitActive() });
+  // Kéo đổi tỉ lệ 2 cột — mọi pane đang hiện fit lại sau mỗi lần đổi
+  initSplitter({ onResize: () => terminals.fitVisible() });
 
   // Toolbar lệnh — render từ constants để thêm/bớt chỉ sửa 1 chỗ
+  const cmdButton = (c, i) =>
+    `<button type="button" class="btn ${c.primary ? 'primary' : ''}" data-cmd-index="${i}" title="${c.title}">${
+      c.icon ? icon(c.icon) : ''
+    }${c.label}</button>`;
   $('#toolbar-cmds').html(
-    COMMANDS.map(
-      (c, i) =>
-        `<button type="button" class="btn ${c.primary ? 'primary' : ''}" data-cmd-index="${i}" title="${c.title}">${
-          c.icon ? icon(c.icon) : ''
-        }${c.label}</button>` + (c.primary ? '<span class="sep"></span>' : '')
-    ).join('')
+    COMMANDS.map((c, i) => (c.menu ? '' : cmdButton(c, i) + (c.primary ? '<span class="sep"></span>' : ''))).join('')
   );
+  $('#cmd-menu').html(COMMANDS.map((c, i) => (c.menu ? cmdButton(c, i) : '')).join(''));
+  $('#cmd-more').html(icon('more') + ' lệnh');
+  $('#grid-mode')
+    .html(GRID_MODES.map((m) => `<option value="${m.id}">${m.label}</option>`).join(''))
+    .val(terminals.gridMode);
 
   // Icon cho các nút tĩnh trong index.html (HTML giữ sạch, không nhúng SVG)
   $('#search-icon').html(icon('search'));
   $('#filter-clear').html(icon('close'));
-  $('#toolbar-cmds').on('click', '[data-cmd-index]', function () {
+
+  const closeCmdMenu = () => {
+    $('#cmd-menu').prop('hidden', true);
+    $('#cmd-more').attr('aria-expanded', 'false');
+  };
+  $('#toolbar-cmds, #cmd-menu').on('click', '[data-cmd-index]', function () {
     const cmd = COMMANDS[Number($(this).data('cmd-index'))];
     if (!cmd) return;
     // Lệnh chạy dài (radar) mở tab riêng để không chiếm tab đang làm việc
     if (cmd.newTab) terminals.create(cmd.newTab);
     terminals.type(cmd.cmd);
+    closeCmdMenu();
   });
+  $('#cmd-more').on('click', function (e) {
+    e.stopPropagation();
+    const opening = $('#cmd-menu').prop('hidden');
+    $('#cmd-menu').prop('hidden', !opening);
+    $(this).attr('aria-expanded', String(opening));
+  });
+  $(document).on('click.cmdmenu', closeCmdMenu);
+
+  $('#grid-mode').on('change', function () {
+    terminals.setGridMode(String($(this).val()));
+  });
+  $('#view-all').on('click', () => terminals.toggleAll());
+  const paintFullWidth = () => {
+    $('body').toggleClass('fullterm', terminals.fullWidth);
+    $('#fullwide')
+      .attr('aria-pressed', String(terminals.fullWidth))
+      .html(icon(terminals.fullWidth ? 'panel-show' : 'panel-hide'));
+  };
+  paintFullWidth();
+  $('#fullwide').on('click', () => {
+    terminals.setFullWidth(!terminals.fullWidth);
+    paintFullWidth();
+  });
+
   $('#tab-add').on('click', () => terminals.create(`term ${terminals.sessions.length + 1}`));
   $('#ctrlc').on('click', () => terminals.sendCtrlC());
   $('#clear').on('click', () => terminals.clearActive());

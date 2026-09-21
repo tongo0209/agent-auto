@@ -1,7 +1,8 @@
 const { WebSocketServer } = require('ws');
 const pty = require('node-pty');
-const { PTY_CWD } = require('../lib/paths');
+const { PTY_CWD, file } = require('../lib/paths');
 const { createPtyStore } = require('../lib/ptyStore');
+const { readJSON } = require('../lib/fsutil');
 
 const DEFAULT_COLS = 100;
 const DEFAULT_ROWS = 30;
@@ -50,7 +51,10 @@ function attachTerminal(server, wsPath = '/term') {
     };
     // Client tự sinh id và giữ trong localStorage; không có id thì mỗi lần nối là một phiên mới
     // (giữ được hành vi cũ cho mọi thứ gọi thẳng /term).
-    const id = new URL(req.url, 'http://localhost').searchParams.get('id') || 'anon-' + Date.now();
+    const url = new URL(req.url, 'http://localhost');
+    const id = url.searchParams.get('id') || 'anon-' + Date.now();
+    const startup =
+      url.searchParams.get('startup') === '1' ? readJSON(file.config, {}).terminal?.startupCommand || '' : '';
 
     const { fresh, replay, error } = store.attach(id, { send }, { cols: DEFAULT_COLS, rows: DEFAULT_ROWS });
     if (error) {
@@ -60,7 +64,7 @@ function attachTerminal(server, wsPath = '/term') {
       return;
     }
     if (replay) send({ type: 'output', data: replay });
-    send({ type: 'attached', fresh, resumed: !fresh });
+    send({ type: 'attached', fresh, resumed: !fresh, startup });
 
     ws.on('message', (raw) => {
       let msg;

@@ -5,6 +5,7 @@ import { icon } from '@core/icons';
 import { IDLE } from '@core/constants.mjs';
 import { loadTabs, saveTabs, newSessionId } from '@terminal/sessionStore.mjs';
 import { gridFor, visiblePanes, loadLayout, saveLayout } from '@terminal/gridLayout.mjs';
+import { startupInput } from '@terminal/startup.mjs';
 
 const THEME = {
   background: '#0A100F',
@@ -68,12 +69,16 @@ export class TerminalManager {
    */
   restore() {
     const saved = loadTabs(window.localStorage);
-    if (!saved.length) return this.create('term 1');
+    if (!saved.length) {
+      this.create('term 1', null, { startup: true });
+      this.create('term 2');
+      return this.activate(0);
+    }
     for (const t of saved) this.create(t.label || 'term', t.id);
     this.activate(0);
   }
 
-  create(label, id) {
+  create(label, id, { startup = false } = {}) {
     const $wrap = $(`<div class="tw">
         <div class="phead">
           <span class="dot"></span><span class="pname"></span>
@@ -110,7 +115,7 @@ export class TerminalManager {
     this.persist();
 
     term.onData((data) => this.send(session, { type: 'input', data }));
-    this.connect(session);
+    this.connect(session, startup);
     this.activate(this.sessions.length - 1);
     return session;
   }
@@ -119,10 +124,10 @@ export class TerminalManager {
     saveTabs(window.localStorage, this.sessions);
   }
 
-  connect(session) {
+  connect(session, startup = false) {
     // `?id=` là thứ làm nên việc nối lại: cùng id → server trả về đúng pty cũ + phát lại phần
     // output đã lỡ, thay vì spawn shell mới.
-    const ws = new WebSocket(`ws://${location.host}/term?id=${encodeURIComponent(session.id)}`);
+    const ws = new WebSocket(`ws://${location.host}/term?id=${encodeURIComponent(session.id)}${startup ? '&startup=1' : ''}`);
     session.ws = ws;
     ws.onopen = () => {
       session.alive = true;
@@ -133,6 +138,8 @@ export class TerminalManager {
       const msg = JSON.parse(evt.data);
       if (msg.type === 'attached') {
         session.resumed = msg.resumed;
+        const input = startupInput(msg);
+        if (input) this.send(session, { type: 'input', data: input });
         this.renderTabs();
         return;
       }

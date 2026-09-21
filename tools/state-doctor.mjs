@@ -126,6 +126,26 @@ export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
     }
   }
 
+  // W10/W11: hợp đồng cấu hình config.json ↔ config.example.json (ca 21/9). Khối `terminal`
+  // thêm vào config.json thật mà quên đưa vào config.example.json — máy cài mới chạy nhánh
+  // preset mà không có lệnh để gõ, im lặng vì đúng type vẫn parse được. Chiều ngược: bản mẫu
+  // có khối máy user chưa có (`janitor`) — thiếu tính năng mới mà không ai báo. Chỉ so khi cả
+  // 2 file tồn tại, key `_...` là ghi chú nên bỏ qua.
+  const examplePath = path.join(root, 'config.example.json');
+  if (fs.existsSync(configPath) && fs.existsSync(examplePath)) {
+    const example = readJSON(examplePath, {});
+    const configKeys = Object.keys(config).filter((k) => !k.startsWith('_'));
+    const exampleKeys = Object.keys(example).filter((k) => !k.startsWith('_'));
+    for (const k of exampleKeys) {
+      if (!configKeys.includes(k))
+        warn('W10', '(config)', `config.json thiếu khối "${k}" — config.example.json đã có, bạn cài từ bản cũ, xem file mẫu để bổ sung`);
+    }
+    for (const k of configKeys) {
+      if (!exampleKeys.includes(k))
+        warn('W11', '(config)', `config.json có khối "${k}" mà config.example.json không có — máy khác cài từ bản mẫu sẽ câm tính năng này, thêm "${k}" vào config.example.json`);
+    }
+  }
+
   // E7: mỗi phase khai icon trong vocab phải thực sự tồn tại trong core/icons.js, nếu không
   // panel render ra icon rỗng mà không ai biết.
   const icons = skipIcons ? null : iconNames(root);

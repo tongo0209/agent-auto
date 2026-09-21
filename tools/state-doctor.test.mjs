@@ -414,3 +414,47 @@ test('E11 đối chứng — có summary thật thì im lặng', () => {
   const root = fixture({ issues: { 'GW-1': { phase: 'coding', summary: '[C19][ANANTA] Landing pre-register', milestones: { html: '2026-08-10' } } } });
   assert.ok(!codes(runDoctor({ root, skipIcons: true }).errors).includes('E11'));
 });
+
+/* ── W10/W11: hợp đồng config.json ↔ config.example.json ──────────────────────────────────
+ * Ca thật 21/9: khối `terminal` vào config.json thật mà quên đưa vào config.example.json —
+ * máy cài mới chạy nhánh preset mà không có lệnh để gõ, im lặng vì JSON vẫn parse được.
+ * Chiều ngược: config.example.json có `janitor` mà config.json không có — người review bắt
+ * được, máy không.
+ */
+test('W10: config.example.json có khối mà config.json không có → WARN', () => {
+  const root = fixtureConfig({});
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify(OK_CFG(root)));
+  fs.writeFileSync(path.join(root, 'config.example.json'), JSON.stringify({ ...OK_CFG(root), janitor: { enabled: true } }));
+  assert.ok(codes(runDoctor({ root, skipIcons: true }).warns).includes('W10'));
+});
+
+test('W11: config.json có khối mà config.example.json không có → WARN (câm trên máy khác)', () => {
+  const root = fixtureConfig({});
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ ...OK_CFG(root), terminal: { startupCommand: 'claude' } }));
+  fs.writeFileSync(path.join(root, 'config.example.json'), JSON.stringify(OK_CFG(root)));
+  assert.ok(codes(runDoctor({ root, skipIcons: true }).warns).includes('W11'));
+});
+
+test('config.json khớp config.example.json → im lặng', () => {
+  const root = fixtureConfig({});
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify(OK_CFG(root)));
+  fs.writeFileSync(path.join(root, 'config.example.json'), JSON.stringify(OK_CFG(root)));
+  const w = codes(runDoctor({ root, skipIcons: true }).warns);
+  assert.ok(!w.includes('W10'));
+  assert.ok(!w.includes('W11'));
+});
+
+test('key "_doc" (ghi chú) không bị tính vào so sánh W10/W11', () => {
+  const root = fixtureConfig({});
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify(OK_CFG(root)));
+  fs.writeFileSync(path.join(root, 'config.example.json'), JSON.stringify({ ...OK_CFG(root), _doc: 'mẫu cấu hình, không phải key thật' }));
+  assert.ok(!codes(runDoctor({ root, skipIcons: true }).warns).includes('W10'));
+});
+
+test('không có config.example.json → im lặng, không báo W10/W11', () => {
+  const root = fixtureConfig({});
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ ...OK_CFG(root), terminal: { startupCommand: 'claude' } }));
+  const w = codes(runDoctor({ root, skipIcons: true }).warns);
+  assert.ok(!w.includes('W10'));
+  assert.ok(!w.includes('W11'));
+});

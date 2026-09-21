@@ -2,11 +2,12 @@ const { Router } = require('express');
 const path = require('path');
 const { file, AGENT_AUTO } = require('../lib/paths');
 const { readJSON } = require('../lib/fsutil');
-const { snapshot, writeAtomic } = require('../lib/backup');
+const { snapshot } = require('../lib/backup');
 const { buildBugs } = require('../lib/bugs');
 
 // Node 25 cho require file ESM — dùng thẳng hàm của tool để console và CLI không lệch luật
 const { unfollowSheet, followSheet, isWatched } = require(path.join(AGENT_AUTO, 'tools', 'bug-radar.mjs'));
+const { writeMerged } = require(path.join(AGENT_AUTO, 'tools', 'state-merge.mjs'));
 
 const router = Router();
 
@@ -25,9 +26,11 @@ router.post('/bugs/watch', (req, res) => {
   const entry = state?.bugWatch?.[sheetId];
   if (!entry) return res.status(404).json({ error: 'không có sheet này trong watchlist' });
 
+  const base = readJSON(file.state, null);
   state.bugWatch[sheetId] = watching ? followSheet(entry) : unfollowSheet(entry, reason || 'tắt từ console');
   snapshot(file.state, 'state');
-  writeAtomic(file.state, JSON.stringify(state, null, 2) + '\n');
+  // Hợp nhất lúc ghi: radar nền và CLI cũng ghi file này, ghi đè cả file là mất thao tác của nhau.
+  writeMerged(file.state, base, state);
   res.json({ sheetId, watching: isWatched(state.bugWatch[sheetId]) });
 });
 

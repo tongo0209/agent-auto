@@ -19,6 +19,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { countPending, countOpen, openBySheet, pickPrompt, isWatched } from './bug-radar.mjs';
 import { dueToday, runJanitor, sweepAlert } from './janitor.mjs';
+import { writeMerged } from './state-merge.mjs';
 import { runAutoClose } from './autoclose.mjs';
 
 export const DEFAULTS = {
@@ -160,16 +161,17 @@ export function buildArgs(prompt = '/daily delta', model = null) {
  * Đóng dấu giờ poll bằng MÁY, không nhờ LLM: trường `heat` từng được giao cho skill ghi và kết
  * quả là không ai ghi — radar câm từ 18/8 01:48. `lastPollAt` là đồng hồ chống chạy loạn nên
  * càng không được phụ thuộc lời hứa: đóng dấu cả khi lượt hỏng, thà chậm 1 chu kỳ hơn là bắn lại mỗi lượt.
+ *
+ * `base` là bản state đọc TRƯỚC lượt claude (vài phút) — ghi qua `writeMerged` nên radar chỉ đặt
+ * `lastPollAt`, còn follow/keys/sheet mới user vừa sửa giữa chừng lấy theo đĩa.
  */
-function stampPoll(root, now) {
-  const statePath = path.join(root, 'state.json');
-  const state = readJSON(statePath, null);
-  if (!state || !state.bugWatch) return;
+function stampPoll(root, now, base) {
+  if (!base?.bugWatch) return;
   const at = new Date(now).toISOString();
-  for (const [id, entry] of Object.entries(state.bugWatch)) {
-    if (isWatched(entry)) state.bugWatch[id] = { ...entry, lastPollAt: at };
-  }
-  fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
+  const bugWatch = Object.fromEntries(
+    Object.entries(base.bugWatch).map(([id, entry]) => [id, isWatched(entry) ? { ...entry, lastPollAt: at } : entry]),
+  );
+  writeMerged(path.join(root, 'state.json'), base, { ...base, bugWatch });
 }
 
 const readJSON = (p, fb) => {
@@ -326,7 +328,7 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
     const res = (runClaude || (() => realClaude(root, timeoutMin * 60e3, cfg.model || null, choice.prompt)))(
       choice.prompt,
     );
-    if (choice.prompt === '/daily bugwatch') stampPoll(root, now);
+    if (choice.prompt === '/daily bugwatch') stampPoll(root, now, state);
     const { changed, newRows } = diffCounts(before, snap());
     const stateAfter = readJSON(path.join(root, 'state.json'), {});
     const bugsAdded = pendingDelta(pendingBefore, countPending(stateAfter));

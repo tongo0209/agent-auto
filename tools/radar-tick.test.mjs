@@ -481,6 +481,58 @@ test('lượt delta không đóng dấu — nó không hề đọc sheet', () =>
   assert.equal(stamps(root).s1, null);
 });
 
+// ---------- ghi hợp nhất: thao tác của user trong lúc radar chạy không được biến mất ----------
+
+const writeState = (root, state) => fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify(state, null, 2));
+const bw = (root) => JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8')).bugWatch;
+
+test('user tắt theo dõi GIỮA lượt radar: sau khi radar ghi, sheet vẫn tắt', () => {
+  const root = pollRoot({ s1: { follow: true, heat: 'warm' }, s2: { follow: true, heat: 'warm' } });
+  runTick({
+    root,
+    now: at(0, 14, 45),
+    runClaude: () => {
+      writeState(root, { bugWatch: { s1: { follow: false, unfollowReason: 'tắt từ console' }, s2: { follow: true, heat: 'warm' } } });
+      return { ok: true, ms: 1 };
+    },
+    notify: () => {},
+  });
+  assert.equal(bw(root).s1.follow, false);
+  assert.equal(bw(root).s1.unfollowReason, 'tắt từ console');
+  assert.equal(bw(root).s2.lastPollAt, at(0, 14, 45).toISOString());
+});
+
+test('user add sheet mới GIỮA lượt radar: sheet mới còn nguyên sau khi radar ghi', () => {
+  const root = pollRoot({ s1: { follow: true, heat: 'warm' } });
+  runTick({
+    root,
+    now: at(0, 14, 45),
+    runClaude: () => {
+      writeState(root, { bugWatch: { s1: { follow: true, heat: 'warm' }, s9: { follow: true, title: 'vừa add', keys: ['GW-1'] } } });
+      return { ok: true, ms: 1 };
+    },
+    notify: () => {},
+  });
+  assert.deepEqual(Object.keys(bw(root)), ['s1', 's9']);
+  assert.equal(bw(root).s9.title, 'vừa add');
+  assert.equal(bw(root).s1.lastPollAt, at(0, 14, 45).toISOString());
+});
+
+test('state.json hỏng giữa lượt: radar vẫn ghi xong lượt, không ném', () => {
+  const root = pollRoot({ s1: { follow: true, heat: 'warm' } });
+  const row = runTick({
+    root,
+    now: at(0, 14, 45),
+    runClaude: () => {
+      fs.writeFileSync(path.join(root, 'state.json'), '{ hỏng');
+      return { ok: true, ms: 1 };
+    },
+    notify: () => {},
+  });
+  assert.equal(row.ok, true);
+  assert.equal(bw(root).s1.lastPollAt, at(0, 14, 45).toISOString());
+});
+
 // ---------- thông báo phải nói RÕ: buglist nào, chưa fix bao nhiêu, chờ confirm bao nhiêu ----------
 
 test('delta tách chưa-fix với chờ-confirm', () => {

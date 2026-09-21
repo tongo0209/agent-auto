@@ -96,6 +96,8 @@ Token đầu của `$ARGUMENTS`:
 - `add <link|text>` → intake ngoài Jira: nhận link nexus/sheet/URL bất kỳ/text dán → tạo
   `tasks/ADHOC-<n>/brief.md` (n = `config.adhocCounter`+1, ghi lại config) + dòng board +
   phân loại như task thường (buglist → đường bug, việc code → đường code). ADHOC cũng có phase.
+  Link là buglist → đăng ký theo dõi luôn bằng `node tools/bug-radar.mjs add "<link>" --key ADHOC-<n>
+  --title "<tên task>"` (cùng đường ghi với `/bug-fixer-lite`), user khỏi dán lại ở tab Bug.
 - `delta` → radar nhẹ, KHÔNG hỏi gì, chạy <1 phút: (1) JQL `assignee = currentUser() AND
   updated >= "<state.lastRun lùi 30 phút, format yyyy-MM-dd HH:mm>"` — fallback `-4h` chỉ khi
   state thiếu `lastRun`. ⚠ CẤM quay về `-4h` cứng: cửa sổ cố định hụt mọi thay đổi rơi vào khe
@@ -609,6 +611,13 @@ mất 48/56 file. Bài học ở sai chỗ = chưa ghi.
    **Trước khi ghi đè state**: copy bản cũ sang `.backups/state/state-<YYYYMMDD-HHMMSS>.json` (giữ
    30 bản mới nhất). agent-auto chưa versioned → ghi sai state là mất, không revert được.
    Đọc state mà thiếu field bắt buộc (`issues`) → **báo trong board, KHÔNG ghi tiếp lên state hỏng**.
+   **ĐỌC LẠI NGAY TRƯỚC KHI GHI** (chốt 21/9/2026, đã trả giá): lượt quét cầm bản chụp state từ
+   đầu lượt rồi ghi đè cả file ở cuối → mọi thao tác user bấm trong console giữa chừng bị xoá
+   (ca thật 13:21-13:26: 2 lần user tắt theo dõi bị lượt radar ghi đè bằng bản 13:20). Ghi state
+   phải: đọc lại file mới nhất tại thời điểm ghi → chỉ thay field mình thật sự đổi → giữ nguyên
+   phần người dùng sở hữu (`bugWatch[].follow`, `unfollowReason`, `keys`, `title`). Việc bật/tắt
+   theo dõi buglist thì **KHÔNG ghi tay**, gọi `node tools/bug-radar.mjs watch|unwatch <sheetId>`
+   (nó đã hợp nhất lúc ghi qua `tools/state-merge.mjs`).
 2. Báo cáo TIẾNG VIỆT: ⏰ cảnh báo trễ mốc trước → ✅ xong (kèm verify) → ⚠️ kẹt →
    📦 động tĩnh promotion → 📋 việc user (review diff, push tay, cập nhật Jira tay, lệnh
    bug-fixer-lite chờ dán) → link dashboard + board → ⏱ máy chạy vs chờ user.

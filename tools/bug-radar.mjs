@@ -11,6 +11,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { writeMerged } from './state-merge.mjs';
 
 export const DEFAULTS = {
   enabled: true,
@@ -490,6 +491,17 @@ export function mergeWatch(bugWatch = {}, found = [], now = new Date()) {
   return next;
 }
 
+/** Có link buglist là theo dõi ngay, không cần sheet đã gắn ticket Jira (user chốt 21/9/2026). */
+export function addWatchFromLink({ bugWatch = {}, url = '', title = '', key = '', now = new Date() } = {}) {
+  const [found] = extractSheetLinks(url);
+  if (!found) return { error: 'Link này không phải link Google Sheets buglist hợp lệ' };
+  const merged = mergeWatch(bugWatch, [{ ...found, key: key || null, title: title || null }], now);
+  const entry = followSheet(merged[found.sheetId], now);
+  if (entry.keys?.length) delete entry.noTicket;
+  merged[found.sheetId] = entry;
+  return { sheetId: found.sheetId, bugWatch: merged };
+}
+
 const ROOT = path.resolve(import.meta.dirname, '..');
 const CACHE = path.join(ROOT, '.cache', 'bugsheets');
 const readJSON = (p, fb) => {
@@ -500,17 +512,20 @@ const readJSON = (p, fb) => {
   }
 };
 
-function saveState(statePath, state) {
+/** `base` = bản đọc lúc vào lệnh; ghi hợp nhất để không đè mất thứ console/radar vừa ghi. */
+function saveState(statePath, state, base) {
   const backupDir = path.join(ROOT, '.backups', 'state');
   fs.mkdirSync(backupDir, { recursive: true });
   const tag = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
   fs.copyFileSync(statePath, path.join(backupDir, `state-${tag}.json`));
-  fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
+  writeMerged(statePath, base, state);
 }
 
-function cli([cmd, sheetId, payload]) {
+function cli(argv) {
+  const [cmd, sheetId, payload] = argv;
   const statePath = path.join(ROOT, 'state.json');
   const state = readJSON(statePath, { issues: {}, bugWatch: {} });
+  const base = structuredClone(state);
   if (cmd === 'pick') {
     const cfg = readJSON(path.join(ROOT, 'config.json'), {}).bugRadar || {};
     return pickPrompt(state, new Date(), cfg);
@@ -533,12 +548,40 @@ function cli([cmd, sheetId, payload]) {
       pending: (e.pendingSheetWrite || []).length,
     }));
   }
+  if (cmd === 'add') {
+    const flag = (name) => {
+      const i = argv.indexOf(`--${name}`);
+      return i < 0 ? '' : argv[i + 1] || '';
+    };
+    const result = addWatchFromLink({ bugWatch: state.bugWatch || {}, url: argv[1], key: flag('key'), title: flag('title') });
+    if (result.error) throw new Error(result.error);
+    state.bugWatch = result.bugWatch;
+    const entry = state.bugWatch[result.sheetId];
+    if (!entry.keys.length) {
+      const configPath = path.join(ROOT, 'config.json');
+      const config = readJSON(configPath, { adhocCounter: 0 });
+      const adhocKey = `ADHOC-${(config.adhocCounter || 0) + 1}`;
+      entry.keys = [adhocKey];
+      state.issues = {
+        ...state.issues,
+        [adhocKey]: {
+          summary: entry.title || `Buglist ${result.sheetId.slice(0, 8)}`,
+          phase: 'bugfix',
+          source: 'adhoc',
+          addedAt: new Date().toISOString(),
+        },
+      };
+      fs.writeFileSync(configPath, JSON.stringify({ ...config, adhocCounter: (config.adhocCounter || 0) + 1 }, null, 2) + '\n');
+    }
+    saveState(statePath, state, base);
+    return { sheetId: result.sheetId, url: entry.url, title: entry.title, keys: entry.keys, watched: isWatched(entry) };
+  }
   if (cmd === 'watch' || cmd === 'unwatch') {
     const entry = (state.bugWatch || {})[sheetId];
     if (!entry) throw new Error(`không có sheet ${sheetId} trong watchlist — chạy list để xem id`);
     const updated = cmd === 'watch' ? followSheet(entry) : unfollowSheet(entry, payload || '');
     state.bugWatch = { ...state.bugWatch, [sheetId]: updated };
-    saveState(statePath, state);
+    saveState(statePath, state, base);
     return {
       sheetId,
       title: updated.title || sheetId,
@@ -552,7 +595,7 @@ function cli([cmd, sheetId, payload]) {
     if (!current) throw new Error(`không có sheet ${sheetId} trong watchlist — chạy list để xem id`);
     const { changed, ...updated } = updateHeat(current, payload, new Date(), cfg);
     state.bugWatch = { ...state.bugWatch, [sheetId]: updated };
-    saveState(statePath, state);
+    saveState(statePath, state, base);
     const cache = path.join(CACHE, `${sheetId}.md`);
     const cacheMtime = fs.existsSync(cache) ? fs.statSync(cache).mtime.toISOString() : null;
     const stale = cacheStale(cacheMtime, updated.modifiedTime);
@@ -572,7 +615,7 @@ function cli([cmd, sheetId, payload]) {
   if (cmd === 'queue') {
     const updated = queueRow(entry, JSON.parse(payload));
     state.bugWatch = { ...state.bugWatch, [sheetId]: updated };
-    saveState(statePath, state);
+    saveState(statePath, state, base);
     const row = updated.pendingSheetWrite.at(-1);
     return { sheetId, bugId: row.bugId, grade: row.grade, why: row.why, pending: countPending(state) };
   }
@@ -600,10 +643,10 @@ function cli([cmd, sheetId, payload]) {
       ...state.bugWatch,
       [sheetId]: { ...entry, seenBugs: next, openBugs: found.open, openBugsAt: fetchedAt, lastScan },
     };
-    saveState(statePath, state);
+    saveState(statePath, state, base);
     return { sheetId, committed: Object.keys(next).length, lastScan };
   }
-  throw new Error(`lệnh không hiểu: ${cmd} — dùng scan|commit|queue|heat|pending|pick|list|watch|unwatch`);
+  throw new Error(`lệnh không hiểu: ${cmd} — dùng scan|commit|queue|heat|pending|pick|list|add|watch|unwatch`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) {

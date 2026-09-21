@@ -1,5 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import {
   bugStatus,
   cacheStale,
@@ -31,6 +35,7 @@ import {
   queueRow,
   mergeWatch,
   isWatched,
+  addWatchFromLink,
 } from './bug-radar.mjs';
 
 /**
@@ -961,4 +966,109 @@ test('cache cũ hơn sheet thì phải đọc lại, dù heat báo changed:false
   assert.equal(cacheStale('2026-08-21T08:00:00.000Z', '2026-08-21T07:32:59.729Z'), false);
   assert.equal(cacheStale(null, '2026-08-21T07:32:59.729Z'), true, 'chưa có cache = chắc chắn phải đọc');
   assert.equal(cacheStale('2026-08-19T08:39:00.000Z', null), false, 'không biết mốc sheet thì không kết luận');
+});
+
+const ADD_NOW = new Date('2026-09-21T10:00:00Z');
+const ADD_URL = 'https://docs.google.com/spreadsheets/d/1XFJ-8m6FnWWx21XLnNuBurEpv33TavFZG6V86Iz5j-w/edit';
+
+test('link buglist mới ⇒ entry mới đang theo dõi', () => {
+  const out = addWatchFromLink({ bugWatch: {}, url: ADD_URL, title: 'Buglist H5 mới', now: ADD_NOW });
+  assert.equal(out.error, undefined);
+  const entry = out.bugWatch[out.sheetId];
+  assert.equal(entry.follow, true);
+  assert.equal(entry.title, 'Buglist H5 mới');
+  assert.deepEqual(entry.keys, []);
+});
+
+test('link không phải Google Sheets ⇒ báo lỗi tiếng Việt, không đụng bugWatch', () => {
+  const out = addWatchFromLink({ bugWatch: { s1: { follow: false } }, url: 'https://vng.com.vn/khong-phai-sheet' });
+  assert.ok(out.error);
+  assert.equal(out.bugWatch, undefined);
+});
+
+test('link đã có trong sổ ⇒ không tạo bản trùng, chỉ bật lại theo dõi + gắn key/title', () => {
+  const id = 'xyz789xyz789xyz789xyz789';
+  const before = { [id]: { url: `https://docs.google.com/spreadsheets/d/${id}`, follow: false, title: null, keys: [] } };
+  const out = addWatchFromLink({
+    bugWatch: before,
+    url: `https://docs.google.com/spreadsheets/d/${id}/edit#gid=1`,
+    title: 'Buglist cũ',
+    key: 'GW-999',
+    now: ADD_NOW,
+  });
+  assert.equal(Object.keys(out.bugWatch).length, 1);
+  const entry = out.bugWatch[id];
+  assert.equal(entry.follow, true);
+  assert.equal(entry.title, 'Buglist cũ');
+  assert.deepEqual(entry.keys, ['GW-999']);
+});
+
+test('không truyền key ⇒ keys rỗng, entry vẫn theo dõi', () => {
+  const out = addWatchFromLink({ bugWatch: {}, url: ADD_URL, now: ADD_NOW });
+  assert.deepEqual(out.bugWatch[out.sheetId].keys, []);
+  assert.equal(out.bugWatch[out.sheetId].follow, true);
+});
+
+const tmpRadar = () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'bugradar-')));
+  fs.mkdirSync(path.join(root, 'tools'));
+  fs.copyFileSync(path.resolve(import.meta.dirname, 'bug-radar.mjs'), path.join(root, 'tools', 'bug-radar.mjs'));
+  fs.copyFileSync(path.resolve(import.meta.dirname, 'state-merge.mjs'), path.join(root, 'tools', 'state-merge.mjs'));
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues: {}, bugWatch: {} }));
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ adhocCounter: 0 }));
+  return root;
+};
+const runAdd = (root, args) =>
+  execFileSync(process.execPath, [path.join(root, 'tools', 'bug-radar.mjs'), 'add', ...args], { encoding: 'utf8' });
+const readWatch = (root) => JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8')).bugWatch;
+
+test('CLI add ghi state.bugWatch với follow bật, gọi lại không sinh bản trùng', () => {
+  const root = tmpRadar();
+  const first = JSON.parse(runAdd(root, [ADD_URL, '--title', 'Buglist H5']));
+  assert.equal(first.watched, true);
+  assert.equal(readWatch(root)[first.sheetId].title, 'Buglist H5');
+
+  runAdd(root, [`${ADD_URL}#gid=7`, '--key', 'GW-123']);
+  const watch = readWatch(root);
+  assert.equal(Object.keys(watch).length, 1);
+  assert.deepEqual(watch[first.sheetId].keys, ['ADHOC-1', 'GW-123'], 'mã ADHOC tạm nằm cạnh ticket thật');
+});
+
+test('CLI add với link không phải sheet ⇒ thoát lỗi, state giữ nguyên', () => {
+  const root = tmpRadar();
+  assert.throws(() => runAdd(root, ['https://vng.com.vn/abc']), /Google Sheets/);
+  assert.deepEqual(readWatch(root), {});
+});
+
+test('gắn key cho sheet mang cờ noTicket cũ ⇒ cờ bị gỡ, trở lại diện kiểm', () => {
+  const id = 'xyz789xyz789xyz789xyz789';
+  const before = { [id]: { url: `https://docs.google.com/spreadsheets/d/${id}`, follow: true, keys: [], noTicket: true } };
+  const out = addWatchFromLink({ bugWatch: before, url: before[id].url, key: 'GW-477', now: ADD_NOW });
+  assert.deepEqual(out.bugWatch[id].keys, ['GW-477']);
+  assert.equal(out.bugWatch[id].noTicket, undefined);
+});
+
+test('CLI add không --key ⇒ cấp ADHOC theo config.adhocCounter + tạo issue, gọi lại không cấp thêm', () => {
+  const root = tmpRadar();
+  const first = JSON.parse(runAdd(root, [ADD_URL, '--title', 'CFL Offline Tournament']));
+  assert.deepEqual(first.keys, ['ADHOC-1']);
+
+  const state = JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8'));
+  assert.equal(state.issues['ADHOC-1'].summary, 'CFL Offline Tournament');
+  assert.equal(state.issues['ADHOC-1'].source, 'adhoc');
+  assert.equal(state.issues['ADHOC-1'].phase, 'bugfix');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'config.json'), 'utf8')).adhocCounter, 1);
+
+  const again = JSON.parse(runAdd(root, [`${ADD_URL}#gid=3`]));
+  assert.deepEqual(again.keys, ['ADHOC-1'], 'gọi lại không cấp mã thứ hai');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'config.json'), 'utf8')).adhocCounter, 1);
+});
+
+test('CLI add có --key ⇒ dùng key đó, không đụng adhocCounter', () => {
+  const root = tmpRadar();
+  const out = JSON.parse(runAdd(root, [ADD_URL, '--key', 'GW-477']));
+  assert.deepEqual(out.keys, ['GW-477']);
+  const state = JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8'));
+  assert.deepEqual(state.issues, {});
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'config.json'), 'utf8')).adhocCounter, 0);
 });

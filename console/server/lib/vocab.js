@@ -43,6 +43,8 @@ module.exports = {
   LATE_EXEMPT_PHASES: idsWhere('lateExempt'),
   /** Phase mà công việc đang nằm trong tay mình — khớp client `constants.mjs::ACTIVE_PHASES` */
   ACTIVE_PHASES: idsWhere('active'),
+  /** Giai đoạn bug sắp về: QC đang test, buglist thường xuất hiện ở đây */
+  QC_TEST_PHASES: idsWhere('qcTest'),
   MILESTONE_IDS: vocab.milestones.map((m) => m.id),
   MILESTONE_BY_ID: Object.fromEntries(vocab.milestones.map((m) => [m.id, m])),
   MUST_DELIVER_IDS: vocab.milestones.filter((m) => m.mustDeliver).map((m) => m.id),

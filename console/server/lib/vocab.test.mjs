@@ -24,7 +24,7 @@ test('không còn cờ CHẾT trong vocab — mọi cờ phase phải có ngư�
   // `htmlDone` từng ở đây và không còn consumer nào sau khi alerts.js chuyển sang `lateExempt`.
   const used = new Set([
     'id', 'label', 'icon', 'sev', 'group',
-    'offMyPlate', 'htmlTodo', 'lateExempt', 'active', 'dim', 'folded', 'needsHandoff', 'key',
+    'offMyPlate', 'htmlTodo', 'lateExempt', 'active', 'dim', 'folded', 'needsHandoff', 'key', 'qcTest',
     // `gone` / `doneMine` tách nhánh của `offMyPlate` cho timeline — consumer là
     // core/constants.mjs (GONE_PHASES · DONE_PHASES) → core/marks.mjs keepOnTimeline().
     'gone', 'doneMine',
@@ -36,4 +36,8 @@ test('không còn cờ CHẾT trong vocab — mọi cờ phase phải có ngư�
 test('duedate là mốc hành chính, không phải mốc phải giao', () => {
   assert.ok(vocabLib.MILESTONE_IDS.includes('duedate'));
   assert.ok(!vocabLib.MUST_DELIVER_IDS.includes('duedate'));
+});
+
+test('QC_TEST_PHASES suy từ cờ qcTest trong schema, không hardcode', () => {
+  assert.deepEqual(vocabLib.QC_TEST_PHASES, ['wait-test']);
 });

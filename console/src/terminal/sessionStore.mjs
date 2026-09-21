@@ -39,6 +39,18 @@ export function saveTabs(storage, sessions) {
   }
 }
 
+/** Ghi được thật không (private mode / hết quota) — không ghi được thì mỗi F5 là một phiên pty MỚI */
+export function canRemember(storage) {
+  const probe = KEY + '.probe';
+  try {
+    storage.setItem(probe, '1');
+    storage.removeItem(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function newSessionId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);

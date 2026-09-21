@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { loadTabs, saveTabs, newSessionId } from './sessionStore.mjs';
+import { loadTabs, saveTabs, newSessionId, canRemember } from './sessionStore.mjs';
 
 /** localStorage giả */
 const mkStorage = (init) => {
@@ -40,4 +40,24 @@ test('lưu chỉ giữ id và label, không nuốt cả object session', () => {
 
 test('id sinh ra phải khác nhau', () => {
   assert.notEqual(newSessionId(), newSessionId());
+});
+
+/* ─── Important 5 (21/9): localStorage hỏng ⇒ mỗi F5 lại đẻ thêm 1 tiến trình claude ─── */
+
+test('localStorage ghi được → canRemember true và không để lại rác', () => {
+  const box = {};
+  const s = { getItem: (k) => box[k] ?? null, setItem: (k, v) => (box[k] = v), removeItem: (k) => delete box[k] };
+  assert.equal(canRemember(s), true);
+  assert.deepEqual(Object.keys(box), []);
+});
+
+test('localStorage bị chặn (setItem ném lỗi) → canRemember false', () => {
+  const s = {
+    getItem: () => null,
+    setItem: () => {
+      throw new Error('QuotaExceededError');
+    },
+    removeItem: () => {},
+  };
+  assert.equal(canRemember(s), false);
 });

@@ -3,7 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { icon } from '@core/icons';
 import { IDLE } from '@core/constants.mjs';
-import { loadTabs, saveTabs, newSessionId } from '@terminal/sessionStore.mjs';
+import { loadTabs, saveTabs, newSessionId, canRemember } from '@terminal/sessionStore.mjs';
 import { gridFor, visiblePanes, loadLayout, saveLayout } from '@terminal/gridLayout.mjs';
 import { startupInput } from '@terminal/startup.mjs';
 
@@ -32,6 +32,7 @@ export class TerminalManager {
     this.sessions = [];
     this.activeIndex = -1;
     this.layout = loadLayout(window.localStorage);
+    this.canRemember = canRemember(window.localStorage);
     this.gridModeBeforeAll = 'auto';
     this.fitTimer = null;
     this.watchIdle();
@@ -65,16 +66,22 @@ export class TerminalManager {
   /**
    * Dựng lại các tab của lần chạy trước rồi nối vào ĐÚNG phiên pty cũ (id lưu trong
    * localStorage, phiên sống ở server — xem server/lib/ptyStore.js). Nhờ vậy reload trang
-   * không giết claude đang chạy. Chưa có gì lưu → mở 1 tab mới như trước.
+   * không giết claude đang chạy. Chưa có gì lưu → dựng preset đầu ngày (2 tab, tab 1 gõ lệnh).
    */
   restore() {
     const saved = loadTabs(window.localStorage);
-    if (!saved.length) {
-      this.create('term 1', null, { startup: true });
-      this.create('term 2');
+    if (saved.length) {
+      for (const t of saved) this.create(t.label || 'term', t.id);
       return this.activate(0);
     }
-    for (const t of saved) this.create(t.label || 'term', t.id);
+    // Không nhớ được tab ⇒ mỗi F5 lại là "lần đầu": chạy preset ở đây là đẻ thêm 1 claude thật
+    if (!this.canRemember) {
+      const session = this.create('term 1');
+      session.term.writeln('[console] Trình duyệt không lưu được tab — bỏ qua lệnh khởi động, F5 sẽ mất phiên này.');
+      return this.activate(0);
+    }
+    this.create('term 1', null, { startup: true });
+    this.create('term 2');
     this.activate(0);
   }
 
@@ -254,7 +261,7 @@ export class TerminalManager {
     this.sessions.splice(index, 1);
     this.persist();
 
-    if (!this.sessions.length) this.create('term 1');
+    if (!this.sessions.length) this.create('term 1', null, { startup: this.canRemember });
     else this.activate(Math.max(0, Math.min(this.activeIndex, this.sessions.length - 1)));
   }
 

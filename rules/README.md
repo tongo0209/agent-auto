@@ -14,6 +14,7 @@ luật** thay vì diễn giải lại; giao subagent thì trỏ file, khỏi cop
 | `repo-vportal2view.md` | `R-VP2-1..6` | `.twig` trong repo portal |
 | `repo-gt-promotion.md` | `R-GTP-1..6` | repo template chiến dịch |
 | `animation.md` | `R-ANIM-1..7` | effect/animation bất kỳ (CSS/Lottie/GSAP) — viết mới hoặc fix bug QC |
+| `agent-evidence.md` | `R-EV-1..7` | báo cáo bất kỳ của agent/subagent — số liệu, trạng thái, verdict |
 
 Bảng trong `~/.claude/CLAUDE.md` **sinh lại từ `templates/rules-index.tsv`** và chỉ in dòng nào có
 file thật ở đây — thêm/bớt file rồi chạy lại `tools/install-skills.sh` là bảng khớp lại.

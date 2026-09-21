@@ -166,8 +166,8 @@ Task: <slug> — <mô tả>
 Ghi spec vào: <ctx>/specs/<slug>.md
 Knowledge dự án: <ctx>/knowledge/
 Repo hiện tại: <cwd> — khảo sát design system trước khi viết spec.
-CẤM kết luận "giống/khớp/tái dùng được" từ TÊN FILE, tên section hay tên folder — chỉ từ nội dung ảnh đã đọc; cần số thì đo bằng `python3 ~/.claude/scripts/design-diff.py`, không đo tay.
-Ngân sách: tối đa 20 tool-call (màn ≥6 section/popup: 30) — chạm ngưỡng → DỪNG, ghi spec phần đã chắc + dồn phần thiếu vào "Câu hỏi mở", báo "dừng vì hết ngân sách".
+CẤM kết luận "giống/khớp/tái dùng được" từ TÊN FILE, tên section hay tên folder — chỉ từ nội dung ảnh đã đọc; cần số thì đo bằng `python3 ~/.claude/scripts/design-diff.py`, không đo tay (R-EV-4, ~/VNG/agent-auto/rules/agent-evidence.md).
+Ngân sách: tối đa 20 tool-call (màn ≥6 section/popup: 30) — chạm ngưỡng → DỪNG (R-EV-6), ghi spec phần đã chắc + dồn phần thiếu vào "Câu hỏi mở", báo "dừng vì hết ngân sách". Spec BẮT BUỘC có mục `Bằng chứng:` cho mục đo bằng design-diff.py (R-EV-*).
 [Task ≤ 2 component: thêm dòng "SPEC COMPACT — chỉ mục 0, 1, 4, 8".]
 ```
 
@@ -180,7 +180,7 @@ Knowledge dự án: <ctx>/knowledge/
 Phạm vi: <thư mục/file được phép đụng>
 Chuẩn BẮT BUỘC đọc trước khi viết dòng đầu: ~/VNG/agent-auto/rules/cdn-source-standard.md (R-CDN-1..14) + popup-library.md (R-POP-1..9) [+ html-handoff.md nếu đưa HTML sang gt-promotion/new-mainsite]. Chốt thế hệ assets-flat vs legacy src-setup trước khi code · popup phải extends base.html.twig + dùng module có sẵn · cấm @media tay · không tự viết engine gameplay · sprite dùng @include sprite($tên), cấm gõ background-position tay / url() PNG lẻ / sửa *generated.scss (R-SPR-*). Campaign mới / thêm section / clone-reskin: trước khi báo xong chạy `node ~/VNG/agent-auto/tools/landing-parity.mjs <campaign>`, xử hết "REF có · MỚI thiếu" hoặc ghi lý do bỏ ở Dev Report mục `Parity:` (không chờ user nhắc "theo landing cũ").
 Code style: đọc ~/VNG/agent-auto/rules/code-style.md (R-CS-1..7). Comment tối giản 1 dòng, đúng 3 loại (hợp đồng platform / hack / logic bí ẩn) — cấm mô tả lại code, banner, JSDoc nhiều dòng · không phòng thủ thừa · không tách hàm cho thứ dùng 1 lần · tên thay comment. Hook guard-style.sh báo R-CS-1 thì gỡ ngay trong lượt đó.
-Dev Report BẮT BUỘC có mục `Rules đã áp:` — mã luật đã áp/kiểm theo nhóm file (vd `R-SPR-1 sprite.scss · R-CDN-6 config.js · R-CS-1..5 main.js`). Thiếu mục = report không hợp lệ.
+Dev Report BẮT BUỘC có mục `Rules đã áp:` — mã luật đã áp/kiểm theo nhóm file (vd `R-SPR-1 sprite.scss · R-CDN-6 config.js · R-CS-1..5 main.js`) — VÀ mục `Bằng chứng:` (R-EV-*, ~/VNG/agent-auto/rules/agent-evidence.md): mỗi claim "Self-smoke PASS"/"đã sửa" kèm lệnh đã chạy + output thật, cấm claim thứ chưa chạy trong chính lượt này. Thiếu 1 trong 2 mục = report không hợp lệ.
 Ngân sách: tối đa 60 tool-call (vòng fix: 25) — chạm ngưỡng → DỪNG, ghi Dev Report phần đã làm + mục "Dừng vì hết ngân sách: còn thiếu gì".
 ```
 
@@ -192,7 +192,7 @@ Knowledge dự án: <ctx>/knowledge/
 Phạm vi code: <thư mục/file>
 Chuẩn: đọc ~/VNG/agent-auto/rules/cdn-source-standard.md + popup-library.md + code-style.md — lệch chuẩn báo theo MÃ LUẬT (R-CDN-…/R-POP-…/R-CS-…), đối chiếu mục `Rules đã áp` trong Dev Report.
 Vai trò vòng này: GIỮA (được tái dụng artifact Self-smoke trong <ctx>/reports/<slug>-dev-<n>.md) | CHỐT (BẮT BUỘC tự build COLD + read_signals độc lập)
-CẤM kết luận "khớp/lệch" từ TÊN FILE ảnh, tên section, tên class hay cảm giác "trông giống" — mỗi verdict phải dựa vào giá trị đọc được (CSS/DOM/số đo) hoặc quan hệ nhìn thấy trong ảnh. Manager chạy phần đo pixel (gate 📏), bạn KHÔNG cần đo — nhưng cũng KHÔNG được phán thay bằng suy luận.
+CẤM kết luận "khớp/lệch" từ TÊN FILE ảnh, tên section, tên class hay cảm giác "trông giống" (R-EV-4) — mỗi verdict phải dựa vào giá trị đọc được (CSS/DOM/số đo) hoặc quan hệ nhìn thấy trong ảnh. Manager chạy phần đo pixel (gate 📏), bạn KHÔNG cần đo — nhưng cũng KHÔNG được phán thay bằng suy luận. PASS chỉ được nói SAU khi build/browser chạy trong chính lượt này (R-EV-2); Check Report BẮT BUỘC mục `Bằng chứng:`.
 Đã cold-build vòng trước: có | không
 Mức test chức năng: mặc định đầy đủ. [Waiver từ user: "<hành vi A>: demo", "<hành vi B>: bỏ qua", hoặc "chỉ test: <list>"]
 Ngân sách: tối đa 20 tool-call (quick/re-check: 12) — chạm ngưỡng → chốt verdict bằng những gì đã có (build + console + check tĩnh), ghi rõ phần chưa test + lý do.

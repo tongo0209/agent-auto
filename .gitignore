@@ -36,6 +36,9 @@ knowledge/gates/*
 knowledge/metrics.jsonl
 # knowledge/lessons.md thì NGƯỢC LẠI — bài học chung cả team, phải vào git.
 
+# Ngữ cảnh riêng từng máy của Claude Code (report/scratch cá nhân) — không vào git
+**/.claude/
+
 # Rác hệ thống
 .DS_Store
 *.tmp-*

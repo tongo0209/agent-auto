@@ -618,6 +618,9 @@ mất 48/56 file. Bài học ở sai chỗ = chưa ghi.
    phần người dùng sở hữu (`bugWatch[].follow`, `unfollowReason`, `keys`, `title`). Việc bật/tắt
    theo dõi buglist thì **KHÔNG ghi tay**, gọi `node tools/bug-radar.mjs watch|unwatch <sheetId>`
    (nó đã hợp nhất lúc ghi qua `tools/state-merge.mjs`).
+   **ĐỌC NGƯỢC SAU KHI GHI, TRƯỚC KHI BÁO SỐ** (R-EV-1, `~/VNG/agent-auto/rules/agent-evidence.md`):
+   đọc lại `state.json` vừa ghi (không tin lệnh ghi đã chạy là đủ) rồi mới lấy số cho báo cáo Bước 6.2
+   — lệnh ghi có thể fail âm thầm hoặc ghi nhầm field, chỉ output đọc-lại mới là bằng chứng.
 2. Báo cáo TIẾNG VIỆT: ⏰ cảnh báo trễ mốc trước → ✅ xong (kèm verify) → ⚠️ kẹt →
    📦 động tĩnh promotion → 📋 việc user (review diff, push tay, cập nhật Jira tay, lệnh
    bug-fixer-lite chờ dán) → link dashboard + board → ⏱ máy chạy vs chờ user.
@@ -625,7 +628,7 @@ mất 48/56 file. Bài học ở sai chỗ = chưa ghi.
 ## Luật an toàn (không thương lượng)
 
 - KHÔNG `git commit`/`push` (kể cả gt-promotion — chép file xong để user push). KHÔNG ghi gì lên Jira.
-- Claim "xong" phải có lệnh + output thật. Chưa verify → nói "chưa verify".
+- Claim "xong" phải có lệnh + output thật. Chưa verify → nói "chưa verify" (R-EV-1/2, `rules/agent-evidence.md`).
 - Tối đa 2 cổng hỏi: (a) duyệt kế hoạch, (b) first-run JQL. Ngoại lệ được hỏi: xung đột
   merge gt-promotion, thiếu input không đoán được. Ca mập mờ khác → default an toàn + ghi board.
 - `delta`/`status`/`wrap` không bao giờ hỏi.

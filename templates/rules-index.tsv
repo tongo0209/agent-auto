@@ -8,3 +8,4 @@ rules/cdn-source-standard.md	**`cdn-source`** (viết/sửa bất cứ gì)	`rul
 rules/popup-library.md	**Popup bất kỳ** (landing/skin/promotion)	`rules/popup-library.md` — R-POP-1..9. Popup là design system: extends `base.html.twig`, dùng module có sẵn, cổng `/check-promotion` trước khi báo xong
 rules/html-handoff.md	**Đưa HTML sang `gt-promotion-template` / `new-mainsite`**	`rules/html-handoff.md` — R-HO-1..11 (URL CDN tuyệt đối, giữ `<% MODULE_CONTENT %>`, soát cả 2 thư mục)
 rules/code-style.md	**Viết code bất kỳ** (mọi repo, mọi ngôn ngữ)	`rules/code-style.md` — R-CS-1..7 (bản rút gọn ở mục "Code style" dưới, đủ dùng; đọc file khi cần ví dụ ❌/✅)
+rules/agent-evidence.md	**Báo cáo bất kỳ của agent/subagent** (số liệu, trạng thái, verdict)	`rules/agent-evidence.md` — R-EV-1..7. Đọc ngược sau khi ghi, cấm "xong/verify" cho thứ chưa chạy, cấm suy từ tên file, mục `Bằng chứng:` bắt buộc trong report

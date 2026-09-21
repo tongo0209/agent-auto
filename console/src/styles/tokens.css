@@ -14,8 +14,8 @@
 
   /* Ink */
   --ink: #e6efec;
-  --ink2: #b9c9c4;
-  --muted: #869994;
+  --ink2: #c6d5d0;
+  --muted: #9bafaa;
 
   /* Accent */
   --accent: #3acdb9;
@@ -42,10 +42,14 @@
   --pad: 16px;
 
   /* Nhịp chữ — mật độ "gọn-pro": nhiều dữ liệu trong 1 màn, cỡ chữ vẫn đọc được */
-  --fs: 12.5px;
+  --fs: 13px;
+  --fs-md: 12px;
   --fs-sm: 11px;
   --fs-xs: 10.5px;
-  --row-h: 30px;
+  --row-h: 32px;
+  --row-h-note: 42px;
+  /* Thanh tab cột trái dính top: bảng task lấy số này làm mốc sticky cho <thead> */
+  --tabs-h: 37px;
 
   /* Font */
   --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;

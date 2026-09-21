@@ -144,7 +144,7 @@ test('mục trong nhóm cũng cũ nhất trước', () => {
   );
 });
 
-test('ticket closed/reassigned đánh dấu offMyPlate để UI gộp cuối và folded sẵn', () => {
+test('việc của ticket đã đóng / đã chuyển người KHÔNG còn là nợ đọng', () => {
   const out = call([
     { date: '2026-08-06', items: [it('GW-660: lệch bản pm__ cần anh quyết')] },
     { date: '2026-08-10', items: [it('GW-654: còn nợ bàn giao')] },
@@ -152,28 +152,50 @@ test('ticket closed/reassigned đánh dấu offMyPlate để UI gộp cuối và
     { date: '2026-08-12', items: [] },
   ]);
   assert.deepEqual(
-    out.groups.filter((g) => g.offMyPlate).map((g) => g.key),
-    ['GW-660', 'GW-654']
+    out.groups.map((g) => g.key),
+    ['GW-627']
   );
-  assert.equal(out.groups.find((g) => g.key === 'GW-627').offMyPlate, false);
 });
 
-test('ticket không có trong state thì KHÔNG bị coi là offMyPlate — không lặng lẽ giấu đi', () => {
+test('status Jira đã đóng và assigneeNow cũng loại, dù phase còn đang chạy', () => {
+  const state = { issues: { 'GW-477': { phase: 'wait-test', status: 'Done' }, 'GW-654': { phase: 'coding', assigneeNow: 'Nam' } } };
+  const out = call(
+    [
+      { date: '2026-08-10', items: [it('GW-477: a'), it('GW-654: b')] },
+      { date: '2026-08-12', items: [] },
+    ],
+    '2026-08-12',
+    state
+  );
+  assert.deepEqual(out.groups, []);
+  assert.equal(out.counts.dropped, 0);
+});
+
+test('ticket không có trong state thì GIỮ — không suy ra được là đã đóng', () => {
   const out = call([
     { date: '2026-08-10', items: [it('GW-999: ticket lạ')] },
     { date: '2026-08-12', items: [] },
   ]);
-  assert.equal(out.groups[0].offMyPlate, false);
+  assert.equal(out.groups[0].key, 'GW-999');
   assert.equal(out.groups[0].phase, null);
 });
 
-test('counts đếm đúng: dropped theo MỤC, tickets theo NHÓM', () => {
+test('việc KHÔNG gắn ticket vẫn giữ nguyên', () => {
+  const out = call([
+    { date: '2026-08-10', items: [it('gọi lại cho anh Minh')] },
+    { date: '2026-08-12', items: [] },
+  ]);
+  assert.equal(out.groups[0].key, null);
+  assert.equal(out.counts.dropped, 1);
+});
+
+test('counts đếm đúng sau khi lọc: dropped theo MỤC, tickets theo NHÓM', () => {
   const out = call([
     { date: '2026-08-10', items: [it('GW-627: a'), it('GW-627: b'), it('GW-660: c')] },
     { date: '2026-08-12', items: [] },
   ]);
-  assert.equal(out.counts.dropped, 3);
-  assert.equal(out.counts.tickets, 2);
+  assert.equal(out.counts.dropped, 2);
+  assert.equal(out.counts.tickets, 1);
 });
 
 test('giữ `index` của mục để tick được vào đúng board gốc', () => {
@@ -216,13 +238,13 @@ test('chưa có board hôm nay → board MỚI NHẤT là radar, mục của nó
   const out = call(
     [
       { date: '2026-08-06', items: [it('GW-627: việc đang hiện ở khối Cần bạn')] },
-      { date: '2026-08-05', items: [it('GW-660: việc cũ thật')] },
+      { date: '2026-08-05', items: [it('GW-720: việc cũ thật')] },
     ],
     '2026-08-09'
   );
   assert.deepEqual(
     out.groups.map((g) => g.key),
-    ['GW-660'],
+    ['GW-720'],
     'GW-627 đang hiện ở "Cần bạn" (board 6/8 là board mới nhất) nên KHÔNG được báo là rơi radar'
   );
 });
@@ -231,7 +253,7 @@ test('chưa có board hôm nay: staleDays vẫn đếm tới HÔM NAY, không t�
   const out = call(
     [
       { date: '2026-08-06', items: [it('GW-627: trong radar')] },
-      { date: '2026-08-05', items: [it('GW-660: nợ')] },
+      { date: '2026-08-05', items: [it('GW-720: nợ')] },
     ],
     '2026-08-09'
   );

@@ -60,10 +60,17 @@ const openNeed = new Set();
  * của mục trên board GỐC (bền hơn nội dung: cùng một việc có thể được ghi lại khác chữ mỗi ngày).
  */
 const openDebt = new Set();
+/** Đỉnh trang gập hay bung — nhớ qua reload, giá trị `'closed'` | `'open'` */
+const TOPFOLD_KEY = 'console.topfold';
+let topKpiText = '';
+let topKpiCrit = false;
+let topAlertText = '';
+let topAlertCrit = false;
 
 export function initTodayPanel({ terminals, notify }) {
   ctx.terminals = terminals;
   onNotify = notify || (() => {});
+  buildTopFold();
 
   $('#task-filter').on('input', function () {
     filterText = String($(this).val() || '').toLowerCase();
@@ -380,7 +387,10 @@ async function loadRadar() {
   try {
     s = await api.radar();
   } catch {
-    return; // server tắt — giữ nguyên UI cũ, không được ném lỗi ra ngoài
+    // Server tắt: nói thẳng ra, vì mọi số trên trang lúc này là bản cũ đọc từ lần poll trước
+    return void $('#radar-bar').html(
+      `<div class="radarbar dead">${icon('radar')}<span>Không nối được server console — số trên trang là bản cũ</span></div>`
+    );
   }
   $('#radar-bar').html(
     `<div class="radarbar ${s.level}">${icon('radar')}<span>${escapeHtml(RADAR_TEXT[s.level](s))}</span>
@@ -388,6 +398,42 @@ async function loadRadar() {
          s.enabled ? 'tắt' : 'bật'
        }</button></div>`
   );
+}
+
+function buildTopFold() {
+  $('#kpis').before(
+    `<div class="topfold" id="topfold">
+       <button type="button" class="topfold-sum" aria-expanded="true"></button>
+       <div class="topfold-body"></div>
+     </div>`
+  );
+  // #kpis và #alerts được DI CHUYỂN nguyên vẹn vào đây — nhiều chỗ khác đang bám vào 2 id này
+  $('#topfold .topfold-body').append($('#kpis'), $('#alerts'));
+
+  let open = true;
+  try {
+    open = localStorage.getItem(TOPFOLD_KEY) !== 'closed';
+  } catch {
+    // localStorage bị chặn (private mode) — cùng lắm là quên trạng thái, không được chết trang
+  }
+  setTopFoldOpen(open);
+  $('#topfold .topfold-sum').on('click', () => setTopFoldOpen($('#topfold').hasClass('closed')));
+}
+
+function setTopFoldOpen(open) {
+  $('#topfold').toggleClass('closed', !open).find('.topfold-sum').attr('aria-expanded', String(open));
+  try {
+    localStorage.setItem(TOPFOLD_KEY, open ? 'open' : 'closed');
+  } catch {
+    // như trên: mất trí nhớ qua reload thì chấp nhận được
+  }
+}
+
+/** Dòng 1 hàng thay cho KPI + cảnh báo lúc gập; có `crit` thì tự lên màu để không bỏ sót mốc trễ */
+function renderTopSummary() {
+  const text = topKpiText + (topAlertText ? ' — ' + topAlertText : '');
+  $('#topfold').toggleClass('crit', topKpiCrit || topAlertCrit);
+  $('#topfold .topfold-sum').html(`${icon('caret')}<span class="tfs-text">${escapeHtml(text)}</span>`);
 }
 
 function renderAlerts() {
@@ -409,6 +455,13 @@ function renderAlerts() {
       )
       .join('')
   );
+
+  const parts = [];
+  if (crit.length) parts.push(`⚠ ${crit.length} cảnh báo`);
+  if (items.length > crit.length) parts.push(`${items.length - crit.length} nhắc`);
+  topAlertText = parts.join(' · ');
+  topAlertCrit = crit.length > 0;
+  renderTopSummary();
 
   const sig = crit.map((a) => a.key + a.code).join('|');
   if (lastCritSignature !== null && sig && sig !== lastCritSignature)
@@ -515,6 +568,10 @@ function renderKpis({ issues, need, today }) {
       )
       .join('')
   );
+
+  topKpiText = cards.map((k) => `${k.n} ${k.l}`).join(' · ');
+  topKpiCrit = cards.some((k) => k.tone === 'crit');
+  renderTopSummary();
 }
 
 function renderWeek(week) {
@@ -663,7 +720,7 @@ function pushCell(key) {
   if (p.unpushed)
     return `<button type="button" class="gt crit" data-goto-review="${escapeHtml(key)}"
       title="${p.unpushed} commit chưa push — sang tab Review">${icon('push')}${p.unpushed}</button>`;
-  return `<span class="gt ok" title="Sạch và đã đẩy lên remote">${icon('check')}</span>`;
+  return `<span class="gt ok" title="Sạch và đã đẩy lên remote">${icon('check')}sạch</span>`;
 }
 
 /**
@@ -682,7 +739,13 @@ function rerenderTasks() {
 
   const matchedCount = groups.reduce((n, g) => n + g.items.length, 0);
   if (!matchedCount) {
-    $('#tasks').html('<span class="empty-note">Không có task nào khớp.</span>');
+    // Không lọc mà vẫn 0 dòng = chưa đọc được state, KHÁC hẳn "lọc không khớp" — nói đúng
+    // cái nào thì user mới biết phải gõ /daily hay chỉ cần xoá ô lọc.
+    $('#tasks').html(
+      filterText
+        ? '<span class="empty-note">Không có task nào khớp.</span>'
+        : '<span class="empty-note">Chưa đọc được task nào — server console chưa chạy, hoặc hôm nay chưa chạy <code>/daily</code>.</span>'
+    );
     return;
   }
 
@@ -773,13 +836,10 @@ function renderNeed(need) {
  * design · lỗi bản TH · xác nhận CDN sync · thứ tự release · review 4 file new-mainsite) không
  * xuất hiện lại ở board 11/8 hay 12/8 — mất radar 2 ngày, mà GW-627 release 15/8.
  *
- * Nhóm ticket đã đóng/chuyển người gộp cuối và FOLDED sẵn: nó là chỗ chứa nhiễu tháng 7 (GW-654
- * 11 mục, GW-556 9 mục) — cùng nếp với nhóm đóng sẵn của bảng task.
+ * Việc của ticket đã đóng / đã chuyển người bị lọc từ server (lib/debt.js) nên không vẽ ở đây nữa.
  */
 function renderDebt(debt) {
   const groups = debt.groups || [];
-  const live = groups.filter((g) => !g.offMyPlate);
-  const gone = groups.filter((g) => g.offMyPlate);
   const n = debt.counts?.dropped || 0;
 
   $('#debt-box').toggle(groups.length > 0);
@@ -808,13 +868,7 @@ function renderDebt(debt) {
     : '';
 
   $('#debt').html(
-    (live.length ? live.map(block).join('') : '<p class="empty-note">Không còn việc nào rơi khỏi radar.</p>') +
-      (gone.length
-        ? `<details class="foldbox"><summary>Ticket đã đóng / chuyển người (${gone.reduce(
-            (s, g) => s + g.items.length,
-            0
-          )} việc)</summary>${gone.map(block).join('')}</details>`
-        : '') +
+    (groups.length ? groups.map(block).join('') : '<p class="empty-note">Không còn việc nào rơi khỏi radar.</p>') +
       strayNote
   );
 }

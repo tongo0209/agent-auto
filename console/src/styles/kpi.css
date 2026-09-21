@@ -55,3 +55,49 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Đỉnh trang gập: mặc định 1 dòng tóm tắt, bấm mới bung hàng KPI + dải cảnh báo */
+.topfold {
+  margin: 13px 0 11px;
+}
+.topfold .kpis {
+  margin: 9px 0 0;
+}
+.topfold.closed .topfold-body {
+  display: none;
+}
+.topfold-sum {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs);
+  text-align: left;
+  cursor: pointer;
+}
+.topfold-sum:hover {
+  color: var(--ink2);
+}
+.topfold-sum .ic {
+  flex: 0 0 auto;
+  transform: rotate(90deg);
+}
+.topfold.closed .topfold-sum .ic {
+  transform: none;
+}
+.topfold-sum .tfs-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topfold.crit .topfold-sum {
+  background: var(--crit-bg);
+  border-color: var(--crit);
+  color: var(--crit);
+}

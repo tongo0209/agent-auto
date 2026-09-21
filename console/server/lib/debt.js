@@ -28,7 +28,7 @@ const ownerKey = (text) => (String(text ?? '').match(/\bGW-\d+/) || [null])[0];
 /**
  * @param boards [{ date, items }] — `items` từ lib/needyou.js::parseNeedYou
  * @param today  'YYYY-MM-DD'
- * @param state  state.json (chỉ để đọc phase → cờ offMyPlate)
+ * @param state  state.json — đọc phase + loại ticket đã ra khỏi tay (vocab::isOffMyPlate)
  * @returns { groups, counts }
  */
 function buildDebt({ boards = [], today = '', state = {} } = {}) {
@@ -79,6 +79,9 @@ function buildDebt({ boards = [], today = '', state = {} } = {}) {
         inRadar++;
         continue;
       }
+      // Ticket đã đóng / đã chuyển người thì việc cũ của nó không còn là nợ của mình (189/254
+      // mục đo ngày 21/9 nằm ở đây). Việc KHÔNG gắn ticket vẫn giữ: không suy ra được là đã đóng.
+      if (key && isOffMyPlate(state.issues?.[key])) continue;
       dropped++;
       if (!byKey.has(key)) byKey.set(key, []);
       byKey.get(key).push({ date: b.date, index: item.index, text: item.text, staleDays });
@@ -87,15 +90,11 @@ function buildDebt({ boards = [], today = '', state = {} } = {}) {
 
   const groups = [...byKey.entries()]
     .map(([key, items]) => {
-      const issue = (key && state.issues?.[key]) || null;
-      const phase = issue?.phase || null;
+      const phase = (key && state.issues?.[key]?.phase) || null;
       items.sort((a, z) => z.staleDays - a.staleDays);
       return {
         key,
         phase,
-        // Ticket không có trong state → KHÔNG coi là offMyPlate: không lặng lẽ giấu việc đi.
-        // Có trong state thì xét đủ 3 nguồn (phase · status Jira · assigneeNow) — vocab::isOffMyPlate.
-        offMyPlate: isOffMyPlate(issue),
         items,
         staleDays: items[0].staleDays,
         oldestDate: items[0].date,

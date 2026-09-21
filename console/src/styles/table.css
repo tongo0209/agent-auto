@@ -11,9 +11,10 @@
 }
 .ttable thead th {
   position: sticky;
-  top: 0;
+  top: calc(var(--tabs-h) - var(--pad));
   z-index: 2;
   background: var(--panel);
+  box-shadow: inset 0 -1px var(--line);
   text-align: left;
   font: 700 var(--fs-xs) / 1 var(--font-ui);
   text-transform: uppercase;
@@ -146,6 +147,10 @@
   background: var(--sev, var(--line));
   opacity: 0.85;
 }
+/* Zebra trong nhóm: chỉ hàng chẵn, mờ hơn hover để hover vẫn là tín hiệu mạnh hơn */
+.trow:nth-child(even of .trow) {
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
+}
 .trow:hover {
   background: var(--surface);
 }
@@ -209,9 +214,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Hàng có ghi chú cao cố định — để chiều cao chạy theo nội dung thì mỗi hàng một kiểu, mắt
+   quét theo cột bị gãy nhịp. */
 .trow:has(.rownote) td {
-  padding-top: 4px;
-  padding-bottom: 4px;
+  height: var(--row-h-note);
+  padding-top: 3px;
+  padding-bottom: 3px;
 }
 
 /* Phase · design · mốc — icon + chữ, cùng một khuôn */
@@ -260,7 +268,7 @@
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
-  color: var(--line);
+  color: var(--muted);
 }
 
 /* Ô Effort — bấm ra modal toàn bộ commit của ticket */
@@ -321,7 +329,8 @@ button.gt:hover {
   text-decoration: underline;
 }
 .cell-none {
-  color: var(--line);
+  color: var(--muted);
+  opacity: 0.55;
   font-size: var(--fs-sm);
 }
 

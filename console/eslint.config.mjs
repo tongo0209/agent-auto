@@ -33,7 +33,7 @@ export default [
     rules: { eqeqeq: 'error', 'no-unused-vars': ['error', { argsIgnorePattern: '^_' }] },
   },
   {
-    files: ['server/**/*.test.mjs', 'src/**/*.test.mjs'],
+    files: ['server/**/*.test.mjs', 'src/**/*.test.mjs', 'smoke/**/*.mjs', 'fixtures/**/*.mjs'],
     languageOptions: { ecmaVersion: 2025, sourceType: 'module', globals: node },
   },
   {

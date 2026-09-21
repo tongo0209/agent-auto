@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "test": "node --test \"server/**/*.test.mjs\" \"src/**/*.test.mjs\"",
     "test:tools": "node --test \"../tools/*.test.mjs\"",
+    "smoke": "node smoke/api-smoke.mjs",
     "doctor": "node ../tools/state-doctor.mjs",
     "dashboard": "node ../tools/build-dashboard.mjs",
     "check": "npm run lint && npm test && npm run test:tools && npm run build && npm run doctor"

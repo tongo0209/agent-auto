@@ -6,6 +6,10 @@ const CONSOLE_ROOT = path.resolve(__dirname, '..', '..');
 const AGENT_AUTO = path.resolve(CONSOLE_ROOT, '..');
 const VNG_ROOT = path.join(HOME, 'VNG');
 
+/** Trỏ state/config sang cảnh dựng sẵn (console/fixtures) để kiểm cảnh báo bằng máy */
+const overridable = (envName, realPath) =>
+  process.env[envName] ? path.resolve(process.env[envName]) : realPath;
+
 module.exports = {
   HOME,
   CONSOLE_ROOT,
@@ -17,8 +21,8 @@ module.exports = {
   /** Chỉ cho phép mở Finder/VS Code trong các gốc này */
   OPEN_WHITELIST: [VNG_ROOT, AGENT_AUTO],
   file: {
-    config: path.join(AGENT_AUTO, 'config.json'),
-    state: path.join(AGENT_AUTO, 'state.json'),
+    config: overridable('CONSOLE_CONFIG', path.join(AGENT_AUTO, 'config.json')),
+    state: overridable('CONSOLE_STATE', path.join(AGENT_AUTO, 'state.json')),
     metrics: path.join(AGENT_AUTO, 'knowledge', 'metrics.jsonl'),
     lessons: path.join(AGENT_AUTO, 'knowledge', 'lessons.md'),
     months: path.join(AGENT_AUTO, 'history', 'months.json'),

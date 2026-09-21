@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 2,
+  "issues": {
+    "DEMO-101": {
+      "status": "In Progress",
+      "phase": "wait-test",
+      "summary": "Landing giả lập — QC đang test đợt 1",
+      "milestones": { "deliver": "2026-01-05" },
+      "lastAction": "2026-01-05"
+    },
+    "DEMO-102": {
+      "status": "In Progress",
+      "phase": "bugfix",
+      "summary": "Landing giả lập — đang fix bug đợt cũ",
+      "milestones": { "deliver": "2026-01-03" },
+      "lastAction": "2026-01-06"
+    }
+  },
+  "bugWatch": {
+    "fixture-sheet-following": {
+      "url": "https://sheets.example.invalid/fixture-following",
+      "title": "Buglist giả lập — đợt 1",
+      "keys": ["DEMO-101"],
+      "addedAt": "2026-01-05T02:00:00.000Z",
+      "lastPollAt": "2026-01-06T02:00:00.000Z",
+      "lastChangeAt": "2026-01-06T02:00:00.000Z",
+      "isBugSheet": true,
+      "follow": true,
+      "followedAt": "2026-01-05T02:05:00.000Z",
+      "seenBugs": { "12": { "status": "reopen" }, "34": { "status": "reopen" }, "56": { "status": "chua-fix" } },
+      "pendingSheetWrite": [],
+      "lastScan": {
+        "at": "2026-01-06T02:00:00.000Z",
+        "rowsTotal": 3,
+        "changed": 2,
+        "reopened": ["12", "34"],
+        "mine": 2,
+        "unknown": 0,
+        "notMine": 1
+      },
+      "openBugs": [
+        {
+          "bugId": "12",
+          "type": "UI",
+          "assignee": "QC giả lập",
+          "desc": "Nút nhận quà lệch 8px trên mobile",
+          "bucket": "mine",
+          "status": "chua-fix"
+        },
+        {
+          "bugId": "34",
+          "type": "UI",
+          "assignee": "QC giả lập",
+          "desc": "Popup thể lệ không đóng được",
+          "bucket": "mine",
+          "status": "cho-confirm"
+        },
+        {
+          "bugId": "56",
+          "type": "Logic",
+          "assignee": "BE giả lập",
+          "desc": "API trả sai số lượt quay",
+          "bucket": "not-mine",
+          "status": "chua-fix"
+        }
+      ],
+      "openBugsAt": "2026-01-06T02:00:00.000Z"
+    },
+    "fixture-sheet-off": {
+      "url": "https://sheets.example.invalid/fixture-off",
+      "title": "Buglist giả lập — chưa bật theo dõi",
+      "keys": ["DEMO-102"],
+      "addedAt": "2026-01-06T01:00:00.000Z",
+      "lastPollAt": "2026-01-06T01:00:00.000Z",
+      "lastChangeAt": "2026-01-06T01:00:00.000Z",
+      "isBugSheet": true,
+      "seenBugs": {},
+      "pendingSheetWrite": []
+    },
+    "fixture-sheet-closed": {
+      "url": "https://sheets.example.invalid/fixture-closed",
+      "title": "Buglist giả lập — đã đóng sổ",
+      "keys": ["DEMO-199"],
+      "addedAt": "2025-01-02T01:00:00.000Z",
+      "lastPollAt": "2025-01-09T01:00:00.000Z",
+      "lastChangeAt": "2025-01-09T01:00:00.000Z",
+      "isBugSheet": true,
+      "retired": true,
+      "seenBugs": {},
+      "pendingSheetWrite": []
+    }
+  },
+  "lastRun": "2026-01-06T02:00:00.000Z"
+}

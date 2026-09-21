@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "issues": {
+    "DEMO-201": {
+      "status": "In Progress",
+      "phase": "wait-test",
+      "summary": "Landing giả lập — vừa bàn giao, QC bắt đầu test",
+      "milestones": { "deliver": "2026-01-08" },
+      "lastAction": "2026-01-08"
+    }
+  },
+  "bugWatch": {},
+  "lastRun": "2026-01-08T02:00:00.000Z"
+}

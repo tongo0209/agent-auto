@@ -1,5 +1,5 @@
 const { daysBetween } = require('./fsutil');
-const { HTML_TODO_PHASES, LATE_EXEMPT_PHASES, KEY_MILESTONE_IDS, MILESTONE_BY_ID, isOffMyPlate } = require('./vocab');
+const { HTML_TODO_PHASES, LATE_EXEMPT_PHASES, KEY_MILESTONE_IDS, MILESTONE_BY_ID, QC_TEST_PHASES, isOffMyPlate } = require('./vocab');
 const { sheetState, OPEN_FRESH_MS } = require('./bugs');
 
 /**
@@ -150,6 +150,17 @@ function buildAlerts(state, today, activity = {}, debt = null, nowMs = Date.now(
       level: 'crit',
       code: 'bug-reopened',
       sheetUrl: entry.url || null,
+    });
+  }
+
+  // Ticket đã sang tay QC mà chưa ai giao buglist — chỗ bug sắp về nhưng không có gì để theo dõi
+  const watchedKeys = new Set(Object.values(state.bugWatch || {}).flatMap((e) => e.keys || []));
+  for (const [key, issue] of Object.entries(state.issues || {})) {
+    if (isOffMyPlate(issue) || !QC_TEST_PHASES.includes(issue.phase) || watchedKeys.has(key)) continue;
+    out.push({
+      ...label(key, 'đang ở giai đoạn QC test mà chưa có buglist nào — đòi link từ QC/PM'),
+      level: 'warn',
+      code: 'qc-test-no-buglist',
     });
   }
 

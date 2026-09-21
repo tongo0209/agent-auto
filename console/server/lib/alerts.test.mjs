@@ -369,3 +369,28 @@ test('sheet đang tắt theo dõi → không alert dù có reopened', () => {
   ).filter((a) => a.code === 'bug-reopened');
   assert.equal(alerts.length, 0);
 });
+
+/* ─────────────────── QC test mà chưa có buglist (qc-test-no-buglist) ─────────────────── */
+
+test('ticket đang QC test mà chưa có buglist → alert warn', () => {
+  const state = { issues: { 'GW-796': { phase: 'wait-test', summary: 'H5 đua xe' } }, bugWatch: {} };
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0].level, 'warn');
+  assert.equal(alerts[0].key, 'GW-796');
+});
+
+test('ticket QC test đã có buglist → im', () => {
+  const state = {
+    issues: { 'GW-796': { phase: 'wait-test' } },
+    bugWatch: { s1: { follow: true, keys: ['GW-796'] } },
+  };
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
+  assert.equal(alerts.length, 0);
+});
+
+test('ticket đã bàn giao người khác → im dù đang QC test', () => {
+  const state = { issues: { 'GW-796': { phase: 'wait-test', assigneeNow: 'ai đó' } }, bugWatch: {} };
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
+  assert.equal(alerts.length, 0);
+});

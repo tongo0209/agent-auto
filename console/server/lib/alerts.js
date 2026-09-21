@@ -1,5 +1,6 @@
 const { daysBetween } = require('./fsutil');
 const { HTML_TODO_PHASES, LATE_EXEMPT_PHASES, KEY_MILESTONE_IDS, MILESTONE_BY_ID, isOffMyPlate } = require('./vocab');
+const { sheetState, OPEN_FRESH_MS } = require('./bugs');
 
 /**
  * Cảnh báo chủ động — server tự soi state, không chờ user mở trang đọc bảng.
@@ -50,7 +51,7 @@ const label = (key, text) => ({ key, text });
  * @param activity map key → bản ghi từ lib/activity (có thể thiếu; chỉ dùng cho "đứng yên")
  * @param debt     kết quả lib/debt.js::buildDebt (có thể thiếu → không sinh alert nợ)
  */
-function buildAlerts(state, today, activity = {}, debt = null) {
+function buildAlerts(state, today, activity = {}, debt = null, nowMs = Date.now()) {
   const out = [];
 
   for (const [key, issue] of Object.entries(state.issues || {})) {
@@ -136,6 +137,19 @@ function buildAlerts(state, today, activity = {}, debt = null) {
       ...label('', `${itemCount} việc "Cần bạn" còn nợ · ${boardCount} board · cũ nhất ${oldest} (${stale} ngày) — ${keys}`),
       level: 'warn',
       code: 'debt-dropped',
+    });
+  }
+
+  // QC mở lại bug đã báo xong — dấu hiệu dễ tuột nhất vì mình đã coi như đóng sổ
+  for (const entry of Object.values(state.bugWatch || {})) {
+    const ids = entry.lastScan?.reopened || [];
+    if (!ids.length || sheetState(entry) !== 'following') continue;
+    if (!entry.openBugsAt || nowMs - Date.parse(entry.openBugsAt) >= OPEN_FRESH_MS) continue;
+    out.push({
+      ...label((entry.keys || [])[0] || '', `${ids.length} bug bị QC mở lại: #${ids.join(', #')} — ${entry.title || 'buglist'}`),
+      level: 'crit',
+      code: 'bug-reopened',
+      sheetUrl: entry.url || null,
     });
   }
 

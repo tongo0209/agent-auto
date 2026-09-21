@@ -203,4 +203,4 @@ function buildBugs({ state = {}, now = new Date(), boards = scanBoards() } = {})
   };
 }
 
-module.exports = { buildBugs, sheetState, filterSheets };
+module.exports = { buildBugs, sheetState, filterSheets, OPEN_FRESH_MS };

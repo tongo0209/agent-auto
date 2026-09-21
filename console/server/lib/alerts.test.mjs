@@ -318,3 +318,54 @@ test('nợ dồn từ ĐÚNG một board: vẫn phải nói đúng "1 board"', (
   assert.ok(t.includes('1 board'), `2 mục cùng ngày = 1 board, không được đếm thành 2: "${t}"`);
   assert.ok(t.includes('2026-08-01'), `phải nói ngày board: "${t}"`);
 });
+
+/* ─────────────────── QC mở lại bug (bug-reopened) ─────────────────── */
+
+const NOW_MS = Date.parse('2026-08-03T10:00:00Z');
+
+function stateWithSheet(entry) {
+  return { issues: {}, bugWatch: { s1: entry } };
+}
+
+test('QC mở lại bug trên sheet đang theo dõi → alert crit', () => {
+  const alerts = buildAlerts(
+    stateWithSheet({
+      follow: true,
+      title: 'BugList X',
+      url: 'https://docs.google.com/spreadsheets/d/abc',
+      keys: ['GW-100'],
+      openBugsAt: '2026-08-03T08:00:00Z',
+      lastScan: { reopened: ['12', '15'] },
+    }),
+    TODAY, {}, null, NOW_MS
+  ).filter((a) => a.code === 'bug-reopened');
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0].level, 'crit');
+  assert.equal(alerts[0].key, 'GW-100');
+  assert.match(alerts[0].text, /#12, #15/);
+  assert.equal(alerts[0].sheetUrl, 'https://docs.google.com/spreadsheets/d/abc');
+});
+
+test('lượt quét quá 6h → không tin, không alert', () => {
+  const alerts = buildAlerts(
+    stateWithSheet({
+      follow: true, title: 'BugList X', keys: ['GW-100'],
+      openBugsAt: '2026-08-03T02:00:00Z',
+      lastScan: { reopened: ['12'] },
+    }),
+    TODAY, {}, null, NOW_MS
+  ).filter((a) => a.code === 'bug-reopened');
+  assert.equal(alerts.length, 0);
+});
+
+test('sheet đang tắt theo dõi → không alert dù có reopened', () => {
+  const alerts = buildAlerts(
+    stateWithSheet({
+      follow: false, title: 'BugList X', keys: ['GW-100'],
+      openBugsAt: '2026-08-03T09:30:00Z',
+      lastScan: { reopened: ['12'] },
+    }),
+    TODAY, {}, null, NOW_MS
+  ).filter((a) => a.code === 'bug-reopened');
+  assert.equal(alerts.length, 0);
+});

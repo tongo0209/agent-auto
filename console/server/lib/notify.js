@@ -12,12 +12,16 @@ const REPEAT_MS = 12 * 3600e3; // đừng spam — 1 mốc crit chỉ nhắc l�
 /**
  * Alert crit này đã nhắc gần đây chưa? So theo (key, code) — không so theo text vì text
  * đổi mỗi ngày (VD "còn 2 ngày" → "còn 1 ngày") mà bản chất vẫn là CÙNG một mốc.
+ * Alert tự khai `dedup` thì so theo đó — `key` rỗng ở 13/25 buglist nên không phân biệt được nguồn.
  */
+const sameThing = (record, alert) =>
+  alert.dedup ? record.dedup === alert.dedup : record.key === alert.key && record.code === alert.code;
+
 function shouldNotify(alert, log, nowMs, config = {}) {
   if (config.notify === false) return false; // công tắc tắt hẳn — tôn trọng lựa chọn user
   if (alert.level !== 'crit') return false; // chỉ crit mới xứng đáng chen ra ngoài trang
   const last = (log || [])
-    .filter((r) => r && r.key === alert.key && r.code === alert.code)
+    .filter((r) => r && sameThing(r, alert))
     .map((r) => Date.parse(r.at))
     .sort((a, b) => b - a)[0];
   return !last || nowMs - last >= REPEAT_MS;

@@ -1,6 +1,14 @@
 const { daysBetween } = require('./fsutil');
-const { HTML_TODO_PHASES, LATE_EXEMPT_PHASES, KEY_MILESTONE_IDS, MILESTONE_BY_ID, QC_TEST_PHASES, isOffMyPlate } = require('./vocab');
-const { sheetState, OPEN_FRESH_MS } = require('./bugs');
+const {
+  HTML_TODO_PHASES,
+  LATE_EXEMPT_PHASES,
+  KEY_MILESTONE_IDS,
+  MILESTONE_BY_ID,
+  QC_TEST_PHASES,
+  isOffMyPlate,
+  isHandedOver,
+} = require('./vocab');
+const { sheetState, isOpenScanFresh } = require('./bugs');
 
 /**
  * Cảnh báo chủ động — server tự soi state, không chờ user mở trang đọc bảng.
@@ -141,22 +149,29 @@ function buildAlerts(state, today, activity = {}, debt = null, nowMs = Date.now(
   }
 
   // QC mở lại bug đã báo xong — dấu hiệu dễ tuột nhất vì mình đã coi như đóng sổ
-  for (const entry of Object.values(state.bugWatch || {})) {
+  // `dedup` riêng vì `key` còn phải hiện lên UI: 13/25 buglist không có mã task ⇒ cùng `key: ''`
+  for (const [sheetId, entry] of Object.entries(state.bugWatch || {})) {
     const ids = entry.lastScan?.reopened || [];
     if (!ids.length || sheetState(entry) !== 'following') continue;
-    if (!entry.openBugsAt || nowMs - Date.parse(entry.openBugsAt) >= OPEN_FRESH_MS) continue;
+    if (!isOpenScanFresh(entry, nowMs)) continue;
     out.push({
       ...label((entry.keys || [])[0] || '', `${ids.length} bug bị QC mở lại: #${ids.join(', #')} — ${entry.title || 'buglist'}`),
       level: 'crit',
       code: 'bug-reopened',
+      dedup: `${sheetId}:${[...ids].sort().join(',')}`,
       sheetUrl: entry.url || null,
     });
   }
 
   // Ticket đã sang tay QC mà chưa ai giao buglist — chỗ bug sắp về nhưng không có gì để theo dõi
-  const watchedKeys = new Set(Object.values(state.bugWatch || {}).flatMap((e) => e.keys || []));
+  // Loại `not-buglist`: đó là link BRIEF gắn mã task (GW-723, GW-629), không phải buglist
+  const watchedKeys = new Set(
+    Object.values(state.bugWatch || {})
+      .filter((e) => sheetState(e) !== 'not-buglist')
+      .flatMap((e) => e.keys || [])
+  );
   for (const [key, issue] of Object.entries(state.issues || {})) {
-    if (isOffMyPlate(issue) || !QC_TEST_PHASES.includes(issue.phase) || watchedKeys.has(key)) continue;
+    if (isHandedOver(issue) || !QC_TEST_PHASES.includes(issue.phase) || watchedKeys.has(key)) continue;
     out.push({
       ...label(key, 'đang ở giai đoạn QC test mà chưa có buglist nào — đòi link từ QC/PM'),
       level: 'warn',

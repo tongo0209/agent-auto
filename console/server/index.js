@@ -107,8 +107,8 @@ async function notifyTick() {
     const config = readJSON(file.config, {});
     const { sent } = notifyNewCrits({ alerts, log, nowMs: Date.now(), config });
     for (const a of sent) {
-      sendNotification('Daily Console — ' + a.key, a.text);
-      appendJSONL(file.notified, { at: new Date().toISOString(), key: a.key, code: a.code });
+      sendNotification(a.key ? 'Daily Console — ' + a.key : 'Daily Console', a.text);
+      appendJSONL(file.notified, { at: new Date().toISOString(), key: a.key, code: a.code, dedup: a.dedup || null });
     }
   } catch (err) {
     // Không được làm sập server — server này đang host terminal thật của user

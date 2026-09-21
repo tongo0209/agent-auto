@@ -72,13 +72,16 @@ const BUCKET_RANK = { mine: 0, unknown: 1, 'not-mine': 2 };
 const STATUS_RANK = { 'chua-fix': 0, 'cho-confirm': 1 };
 const isChuaFix = (row) => row.status !== 'cho-confirm';
 const OPEN_FRESH_MS = 6 * HOUR_MS;
+/** Lượt quét openBugs còn tin được không — dùng chung cho bảng bug và cảnh báo */
+const isOpenScanFresh = (entry, now) =>
+  Boolean(entry.openBugsAt) && Number(now) - Date.parse(entry.openBugsAt) < OPEN_FRESH_MS;
 
 function openRowsOf(state, now, boards) {
   return Object.entries(state.bugWatch || {})
     .filter(([, entry]) => sheetState(entry) === 'following')
     .flatMap(([sheetId, entry]) =>
       annotateOpenBugs(entry.openBugs, boards[sheetId]).map((row) => ({
-        stale: !entry.openBugsAt || Number(now) - Date.parse(entry.openBugsAt) >= OPEN_FRESH_MS,
+        stale: !isOpenScanFresh(entry, now),
         openAt: entry.openBugsAt || null,
         sheetId,
         sheetTitle: entry.title || sheetId,
@@ -203,4 +206,4 @@ function buildBugs({ state = {}, now = new Date(), boards = scanBoards() } = {})
   };
 }
 
-module.exports = { buildBugs, sheetState, filterSheets, OPEN_FRESH_MS };
+module.exports = { buildBugs, sheetState, filterSheets, isOpenScanFresh };

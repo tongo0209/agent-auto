@@ -37,3 +37,28 @@ test('notifyNewCrits chỉ trả về những alert đáng nhắc', () => {
   });
   assert.deepEqual(r.sent.map((a) => a.key), ['GW-1']);
 });
+
+/* ─── Critical 2 (21/9): 13/25 buglist không có mã task ⇒ key='' đè dedup của nhau ─── */
+
+const reopened = (dedup) => ({ key: '', code: 'bug-reopened', level: 'crit', text: 'bug bị mở lại', dedup });
+
+test('2 buglist không có mã task cùng bị mở lại → cả hai đều được nhắc', () => {
+  const r = notifyNewCrits({
+    alerts: [reopened('sheetA:12'), reopened('sheetB:7')],
+    log: [],
+    nowMs: NOW,
+    config: on,
+  });
+  assert.equal(r.sent.length, 2, 'không sheet nào được nuốt thông báo của sheet kia');
+});
+
+test('sheet đã nhắc, đợt sau bug KHÁC → vẫn nhắc dù chưa quá 12h', () => {
+  const log = [{ at: '2026-08-03T10:00:00+07:00', key: '', code: 'bug-reopened', dedup: 'sheetA:12' }];
+  assert.equal(shouldNotify(reopened('sheetA:12'), log, NOW, on), false, 'cùng danh sách bug thì vẫn là trùng');
+  assert.equal(shouldNotify(reopened('sheetA:20'), log, NOW, on), true);
+});
+
+test('alert không có dedup vẫn so theo (key, code) như cũ', () => {
+  const log = [{ at: '2026-08-03T10:00:00+07:00', key: 'GW-1', code: 'html-urgent', dedup: null }];
+  assert.equal(shouldNotify(crit, log, NOW, on), false);
+});

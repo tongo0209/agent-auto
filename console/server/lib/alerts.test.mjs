@@ -214,13 +214,15 @@ test('nhiều ticket nợ → ĐÚNG 1 dòng gom, không phải mỗi ticket 1 d
 test('ticket đã đóng ở Jira thì IM, dù phase còn tụt hậu', () => {
   // Ca thật 13/8: GW-477 `status: Done` mà phase mới `wait-test`; GW-610/GW-627 `COMPLETED`.
   // Phase do skill suy từ commit nên luôn chậm hơn Jira ⇒ không được lấy phase làm nguồn duy nhất.
+  // Trừ `qc-test-no-buglist` (chốt 21/9): QC test luôn bắt đầu SAU khi ticket đã đóng, rule đó
+  // cố ý không nhìn status — xem vocab::isHandedOver.
   for (const status of ['Done', 'COMPLETED', 'Canceled', 'closed']) {
     const alerts = buildAlerts(
       { issues: { 'GW-477': { phase: 'wait-test', status, milestones: { html: '2026-08-01' } } } },
       TODAY,
       {},
       debtWith([{ key: 'GW-477', offMyPlate: false, staleDays: 14, oldestDate: '2026-07-30', items: [{ date: '2026-07-30' }] }])
-    );
+    ).filter((a) => a.code !== 'qc-test-no-buglist');
     assert.equal(alerts.length, 0, `status "${status}" mà vẫn còn cảnh báo: ${JSON.stringify(alerts)}`);
   }
 });
@@ -408,4 +410,86 @@ test('sheet được tắt theo dõi nhưng vẫn có buglist link → im (link 
   };
   const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
   assert.equal(alerts.length, 0, 'quy tắc kiểm "có buglist" tức là key ở watchedKeys, không quan tâm follow flag');
+});
+
+/* ─── Critical 1 (21/9): link BRIEF gắn key làm câm cảnh báo "chưa có buglist" ─── */
+
+test('brief gắn key (notBugSheet) KHÔNG phải buglist → vẫn phải cảnh báo thiếu buglist', () => {
+  const state = {
+    issues: { 'GW-723': { phase: 'wait-test' } },
+    bugWatch: { s1: { notBugSheet: true, keys: ['GW-723'], title: 'Brief chi tiết — Gunny' } },
+  };
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
+  assert.equal(alerts.length, 1, 'entry not-buglist không được tính là "đã có buglist"');
+});
+
+test('buglist đã qua mốc release (retired) VẪN tính là đã có buglist → im', () => {
+  const state = {
+    issues: { 'GW-713': { phase: 'wait-test' } },
+    bugWatch: { s1: { retired: true, keys: ['GW-713'], title: 'BugList JXm' } },
+  };
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
+  assert.equal(alerts.length, 0, 'retired từng là buglist thật, chỉ qua mốc release');
+});
+
+/* ─── Critical 2 (21/9): alert phải mang khoá dedup riêng, không đè nhau ở notify ─── */
+
+const reopenedEntry = (over) => ({
+  follow: true,
+  openBugsAt: '2026-08-03T09:00:00Z',
+  ...over,
+});
+
+test('2 buglist KHÔNG có mã task cùng bị mở lại → 2 alert với dedup khác nhau', () => {
+  const alerts = buildAlerts(
+    {
+      issues: {},
+      bugWatch: {
+        sheetA: reopenedEntry({ title: 'BugList A', keys: [], lastScan: { reopened: ['12'] } }),
+        sheetB: reopenedEntry({ title: 'BugList B', keys: [], lastScan: { reopened: ['7'] } }),
+      },
+    },
+    TODAY, {}, null, NOW_MS
+  ).filter((a) => a.code === 'bug-reopened');
+  assert.equal(alerts.length, 2);
+  assert.equal(alerts[0].key, '', 'hiển thị vẫn gọn — không nhét sheetId vào key');
+  assert.notEqual(alerts[0].dedup, alerts[1].dedup);
+});
+
+test('cùng một sheet, đợt reopen với danh sách bug khác → dedup khác', () => {
+  const at = (ids) =>
+    buildAlerts(
+      { issues: {}, bugWatch: { sheetA: reopenedEntry({ title: 'A', keys: [], lastScan: { reopened: ids } }) } },
+      TODAY, {}, null, NOW_MS
+    ).filter((a) => a.code === 'bug-reopened')[0].dedup;
+  assert.equal(at(['12']), at(['12']), 'cùng danh sách bug thì dedup phải ổn định');
+  assert.notEqual(at(['12']), at(['20']));
+});
+
+/* ─── Important 3 (21/9): QC test bắt đầu SAU khi status Jira đã đóng ─── */
+
+test('ticket wait-test mà Jira đã COMPLETED vẫn phải nhắc thiếu buglist', () => {
+  const state = { issues: { 'GW-796': { phase: 'wait-test', status: 'COMPLETED' } }, bugWatch: {} };
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
+  assert.equal(alerts.length, 1, 'status đóng KHÔNG được loại rule này — QC test luôn đến sau');
+});
+
+test('ticket wait-test + COMPLETED nhưng đã có người nhận khác → im', () => {
+  const state = {
+    issues: { 'GW-796': { phase: 'wait-test', status: 'COMPLETED', assigneeNow: 'ai đó' } },
+    bugWatch: {},
+  };
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
+  assert.equal(alerts.length, 0);
+});
+
+test('phase closed + COMPLETED → im', () => {
+  const state = { issues: { 'GW-796': { phase: 'closed', status: 'COMPLETED' } }, bugWatch: {} };
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
+  assert.equal(alerts.length, 0);
+});
+
+test('mốc gấp của ticket đã đóng status vẫn im — các cảnh báo khác không đổi hành vi', () => {
+  const state = { issues: { 'GW-1': { phase: 'coding', status: 'Done', milestones: { html: '2026-08-04' } } } };
+  assert.deepEqual(buildAlerts(state, TODAY, {}, null, NOW_MS), []);
 });

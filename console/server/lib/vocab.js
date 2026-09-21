@@ -31,6 +31,10 @@ const isOffMyPlate = (issue) =>
       (idsWhere('offMyPlate').includes(issue.phase) || isDoneStatus(issue.status) || Boolean(issue.assigneeNow))
   );
 
+/** Như `isOffMyPlate` nhưng BỎ cổng status Jira — QC test luôn bắt đầu SAU khi ticket đã đóng (GW-796, GW-477) */
+const isHandedOver = (issue) =>
+  Boolean(issue && (idsWhere('offMyPlate').includes(issue.phase) || issue.assigneeNow));
+
 module.exports = {
   vocab,
   PHASE_IDS: vocab.phases.map((p) => p.id),
@@ -61,4 +65,5 @@ module.exports = {
   DONE_STATUSES,
   isDoneStatus,
   isOffMyPlate,
+  isHandedOver,
 };

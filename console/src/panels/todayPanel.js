@@ -127,6 +127,9 @@ export function initTodayPanel({ terminals, notify }) {
       $('.tab[data-tab="review"]').trigger('click');
     });
 
+  // Gõ sẵn, không Enter: fix bug là việc chạm sheet chung với QC, user tự bấm chạy
+  $('#alerts').on('click', '[data-fixbug]', (e) => ctx.terminals.typeDraft('/bug-fixer-lite ' + $(e.currentTarget).data('fixbug')));
+
   // Dòng dài: bấm vào chữ để mở hết / thu lại (không mở modal cho một dòng việc)
   $('#need').on('click', '[data-need-text]', function () {
     const $li = $(this).closest('li');
@@ -451,7 +454,8 @@ function renderAlerts() {
     items
       .map(
         (a) => `<div class="alert ${escapeHtml(a.level)}">${icon(a.level === 'crit' ? 'warn' : 'wait')}
-          <span class="akey">${escapeHtml(a.key)}</span><span class="atext">${escapeHtml(a.text)}</span></div>`
+          <span class="akey">${escapeHtml(a.key)}</span><span class="atext">${escapeHtml(a.text)}</span>
+          ${a.code === 'bug-reopened' && a.sheetUrl ? `<button type="button" class="abtn" data-fixbug="${escapeHtml(a.sheetUrl)}">fix bug</button>` : ''}</div>`
       )
       .join('')
   );

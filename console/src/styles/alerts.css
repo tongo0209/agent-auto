@@ -39,6 +39,20 @@
 .alert .atext {
   color: var(--ink2);
 }
+.alert .abtn {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: var(--fs-xs);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.alert .abtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 /* ---- Dòng "có gì mới" (Task 8) — thông tin, không phải báo động, nên dùng tone accent
    chứ không đỏ/vàng như .alert. Đặt NGAY TRÊN #kpis (xem index.html), khối RIÊNG khỏi

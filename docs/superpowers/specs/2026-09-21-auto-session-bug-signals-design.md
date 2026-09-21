@@ -42,7 +42,9 @@ Thêm rule vào `buildAlerts()`. Nguồn: `state.bugWatch[sheetId].lastScan.reop
 
 - Chỉ tính sheet đang `following`.
 - Chỉ tin khi lượt quét còn tươi: dùng đúng ngưỡng 6h của cờ `stale` đang có trong
-  `console/server/lib/bugs.js` (`OPEN_FRESH_MS`), KHÔNG khai ngưỡng mới.
+  `console/server/lib/bugs.js` (`OPEN_FRESH_MS`), KHÔNG khai ngưỡng mới. `alerts.js` không được
+  chép lại hằng số này — export từ `bugs.js` (hoặc chuyển hằng sang chỗ cả hai cùng require) để
+  chỉ có MỘT định nghĩa "tươi".
 - Nội dung: ticket key (hoặc tên buglist nếu không có mã) + số bug + danh sách `#id`.
 - `crit` nên `notifyNewCrits()` tự bắn thông báo macOS — không phải viết thêm gì.
 
@@ -52,7 +54,10 @@ Thêm rule vào `buildAlerts()`. Nguồn: `state.bugWatch[sheetId].lastScan.reop
   `bugWatch[].keys` nào.
 - Chỉ tính ticket còn của mình: lọc qua `isOffMyPlate` (`server/lib/vocab.js`) — cùng cổng mà
   cảnh báo/nợ/doctor đang dùng, tránh lặp ca GW-654 (đếm mốc của người đã nhận bàn giao).
-- Giai đoạn "QC test" suy từ `schema/vocab.json`, CẤM hardcode tên phase.
+- Giai đoạn "QC test" = phase `wait-test` (đã kiểm `schema/vocab.json`: 9 phase, KHÔNG có cờ nào
+  mang nghĩa này sẵn — `wait-test` chỉ có `lateExempt`). Theo đúng quy ước repo "thêm phase = sửa
+  JSON, không sửa code": **thêm cờ `qcTest: true` cho `wait-test` trong `schema/vocab.json`**, rồi
+  đọc qua lớp vocab dẫn xuất như các cờ khác. CẤM viết thẳng chuỗi `'wait-test'` trong alerts.js.
 - `warn` nên KHÔNG bắn desktop — đây là việc nhắc, không phải báo động.
 
 ### 4.3 Nút hành động trên cảnh báo

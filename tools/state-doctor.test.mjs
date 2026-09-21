@@ -384,6 +384,21 @@ test('W8 sheet mồ côi — nhắc khi đang theo dõi, im khi user đã tắt 
   assert.ok(!codes(runDoctor({ root: muted, skipIcons: true }).warns).includes('W8'));
 });
 
+test('W8 im với sheet user cố ý đăng ký không ticket, vẫn nhắc sheet radar dò thiếu key', () => {
+  const coY = fixture({ bugWatch: { s1: { follow: true, title: 'CFL Offline', keys: [], noTicket: true } } });
+  assert.ok(!codes(runDoctor({ root: coY, skipIcons: true }).warns).includes('W8'));
+
+  const doDo = fixture({ bugWatch: { s2: { follow: true, title: 'sheet radar dò', keys: [] } } });
+  assert.ok(codes(runDoctor({ root: doDo, skipIcons: true }).warns).includes('W8'));
+});
+
+test('task ADHOC từ buglist ngoài Jira không bị đòi mốc (W4)', () => {
+  const root = fixture({ issues: { 'ADHOC-1': { phase: 'bugfix', summary: 'CFL Offline Tournament', source: 'adhoc' } } });
+  const r = runDoctor({ root, skipIcons: true });
+  assert.ok(!codes(r.warns).includes('W4'));
+  assert.deepEqual(codes(r.errors), []);
+});
+
 // E11 sinh ra từ 19/8 GW-779: delta thêm ticket mới mà bỏ sót summary, console render title "—"
 test('E11 thiếu summary → ERROR (console mất title)', () => {
   const root = fixture({ issues: { 'GW-1': { phase: 'coding', milestones: { html: '2026-08-10' } } } });

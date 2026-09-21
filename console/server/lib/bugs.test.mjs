@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import bugs from './bugs.js';
 
-const { buildBugs, sheetState } = bugs;
+const { buildBugs, sheetState, filterSheets } = bugs;
 
 const NOW = new Date('2026-08-18T10:00:00Z');
 
@@ -145,7 +145,9 @@ test('sheet đã nghỉ hoặc đã tắt không góp bug mở nào', () => {
 
 test('đếm bug mở tách theo của mình / chưa rõ / của người khác', () => {
   const out = buildBugs({ state: openState, now: NOW });
-  assert.deepEqual(out.open.counts, { total: 3, mine: 1, unknown: 1, notMine: 1, stale: 3, chuaFix: 3, choConfirm: 0 });
+  assert.deepEqual(out.open.counts, {
+    total: 3, mine: 1, unknown: 1, notMine: 1, stale: 3, chuaFix: 3, choConfirm: 0, daFix: 0, daGhi: 0,
+  });
 });
 
 test('mỗi sheet mang sẵn số bug đang mở để vẽ badge', () => {
@@ -157,7 +159,9 @@ test('mỗi sheet mang sẵn số bug đang mở để vẽ badge', () => {
 test('state cũ chưa có openBugs thì bảng rỗng, không nổ', () => {
   const out = buildBugs({ state: STATE, now: NOW });
   assert.deepEqual(out.open.rows, []);
-  assert.deepEqual(out.open.counts, { total: 0, mine: 0, unknown: 0, notMine: 0, stale: 0, chuaFix: 0, choConfirm: 0 });
+  assert.deepEqual(out.open.counts, {
+    total: 0, mine: 0, unknown: 0, notMine: 0, stale: 0, chuaFix: 0, choConfirm: 0, daFix: 0, daGhi: 0,
+  });
 });
 
 // ---------- số liệu cũ phải nói rõ là cũ (trả giá 18/8: cache 21h báo như hiện tại) ----------
@@ -231,16 +235,16 @@ test('bug chưa fix xếp trước bug chờ confirm, trong nhóm chưa fix thì
   );
 });
 
-test('đếm tách hai loại việc để hiện 2 nhóm', () => {
-  const out = buildBugs({ state: statusState, now: NOW });
-  assert.equal(out.open.counts.chuaFix, 2);
+test('đếm tách hai loại việc để hiện 2 nhóm — "chưa fix" gồm cả dòng chờ QC confirm chưa ai sửa', () => {
+  const out = buildBugs({ state: statusState, now: NOW, boards: {} });
+  assert.equal(out.open.counts.chuaFix, 3);
   assert.equal(out.open.counts.choConfirm, 1);
 });
 
 test('mỗi buglist mang sẵn số chưa fix + chờ confirm để vẽ badge', () => {
-  const out = buildBugs({ state: statusState, now: NOW });
+  const out = buildBugs({ state: statusState, now: NOW, boards: {} });
   const s = out.sheets.find((x) => x.sheetId === 's1');
-  assert.equal(s.chuaFixCount, 2);
+  assert.equal(s.chuaFixCount, 3);
   assert.equal(s.choConfirmCount, 1);
 });
 
@@ -306,7 +310,7 @@ test('nhóm mang tên ticket + summary + phase để nhìn là biết project n�
 test('sheet chưa gắn ticket vẫn có nhóm riêng, nhãn theo tên sheet', () => {
   const g = buildBugs({ state: groupState, now: NOW }).open.groups;
   const mc = g.find((x) => !x.keys.length);
-  assert.equal(mc.label, 'chưa gắn ticket');
+  assert.equal(mc.label, 'task ngoài Jira');
   assert.equal(mc.summary, 'Bug List không gắn ticket');
   assert.equal(mc.chuaFix, 1);
 });
@@ -333,4 +337,161 @@ test('nhóm nhiều việc chưa fix xếp trên', () => {
 
 test('không có bug treo thì không sinh nhóm rỗng', () => {
   assert.deepEqual(buildBugs({ state: STATE, now: NOW }).open.groups, []);
+});
+
+test('sheets xếp mới nhất trước: lastChangeAt, chưa quét thì tính addedAt', () => {
+  const state = {
+    bugWatch: {
+      cu: { follow: true, title: 'cũ', lastChangeAt: '2026-09-01T00:00:00Z' },
+      moi: { follow: true, title: 'mới', lastChangeAt: '2026-09-20T00:00:00Z' },
+      vuaThem: { follow: true, title: 'vừa thêm', addedAt: '2026-09-21T00:00:00Z' },
+      chuaBiet: { follow: true, title: 'không mốc' },
+    },
+  };
+  const order = buildBugs({ state, now: NOW }).sheets.map((s) => s.title);
+  assert.deepEqual(order, ['vừa thêm', 'mới', 'cũ', 'không mốc']);
+});
+
+// ---------- chia mục: đang theo dõi · chưa theo dõi · task đã đóng ----------
+
+const GROUPED = {
+  issues: {
+    'GW-1': { phase: 'bugfix', summary: 'còn sống' },
+    'GW-2': { phase: 'closed', summary: 'đã đóng' },
+    'GW-3': { phase: 'reassigned', summary: 'sang tay người khác' },
+  },
+  bugWatch: {
+    song: { follow: true, title: 'BugList đang chạy', keys: ['GW-1'], lastChangeAt: '2026-08-18T09:00:00Z' },
+    dong: { follow: true, title: 'BugList ticket đóng', keys: ['GW-2'], lastChangeAt: '2026-08-18T08:00:00Z' },
+    tatSong: { follow: false, title: 'BugList chờ bật', keys: ['GW-1'], lastChangeAt: '2026-08-18T07:00:00Z' },
+    tatDong: { follow: false, title: 'BugList xong rồi', keys: ['GW-2', 'GW-3'], lastChangeAt: '2026-08-18T06:00:00Z' },
+    khongMa: { follow: false, title: 'BugList ngoài Jira', keys: [], lastChangeAt: '2026-08-18T05:00:00Z' },
+    khongMaCu: { follow: false, title: 'BugList chiến dịch cũ', keys: [], lastChangeAt: '2026-05-01T05:00:00Z' },
+    nghi: { follow: true, title: 'BugList hết hạn', keys: ['GW-1'], retired: true },
+  },
+};
+const grouped = () => Object.fromEntries(buildBugs({ state: GROUPED, now: NOW }).sheets.map((s) => [s.sheetId, s]));
+
+test('sheet đang theo dõi vào mục following, ticket còn sống xếp trên ticket đã đóng', () => {
+  const g = grouped();
+  assert.equal(g.song.group, 'following');
+  assert.equal(g.song.alive, true);
+  assert.equal(g.dong.group, 'following');
+  assert.equal(g.dong.alive, false);
+  const order = buildBugs({ state: GROUPED, now: NOW }).sheets.map((s) => s.sheetId);
+  assert.ok(order.indexOf('song') < order.indexOf('dong'));
+});
+
+test('sheet đã tắt: ticket còn sống thì nằm mục chờ bật, mọi ticket đóng thì vào khu đã đóng', () => {
+  const g = grouped();
+  assert.equal(g.tatSong.group, 'off');
+  assert.equal(g.tatDong.group, 'closed');
+});
+
+test('sheet không gắn ticket: mới có động tĩnh thì chờ bật, im lâu thì vào khu đã đóng', () => {
+  assert.equal(grouped().khongMa.group, 'off');
+  assert.equal(grouped().khongMaCu.group, 'closed');
+});
+
+test('ticket lạ không có trong state.issues thì xét như sheet không ticket — cũ là vào khu đã đóng', () => {
+  const state = { issues: GROUPED.issues, bugWatch: { x: { follow: false, keys: ['GW-999'], lastChangeAt: '2026-05-01T00:00:00Z' } } };
+  assert.equal(buildBugs({ state, now: NOW }).sheets[0].group, 'closed');
+});
+
+test('ticket còn sống thì luôn ở khu chờ bật dù buglist im lâu', () => {
+  const state = { issues: GROUPED.issues, bugWatch: { x: { follow: false, keys: ['GW-1'], lastChangeAt: '2026-01-01T00:00:00Z' } } };
+  assert.equal(buildBugs({ state, now: NOW }).sheets[0].group, 'off');
+});
+
+test('retired và not-buglist luôn nằm khu đã đóng dù đang bật theo dõi', () => {
+  assert.equal(grouped().nghi.group, 'closed');
+  assert.equal(buildBugs({ state: STATE, now: NOW }).sheets.find((s) => s.sheetId === 's4').group, 'closed');
+});
+
+test('searchText gom mã task + tên sheet, thường hoá để lọc tại chỗ', () => {
+  const g = grouped();
+  assert.ok(g.song.searchText.includes('gw1'));
+  assert.ok(g.song.searchText.includes('buglistđangchạy'));
+  const hits = Object.values(g).filter((s) => s.searchText.includes('gw2'));
+  assert.deepEqual(hits.map((s) => s.sheetId).sort(), ['dong', 'tatDong']);
+});
+
+// ---------- lọc: gõ số trần cũng ra đúng task ----------
+
+const FILTER_SHEETS = buildBugs({
+  state: {
+    issues: { 'GW-477': { phase: 'closed', summary: 'CFL Offline' } },
+    bugWatch: {
+      a: { follow: true, title: 'CFL Offline Tournament', keys: ['GW-477'] },
+      b: { follow: true, title: 'BugList NTH Affiliate v2 — đợt 477 câu hỏi', keys: [] },
+      c: { follow: true, title: 'BugList GNOTH', keys: ['GW-610'] },
+    },
+  },
+  now: NOW,
+}).sheets;
+const ids = (q) => filterSheets(FILTER_SHEETS, q).map((s) => s.sheetId);
+
+test('gõ số trần ra đúng task, sheet khớp MÃ xếp trước sheet chỉ khớp tên', () => {
+  assert.deepEqual(ids('477'), ['a', 'b']);
+});
+
+test('gõ có tiền tố, có gạch hay có khoảng trắng đều khớp cùng một mã', () => {
+  for (const q of ['GW-477', 'gw477', 'gw 477', '  Gw-477 ']) assert.deepEqual(ids(q), ['a'], q);
+});
+
+test('gõ tên sheet vẫn lọc theo tên', () => {
+  assert.deepEqual(ids('gnoth'), ['c']);
+});
+
+test('gõ chuỗi không có gì ⇒ rỗng; ô lọc trống ⇒ giữ nguyên danh sách', () => {
+  assert.deepEqual(ids('khongcogi'), []);
+  assert.equal(filterSheets(FILTER_SHEETS, '   ').length, 3);
+});
+
+// ---------- nối board fix: bug đã fix không được đếm là "chưa fix" ----------
+
+const FIX_STATE = {
+  bugWatch: {
+    s9: {
+      follow: true,
+      title: 'BugList Trung Thu',
+      keys: ['GW-525'],
+      openBugsAt: '2026-08-18T09:00:00Z',
+      openBugs: [
+        { bugId: '3', desc: 'lệch nút', bucket: 'mine', status: 'chua-fix' },
+        { bugId: '5', desc: 'sai text', bucket: 'mine', status: 'cho-confirm' },
+        { bugId: '9', desc: 'chưa ai đụng', bucket: 'mine', status: 'chua-fix' },
+      ],
+    },
+  },
+};
+const BOARDS = { s9: { 3: { fixedAt: '2026-08-18', board: '/b/x.md', sheetWritten: null }, 5: { fixedAt: '2026-08-18', board: '/b/x.md', sheetWritten: 'done' } } };
+const bySheet9 = (boards) => buildBugs({ state: FIX_STATE, now: NOW, boards }).sheets[0];
+
+test('bug có trong board fix ⇒ da-fix-chua-ghi-sheet, bug không có ⇒ chua-fix', () => {
+  const out = buildBugs({ state: FIX_STATE, now: NOW, boards: BOARDS });
+  assert.deepEqual(
+    out.open.rows.map((r) => [r.bugId, r.fixState]),
+    [
+      ['3', 'da-fix-chua-ghi-sheet'],
+      ['9', 'chua-fix'],
+      ['5', 'da-ghi-sheet'],
+    ],
+  );
+});
+
+test('số "chưa fix" phải TRỪ phần board báo đã fix', () => {
+  const s = bySheet9(BOARDS);
+  assert.equal(s.chuaFixCount, 1);
+  assert.equal(s.daFixCount, 1);
+  assert.equal(s.daGhiCount, 1);
+  assert.equal(buildBugs({ state: FIX_STATE, now: NOW, boards: BOARDS }).open.counts.chuaFix, 1);
+});
+
+test('sheet không map được board hoặc board rỗng ⇒ giữ nguyên như cũ, không ném lỗi', () => {
+  for (const boards of [{}, { khac: {} }, undefined]) {
+    const s = bySheet9(boards);
+    assert.equal(s.chuaFixCount, 3, 'không có board thì cả 3 bug vẫn là chưa fix');
+    assert.equal(s.daFixCount, 0);
+  }
 });

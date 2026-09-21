@@ -76,3 +76,69 @@
   font-size: var(--fs-xs);
   color: var(--muted);
 }
+
+.bugsearch {
+  margin-bottom: 10px;
+}
+.bugtabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.bugtab {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  cursor: pointer;
+  font: var(--fs-sm) var(--font-ui);
+  padding: 5px 10px;
+}
+.bugtab.on {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.bugtab.bug-following.on {
+  background: var(--ok-bg);
+}
+.mrow.bug-following {
+  border-left: 3px solid var(--accent);
+}
+.mrow.bug-following .ym {
+  color: var(--ink);
+}
+.mrow.bug-off {
+  border-left: 3px solid var(--line);
+}
+.mrow.bug-off .ym {
+  color: var(--ink2);
+}
+.mrow .h[data-sheet] {
+  cursor: pointer;
+}
+.badge.fix-da-fix-chua-ghi-sheet {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.badge.fix-da-ghi-sheet {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.bugopenlist {
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+.mrow.bug-closed {
+  opacity: 0.55;
+}
+.bugorder-note {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.bugsheetacts {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}

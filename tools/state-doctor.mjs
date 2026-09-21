@@ -91,7 +91,8 @@ export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
   // cổng G1/G2 nên không bao giờ tự fix, còn hàng đợi ghi sheet thì chỉ phiên CLI mới xả được.
   for (const [sheetId, entry] of Object.entries(state.bugWatch || {})) {
     const label = entry.title || sheetId.slice(0, 12);
-    if (isWatched(entry) && !entry.keys?.length) warn('W8', label, 'sheet buglist chưa gắn ticket nào — cổng G1/G2 không kiểm được');
+    if (isWatched(entry) && !entry.keys?.length && !entry.noTicket)
+      warn('W8', label, 'sheet buglist chưa gắn ticket nào — cổng G1/G2 không kiểm được');
     const queued = entry.pendingSheetWrite?.length || 0;
     if (queued) warn('W9', label, `${queued} dòng chờ ghi ngược sheet — mở phiên CLI chạy /daily bugwrite`);
   }
@@ -153,7 +154,8 @@ export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
       if (!milestoneIds.has(name)) err('E2', key, `key mốc "${name}" không có trong vocab`);
       if (!ISO_DATE.test(String(date))) err('E3', key, `mốc "${name}" = "${date}" không phải YYYY-MM-DD`);
     }
-    if (Object.keys(ms).filter((n) => !n.startsWith('_')).length === 0) {
+    // task ADHOC (buglist ngoài Jira) không có mốc Jira để đòi — W4 ở đó là cảnh báo oan
+    if (issue.source !== 'adhoc' && Object.keys(ms).filter((n) => !n.startsWith('_')).length === 0) {
       warn('W4', key, 'không có mốc nào — không biết deadline');
     }
     // W5: ngược với E2/E3, `_conflict` LÀ đáng cảnh báo — mốc còn tranh chấp chưa ai hỏi lại,

@@ -3,8 +3,19 @@ import { api } from '@core/api';
 import { escapeHtml, shortDate } from '@core/format.mjs';
 import { icon } from '@core/icons';
 import { JIRA_SITE } from '@core/constants.mjs';
+import { filterSheets } from '../../server/lib/bugsearch.js';
 
 let ctx = { terminals: null };
+let sheetsCache = [];
+let openRowsCache = [];
+let expandedSheet = null;
+let filterText = '';
+let subTab = 'following';
+try {
+  subTab = localStorage.getItem('bug-subtab') || subTab;
+} catch {
+  // trình duyệt chặn localStorage (chế độ riêng tư) — vẫn chạy, chỉ không nhớ tab
+}
 
 const day = (iso) => shortDate(String(iso || '').slice(0, 10));
 
@@ -12,11 +23,12 @@ const held = (h) => (h === null ? '' : h < 1 ? 'vừa xong' : h < 24 ? `treo ${h
 
 const keyChips = (keys) =>
   (keys || [])
-    .map(
-      (k) =>
-        `<a class="kchip open" href="${JIRA_SITE}/browse/${escapeHtml(k)}" target="_blank" rel="noopener">${escapeHtml(k)}</a>`,
+    .map((k) =>
+      k.startsWith('ADHOC-')
+        ? `<span class="kchip">${escapeHtml(k)}</span>`
+        : `<a class="kchip open" href="${JIRA_SITE}/browse/${escapeHtml(k)}" target="_blank" rel="noopener">${escapeHtml(k)}</a>`,
     )
-    .join('') || '<span class="kchip">chưa gắn ticket</span>';
+    .join('') || '<span class="kchip">task ngoài Jira</span>';
 
 function bugCard(row, verified) {
   const age = held(row.heldHours);
@@ -41,6 +53,11 @@ function bugCard(row, verified) {
   </div>`;
 }
 
+const FIX_LABEL = {
+  'da-fix-chua-ghi-sheet': 'đã fix · chưa ghi sheet',
+  'da-ghi-sheet': 'đã ghi sheet · chờ QC',
+};
+
 const BUCKET_LABEL = { mine: 'của mình', unknown: 'chưa rõ của ai', 'not-mine': 'của người khác' };
 const BUCKET_TONE = { mine: 'warn', unknown: 'doing', 'not-mine': '' };
 
@@ -51,27 +68,13 @@ function openCard(row) {
       <strong>#${escapeHtml(row.bugId)}</strong>
       <span class="badge ${BUCKET_TONE[row.bucket]}">${BUCKET_LABEL[row.bucket] || row.bucket}</span>
       ${row.status === 'cho-confirm' ? '<span class="badge done">đã sửa, chờ QC confirm</span>' : ''}
+      ${FIX_LABEL[row.fixState] ? `<span class="badge fix-${row.fixState}">${FIX_LABEL[row.fixState]}</span>` : ''}
       ${row.stale ? '<span class="badge">số liệu cũ — chờ lượt quét mới</span>' : ''}
       ${row.type ? `<span class="badge">${escapeHtml(row.type)}</span>` : ''}
       ${row.sheetUrl ? `<a class="bchip" href="${escapeHtml(row.sheetUrl)}" target="_blank" rel="noopener">${icon('sheet')}sheet</a>` : ''}
     </div>
     ${row.desc ? `<div class="bugdesc">${escapeHtml(row.desc)}</div>` : ''}
     <div class="bugfoot">${escapeHtml(row.sheetTitle)}${row.assignee ? ` · assignee ${escapeHtml(row.assignee)}` : ''}${row.openAt ? ` · đọc ${day(row.openAt)}` : ''}</div>
-  </div>`;
-}
-
-function ticketGroup(g) {
-  const counts = [g.chuaFix && `${g.chuaFix} chưa fix`, g.choConfirm && `${g.choConfirm} chờ QC confirm`]
-    .filter(Boolean)
-    .join(' · ');
-  return `<div class="buggroup">
-    <div class="grouphead">
-      ${g.keys.length ? keyChips(g.keys) : '<span class="badge">chưa gắn ticket</span>'}
-      ${g.summary ? `<span class="ym">${escapeHtml(g.summary)}</span>` : ''}
-      ${g.phase ? `<span class="badge">${escapeHtml(g.phase)}</span>` : ''}
-      <span class="badge ${g.chuaFix ? 'warn' : 'done'}">${counts}</span>
-    </div>
-    ${g.rows.map(openCard).join('')}
   </div>`;
 }
 
@@ -88,7 +91,9 @@ function sheetRow(s) {
   const moves = scan
     ? [
         s.chuaFixCount ? `${s.chuaFixCount} chưa fix` : '',
-        s.choConfirmCount ? `${s.choConfirmCount} chờ QC confirm` : '',
+        s.daFixCount ? `${s.daFixCount} đã fix — chưa ghi sheet` : '',
+        s.daGhiCount ? `${s.daGhiCount} đã ghi sheet, chờ QC` : '',
+        s.choConfirmCount ? `${s.choConfirmCount} trong đó chờ QC confirm` : '',
         scan.fresh ? `${scan.fresh} bug mới lượt trước` : '',
         scan.changed ? `${scan.changed} đổi` : '',
         (scan.reopened || []).length ? `QC mở lại #${scan.reopened.join(', #')}` : '',
@@ -97,8 +102,8 @@ function sheetRow(s) {
         .filter(Boolean)
         .join(' · ')
     : 'chưa ghi nhận lượt quét nào — có từ lượt bugwatch kế tiếp';
-  return `<div class="mrow">
-    <div class="h">
+  return `<div class="mrow bug-${s.group}">
+    <div class="h" data-sheet="${escapeHtml(s.sheetId)}">
       <span class="ym">${escapeHtml(s.title)}</span>
       ${keyChips(s.keys)}
       <span class="badges">
@@ -113,9 +118,21 @@ function sheetRow(s) {
     ${
       s.state === 'not-buglist'
         ? ''
-        : `<button type="button" class="btn small" data-watch="${escapeHtml(s.sheetId)}" data-on="${s.state === 'following' ? '0' : '1'}">${
-            s.state === 'following' ? 'thôi theo dõi' : 'bật theo dõi'
-          }</button>`
+        : `<div class="bugsheetacts">
+            <button type="button" class="btn small ${s.state === 'following' ? 'ghost' : 'primary'}" data-watch="${escapeHtml(s.sheetId)}" data-on="${s.state === 'following' ? '0' : '1'}">${
+              s.state === 'following' ? 'thôi theo dõi' : 'bật theo dõi'
+            }</button>
+            <button type="button" class="btn small" data-bugfix="${escapeHtml(s.url || '')}" ${s.url ? '' : 'disabled'}>${icon('term')}fix bug</button>
+            <button type="button" class="btn small ${s.daFixCount ? 'primary' : ''}" data-bugwrite>${icon('term')}ghi kết quả lên sheet${s.daFixCount ? ` (${s.daFixCount})` : ''}</button>
+          </div>`
+    }
+    ${
+      expandedSheet === s.sheetId
+        ? `<div class="bugopenlist">${
+            openRowsCache.filter((r) => r.sheetId === s.sheetId).map(openCard).join('') ||
+            '<span class="empty-note">Không có bug đang mở trong lượt quét gần nhất.</span>'
+          }</div>`
+        : ''
     }
   </div>`;
 }
@@ -129,6 +146,54 @@ export function initBugPanel({ terminals }) {
     await api.bugWatch(btn.attr('data-watch'), btn.attr('data-on') === '1');
     await loadBugs();
   });
+  $('#bug-sheets').on('click', '[data-bugfix]', (e) =>
+    ctx.terminals.type(`/bug-fixer-lite ${e.currentTarget.getAttribute('data-bugfix')}`),
+  );
+  $('#bug-sheets').on('click', '[data-bugwrite]', () => ctx.terminals.type('/daily bugwrite'));
+  $('#bug-sheets').on('input', '#bug-filter', function () {
+    filterText = String($(this).val() || '');
+    $('#bug-filter-clear').toggle(Boolean(filterText));
+    $('#bug-sheetlist').html(sheetSections());
+  });
+  $('#bug-sheets').on('click', '[data-sheet]', function () {
+    const sheetId = String($(this).data('sheet'));
+    expandedSheet = expandedSheet === sheetId ? null : sheetId;
+    $('#bug-sheetlist').html(sheetSections());
+  });
+  $('#bug-sheets').on('click', '[data-bugtab]', function () {
+    subTab = String($(this).data('bugtab'));
+    try {
+      localStorage.setItem('bug-subtab', subTab);
+    } catch {
+      // không ghi được thì thôi, tab vẫn đổi trong phiên này
+    }
+    $('#bug-sheetlist').html(sheetSections());
+  });
+  $('#bug-sheets').on('click', '#bug-filter-clear', () => {
+    filterText = '';
+    $('#bug-filter').val('');
+    $('#bug-filter-clear').hide();
+    $('#bug-sheetlist').html(sheetSections());
+  });
+}
+
+const SUB_TABS = [
+  ['following', 'Đang theo dõi'],
+  ['off', 'Chưa theo dõi'],
+  ['closed', 'Task đã đóng'],
+];
+
+function sheetSections() {
+  const shown = filterSheets(sheetsCache, filterText);
+  const tabs = SUB_TABS.map(
+    ([group, label]) =>
+      `<button type="button" class="bugtab bug-${group} ${group === subTab ? 'on' : ''}" data-bugtab="${group}">${label} <span class="badge">${shown.filter((s) => s.group === group).length}</span></button>`,
+  ).join('');
+  const rows = shown.filter((s) => s.group === subTab);
+  const body = rows.length
+    ? rows.map(sheetRow).join('')
+    : `<span class="empty-note">${filterText ? 'Không có kết quả ở khu này — thử khu khác.' : 'Khu này đang trống.'}</span>`;
+  return `<div class="bugtabs">${tabs}</div>${body}`;
 }
 
 export async function loadBugs() {
@@ -145,17 +210,14 @@ export async function loadBugs() {
   $('#bug-count').text(todo ? `(${todo})` : '');
   $('#bug-opennote').text(
     open.counts.total
-      ? `${open.counts.chuaFix} chưa fix · ${open.counts.choConfirm} đã sửa chờ QC confirm` +
+      ? `${open.counts.chuaFix} chưa fix · ${open.counts.daFix} đã fix chưa ghi sheet · ${open.counts.choConfirm} chờ QC confirm` +
         (open.counts.stale ? ` · ${open.counts.stale} đọc từ lượt cũ, chưa chắc còn đúng` : '')
       : watching
         ? 'Các buglist đang theo dõi không còn bug nào treo.'
         : 'Chưa bật theo dõi buglist nào — bấm "bật theo dõi" ở bảng dưới.',
   );
-  $('#bug-open').html(
-    open.counts.total
-      ? open.groups.map(ticketGroup).join('')
-      : '<span class="empty-note">Không có bug nào treo.</span>',
-  );
+  openRowsCache = open.rows;
+  $('#bug-open').empty();
   $('#bug-watchnote').text(`${watching} sheet đang theo dõi · ${sheets.length} sheet trong sổ`);
 
   $('#bug-pending').html(
@@ -168,5 +230,18 @@ export async function loadBugs() {
       : '<span class="empty-note">Không có bug nào chờ bạn duyệt.</span>',
   );
 
-  $('#bug-sheets').html(sheets.map(sheetRow).join('') || '<span class="empty-note">Watchlist trống.</span>');
+  sheetsCache = sheets;
+  // Ô lọc chỉ dựng 1 lần: loadBugs chạy lại mỗi 15s, vẽ lại input là mất chữ user đang gõ
+  if (!$('#bug-filter').length) {
+    $('#bug-sheets').html(
+      `<div class="bugorder-note">Thứ tự: "fix bug" gõ /bug-fixer-lite → tự verify → "ghi kết quả lên sheet" gõ /daily bugwrite mới ghi lên sheet.</div>
+      <span class="searchbox bugsearch">
+        <span class="searchicon">${icon('search')}</span>
+        <input type="search" id="bug-filter" placeholder="lọc theo mã task / tên buglist…" aria-label="Lọc buglist">
+        <button type="button" class="clearx" id="bug-filter-clear" title="Xoá lọc" aria-label="Xoá lọc">${icon('close')}</button>
+      </span>
+      <div id="bug-sheetlist"></div>`,
+    );
+  }
+  $('#bug-sheetlist').html(sheetSections());
 }

@@ -33,6 +33,13 @@ Tham số: `$ARGUMENTS`.
 
 1. **Mode**: token đầu = `report` → chỉ chạy giai đoạn [5] GHI-CHROME từ board có sẵn (không intake/fix lại). Token đầu = `turbo` → chạy trọn luồng nhưng bật SONG SONG SÂU (xem "Mode `turbo`" trong GIAI ĐOẠN [2]). Không có token mode → chạy trọn luồng (mặc định: cap-3 + model kế thừa). Phần còn lại của args: URL sheet (`docs.google.com/spreadsheets`) / URL OneDrive-SharePoint / path-URL file `.xlsx/.pdf/.pptx/.docx` / text dán / project slug / rỗng.
 2. **Nhận diện nguồn (INTAKE ADAPTER):** args có URL `docs.google.com/spreadsheets` → `gsheet` (luồng chuẩn bên dưới). URL `docs.google.com/document` → `gdoc` (Drive MCP `read_file_content`). URL `drive.google.com/file/d/` → `drive-file` (Drive MCP `download_file_content` → Read local). URL sharepoint/onedrive/office.com → `excel-online`. File local hoặc URL tải được đuôi `.xlsx/.pdf/.pptx/.docx` → `file`. User dán text/chat/email → `text`. Nguồn ≠ gsheet → xem mục INTAKE ADAPTER cuối file (bóc về bug-record chuẩn rồi chạy pipeline y hệt) — KHÔNG từ chối, KHÔNG trỏ skill khác.
+2b. **Đưa sheet vào theo dõi NGAY (cơ học, KHÔNG hỏi user):** nguồn có URL → chạy
+   `node ~/VNG/agent-auto/tools/bug-radar.mjs add "<url>" [--key <JIRA-KEY>] [--title "<tên task>"]`
+   (key suy được từ args/branch/registry thì gắn, không suy được thì bỏ; title = tên task).
+   Sheet vào `state.bugWatch` với theo dõi bật ⇒ console + radar nền thấy ngay, user không phải dán link lần hai.
+   Lệnh lỗi (link không phải Sheets, tool vắng) → ghi 1 dòng vào board rồi đi tiếp, KHÔNG dừng pipeline.
+   Nguồn không có URL (text dán, file local) → bỏ qua bước này, CẤM bịa link.
+
 3. **Project**: slug trong args → dùng; không có → suy từ cwd (`products/<slug>/…`); không suy được → hỏi user.
 **CONFIG PER-MÁY (đọc TRƯỚC registry)** `~/.claude/knowledge/bug-fixer-lite/config.json` (thiếu file/trường → auto-dò [root repo bằng `<SCRIPTS>/detect-roots.sh` — xem bullet dưới] rồi HỎI GỘP 1 lần trước đợt 1, lưu lại — KHÔNG hỏi lại):
    ```json

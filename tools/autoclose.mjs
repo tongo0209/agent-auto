@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeMerged } from './state-merge.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BACKUPS_KEPT = 30;
@@ -75,7 +76,8 @@ function backupState(root) {
 
 /** Khuôn giống runJanitor: máy tự chạy được trong radar-tick, không cần LLM phán. */
 export function runAutoClose({ root, now = new Date(), dry = false }) {
-  const state = JSON.parse(fs.readFileSync(path.join(root, 'state.json'), 'utf8'));
+  const statePath = path.join(root, 'state.json');
+  const base = JSON.parse(fs.readFileSync(statePath, 'utf8'));
 
   // Thiếu vocab thì BỎ LƯỢT có ghi lý do, không ném: radar-tick gọi hàm này, ném là chết cả
   // lượt canh buglist chỉ vì một file schema.
@@ -83,12 +85,15 @@ export function runAutoClose({ root, now = new Date(), dry = false }) {
   if (!fs.existsSync(vocabPath)) return { closed: [], error: 'thiếu schema/vocab.json' };
   const { doneStatuses } = JSON.parse(fs.readFileSync(vocabPath, 'utf8'));
 
-  const plan = planAutoClose(state, { todayISO: now.toLocaleDateString('en-CA'), doneStatuses });
+  const plan = planAutoClose(base, { todayISO: now.toLocaleDateString('en-CA'), doneStatuses });
   if (!plan.length || dry) return { closed: plan };
 
   backupState(root);
-  const { state: next, phaseLog } = applyAutoClose(state, plan, { nowISO: now.toISOString() });
-  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify(next, null, 2));
+  const { state: mine, phaseLog } = applyAutoClose(base, plan, { nowISO: now.toISOString() });
+  // Đọc lại đĩa NGAY lúc ghi và chỉ ghi phần autoclose thật sự đổi (phase/closedAuto/closedAt/
+  // closedReason của đúng ticket trong plan) — tránh đè mất thao tác user/radar/console ghi
+  // xen giữa lúc `base` được đọc ở trên và lúc này (lost-update, đo thật 21/9 ở 3 writer khác).
+  writeMerged(statePath, base, mine);
   fs.appendFileSync(path.join(root, 'history/phases.jsonl'), phaseLog.map((l) => JSON.stringify(l)).join('\n') + '\n');
   return { closed: plan };
 }

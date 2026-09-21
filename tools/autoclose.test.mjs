@@ -146,3 +146,64 @@ test('thiếu schema/vocab.json thì báo lỗi ra, KHÔNG ném và không đụ
   assert.match(res.error, /vocab/);
   assert.equal(fs.readFileSync(path.join(root, 'state.json'), 'utf8'), before);
 });
+
+/**
+ * Ca thật 21/9: radar-tick cầm bản chụp state.json lúc đầu lượt, user bấm tắt theo dõi một
+ * sheet ở giữa lượt, radar ghi đè sau cùng thì mất thao tác tắt. `autoclose.mjs` cùng dạng
+ * write-cả-file nên trúng đúng lỗi này. Giả lập bằng cách chặn LẦN ĐỌC ĐẦU (bản `base` autoclose
+ * cầm) rồi mới ghi thay đổi của "user" xuống đĩa — lần đọc THỨ HAI (writeMerged đọc lại lúc ghi)
+ * phải thấy được thay đổi đó.
+ */
+test('user tắt follow một sheet giữa lúc autoclose cầm bản chụp cũ vẫn không mất', () => {
+  const root = tmpRepo({ 'GW-660': { phase: 'bugfix', status: 'COMPLETED', milestones: { release: '2026-08-26' } } });
+  const statePath = path.join(root, 'state.json');
+  const seed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  seed.bugWatch = { s1: { follow: true, title: 'buglist X' } };
+  fs.writeFileSync(statePath, JSON.stringify(seed, null, 2));
+
+  const realRead = fs.readFileSync;
+  let firstRead = true;
+  fs.readFileSync = (p, ...rest) => {
+    const result = realRead(p, ...rest);
+    if (firstRead && String(p) === statePath) {
+      firstRead = false;
+      const state = JSON.parse(result);
+      state.bugWatch.s1.follow = false;
+      state.bugWatch.s1.unfollowReason = 'user tắt giữa lượt';
+      fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+    }
+    return result;
+  };
+  try {
+    runAutoClose({ root, now: NOW });
+  } finally {
+    fs.readFileSync = realRead;
+  }
+
+  const after = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  assert.equal(after.bugWatch.s1.follow, false, 'follow tắt của user bị autoclose ghi đè lại');
+  assert.equal(after.issues['GW-660'].phase, 'closed', 'autoclose vẫn đóng đúng ticket của nó');
+});
+
+test('state.json hỏng lúc autoclose ghi — không ném, giữ bản mình', () => {
+  const root = tmpRepo({ 'GW-660': { phase: 'bugfix', status: 'COMPLETED', milestones: { release: '2026-08-26' } } });
+  const statePath = path.join(root, 'state.json');
+
+  const realRead = fs.readFileSync;
+  let firstRead = true;
+  fs.readFileSync = (p, ...rest) => {
+    const result = realRead(p, ...rest);
+    if (firstRead && String(p) === statePath) {
+      firstRead = false;
+      fs.writeFileSync(statePath, '{ hỏng giữa lượt');
+    }
+    return result;
+  };
+  try {
+    assert.doesNotThrow(() => runAutoClose({ root, now: NOW }));
+  } finally {
+    fs.readFileSync = realRead;
+  }
+
+  assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).issues['GW-660'].phase, 'closed');
+});

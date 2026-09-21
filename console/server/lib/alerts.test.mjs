@@ -394,3 +394,18 @@ test('ticket đã bàn giao người khác → im dù đang QC test', () => {
   const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
   assert.equal(alerts.length, 0);
 });
+
+test('phase không phải QC test → im dù chưa có buglist', () => {
+  const state = { issues: { 'GW-999': { phase: 'coding', summary: 'H5 coding' } }, bugWatch: {} };
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
+  assert.equal(alerts.length, 0, 'chỉ cảnh báo khi ticket ở QC_TEST_PHASES');
+});
+
+test('sheet được tắt theo dõi nhưng vẫn có buglist link → im (link chính là tiêu chí, không phải follow flag)', () => {
+  const state = {
+    issues: { 'GW-796': { phase: 'wait-test' } },
+    bugWatch: { s1: { follow: false, keys: ['GW-796'] } },
+  };
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
+  assert.equal(alerts.length, 0, 'quy tắc kiểm "có buglist" tức là key ở watchedKeys, không quan tâm follow flag');
+});

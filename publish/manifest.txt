@@ -6,6 +6,7 @@
 # ── RA: nội dung nội bộ, không genericize được ───────────────────────────────
 - rules/pm-contract.md            # hợp đồng class platform, spec nội bộ
 - rules/cdn-source-standard.md    # chuẩn build repo nội bộ
+- rules/landing-js.md             # chuẩn JS landing trên lib nội bộ, dẫn chứng campaign thật
 - rules/popup-library.md          # design system popup nội bộ
 - rules/html-handoff.md           # quy trình bàn giao giữa 2 repo nội bộ
 - rules/repo-new-mainsite.md      # đặc thù 1 repo nội bộ

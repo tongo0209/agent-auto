@@ -30,7 +30,7 @@ Comment tối giản 1 dòng đúng 3 loại · không phòng thủ thừa · ru
 
 Cổng cuối trước khi báo xong (**R-CS-7**): intern đọc một lượt từ trên xuống, KHÔNG nhảy file, có hiểu không? Không đạt → làm phẳng code + đổi tên, **cấm chữa bằng cách thêm comment**.
 
-Giao subagent viết code → brief phải trỏ `rules/code-style.md` **và** (nếu chạm cdn-source) `rules/cdn-source-standard.md` + `rules/popup-library.md`, (nếu bàn giao) `rules/html-handoff.md`.
+Giao subagent viết code → brief phải trỏ `rules/code-style.md` **và** (nếu chạm cdn-source) `rules/cdn-source-standard.md` + `rules/popup-library.md` + `rules/landing-js.md` (khi viết JS), (nếu bàn giao) `rules/html-handoff.md`.
 
 ## Git (R-GIT-1..6 — `rules/git-workflow.md`)
 - `git commit`: **tự làm được, KHÔNG hỏi** — nhưng gom đúng phạm vi project đang làm và BÁO LẠI đã commit gì.

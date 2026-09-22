@@ -80,6 +80,7 @@ file `*.sprite.scss`).
 - Popup: [`popup-library.md`](popup-library.md) — R-POP-*.
 - Đưa HTML sang `gt-promotion-template` / `new-mainsite`: [`html-handoff.md`](html-handoff.md) — R-HO-*.
 - Hook platform `pm__`: [`pm-contract.md`](pm-contract.md) — R-PM-*.
+- JS riêng của campaign (nối engine R-CDN-8, `MJ__*`, popup, observer, mock, namespace): [`landing-js.md`](landing-js.md) — R-JS-*.
 - Cách viết code (comment, phòng thủ, trừu tượng): [`code-style.md`](code-style.md) — R-CS-*.
 - Commit: repo này đẩy lên git VNG → theo skill `/commit` (Conventional Commits `(<type>): <mô tả>` + `Co-Authored-By`),
   KHÔNG dùng `[leaf-folder]`. Chi tiết ở mục "Commit" cuối [`code-style.md`](code-style.md).

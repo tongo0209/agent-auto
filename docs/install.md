@@ -59,17 +59,25 @@ Dữ liệu công việc của bạn không nằm trong `config.json` mà sinh d
 `boards/`, `tasks/`, `designs/`, `history/`. Cặp ticket ↔ folder code do `/daily` hỏi 1 lần rồi
 nhớ, hoặc gắn thẳng bằng `/daily link <KEY> <repo> <path>`.
 
-## Hook trong `settings.json` — 4 ca
+## Hook trong `settings.json` — soi từng hook
 
-`settings.json` là file của **bạn**, có thể đã có hook khác. Script tự phân loại rồi chỉ ghi ở ca
-chắc chắn an toàn, và chỉ khi có `--write-hooks`:
+`settings.json` là file của **bạn**, có thể đã có hook khác. Script soi riêng từng hook của
+agent-auto (`guard-bash`, `guard-read`, `guard-style`, `guard-state`, `guard-pm`, `token-watch`)
+và chỉ ghi khi có `--write-hooks`:
 
 | Ca | Script làm gì |
 |---|---|
-| chưa có file / chưa có hook nào | ghi 4 hook + `statusLine`, backup 1 lần ra `settings.json.bak-before-agent-auto` |
-| đã có hook của agent-auto trỏ đúng repo | báo xanh, không đụng |
-| đã có hook của **thứ khác** | **không đụng**, in khối JSON để bạn gộp tay |
+| hook đã có trong settings | báo xanh, không đụng |
+| hook còn thiếu | `--check`/cài thường: báo vàng · `--write-hooks`: **nối thêm** đúng hook đó, hook khác giữ nguyên; backup 1 lần ra `settings.json.bak-before-agent-auto`; thiếu `statusLine` thì ghi luôn |
 | file không phải JSON hợp lệ | **không đụng**, yêu cầu sửa tay trước |
+
+## Symlink đang trỏ ra ngoài repo — `--relink`
+
+Skill/agent/hook trong `~/.claude/` là symlink trỏ repo khác (bản cũ ở repo riêng) thì `--check`
+và cài thường chỉ **báo** (`trỏ ra ngoài agent-auto: <đích cũ>` + dòng tổng hợp), không đổi.
+Muốn đổi hết về repo này: `bash tools/install-skills.sh --relink` — danh sách symlink cũ lưu vào
+`.backups/relink-<ngày giờ>.txt` (mỗi dòng `<đường link><TAB><đích cũ>`) trước khi đổi.
+Self-test của installer: `bash tools/install-skills.test.sh` (HOME giả, không đụng máy thật).
 
 Đường dẫn bash trong hook lấy từ `command -v bash` nên đúng cả macOS (`/bin/bash`) và Git Bash
 trên Windows. Kiểm hook chạy được: `bash hooks/guard-bash.test.sh` (phải `pass` hết, `0 fail`).

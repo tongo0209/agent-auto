@@ -6,25 +6,34 @@
 #
 #   bash tools/install-skills.sh            # cài
 #   bash tools/install-skills.sh --check    # chỉ kiểm tra, không đụng gì
+#   bash tools/install-skills.sh --relink   # cài + đổi symlink đang trỏ ra ngoài về repo này
 #   bash tools/install-skills.sh --print-claude-md   # in luật chung để dán tay vào CLAUDE.md
 #
-# Script KHÔNG xoá gì. settings.json chỉ được ghi khi bạn gọi --write-hooks và chỉ ở ca
-# an toàn (chưa có hook nào); ca khác in khối JSON để gộp tay. Gặp thư mục thật trùng tên
-# thì đổi tên thành <tên>.bak-<n> rồi mới link, và in ra để bạn tự xử.
+# Script KHÔNG xoá gì. Symlink đang trỏ ra ngoài repo chỉ bị đổi khi có --relink, và danh sách
+# symlink cũ được lưu vào .backups/relink-<ngày giờ>.txt trước khi đổi. settings.json chỉ được
+# ghi khi bạn gọi --write-hooks: bổ sung đúng hook còn thiếu, không đụng hook khác. Gặp thư mục
+# thật trùng tên thì cất vào .backups/replaced-<ngày giờ>/ rồi mới link, và in ra để bạn tự xử.
 # Exit code: 0 = cài xong (kể cả khi còn việc tay); --check thì exit 1 khi còn mục cần xem.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-CHECK_ONLY=0; WRITE_HOOKS=0; PRINT_CLAUDEMD=0
+CHECK_ONLY=0; WRITE_HOOKS=0; PRINT_CLAUDEMD=0; RELINK=0
 for a in "$@"; do
   case "$a" in
     --check)           CHECK_ONLY=1 ;;
+    --relink)          RELINK=1 ;;
     --write-hooks)     WRITE_HOOKS=1 ;;
     --print-claude-md) PRINT_CLAUDEMD=1 ;;
-    *) echo "Tham số lạ: $a  (dùng: --check | --write-hooks | --print-claude-md)" >&2; exit 2 ;;
+    *) echo "Tham số lạ: $a  (dùng: --check | --relink | --write-hooks | --print-claude-md)" >&2; exit 2 ;;
   esac
 done
+if [ "$CHECK_ONLY" = 1 ] && [ "$RELINK" = 1 ]; then
+  echo "--check không đổi gì nên không đi cùng --relink — chạy riêng từng lệnh" >&2; exit 2
+fi
+STAMP="$(date +%Y%m%d-%H%M%S)"
+RELINK_BACKUP="$REPO/.backups/relink-$STAMP.txt"
+outside=()
 
 ok=0; changed=0; warn=0
 say()  { printf '%s\n' "$*"; }
@@ -38,15 +47,22 @@ link() {
   if [ -L "$linkpath" ]; then
     local cur; cur="$(readlink "$linkpath")"
     if [ "$cur" = "$target" ]; then good "$name — đã link đúng"; return; fi
-    [ "$CHECK_ONLY" = 1 ] && { bad "$name — symlink trỏ chỗ khác: $cur"; return; }
-    ln -sfn "$target" "$linkpath"; add "$name — trỏ lại vào repo (cũ: $cur)"; return
+    if [ "$RELINK" = 1 ]; then
+      mkdir -p "${RELINK_BACKUP%/*}"
+      printf '%s\t%s\n' "$linkpath" "$cur" >> "$RELINK_BACKUP"
+      ln -sfn "$target" "$linkpath"; add "$name — trỏ lại vào repo (cũ: $cur)"; return
+    fi
+    outside+=("$name")
+    bad "$name — symlink trỏ ra ngoài agent-auto: $cur"; return
   fi
   if [ -e "$linkpath" ]; then
-    [ "$CHECK_ONLY" = 1 ] && { bad "$name — đang là file/thư mục THẬT, sẽ được đổi tên .bak khi cài"; return; }
-    local n=1; while [ -e "$linkpath.bak-$n" ]; do n=$((n+1)); done
-    mv "$linkpath" "$linkpath.bak-$n"
+    [ "$CHECK_ONLY" = 1 ] && { bad "$name — đang là file/thư mục THẬT, sẽ được cất vào .backups/ khi cài"; return; }
+    # cất ra khỏi ~/.claude: để <tên>.bak cạnh đó thì Claude Code vẫn nạp nó thành skill trùng
+    local replaced="$REPO/.backups/replaced-$STAMP"
+    mkdir -p "$replaced"
+    mv "$linkpath" "$replaced/$name"
     ln -s "$target" "$linkpath"
-    bad "$name — bản cũ là thư mục thật, đã cất vào ${name}.bak-$n rồi mới link"
+    bad "$name — bản cũ là thư mục thật, đã cất vào $replaced/$name rồi mới link"
     return
   fi
   [ "$CHECK_ONLY" = 1 ] && { bad "$name — chưa cài"; return; }
@@ -174,82 +190,60 @@ fi
 say ""
 
 # ── Hook trong settings.json ─────────────────────────────────────────────────
-# Vì sao không mù quáng ghi đè: settings.json là file của NGƯỜI DÙNG, có thể đã có hook khác.
-# Script tự phân loại 4 ca rồi chỉ ghi ở ca CHẮC CHẮN an toàn, và chỉ khi có --write-hooks.
+# settings.json là file của người dùng, có thể đã có hook khác ⇒ chỉ nối hook còn thiếu
 say "Hook trong settings.json"
 SETTINGS="$CLAUDE_DIR/settings.json"
 if ! command -v node >/dev/null; then
   bad "chưa có node — bỏ qua bước hook/statusline; cài node rồi chạy lại (kèm --write-hooks nếu muốn ghi hộ)"
 else
-# Lưu ý: `node -e` KHÔNG bọc code trong hàm module như khi chạy file, nên `return` ở top-level
-# là SyntaxError — cả 4 ca sẽ cùng rơi về "badjson". Phải bọc IIFE. (Đã trả giá 14/8.)
-hooks_state="$(node -e '
+hooks_mode=check; [ "$WRITE_HOOKS" = 1 ] && [ "$CHECK_ONLY" = 0 ] && hooks_mode=write
+# `node -e` không bọc code trong hàm module: `return` top-level là SyntaxError ⇒ phải bọc IIFE (14/8)
+hooks_report="$(node -e '
   (() => {
-    const fs=require("fs"), p=process.argv[1], want=process.argv[2];
-    if(!fs.existsSync(p)) return console.log("nofile");
-    let j; try{ j=JSON.parse(fs.readFileSync(p,"utf8")||"{}"); }catch(e){ return console.log("badjson"); }
-    const pre = j && j.hooks && j.hooks.PreToolUse, post = j && j.hooks && j.hooks.PostToolUse;
-    const hasPre = Array.isArray(pre) && pre.length, hasPost = Array.isArray(post) && post.length;
-    if(!hasPre && !hasPost) return console.log("nohooks");
-    // soi CẢ 2 mảng: chỉ soi Pre thì máy có PostToolUse của thứ khác sẽ bị ghi đè âm thầm
-    console.log(JSON.stringify([pre||[],post||[]]).includes(want) ? "ours" : "other");
-  })();
-' "$SETTINGS" "$CLAUDE_DIR/hooks/guard-bash.sh" 2>/dev/null || echo badjson)"
-
-write_hooks_now() {
-  local bash_bin; bash_bin="$(command -v bash)"
-  node -e '
-    const fs=require("fs"), p=process.argv[1], dir=process.argv[2];
-    const j = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p,"utf8")||"{}") : {};
-    // backup chỉ ghi 1 lần — chạy lần 2 mà đè thì bản gốc trước agent-auto mất luôn
-    if (fs.existsSync(p) && !fs.existsSync(p+".bak-before-agent-auto")) fs.copyFileSync(p, p+".bak-before-agent-auto");
-    const sh = process.argv[4];
+    const fs = require("fs"), [p, dir, repo, sh, mode] = process.argv.slice(1);
+    const HOOKS = [
+      ["guard-bash",  "PreToolUse",       "Bash",                      5],
+      ["guard-read",  "PreToolUse",       "Read|Grep",                 5],
+      ["guard-style", "PostToolUse",      "Write|Edit|MultiEdit",      5],
+      ["guard-state", "PostToolUse",      "Write|Edit|MultiEdit|Bash", 10],
+      ["guard-pm",    "PostToolUse",      "Write|Edit|MultiEdit",      10],
+      ["token-watch", "UserPromptSubmit", "",                          5],
+    ];
+    let j = {};
+    if (fs.existsSync(p)) {
+      try { j = JSON.parse(fs.readFileSync(p, "utf8") || "{}"); } catch { return console.log("badjson"); }
+    }
     j.hooks = j.hooks || {};
-    j.hooks.PreToolUse = [
-      { matcher:"Bash",       hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-bash.sh"],timeout:5}] },
-      { matcher:"Read|Grep",  hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-read.sh"],timeout:5}] },
-    ];
-    j.hooks.PostToolUse = [
-      { matcher:"Write|Edit|MultiEdit",      hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-style.sh"],timeout:5}] },
-      { matcher:"Write|Edit|MultiEdit|Bash", hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-state.sh"],timeout:10}] },
-      { matcher:"Write|Edit|MultiEdit",      hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-pm.sh"],timeout:10}] },
-    ];
-    if (!j.statusLine) j.statusLine = { type:"command", command:"node "+process.argv[3]+"/tools/statusline.mjs" };
-    fs.mkdirSync(require("path").dirname(p),{recursive:true});
-    fs.writeFileSync(p, JSON.stringify(j,null,2)+"\n");
-  ' "$SETTINGS" "$CLAUDE_DIR" "$REPO" "$bash_bin"
-}
+    const missing = HOOKS.filter(([name, event]) => !JSON.stringify(j.hooks[event] || []).includes(`/hooks/${name}.sh`));
+    const writing = mode === "write" && (missing.length > 0 || !j.statusLine);
+    if (writing) {
+      // backup chỉ ghi 1 lần — chạy lần 2 mà đè thì bản gốc trước agent-auto mất luôn
+      if (fs.existsSync(p) && !fs.existsSync(p + ".bak-before-agent-auto")) {
+        fs.copyFileSync(p, p + ".bak-before-agent-auto");
+        console.log("backup settings.json.bak-before-agent-auto");
+      }
+      for (const [name, event, matcher, timeout] of missing) {
+        const hooks = [{ type: "command", command: sh, args: [`${dir}/hooks/${name}.sh`], timeout }];
+        (j.hooks[event] = j.hooks[event] || []).push(matcher ? { matcher, hooks } : { hooks });
+      }
+      if (!j.statusLine) j.statusLine = { type: "command", command: `node ${repo}/tools/statusline.mjs` };
+      fs.mkdirSync(require("path").dirname(p), { recursive: true });
+      fs.writeFileSync(p, JSON.stringify(j, null, 2) + "\n");
+    }
+    for (const [name] of HOOKS) console.log(!missing.some(([m]) => m === name) ? "ok" : writing ? "added" : "missing", name);
+  })();
+' "$SETTINGS" "$CLAUDE_DIR" "$REPO" "$(command -v bash)" "$hooks_mode" 2>/dev/null || echo failed)"
 
-case "$hooks_state" in
-  ours)  good "hook đã bật, trỏ đúng repo" ;;
-  other) bad  "settings.json đã có PreToolUse của thứ khác — script KHÔNG đụng. Gộp tay khối dưới." ;;
-  badjson) bad "settings.json không phải JSON hợp lệ — sửa tay trước đã, script không dám ghi đè." ;;
-  nofile|nohooks)
-    if [ "$CHECK_ONLY" = 1 ]; then bad "hook chưa bật (ghi được an toàn — chạy kèm --write-hooks)"
-    elif [ "$WRITE_HOOKS" = 1 ]; then write_hooks_now; add "đã ghi hook + statusline vào settings.json (bản cũ giữ ở settings.json.bak-before-agent-auto)"
-    else bad "hook chưa bật. Ghi hộ an toàn: bash tools/install-skills.sh --write-hooks"
-    fi ;;
-esac
-if [ "$hooks_state" = other ] || [ "$hooks_state" = badjson ]; then
-  BASH_BIN="$(command -v bash)"
-  cat <<JSON
-    { "matcher": "Bash",
-      "hooks": [{ "type": "command", "command": "$BASH_BIN",
-                  "args": ["$CLAUDE_DIR/hooks/guard-bash.sh"], "timeout": 5 }] },
-    { "matcher": "Read|Grep",
-      "hooks": [{ "type": "command", "command": "$BASH_BIN",
-                  "args": ["$CLAUDE_DIR/hooks/guard-read.sh"], "timeout": 5 }] }
-JSON
-  say "  … và trong PostToolUse:"
-  cat <<JSON
-    { "matcher": "Write|Edit|MultiEdit",
-      "hooks": [{ "type": "command", "command": "$BASH_BIN",
-                  "args": ["$CLAUDE_DIR/hooks/guard-style.sh"], "timeout": 5 }] },
-    { "matcher": "Write|Edit|MultiEdit|Bash",
-      "hooks": [{ "type": "command", "command": "$BASH_BIN",
-                  "args": ["$CLAUDE_DIR/hooks/guard-state.sh"], "timeout": 10 }] }
-JSON
-fi
+while read -r status name; do
+  case "$status" in
+    ok)      good "hook $name — đã bật" ;;
+    added)   add  "hook $name — đã ghi bổ sung vào settings.json" ;;
+    backup)  say  "    (bản gốc settings.json đã lưu: $name)" ;;
+    missing) bad  "hook $name — chưa bật (ghi bổ sung, không đụng hook khác: --write-hooks)" ;;
+    badjson) bad  "settings.json không phải JSON hợp lệ — sửa tay trước đã, script không dám ghi đè." ;;
+    failed)  bad  "không đọc/ghi được $SETTINGS (node lỗi) — kiểm quyền file rồi chạy lại" ;;
+  esac
+done <<< "$hooks_report"
 if [ -f "$SETTINGS" ] && grep -q "statusline.mjs" "$SETTINGS"; then good "statusline — đã bật"
 else bad "statusline chưa bật — --write-hooks ghi hộ, hoặc tự thêm key statusLine: node $REPO/tools/statusline.mjs"
 fi
@@ -270,6 +264,12 @@ say "4) Ghép Claude in Chrome: gõ /chrome → Enabled by default. Extension gh
 say "   — 1 profile browser/1 account; Edge trên macOS chưa hiện trong danh sách."
 say "5) Mở phiên Claude Code MỚI (skill nạp lúc khởi động), gõ /daily doctor — 0 ERROR mới là xong."
 say ""
+if [ "${#outside[@]}" -gt 0 ]; then
+  say "Symlink trỏ ra ngoài agent-auto (${#outside[@]}): ${outside[*]} → đổi về repo: bash tools/install-skills.sh --relink"
+fi
+if [ -f "$RELINK_BACKUP" ]; then
+  say "Symlink cũ đã lưu: $RELINK_BACKUP (mỗi dòng: <đường link><TAB><đích cũ>)"
+fi
 printf '%s\n' "Kết quả: $ok đã đúng · $changed thay đổi · $warn cần bạn xem"
 if [ "$CHECK_ONLY" = 1 ] && [ "$warn" -gt 0 ]; then exit 1; fi
 exit 0

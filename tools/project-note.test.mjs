@@ -176,6 +176,16 @@ check('debt ghi preexisting + warns, khử trùng, bỏ fails',
   debt.split('\n').filter((l) => l.startsWith('- [')).join(' | '),
   '- [ ] PG-ONCE pm__point (dist/index.html) | - [ ] PG-TEXT pm__text_vi (dist/index.html)');
 
+const pageJson = join(root, 'pm-gate-page.json');
+writeFileSync(pageJson, JSON.stringify([
+  { file: join(campaign, 'dist/index.html'), fails: [], warns: [], preexisting: [{ code: 'PG-ONCE', msg: 'trùng', token: 'pm__point', lines: [4] }] },
+  { file: join(campaign, 'dist/huong-dan.html'), fails: [], warns: [{ code: 'PG-UNKNOWN', msg: 'lạ', token: 'pm__foo', lines: [2] }], preexisting: [] },
+]));
+check('debt nhận mảng của pm-gate --page → exit 0', run('debt', campaign, '--from', pageJson).code, 0);
+check('debt mảng: thêm dòng của trang thứ 2, không nhân đôi dòng cũ',
+  section(readFileSync(note, 'utf8'), '7. Nợ kỹ thuật').split('\n').filter((l) => l.startsWith('- [')).join(' | '),
+  '- [ ] PG-ONCE pm__point (dist/index.html) | - [ ] PG-TEXT pm__text_vi (dist/index.html) | - [ ] PG-UNKNOWN pm__foo (dist/huong-dan.html)');
+
 check('log → exit 0', run('log', campaign, 'GW-12345 sửa popup login · abc123').code, 0);
 check('log thêm dòng cuối mục 9', section(readFileSync(note, 'utf8'), '9. Nhật ký').trimEnd().split('\n').at(-1), `- ${today} GW-12345 sửa popup login · abc123`);
 

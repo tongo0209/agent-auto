@@ -254,11 +254,15 @@ function lock(target, flag) {
 function debt(target, flag) {
   if (!flag('from')) fail('thiếu --from <pm-gate.json>', 2);
   const { campaign, note, text } = openNote(target);
-  const report = JSON.parse(readFileSync(flag('from'), 'utf8'));
-  const reportFile = resolve(report.file);
-  const file = reportFile.startsWith(campaign.dir + sep) ? relative(campaign.dir, reportFile) : report.file;
+  const parsed = JSON.parse(readFileSync(flag('from'), 'utf8'));
+  const reports = Array.isArray(parsed) ? parsed : [parsed]; // pm-gate --page --json trả mảng, mỗi trang dist 1 report
+  const items = reports.flatMap((report) => {
+    const reportFile = resolve(report.file);
+    const file = reportFile.startsWith(campaign.dir + sep) ? relative(campaign.dir, reportFile) : report.file;
+    return [...report.preexisting, ...report.warns].map((f) => `${f.code} ${f.token} (${file})`);
+  });
   const recorded = new Set(bullets(sectionBody(text, SECTION.debt)).map((line) => line.replace(/^- \[[ x]\] /, '')));
-  const fresh = [...new Set([...report.preexisting, ...report.warns].map((f) => `${f.code} ${f.token} (${file})`))].filter((item) => !recorded.has(item));
+  const fresh = [...new Set(items)].filter((item) => !recorded.has(item));
   writeFileSync(note, editSection(text, SECTION.debt, (body) => [body, ...fresh.map((item) => `- [ ] ${item}`)].join('\n')));
   console.log(`thêm ${fresh.length} dòng nợ vào mục 7: ${note}`);
 }

@@ -27,6 +27,14 @@ KHÔNG chặn ghi, chỉ báo — **nhận cảnh báo thì gỡ ngay trong lư�
 
 ⚠️ Hook chỉ đo được `R-CS-1`; `R-CS-2..7` là tự giác. **Hook THOÁNG HƠN luật** (tha jsdoc + khối comment dài) ⇒ **hook im ≠ đạt R-CS-1**. Self-test: `bash ~/.claude/hooks/guard-style.test.sh`.
 
+## `guard-pm.sh` (PostToolUse `Write|Edit`)
+
+Ghi xong file `.html`/`.twig` **có `pm__`** → chạy `tools/pm-gate.mjs`, đối chiếu `AI-RULES` của gameplay
+trong `ai-template-kit`. Chỉ 🔴 mới lên tiếng (hook nhân đôi · đặt sai container · còn `<any>`), 🟡 im.
+Im lặng cả khi: file không có `pm__` · không nhận ra gameplay (kit mới phủ 2 gameplay) · chưa pull kit.
+Bị báo thì sửa rồi chạy lại `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>`, **đừng đổi tên hook cho qua cổng**.
+Self-test: `bash ~/.claude/hooks/guard-pm.test.sh`.
+
 ## `token-watch.sh` (UserPromptSubmit)
 
 Đọc `transcript_path` từ stdin, tính context của lượt gần nhất. Vượt ngưỡng (mặc định 200.000 token) thì chèn nhắc cắt phiên bằng `/clear`.

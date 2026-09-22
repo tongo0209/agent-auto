@@ -212,6 +212,7 @@ write_hooks_now() {
     j.hooks.PostToolUse = [
       { matcher:"Write|Edit|MultiEdit",      hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-style.sh"],timeout:5}] },
       { matcher:"Write|Edit|MultiEdit|Bash", hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-state.sh"],timeout:10}] },
+      { matcher:"Write|Edit|MultiEdit",      hooks:[{type:"command",command:sh,args:[dir+"/hooks/guard-pm.sh"],timeout:10}] },
     ];
     if (!j.statusLine) j.statusLine = { type:"command", command:"node "+process.argv[3]+"/tools/statusline.mjs" };
     fs.mkdirSync(require("path").dirname(p),{recursive:true});

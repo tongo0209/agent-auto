@@ -40,7 +40,7 @@ Giao subagent viết code → brief phải trỏ `rules/code-style.md` **và** (
 - `gt-promotion-template` / `new-mainsite`: KHÔNG commit hộ user — chỉ đưa `git diff --stat`.
 
 ## Guardrails cơ học (`rules/guardrails.md`)
-Hook chặn ở tầng harness, không phải lời khuyên: `guard-bash` (deny lệnh huỷ hoại + đọc credential, ask git/deploy/`rm` vùng dữ liệu) · `guard-state` (state.json đổi mtime ⇒ `state-doctor` NGAY, sửa trong lượt) · `guard-style` (đếm comment đoạn vừa ghi; **hook im ≠ đạt R-CS-1**) · `token-watch` (context vượt ngưỡng ⇒ nhắc `/clear`).
+Hook chặn ở tầng harness, không phải lời khuyên: `guard-bash` (deny lệnh huỷ hoại + đọc credential, ask git/deploy/`rm` vùng dữ liệu) · `guard-state` (state.json đổi mtime ⇒ `state-doctor` NGAY, sửa trong lượt) · `guard-style` (đếm comment đoạn vừa ghi; **hook im ≠ đạt R-CS-1**) · `guard-pm` (file `pm__` vừa ghi → chạy `pm-gate`, 🔴 là chặn) · `token-watch` (context vượt ngưỡng ⇒ nhắc `/clear`).
 
 Bị chặn thì đọc mã `G-*` rồi đổi cách làm — **KHÔNG tìm đường lách**.
 

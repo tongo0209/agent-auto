@@ -73,10 +73,14 @@ Theo `profile.packs`:
 
 | Pack | Đọc file |
 |---|---|
-| `landing-promotion` | `references/pm-contract.md` — **bắt buộc**, đây là loại lỗi làm chết nút |
+| `landing-promotion` | `~/VNG/agent-auto/rules/pm-contract.md` (R-PM-1..12) — **bắt buộc**, đây là loại lỗi làm chết nút · + file dự án + `pm-gate` (khối dưới) |
 | `mainsite-twig` | `references/mainsite-twig.md` |
 | `frontend` (luôn có) | `references/frontend-checklist.md` |
 | `code-style` (luôn có) | `~/VNG/agent-auto/rules/code-style.md` — R-CS-1..7: comment tối đa 1 dòng, đúng 3 loại (hợp đồng platform · hack · logic bí ẩn) · không phòng thủ thừa · rule of two · tên thay comment · cổng nghiệm thu junior |
+
+**Pack `landing-promotion` — file dự án + cổng máy (R-PM-8, R-PM-11):**
+1. `node ~/VNG/agent-auto/tools/project-note.mjs path <file>` → có thì đọc mục 1 Khoá + 4 Bản đồ hook TRƯỚC khi đọc code (skill chỉ đọc — không `init`/`lock`; chưa có file dự án hoặc `CHƯA KHOÁ` → ghi 🟡 "chưa khoá gameplay — làm bước khoá R-PM-11 trước khi merge").
+2. Mọi file `pm__` trong vùng soi: `node ~/VNG/agent-auto/tools/pm-gate.mjs <file> --baseline <base>` — `<base>` = SHA dòng `base = …` in ở Bước 1 (Bash không giữ biến giữa các lệnh), không có remote → `HEAD` (mode full: `--baseline none`; campaign có `dist/` mới build thì thêm 1 lần `--page <campaign>`). 🔴 `PG-*` → issue 🔴 trích mã (kịch bản hỏng = nút chết, neo vào mục "Bị ràng buộc gì" của Phần A); mục "lỗi có sẵn (nợ)" → 🟡 gom 1 dòng "nợ có sẵn, không do diff này". Dán dòng cuối gate vào báo cáo.
 
 Đọc thêm `CLAUDE.md` / `README.md` / `.editorconfig` của repo đang soi để biết convention tại chỗ. Convention của repo **thắng** ý kiến chung: repo đang dùng kiểu khác thì đó không phải issue.
 
@@ -99,7 +103,9 @@ Với mỗi fact, làm đúng cột giữa trước khi phán. Fact không qua �
 | Fact | Phải kiểm tra thêm gì | Thành issue khi |
 |---|---|---|
 | `PM_HOOK_REMOVED` / `PM_HOOK_RENAMED` | Xem `git diff` chỗ đó. Có phải cố ý bỏ khối tính năng? | Hook mất/đổi mà khối tính năng vẫn còn → 🔴 nút chết |
-| `PM_SEPARATOR_TRAP` | So với hook cùng loại trong repo/base xem cái nào đúng | Luôn báo, tối thiểu 🟡; đè lên 🔴 nếu hook mới không có ở base |
+| `PM_SEPARATOR_TRAP` | So với base + gameplay đã khoá ở mục 1 file dự án (R-PM-3); không suy được → hỏi user | Luôn báo, tối thiểu 🟡; đè lên 🔴 nếu hook mới không có ở base |
+| `PM_HOOK_ADDED` | Ghép được với một hook vừa mất không? Có trong MASTER/ref đã khoá không (R-PM-7)? | Ghép được → soi như đổi tên. Không có trong MASTER/ref → 🟡 hook bịa. Còn lại bỏ |
+| `ID_REMOVED` / `DATA_ATTR_REMOVED` | Tên có dấu hiệu hợp đồng (platform, promotion, campaign, nexus, reward, claim)? | Có → 🔴. Còn lại 🟡 |
 | `FIELD_CONTRACT_CHANGED` / `FIELD_REMOVED` | `name`/`type`/`id` là hợp đồng với JS platform | Đổi/mất mà không có yêu cầu đổi → 🔴 platform không nhận field |
 | `ANY_PLACEHOLDER` | Không cần kiểm tra gì | Luôn 🔴 — `<any>` chưa thay là chưa build được |
 | `DUPLICATE_ID`, `LABEL_FOR_ORPHAN` | Đọc markup quanh đó | Gần như luôn 🔴/🟡: id trùng làm JS bắt sai node, `for` trượt làm click label không focus |

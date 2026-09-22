@@ -26,10 +26,12 @@ Spec là **hợp đồng chung** của cả pipeline — spec sai thì cả dev 
    - `~/.claude/knowledge/code-developer/base-structure.md` (mục lục) → `Read` section trong `base/` liên quan tới việc đang làm. Với analyst thường là `05-scss-conventions` (token/spacing), `07-shared-modules-librarymainsite` (nhận diện H5), `09-khac-biet-landing-vs-mainsite-skin`. **CẤM đọc cả 10 section.**
    - Dự án: thư mục "Knowledge dự án" manager truyền trong prompt — đọc `INDEX.md` trong đó nếu có, không thì `mistakes.md`/`improvements.md` (không truyền → `.claude/knowledge/` tại cwd)
    - **`gameplay-registry.json`** + **`cdn-source-conventions.md`** (cùng thư mục): để nhận diện loại gameplay theo `visual_signature` và biết landing có phải H5 không.
+   - **Landing `pm__`:** brief có `File dự án:` (file `projects/<game>/<slug>.md` do `project-note.mjs` sinh — manager truyền path, bạn chỉ Read) → Read TRƯỚC khi khảo sát repo: mục 1 khoá · 4 bản đồ hook cho biết popup/section nào đã có hook.
    - (Khi dùng tool Read, thay `~` bằng đường dẫn home tuyệt đối.)
    - ⚠ `Read` = 0.1s (đo thật). **Đừng tiết kiệm `Read` bằng cách suy luận thay** — suy luận là sinh chữ, mà sinh chữ ăn 86% thời gian phiên. Đọc thẳng file rẻ hơn nghĩ xem trong file có gì.
 2. **Đọc từng hình ảnh** được giao bằng tool Read. Ảnh đã cắt theo phần — ghi chú rõ phần nào của UI nằm trong ảnh nào.
    **2b. Đo bằng máy TRƯỚC khi viết** (bổ sung 27/8 — đo thật: spec thiếu số đo là nguồn lỗi UI số 1): số nào quyết định layout (pitch grid, biên section, toạ độ/kích thước asset chính, canvas) → chạy `python3 ~/.claude/scripts/design-diff.py <match|sections|heights>` / `sips -g pixelWidth -g pixelHeight` / `python3 -c` đọc pixel. Số máy đo ghi hậu tố `[đo]` — hết quyền dùng `(~)` cho thứ đo được.
+   **2c. Input là ảnh/site THAM CHIẾU** (PM đưa reference muốn "làm giống" thay vì design PSD — manager ghi rõ trong prompt): đọc `~/VNG/agent-auto/agents/references/design-dna.md` và bóc Design DNA theo quy trình trong đó, rồi mới viết spec.
 3. **Khảo sát design system của repo hiện tại** (nếu có): `tailwind.config.*`, file theme/tokens, biến CSS, thư mục component dùng chung (`components/ui`, `src/components`, …). Mục tiêu: spec phải trỏ về token và component **có sẵn** thay vì bịa giá trị mới.
 4. **Viết spec** vào đường dẫn manager chỉ định (mặc định `.claude/specs/<slug>.md`) theo đúng template bên dưới.
 
@@ -68,8 +70,9 @@ Spec là **hợp đồng chung** của cả pipeline — spec sai thì cả dev 
   `popup_confirm`, `popup_inform`, `popup_reward`, `popup_doithuong`, `popup_history`, `popup_getlist`, `popup_bxh`,
   `popup_input`, `popup_rule`). Có module khớp → ghi `dùng lại <module>`; không khớp → ghi `popup mới (extends base)`.
   Đây là hợp đồng cho dev theo R-POP-1..3 (`~/VNG/agent-auto/rules/popup-library.md`) — CẤM để dev tự nghĩ ra markup popup.
-- **Loại promotion (cho cổng R-POP-7)**: đoán loại theo danh sách platform (`/check-promotion` có bảng 39 loại) và
-  ghi kèm `(cần confirm)` nếu không chắc — manager sẽ hỏi user 1 câu rồi chạy checklist.
+- **Loại promotion (cho cổng R-POP-7)**: file dự án đã khoá (mục 1 có `gameplay`/`type`) → chép nguyên, KHÔNG đoán lại.
+  Chưa khoá → đoán loại theo danh sách platform (`/check-promotion` có bảng 39 loại) và ghi kèm `(cần confirm)` nếu
+  không chắc — đây chỉ là ĐỀ XUẤT cho bước khoá R-PM-11 (`~/VNG/agent-auto/rules/pm-contract.md`) của manager, không phải khoá.
 
 ## 1. Tổng quan
 3–5 câu: màn hình gì, mục đích, các vùng chính, ảnh nào ứng với vùng nào.
@@ -101,6 +104,11 @@ Cái nào NHÌN THẤY trong ảnh thì mô tả; cái nào không thấy → gh
 - Bấm <nút X> → <mở popup Y / chuyển section Z / submit form…>
 - Form <tên>: field nào bắt buộc, định dạng gì, lỗi hiện ra sao
 - Đổi ngôn ngữ → phần nào thay đổi
+
+**Motion** (CHỈ khi design/brief thể hiện animation — không có thì bỏ hẳn khối này):
+| Element | Trigger | Property | Duration | Easing |
+|---|---|---|---|---|
+Ảnh tĩnh không thể hiện timing → điền theo R-ANIM-6 (`~/VNG/agent-auto/rules/animation.md`) và đánh dấu "(suy đoán)".
 
 ## 6. Responsive
 Chỉ ghi những gì ảnh thể hiện. Nếu chỉ có 1 breakpoint → ghi rõ

@@ -20,4 +20,4 @@ Vùng đã bàn giao backend: frontend chỉ còn quyền CSS/JS + text/HTML qua
 
 ## Hook platform trong Twig
 
-Twig cũng có thể chứa `pm__…` / `id` / `data-*` là hợp đồng — áp nguyên `references/pm-contract.md`. Script đã quét `.twig` như markup nên các fact `PM_*` vẫn có giá trị.
+Twig cũng có thể chứa `pm__…` / `id` / `data-*` là hợp đồng — áp nguyên `~/VNG/agent-auto/rules/pm-contract.md` + `pm-gate` (chạy được trên `.twig`, SKILL.md Bước 3). Script đã quét `.twig` như markup nên các fact `PM_*` vẫn có giá trị.

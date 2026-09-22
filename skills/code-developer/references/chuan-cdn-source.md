@@ -9,6 +9,7 @@ Luật nằm ở `~/VNG/agent-auto/rules/` (R-CDN-*, R-POP-*, R-HO-*). File này
 | `frontend-developer` | `cdn-source-standard.md` + `popup-library.md` (+ `html-handoff.md` nếu có bàn giao) + `code-style.md` |
 | `design-checker` | 3 file trên — chấm theo mã luật, mỗi lệch ghi `<mã> — file:line` |
 | `design-analyst` | `popup-library.md` — spec phải liệt kê popup ↔ module có sẵn, và đoán loại promotion |
+| Bất kỳ ai, khi chạm `pm__` | khối `Landing pm__:` (SKILL.md 🧱): file dự án + khoá + `pm-contract.md` (R-PM-1..12) + AI-GUIDE + cặp AI-RULES/MASTER đã khoá (hoặc ref khi `gameplay: none`) — xem §6 |
 
 Trỏ **đường dẫn đầy đủ**, không copy nội dung luật vào brief (tốn token, dễ lệch bản).
 
@@ -53,3 +54,17 @@ Lý do: ảnh chụp code có thể chụp trúng campaign làm ẩu; để nó 
 Task có chữ "đưa lên gt-promotion", "apply mainsite", "giao platform" → brief phải kèm `html-handoff.md` và
 nhắc 3 điểm chết người: URL CDN tuyệt đối · giữ `<% MODULE_CONTENT %>` ở bản `Promotion/` · soát **cả**
 `Promotion/` lẫn `mainsite/`. Manager KHÔNG commit hộ user ở 2 repo đó — chỉ đưa `git diff --stat`.
+
+## 6. Landing `pm__` — file dự án + khoá gameplay (R-PM-11)
+
+Áp mọi mode có dựng · sửa · soát file `pm__`. `PN` = `node ~/VNG/agent-auto/tools/project-note.mjs`,
+`PG` = `node ~/VNG/agent-auto/tools/pm-gate.mjs`. Landing **mới** = campaign dựng/clone trong lượt này
+(chưa có ở HEAD); landing **cũ** = đã có commit.
+
+| Lúc | Manager làm |
+|---|---|
+| Đầu task | `PN path <campaign\|file>` in đường dẫn; stderr `chưa có file` → `PN init <campaign> [--jira KEY]`; exit 1 = không map được (file ngoài cdn-source chưa có dòng handoff ở mục 2 note nào) → chạy `path` trên campaign cdn-source tương ứng. Đọc file dự án TRƯỚC khi đọc code — mục 2 nơi code/handoff, 3 sơ đồ file, 4 bản đồ hook thay cho việc đọc lại cả campaign. `PN check <campaign>` báo lỗi thời → `PN refresh <campaign>` trước khi giao việc. |
+| Khoá | Mục 1 có `gameplay:` → dùng, không khoá lại. `CHƯA KHOÁ` → đọc brief/thể lệ → bảng route AI-GUIDE §2 → `luckydraw-gift-exchange` · `payment` · `none` + `type <STT-slug>` (bảng 39 loại của `/check-promotion`) + `ref <campaign mẫu cùng loại gần nhất>`. Không khớp route / không chọn được loại → AskUserQuestion. CẤM đoán gameplay từ hook trong file. Ghi `PN lock <campaign> --gameplay <g> [--type <t>] [--ref <dir>] --by <ai\|user>` TRƯỚC dòng code đầu. |
+| Giao việc | Khối `Landing pm__:` vào MỌI brief — subagent không tự khoá, không đọc lại cả campaign. |
+| Sau khi chạy được | **Landing mới** — pha tối ưu: dọn theo R-CS + chuẩn cdn-source (quy trình `/clean-code`: không đổi hành vi, không đụng hợp đồng) → build → `PG --page <campaign> --baseline none` → `layout-gate` → `/check-promotion`. **Landing cũ** — chỉ dọn trong file/section đang chạm; phần thấy mà không chạm + lỗi có sẵn của gate → mục 7 Nợ: `PG --page <campaign> --json > <scratch>/pg.json` rồi `PN debt <campaign> --from <scratch>/pg.json`. |
+| Cuối task | Còn 🔴 = chưa xong. `PN refresh <campaign>` + sửa tay mục 5/6 nếu có quyết định/câu hỏi mới + `PN log <campaign> "<task> — <đổi gì>"`. Dán dòng cuối của `PG` vào Tổng kết. |

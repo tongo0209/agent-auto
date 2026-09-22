@@ -24,6 +24,7 @@ Nhận từ manager: MỘT CỤM bug (đã lọc queue, thuộc cùng module/nh�
 1. **Đọc knowledge trước khi làm** (file không tồn tại thì bỏ qua, không báo lỗi):
    - Toàn cục: `~/.claude/knowledge/code-developer/mistakes.md`, `improvements.md`, `base-structure.md` (stack Twig/SCSS/webpack, cấu trúc `products/<game>/`). Khi Read thay `~` bằng home tuyệt đối. Các file này KHÔNG có (chạy dạng plugin bug-fixer-lite tự-chứa) → đọc convention bundled `${CLAUDE_PLUGIN_ROOT}/reference/conventions.md` thay thế (file nào không tồn tại thì bỏ qua).
    - Dự án: thư mục "Knowledge dự án" manager truyền trong prompt.
+   - **Landing `pm__`:** prompt có dòng `[Landing pm__:] File dự án:` → Read file đó TRƯỚC khi đọc code (mục 1 khoá · 3 sơ đồ file · 4 bản đồ hook) — thay cho re-survey campaign. Ghi "chưa có" → `node ~/VNG/agent-auto/tools/project-note.mjs path <khu vực code>` thử 1 lần; vẫn không có thì đi tiếp, không tự `init`/`lock`.
    - **Delta re-run** (manager báo board đã có entry carry-forward): board cũ = code-map, KHÔNG re-survey cấu trúc, KHÔNG đọc lại `base-structure.md`; chỉ đào đúng khu vực bug delta.
 
 2. **[TRIAGE-❓] — làm NGAY, ghi file NGAY:** với từng bug manager đánh dấu `❓` trong prompt: **có ảnh thì Read ảnh TRƯỚC** (đây là chỗ ảnh đáng giá nhất — nhìn 1 lần thay cho vài vòng suy luận trên mô tả chữ), rồi nhìn code/asset ĐÚNG MỨC ĐỦ CHỐT (Glob tên file ảnh, Read đoạn SCSS liên quan — vài phút, KHÔNG điều tra sâu): kết luận `→ 🔧 code` (CSS/layout/logic — sửa được) hay `→ ↪ chuyển <GS|backend|SDK|QC>` (asset sai/mờ/thiếu cần file mới, hoặc của bên khác — không sửa được bằng code trong quyền mình).
@@ -49,7 +50,7 @@ Nhận từ manager: MỘT CỤM bug (đã lọc queue, thuộc cùng module/nh�
    - Fix theo đúng `Nguyên nhân`/`Hướng fix` mình vừa viết. Thực tế hoá ra KHÁC → fix theo thực tế + cập nhật entry board (sửa Nguyên nhân/Hướng fix cho đúng thực tế — board là hợp đồng cho checker, KHÔNG để lệch âm thầm).
    - Fix đổi selector/DOM/giá trị so với assertion `Verify:` đã viết → cập nhật luôn assertion trong board (bạn là người viết nó, sửa tại chỗ).
    - **ĐÁP FIX MỌI NƠI MATCHING (bắt buộc từng bug):** sau khi fix ở nơi chính, dò các nơi còn lại trong "Nơi cần đáp fix" bằng grep chuỗi/selector quanh chỗ sửa — thấy đoạn matching → áp fix Y HỆT (HTML gt-promotion soát CẢ `Promotion/` lẫn `mainsite/`); không thấy → ghi "không có bản sao" (không phải lỗi). Twig mà text/giá trị nằm trong BIẾN/logic render (`{{ ... }}`, `{% ... %}`) → KHÔNG đoán, chuyển bug phần đó thành Note-routing backend. Phát hiện cặp file matching mới giữa các nơi → ghi vào Câu hỏi mở để manager lưu `fileMap` registry.
-   - Convention: **luật `~/VNG/agent-auto/rules/cdn-source-standard.md` (R-CDN-*) + `popup-library.md` (R-POP-*) + `code-style.md` (R-CS-*) THẮNG** → rồi mới tới code thực tế project → `base-structure.md`. Vá bug cấm lệch chuẩn: không `@media` tay (dùng `@include mobile/pc` — R-CDN-5), không dựng popup tự chế (extends `base.html.twig` + module có sẵn — R-POP-2), không bê pattern legacy `src-setup` vào campaign assets-flat (R-CDN-1), không sửa `*generated.scss` (R-CDN-6), không vá bằng cách gõ `background-position` số cứng hay `url()` trỏ PNG lẻ trong `images/sprite/` — dùng `@include sprite($tên)` (R-SPR-5), comment tối giản 1 dòng đúng 3 loại (R-CS-1). Code repo đang lệch chuẩn → ghi vào Câu hỏi mở, KHÔNG nhân bản cái sai. CẤM thêm dependency. CẤM sửa file ngoài `files:` đã khai trong board và ngoài các nơi trong "Nơi cần đáp fix" (thấy bug ngoài phạm vi → ghi mục Câu hỏi mở).
+   - Convention: **luật `~/VNG/agent-auto/rules/cdn-source-standard.md` (R-CDN-*) + `popup-library.md` (R-POP-*) + `code-style.md` (R-CS-*) + `animation.md` (R-ANIM-* — bug effect/animation: chẩn đoán theo bảng R-ANIM-7, cấm trộn GSAP v2/v3, cấm vá bằng animate layout property) THẮNG** → rồi mới tới code thực tế project → `base-structure.md`. Vá bug cấm lệch chuẩn: không `@media` tay (dùng `@include mobile/pc` — R-CDN-5), không dựng popup tự chế (extends `base.html.twig` + module có sẵn — R-POP-2), không bê pattern legacy `src-setup` vào campaign assets-flat (R-CDN-1), không sửa `*generated.scss` (R-CDN-6), không vá bằng cách gõ `background-position` số cứng hay `url()` trỏ PNG lẻ trong `images/sprite/` — dùng `@include sprite($tên)` (R-SPR-5), comment tối giản 1 dòng đúng 3 loại (R-CS-1). Code repo đang lệch chuẩn → ghi vào Câu hỏi mở, KHÔNG nhân bản cái sai. CẤM thêm dependency. CẤM sửa file ngoài `files:` đã khai trong board và ngoài các nơi trong "Nơi cần đáp fix" (thấy bug ngoài phạm vi → ghi mục Câu hỏi mở).
    - **CẤM MỌI LỆNH BUILD/WATCH** (`npm run build-dev`, `npm run dev`, webpack...) — nhiều lane chạy song song đụng chung `dist/`; manager build 1 lần sau khi mọi lane xong. Lỗi cú pháp SCSS/JS sẽ lộ ở build của manager → viết cẩn thận, tự soát lại diff bằng Read trước khi kết thúc.
    - Xong mỗi bug: cập nhật entry board thêm 2 dòng:
      ```
@@ -155,6 +156,7 @@ Board ghi:
   - Verify (assertion máy-chạy-được): <selector + expect...> — Device: <PC|Mobile>
   - Kết quả fix: <điền sau bước FIX>
   - Nơi đã sửa: <điền sau bước FIX — PATH cụ thể mỗi nơi: local/html/twig (cho checker path-scoped)>
+  - pm-gate: <dòng cuối output từng file `pm__` đã sửa | "không chạm pm__"> — Nợ: <mã + file:line lỗi có sẵn thấy mà không chạm | —>
   - Ghi-sheet: pending
 
 ## 3. BÁO (không fix — kèm bằng chứng)
@@ -178,6 +180,11 @@ Board ghi:
 - Mỗi nhận định phải kèm bằng chứng file:line hoặc lý do kỹ thuật. Không chắc → `(nghi ngờ)`, cấm trình bày phỏng đoán như sự thật.
 - Chỉ làm bug được giao, trong khu vực code + các nơi trong "Nơi cần đáp fix" được giao. KHÔNG git pull/commit/push ở bất kỳ repo nào (manager pull đầu phiên; user push).
 - Báo cáo trung thực: bug không fix được → nói rõ + lý do, không im lặng bỏ qua.
+- 🎯 **Landing `pm__` — `~/VNG/agent-auto/rules/pm-contract.md` (R-PM-1..12, cửa vào R-PM-11):** dùng đúng khoá
+  manager đưa, CẤM tự khoá hay đoán gameplay từ hook; khoá = `CHƯA KHOÁ` → cấm đụng hook `pm__`/`id`/`data-*`
+  (chỉ CSS/text), bug buộc phải sửa hook → rổ BÁO `CẦN-QUYẾT`. Hook chỉ lấy từ AI-RULES/MASTER đã khoá (hoặc ref).
+  Sửa xong chạy `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>` (lệnh đọc — được phép) từng file `pm__` đã sửa:
+  🔴 lỗi MỚI → sửa tiếp, chưa sạch thì KHÔNG được ghi "Kết quả fix" là xong; lỗi có sẵn (nợ) → dòng `Nợ:`, không sửa lan.
 - **Code style khi fix (R-CS-*, chi tiết `~/VNG/agent-auto/rules/code-style.md`):** không thêm comment mô tả
   lại code — chỉ được comment hợp đồng (`pm__`/`MJ__`/`MS__`) và hack trình duyệt; không bọc `try-catch`/
   `if (!el) return` cho node cố định; không tách hàm/biến cho thứ dùng 1 lần. Fix bug là thêm ít dòng nhất

@@ -124,6 +124,7 @@ Tham số: `$ARGUMENTS`.
      | sed -E 's#.*/products/##; s#/dist/.*##' | sort -u
    ```
    neo tuyệt đối bằng `<repo>` từ cwd/`repoRoot` (không có → hỏi gộp trước đợt 1 + lưu); `ls` kiểm tra tồn tại. **[3]** nhiều kết quả → chọn theo bằng chứng nội dung (grep chuỗi đặc trưng từ Description trong từng folder ứng viên — như đã làm với registry playtogether), ghi chú cách chọn; không tồn tại/curl fail/vẫn không chắc → bug khu vực đó gắn cờ CẦN-QUYẾT vào đợt 1 rồi CHẠY TIẾP các lane khác (KHÔNG chặn pipeline); câu trả lời của user lưu `codeDirs` + sổ ranh giới — lần sau không hỏi lại. Resolve xong lưu `codeDirs`. Nhiều link test → bảng map link→folder, đưa cho lane kèm luật chọn (bug match link nào → folder đó; không match chắc → Câu hỏi mở).
+7. **File dự án — landing `pm__` (R-PM-11 MUST, `~/VNG/agent-auto/rules/pm-contract.md`):** mỗi codeDir/promoHtmlDir có `pm__` → `node ~/VNG/agent-auto/tools/project-note.mjs path <codeDir|file HTML>`; stderr `chưa có file` → `init <codeDir>`; exit 1 (HTML gt-promotion không map được) → ghi "chưa có file dự án" vào board rồi đi tiếp. Đọc mục 1-4 (khoá · nơi code · sơ đồ file · bản đồ hook) TRƯỚC dispatch — đó là thứ thay cho việc lane đọc lại cả campaign (triage vẫn KHÔNG đọc code). Mục 1 `CHƯA KHOÁ` → khoá theo bảng route AI-GUIDE §2 từ loại promotion trên sheet/ticket/`prodTemplate` (`project-note lock <codeDir> --gameplay <g> [--type <t>] [--ref <dir>] --by ai`); không chốt được → ✋ CẦN-QUYẾT đợt 1, lane cụm đó CẤM đụng hook `pm__` (chỉ CSS/text) tới khi khoá. CẤM đoán gameplay từ hook trong file.
 
 ## GIAI ĐOẠN [1] TRIAGE-NGAY — deliverable ĐẦU TIÊN (manager tự làm, KHÔNG agent, KHÔNG đọc code)
 
@@ -170,10 +171,10 @@ Tham số: `$ARGUMENTS`.
 
 **CAP CỨNG — TỐI ĐA 3 AGENT ĐỒNG THỜI (quyết định user 2026-07-16, áp cho MỌI giai đoạn của skill):** ra hơn 3 cụm → gộp cụm nhỏ cùng khu vực, vẫn dư → chạy theo ĐỢT 3 lane (đợt xong mới thả đợt kế — bug ❓ dồn vào đợt đầu để đợt-2-triage vẫn sớm). Checker (1) chạy SAU khi lane xong nên không cộng dồn vào cap.
 
-**Model (quyết định user 2026-07-17):** TOÀN BỘ agent trong skill (bug-lane, design-checker) KHÔNG set `model` override khi dispatch — kế thừa model của phiên đang gọi skill. User chạy Claude Code bằng model nào thì cả luồng dùng đúng model đó, không hạ cấp per-lane.
+**Model (quyết định user 2026-08-27, thay bản 17/7):** agent đã pin frontmatter — bug-lane `sonnet · effort medium` (đúng mức đo 25/25 bảng dưới), design-checker `opus · effort high`. KHÔNG kế thừa model/effort phiên nữa (phiên chính có thể chạy model/effort nặng hơn nhiều → lane vừa chậm vừa đắt); agent CHỈ dùng opus/sonnet. Dispatch mặc định không override; lane KHÓ (routing-relevant · CSS-layout-tinh · JS logic mới) → override `model: opus` ngay cả ngoài turbo — phân vân chọn opus (đúng-1-lần rẻ hơn FAIL→reopen). Buglist khó cả list → không dùng `--effort xhigh` nữa (không còn chạm tới lane), dùng override opus per-lane.
 
 **EFFORT — lever mạnh nhất, khuyến nghị theo số đo 2026-07-30** (13+ vòng trên fixture 9 bug, chi tiết: `docs/measurements/2026-07-29-runtime-tinh-nang-moi.md`).
-⚠ **Effort là tham số của PHIÊN — skill KHÔNG thể tự đặt, cũng KHÔNG thể đặt cho riêng lane/checker** (tool `Agent` không có tham số effort). Và main-loop manager — chiếm **63–81% out token** — luôn chạy ở effort của phiên, nên đặt effort cho riêng subagent (nếu có cách) cũng bỏ sót đúng chỗ nghẽn. Cách đặt cho RIÊNG skill này: gọi qua launcher `scripts/bugfix.sh` (mặc định `medium`) — nó mở phiên với `--effort` rồi gọi skill, không ảnh hưởng skill khác. Skill chỉ được **nhắc 1 dòng** trong block "🔧 Môi trường":
+⚠ **Effort đặt được ở 2 chỗ (cập nhật 27/8/2026):** frontmatter agent — ĐÃ pin bug-lane `medium`, design-checker `high` (tool `Agent` vẫn KHÔNG có effort per-call) — và tham số phiên. Và main-loop manager — chiếm **63–81% out token** — luôn chạy ở effort của phiên, nên đặt effort cho riêng subagent (nếu có cách) cũng bỏ sót đúng chỗ nghẽn. Cách đặt cho RIÊNG skill này: gọi qua launcher `scripts/bugfix.sh` (mặc định `medium`) — nó mở phiên với `--effort` rồi gọi skill, không ảnh hưởng skill khác. Skill chỉ được **nhắc 1 dòng** trong block "🔧 Môi trường":
 
 | Cấu hình phiên | Đo được | Dùng khi |
 |---|---|---|
@@ -215,10 +216,11 @@ Luật đáp fix: dò chỗ matching bằng grep chuỗi/selector quanh chỗ s�
 Ranh giới sở hữu (từ SỔ RANH GIỚI): <vùng nào đã bàn giao backend — CHỈ được sửa .scss/.js + text/HTML trong promoHtmlDir, CẤM template/logic render động; vùng nào của bên khác — cấm hẳn; không có entry → ghi "không có ranh giới đặc biệt">
 Tag routing (dùng khi soạn Note-routing): <devTag>
 Knowledge dự án: <ctx>/knowledge/
+[Landing pm__:] File dự án: <note path | "chưa có"> — đọc mục 1-4 TRƯỚC khi đọc code · Khoá: <gameplay>[ · type <STT-slug> · ref <dir>] | "CHƯA KHOÁ — cấm đụng hook pm__, chỉ CSS/text" · Luật: ~/VNG/agent-auto/rules/pm-contract.md (R-PM-1..12) + ~/VNG/git-vng/gt-promotion-template/standard-html-templates/ai-template-kit/AI-GUIDE.md + <AI-RULES + MASTER của gameplay đã khoá | ref nếu gameplay none>. Dọn trong vùng đang chạm; lỗi có sẵn thấy mà không chạm → dòng `Nợ:` của bug trong board (không sửa lan).
 File triage sớm — GHI TRƯỚC KHI ĐIỀU TRA SÂU: <ctx>/bugs-lite/<project>-<ngày>--lane<N>-triage.md
 Partial board — ghi vào: <ctx>/bugs-lite/<project>-<ngày>--lane<N>.md
 [Delta: board path trên đã pre-seed entry carry-forward — CHỈ Edit bug delta: #…, GIỮ NGUYÊN phần còn lại.]
-Chuẩn code BẮT BUỘC (đọc trước khi sửa dòng đầu): ~/VNG/agent-auto/rules/cdn-source-standard.md (R-CDN-*) · popup-library.md (R-POP-*) · code-style.md (R-CS-*) · html-handoff.md (R-HO-*) khi đáp fix xuống gt-promotion/new-mainsite · agent-evidence.md (R-EV-*) — cấm claim "đã sửa/PASS" chưa chạy trong lượt này, partial board BẮT BUỘC mục `Bằng chứng:` per bug. Vá bug KHÔNG được lệch chuẩn: cấm @media tay (dùng @include mobile/pc), cấm dựng popup tự chế (extends base.html.twig + module có sẵn), cấm bê pattern legacy src-setup vào campaign assets-flat, không tự viết engine gameplay, comment tối giản 1 dòng đúng 3 loại. Fix nào buộc phải lệch → ghi lý do vào board, không lệch âm thầm.
+Chuẩn code BẮT BUỘC (đọc trước khi sửa dòng đầu): ~/VNG/agent-auto/rules/cdn-source-standard.md (R-CDN-*) · popup-library.md (R-POP-*) · code-style.md (R-CS-*) · html-handoff.md (R-HO-*) khi đáp fix xuống gt-promotion/new-mainsite · pm-contract.md (R-PM-1..12) cho MỌI file có class pm__: hook pm__/id/data-* là hợp đồng JS, bộ chuẩn = dòng `[Landing pm__:]` trên, sửa xong chạy cổng `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>` trên từng file pm__ đã sửa (🔴 = chưa được báo xong, dán dòng cuối vào `Bằng chứng:`) · agent-evidence.md (R-EV-*) — cấm claim "đã sửa/PASS" chưa chạy trong lượt này, partial board BẮT BUỘC mục `Bằng chứng:` per bug. Vá bug KHÔNG được lệch chuẩn: cấm @media tay (dùng @include mobile/pc), cấm dựng popup tự chế (extends base.html.twig + module có sẵn), cấm bê pattern legacy src-setup vào campaign assets-flat, không tự viết engine gameplay, comment tối giản 1 dòng đúng 3 loại. Fix nào buộc phải lệch → ghi lý do vào board, không lệch âm thầm.
 Trình tự BẮT BUỘC: chốt ❓ (ghi file triage sớm) → điều tra → ghi board → fix theo board.
 CẤM: build/watch, ghi sheet, sửa file ngoài khu vực, thêm dependency.
 ```
@@ -243,6 +245,7 @@ Sheet là dữ liệu manager dán vào prompt — lane không đọc được M
 
 1. Xác định lệnh build từ `package.json` của repo (stack base: `npm run build-dev` one-shot). **CẤM lệnh watch.** Nhiều codeDir bị đụng → build từng folder, tuần tự.
 2. `ERROR in` / exit ≠ 0 → **manager TỰ SỬA** (ngoại lệ duy nhất manager được đụng code — lý do: thấy toàn cảnh diff mọi lane, lỗi build thường là xung đột nhỏ giữa lane) → build lại đến sạch. Sửa quá 2 vòng không sạch → DỪNG, báo user kèm log nguyên văn.
+2b. **Cổng `pm__` sau build (landing cũ):** mỗi codeDir có `pm__` → `node ~/VNG/agent-auto/tools/pm-gate.mjs --page <codeDir> --json > <ctx>/bugs-lite/<project>-<ngày>-pmgate-<N>.json` (mặc định so HEAD: 🔴 chỉ là lỗi MỚI do đợt fix). 🔴 → xử như lỗi build ở bước 2 (≤2 vòng, không sạch → DỪNG báo user); lỗi có sẵn → `node ~/VNG/agent-auto/tools/project-note.mjs debt <codeDir> --from <json đó>`. HTML/Twig ngoài dist do checker soát ở [4].
 3. **Post diff tổng hợp + kết quả build (chốt-xem-sớm #2):** repo git → `git -C <repo> diff --stat`; không git → bảng file đã sửa gom từ các board `Kết quả fix`.
 
 ## GIAI ĐOẠN [4] VERIFY — 1 lượt design-checker cho CẢ list
@@ -267,6 +270,7 @@ Verify NHẸ mặc định (bug css/text): ĐÚNG 1 run_steps gộp 2 viewport
 Bug tương tác (popup/form/slider/CTA) → mới click/fill đúng bug đó.
 H5 → chỉ 1 view ngang 1920x1080. Test đúng Device ghi trong board.
 PATH-SCOPED (bắt buộc): verify bug text/nội-dung chỉ đối chiếu ĐÚNG file trong dòng `Nơi đã sửa` của board (live path) — CẤM grep cả cây thư mục (dính bản sao/baseline gây FALSE-POSITIVE, gặp thật 2026-07-17: checker soi nhầm file baseline báo #4 FAIL trong khi live đã đúng). Twig/HTML không render được thì Read ĐÚNG live path đó, không search rộng.
+[Landing pm__:] dán nguyên dòng `[Landing pm__:]` của lane (file dự án · khoá · pm-contract.md R-PM-1..12 · AI-GUIDE + cặp AI-RULES/MASTER | ref) — mục 4 file dự án = bản đồ hook · file HTML/Twig NGOÀI dist có `pm__` trong `Nơi đã sửa` → gộp 1 Bash `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>` từng file; 🔴 = FAIL bug đó, trích mã PG-*. (dist đã qua `pm-gate --page` ở [3] — không chạy lại.)
 Ghi report: <ctx>/reports/bugfix-lite-<project>-<ngày>-check.md
 (Máy chỉ có Playwright MCP → tự map tool tương đương như hướng dẫn trong design-checker.md. Đọc DOM/computed-style bằng `browser_evaluate` gộp JSON — KHÔNG dùng run_script scope-Node `page.*`.)
 ```
@@ -329,6 +333,7 @@ Board mới nhất `bugs-lite` = mốc. CHỈ (re)xử lý bug **MỚI** (BugID 
 ## State qua phiên — `<ctx>/state.md`
 
 Sau TRIAGE đợt 1, sau merge board, sau verify, sau ghi sheet → cập nhật entry `bugfix-lite-<project>-<ngày>`: nhóm ↪/✋ đã báo, lane nào xong, bug PASS/FAIL, `Ghi-sheet`/`Note-routing` từng bug, việc tiếp theo. Phiên mới đọc state + board là tiếp đúng chỗ.
+**File dự án (landing `pm__`) — cuối phiên, TRƯỚC Tổng kết:** mỗi codeDir đã có file dự án → `node ~/VNG/agent-auto/tools/project-note.mjs refresh <codeDir>` + `log <codeDir> "bugfix-lite <ngày>: #<id> <đổi gì> …"`; dòng `Nợ:` trong các partial board → thêm tay vào mục 7 (khử trùng).
 
 ## Tổng kết (BẮT BUỘC cuối mọi lần chạy)
 
@@ -343,6 +348,7 @@ Trước khi in: chạy `<SCRIPTS>/run-metrics.sh <RUN_START>` → dán nguyên 
 - **🖼 Ảnh recommend:** <n> lấy được (<n> link / <n> nhúng) · nhãn ĐÚNG <n> · chỉ-định-vị <n> · ASSET <n> · bỏ <n> (<lý do gộp>) / "sheet không có cột này"
 - **🔄 ASSET-SWAP:** <n> bug tự thay ảnh (khỏi chờ GS) · <n> bug KHÔNG thay được → ↪ (lý do: <thiếu điều kiện nào>)
 - **👁 So ảnh đích:** <n> bug có baseline · <n> khớp · <n> hạ xuống `PASS-nghi-visual` (đã đưa vào "Cần bạn") · <n> không so được / "tắt bằng visualCompare: off"
+- **`pm__`:** <dòng cuối `pm-gate --page` từng codeDir · `project-note log` đã ghi / "không có landing pm__">
 - **Sổ ranh giới:** <entry mới học được / "không đổi">
 - **Nghiệm thu đường ghi:** <lần đầu: kết quả 4 spike / đã verified từ trước>
 - **Cần bạn:** <việc tay còn lại + bug FAIL + câu hỏi mở>
@@ -361,8 +367,8 @@ Trước khi in: chạy `<SCRIPTS>/run-metrics.sh <RUN_START>` → dán nguyên 
 - Ghi đè local từ gt-promotion CHỈ khi file local sạch (git clean); file có sửa dở chưa commit → hỏi user (ca "nguy cơ ghi đè").
 - Mọi handoff qua file với đường dẫn tuyệt đối. Agent fail/extension lỗi → báo trung thực + fallback, không che.
 - Ghi knowledge như code-developer (single-pass tail: đọc report 1 lượt → soạn → ghi → xác nhận rồi mới nói "đã ghi").
-- **Chuẩn code:** brief lane LUÔN kèm 3-4 file luật ở `~/VNG/agent-auto/rules/` (xem prompt lane). Bug do lệch chuẩn → ghi mã luật làm nguyên nhân gốc trong board.
-- **Cổng popup:** đợt fix chạm popup / gameplay promotion → trước khi ghi Done, đối chiếu checklist trong `~/VNG/agent-auto/skills/check-promotion/reference/<loại>.md` (đọc file, skill này không gọi skill khác). Loại promotion lấy từ sheet/ticket; không xác định được → ghi "chưa soát popup: chưa rõ loại" vào Tổng kết, KHÔNG bịa.
+- **Chuẩn code:** brief lane LUÔN kèm 3-4 file luật ở `~/VNG/agent-auto/rules/` (xem prompt lane); file có `pm__` thì kèm thêm dòng `[Landing pm__:]` — file dự án + khoá + `pm-contract.md` (R-PM-1..12) + `AI-GUIDE.md` + cặp AI-RULES/MASTER đã khoá (hoặc ref). Bug do lệch chuẩn → ghi mã luật làm nguyên nhân gốc trong board.
+- **Cổng popup:** đợt fix chạm popup / gameplay promotion → trước khi ghi Done, đối chiếu CẢ checklist `~/VNG/agent-auto/skills/check-promotion/reference/<loại>.md` LẪN cấu trúc chung `~/VNG/agent-auto/skills/check-promotion/reference/_popup-structure.md` (đọc file, skill này không gọi skill khác). Loại promotion lấy từ `type` mục 1 file dự án → sheet/ticket; không xác định được → ghi "chưa soát popup: chưa rõ loại" vào Tổng kết, KHÔNG bịa.
 - Luôn kết thúc bằng Tổng kết.
 
 ## INTAKE ADAPTER — buglist ngoài Google Sheet (xử lý TẠI CHỖ, không từ chối)

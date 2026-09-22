@@ -222,6 +222,7 @@ Chỉ chạy khi INTAKE dùng adapter nguồn lạ. Trước khi tốn công ana
 2. **Trạng thái THẬT** = `DEV Check Status` + `Comment Thread` + `Recheck`, không tin mỗi cột status:
    - `Done`/`Skip` → đánh dấu bỏ qua, TRỪ khi Comment Thread có phản hồi QC/GS **sau** câu trả lời `[DEV-…]` gần nhất (= reopen), hoặc Recheck báo fail.
    - Comment cho thấy đang chờ bên khác (đợi ảnh GS, thiếu content) → ghi chú `BLOCKED?` cho analyst xác nhận.
+3. **File dự án — landing `pm__` (R-PM-11 MUST, `~/VNG/agent-auto/rules/pm-contract.md`):** mỗi khu vực code có `pm__` → `node ~/VNG/agent-auto/tools/project-note.mjs path <products/...|file HTML>` (stderr `chưa có file` → `init <campaign>`; exit 1 = file ngoài cdn-source chưa map → dùng campaign cdn-source tương ứng). Mục 1 `CHƯA KHOÁ` → khoá theo bảng route AI-GUIDE §2 từ loại promotion trên sheet/ticket/`prodTemplate` (`project-note lock <campaign> --gameplay <g> [--type <t>] [--ref <dir>] --by ai`); không chốt được → `CẦN-QUYẾT` (mode `auto`: báo cuối, cụm đó chỉ fix CSS/text). CẤM đoán gameplay từ hook trong file. Đường dẫn file dự án + khoá đi vào MỌI brief dưới (dòng `[Landing pm__:]`).
 
 **Phần 2 — phân tích sâu, giao `bug-analyst`** (mặc định **1 lần gọi cho cả đợt** — KHÔNG tự làm thay, kể cả khi đợt chỉ có 2-3 bug). **Mode `turbo`** → **LUÔN SPLIT** thành N analyst song song theo **module** (vô điều kiện, kể cả đợt nhỏ/cùng folder), mỗi con 1 partial board, manager merge (xem mục Mode `turbo`):
 
@@ -237,6 +238,7 @@ Khu vực code (resolve từ link test, KHÔNG đoán thêm folder khác):
   <link test 2> → <products/...>
 Sheet gốc: <url> (gid <gid>) — chỉ để trace, không cần đọc lại
 Knowledge dự án: <ctx>/knowledge/
+[Landing pm__:] File dự án: <note path | "chưa có"> — đọc mục 1-4 TRƯỚC khi đọc code · Khoá: <gameplay>[ · type <STT-slug> · ref <dir>] | "CHƯA KHOÁ — cấm đụng hook pm__" · Luật: ~/VNG/agent-auto/rules/pm-contract.md (R-PM-1..12) + ~/VNG/git-vng/gt-promotion-template/standard-html-templates/ai-template-kit/AI-GUIDE.md + <AI-RULES + MASTER của gameplay đã khoá | ref nếu gameplay none> · bug chạm hook → `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>` khi điều tra, tách lỗi mới vs lỗi có sẵn (nợ).
 Ghi bug-board vào: <ctx>/bugs/<project>-<ngày>.md
 [Delta re-run — board path trên ĐÃ chứa entry carry-forward từ đợt trước:
   CHỈ Edit thêm/sửa các bug delta liệt kê ở trên, GIỮ NGUYÊN nguyên văn
@@ -262,6 +264,7 @@ Chuẩn BẮT BUỘC: ~/VNG/agent-auto/rules/cdn-source-standard.md (R-CDN-*) + 
 [Vòng fix lại: Check report: <ctx>/reports/bugfix-<project>-l<lượt>-check-<v>.md — CHỈ fix issue trong report.]
 Knowledge dự án: <ctx>/knowledge/
 Phạm vi: <thư mục/file được phép đụng>
+[Landing pm__:] File dự án: <note path | "chưa có"> — đọc mục 1-4 TRƯỚC khi đọc code · Khoá: <gameplay>[ · type <STT-slug> · ref <dir>] | "CHƯA KHOÁ — cấm đụng hook pm__" · Luật: ~/VNG/agent-auto/rules/pm-contract.md (R-PM-1..12) + ~/VNG/git-vng/gt-promotion-template/standard-html-templates/ai-template-kit/AI-GUIDE.md + <AI-RULES + MASTER của gameplay đã khoá | ref nếu gameplay none> · chạy `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>` trên từng file pm__ đã sửa, dán dòng cuối vào `Bằng chứng:` · chỉ dọn vùng đang chạm, phần còn lại ghi Dev Report mục `Nợ:`.
 Ghi Dev Report: <ctx>/reports/bugfix-<project>-l<lượt>-dev-<v>.md
 Mỗi bug: ghi trong Dev Report đã sửa file nào + cách fix, hoặc KHÔNG fix được + lý do và môi trường đã thử (không im lặng bỏ qua). Fix lệch board / đổi selector-DOM so với assertion `Verify:` → BẮT BUỘC khai "Lệch board"/"Verify-update" trong Dev Report (checker đọc file này).
 ```
@@ -285,6 +288,7 @@ Knowledge dự án: <ctx>/knowledge/
 Phạm vi code: <files từ Dev Report>
 Mỗi bug 1 verdict: PASS / FAIL (kèm file:line) / KHÔNG-CHECK-ĐƯỢC (lý do).
 Test đúng Device ghi trong board (PC/Mobile).
+[Landing pm__:] File dự án: <note path | "chưa có"> — đọc mục 1-4 TRƯỚC khi đọc code · Khoá: <gameplay>[ · type <STT-slug> · ref <dir>] | "CHƯA KHOÁ — cấm đụng hook pm__" · Luật: ~/VNG/agent-auto/rules/pm-contract.md (R-PM-1..12) + ~/VNG/git-vng/gt-promotion-template/standard-html-templates/ai-template-kit/AI-GUIDE.md + <AI-RULES + MASTER của gameplay đã khoá | ref nếu gameplay none> · sau build `node ~/VNG/agent-auto/tools/pm-gate.mjs --page <campaign>` — 🔴 = FAIL bug chạm file đó, trích mã PG-*; HTML/Twig ngoài dist → `pm-gate <file>`.
 Ghi report: <ctx>/reports/bugfix-<project>-l<lượt>-check-<v>.md
 ```
 
@@ -395,5 +399,6 @@ Quy trình + format y hệt code-developer (gom đề xuất từ report, khử 
 - Mọi handoff qua file (bug-board, report, payload) với đường dẫn tường minh.
 - Webhook lỗi / agent fail → xử lý trung thực: báo user + fallback, không che.
 - **Chuẩn code khi fix:** brief cho `frontend-developer`/`bug-analyst` LUÔN kèm `~/VNG/agent-auto/rules/cdn-source-standard.md` + `popup-library.md` (+ `html-handoff.md` khi fix đáp xuống gt-promotion/new-mainsite). Bug do lệch chuẩn thì ghi mã luật làm nguyên nhân gốc (`R-CDN-5`), đừng chỉ ghi "CSS sai".
-- **Cổng popup (R-POP-7):** đợt fix có chạm popup/gameplay promotion → chạy `/check-promotion <loại> <file>` trước khi báo Done; loại lấy từ ticket, không chắc thì hỏi user 1 câu. Còn Fail = chưa Done.
+- **Cổng popup (R-POP-7):** đợt fix có chạm popup/gameplay promotion → chạy `/check-promotion <loại> <file>` trước khi báo Done; loại = `type` mục 1 file dự án → ticket, không chắc thì hỏi user 1 câu. Còn Fail = chưa Done.
+- **Landing `pm__` (R-PM-11):** brief `bug-analyst`/`frontend-developer`/`design-checker` LUÔN có dòng `[Landing pm__:]`; cuối pipeline `project-note refresh <campaign>` + `log <campaign> "bugfix <ngày>: #<id> <đổi gì>"`, mục `Nợ:` của Dev Report → mục 7 file dự án (`project-note debt <campaign> --from <pm-gate.json>` cho lỗi có sẵn của gate).
 - Luôn kết thúc bằng Tổng kết.

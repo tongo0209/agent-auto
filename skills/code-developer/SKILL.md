@@ -21,10 +21,11 @@ Team của bạn (gọi qua tool Agent/Task, `subagent_type` = đúng tên):
 
 ## 🧱 Chuẩn bắt buộc (áp cho MỌI mode, kể cả `quick`)
 
-Luật cứng ở `~/VNG/agent-auto/rules/`: **`cdn-source-standard.md`** (R-CDN-1..14) · **`popup-library.md`** (R-POP-1..9) · **`html-handoff.md`** (R-HO-1..11) · `code-style.md` (R-CS-1..7) · `pm-contract.md` (R-PM-1..6). Chi tiết cách áp: `references/chuan-cdn-source.md`.
+Luật cứng ở `~/VNG/agent-auto/rules/`: **`cdn-source-standard.md`** (R-CDN-1..14) · **`popup-library.md`** (R-POP-1..9) · **`html-handoff.md`** (R-HO-1..11) · `code-style.md` (R-CS-1..7) · `pm-contract.md` (R-PM-1..12). Landing promotion (`pm__`): bộ quy chuẩn team là `~/VNG/git-vng/gt-promotion-template/standard-html-templates/ai-template-kit/AI-GUIDE.md` → 1 cặp `AI-RULES-*` + `MASTER-*`; brief giao subagent phải kèm đường dẫn này. Chi tiết cách áp: `references/chuan-cdn-source.md`.
 - **Thứ tự thắng:** rules > `~/.claude/knowledge/code-developer/` (ảnh chụp code, chỉ là ví dụ) > code campaign đang mở. Mode `learn` **chỉ được ĐỀ XUẤT** sửa rules — in ra cho user duyệt, CẤM tự ghi đè.
-- **Manager phải nhồi rules vào brief** mọi subagent viết/kiểm code — không agent nào tự biết.
-- **Cổng popup (R-POP-7):** trang có gameplay promotion → chạy `/check-promotion <loại> <file>` trước khi báo xong; loại suy từ ticket/design/`prodTemplate`, không chắc thì hỏi user đúng 1 câu. Còn mục Fail = **chưa xong**.
+- **Landing `pm__` — cửa vào R-PM-11 MUST (mọi mode, kể cả `quick`/`mid`/`batch`):** đầu việc `node ~/VNG/agent-auto/tools/project-note.mjs path <campaign>` (stderr `chưa có file` → `init <campaign> [--jira KEY]`; exit 1 = không map được) → đọc file dự án TRƯỚC khi đọc code → mục 1 `CHƯA KHOÁ` thì khoá theo bảng route AI-GUIDE §2 (không khớp route → hỏi user; CẤM đoán gameplay từ hook trong file) → `project-note lock` TRƯỚC dòng code đầu → code → pha tối ưu (landing mới) / dọn vùng đang chạm + ghi Nợ (landing cũ) → build → `node ~/VNG/agent-auto/tools/pm-gate.mjs --page <campaign>` (🔴 = chưa xong) → `project-note refresh` + `log`. Chi tiết: `references/chuan-cdn-source.md` §6.
+- **Manager phải nhồi rules vào brief** mọi subagent viết/kiểm code — không agent nào tự biết. Chạm `pm__` → thêm **khối `Landing pm__:`** vào MỌI brief (dev/checker/analyst, mọi mode): `File dự án: <note path> — đọc TRƯỚC khi đọc code · Khoá: <gameplay>[ · type <STT-slug> · ref <campaign mẫu>] — không khoá lại · Luật: ~/VNG/agent-auto/rules/pm-contract.md (R-PM-1..12) + <AI-GUIDE.md> + <AI-RULES + MASTER của gameplay đã khoá | ref nếu gameplay none>`.
+- **Cổng popup (R-POP-7):** trang có gameplay promotion → chạy `/check-promotion <loại> <file>` trước khi báo xong; loại = `type` ở mục 1 file dự án, chưa có thì suy từ ticket/design/`prodTemplate`, không chắc thì hỏi user đúng 1 câu. Còn mục Fail = **chưa xong**.
 
 ## Bước 0 — Phân tích đầu vào
 
@@ -165,7 +166,7 @@ Task: <slug> — <mô tả>
 Ảnh design: <liệt kê từng đường dẫn>
 Ghi spec vào: <ctx>/specs/<slug>.md
 Knowledge dự án: <ctx>/knowledge/
-Repo hiện tại: <cwd> — khảo sát design system trước khi viết spec.
+Repo hiện tại: <cwd> — khảo sát design system trước khi viết spec. [Chạm `pm__`: khối `Landing pm__:` (🧱) — đọc mục 1 Khoá + 4 Bản đồ hook trước khi khảo sát repo.]
 CẤM kết luận "giống/khớp/tái dùng được" từ TÊN FILE, tên section hay tên folder — chỉ từ nội dung ảnh đã đọc; cần số thì đo bằng `python3 ~/.claude/scripts/design-diff.py`, không đo tay (R-EV-4, ~/VNG/agent-auto/rules/agent-evidence.md).
 Ngân sách: tối đa 20 tool-call (màn ≥6 section/popup: 30) — chạm ngưỡng → DỪNG (R-EV-6), ghi spec phần đã chắc + dồn phần thiếu vào "Câu hỏi mở", báo "dừng vì hết ngân sách". Spec BẮT BUỘC có mục `Bằng chứng:` cho mục đo bằng design-diff.py (R-EV-*).
 [Task ≤ 2 component: thêm dòng "SPEC COMPACT — chỉ mục 0, 1, 4, 8".]
@@ -180,6 +181,7 @@ Knowledge dự án: <ctx>/knowledge/
 Phạm vi: <thư mục/file được phép đụng>
 Chuẩn BẮT BUỘC đọc trước khi viết dòng đầu: ~/VNG/agent-auto/rules/cdn-source-standard.md (R-CDN-1..14) + popup-library.md (R-POP-1..9) [+ html-handoff.md nếu đưa HTML sang gt-promotion/new-mainsite]. Chốt thế hệ assets-flat vs legacy src-setup trước khi code · popup phải extends base.html.twig + dùng module có sẵn · cấm @media tay · không tự viết engine gameplay · sprite dùng @include sprite($tên), cấm gõ background-position tay / url() PNG lẻ / sửa *generated.scss (R-SPR-*). Campaign mới / thêm section / clone-reskin: trước khi báo xong chạy `node ~/VNG/agent-auto/tools/landing-parity.mjs <campaign>`, xử hết "REF có · MỚI thiếu" hoặc ghi lý do bỏ ở Dev Report mục `Parity:` (không chờ user nhắc "theo landing cũ").
 Code style: đọc ~/VNG/agent-auto/rules/code-style.md (R-CS-1..7). Comment tối giản 1 dòng, đúng 3 loại (hợp đồng platform / hack / logic bí ẩn) — cấm mô tả lại code, banner, JSDoc nhiều dòng · không phòng thủ thừa · không tách hàm cho thứ dùng 1 lần · tên thay comment. Hook guard-style.sh báo R-CS-1 thì gỡ ngay trong lượt đó.
+[Chạm `pm__`: khối `Landing pm__:` (🧱) · cấm đổi khoá, cấm bịa hook ngoài MASTER/ref · landing mới: sau khi chạy được làm pha tối ưu §6 · landing cũ: chỉ dọn vùng đang chạm, phần thấy mà không chạm ghi vào Dev Report mục `Nợ:` · chạy `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>` trên từng file `pm__` đã sửa, dán dòng cuối vào `Bằng chứng:`.]
 Dev Report BẮT BUỘC có mục `Rules đã áp:` — mã luật đã áp/kiểm theo nhóm file (vd `R-SPR-1 sprite.scss · R-CDN-6 config.js · R-CS-1..5 main.js`) — VÀ mục `Bằng chứng:` (R-EV-*, ~/VNG/agent-auto/rules/agent-evidence.md): mỗi claim "Self-smoke PASS"/"đã sửa" kèm lệnh đã chạy + output thật, cấm claim thứ chưa chạy trong chính lượt này. Thiếu 1 trong 2 mục = report không hợp lệ.
 Ngân sách: tối đa 60 tool-call (vòng fix: 25) — chạm ngưỡng → DỪNG, ghi Dev Report phần đã làm + mục "Dừng vì hết ngân sách: còn thiếu gì".
 ```
@@ -191,6 +193,7 @@ Chuẩn so sánh: <ctx>/specs/<slug>.md   (hoặc ảnh: <paths> / hoặc mô t�
 Knowledge dự án: <ctx>/knowledge/
 Phạm vi code: <thư mục/file>
 Chuẩn: đọc ~/VNG/agent-auto/rules/cdn-source-standard.md + popup-library.md + code-style.md — lệch chuẩn báo theo MÃ LUẬT (R-CDN-…/R-POP-…/R-CS-…), đối chiếu mục `Rules đã áp` trong Dev Report.
+[Chạm `pm__`: khối `Landing pm__:` (🧱) · sau build chạy `node ~/VNG/agent-auto/tools/pm-gate.mjs --page <campaign>` — 🔴 = FAIL, trích mã PG-*/R-PM-* + file:line; 🟡 ghi vào report, không lờ.]
 Vai trò vòng này: GIỮA (được tái dụng artifact Self-smoke trong <ctx>/reports/<slug>-dev-<n>.md) | CHỐT (BẮT BUỘC tự build COLD + read_signals độc lập)
 CẤM kết luận "khớp/lệch" từ TÊN FILE ảnh, tên section, tên class hay cảm giác "trông giống" (R-EV-4) — mỗi verdict phải dựa vào giá trị đọc được (CSS/DOM/số đo) hoặc quan hệ nhìn thấy trong ảnh. Manager chạy phần đo pixel (gate 📏), bạn KHÔNG cần đo — nhưng cũng KHÔNG được phán thay bằng suy luận. PASS chỉ được nói SAU khi build/browser chạy trong chính lượt này (R-EV-2); Check Report BẮT BUỘC mục `Bằng chứng:`.
 Đã cold-build vòng trước: có | không
@@ -245,7 +248,7 @@ Yêu cầu:
 1. Lập "Bảng lệch" đặt ĐẦU Dev Report: | # | Vị trí | Hiện trạng | Design | Việc sửa |
    Điểm nào knowledge/base-structure đã cover → áp pattern luôn; điểm nào LẠ → đánh dấu ⚠ "ngoài kiến thức có sẵn".
 2. Sửa ĐÚNG các điểm trong bảng — không refactor lan man.
-2b. Chuẩn + style: đọc ~/VNG/agent-auto/rules/cdn-source-standard.md (R-CDN-*) + popup-library.md (R-POP-*) + code-style.md (R-CS-*). Vá bug KHÔNG được lệch chuẩn (cấm @media tay, cấm popup tự chế, cấm bê pattern legacy). Comment tối giản 1 dòng đúng 3 loại · không phòng thủ thừa · không tách hàm cho thứ dùng 1 lần.
+2b. Chuẩn + style: đọc ~/VNG/agent-auto/rules/cdn-source-standard.md (R-CDN-*) + popup-library.md (R-POP-*) + code-style.md (R-CS-*). Vá bug KHÔNG được lệch chuẩn (cấm @media tay, cấm popup tự chế, cấm bê pattern legacy). Comment tối giản 1 dòng đúng 3 loại · không phòng thủ thừa · không tách hàm cho thứ dùng 1 lần. [Chạm `pm__`: khối `Landing pm__:` (🧱) + dòng `[Chạm pm__…]` của template dev chuẩn.]
 3. Build verify thật + console sạch (BrowserPilot nếu có).
 Phát hiện phức tạp hơn dự kiến → DỪNG phần đó, ghi mục "Cần quyết định / Cần hỗ trợ".
 ```
@@ -255,7 +258,7 @@ Phát hiện phức tạp hơn dự kiến → DỪNG phần đó, ghi mục "C�
 Task: <slug> — QUICK CHECK (1 vòng duy nhất, theo "Chế độ quick" trong agent)
 Chuẩn so sánh: ảnh design <path> + Bảng lệch (dán bảng từ Dev Report vào đây)
 Phạm vi code: <files từ Dev Report>
-Chỉ check 3 việc: (1) build PASS, (2) console/network sạch, (3) so visual TỪNG điểm trong Bảng lệch với ảnh design — 2 viewport theo quy ước team.
+Chỉ check 3 việc: (1) build PASS, (2) console/network sạch, (3) so visual TỪNG điểm trong Bảng lệch với ảnh design — 2 viewport theo quy ước team. [Chạm `pm__`: khối `Landing pm__:` (🧱) + `pm-gate --page <campaign>` sau build, 🔴 = FAIL.]
 KHÔNG checklist spec, KHÔNG bảng test chức năng toàn trang.
 Ghi report: <ctx>/reports/<slug>-check-1.md (header ghi rõ "quick check")
 ```
@@ -335,7 +338,7 @@ Mode `quick`: tổng kết chỉ **3 dòng** (đã sửa gì / build kết quả
 - **fe-gate:** <output thật: `✓ PASS — 0 ERROR · n WARN` / `✗ FAIL …` / `chưa chạy: <lý do>`>
 - **Files:** spec, reports, code đã tạo/sửa
 - **Knowledge đã ghi:** <entry nào, vào file nào — hoặc "không có gì đáng ghi">
-- **Cổng popup (R-POP-7):** <bảng Pass/Fail `/check-promotion <loại>` — hoặc "không phải trang promotion">
+- **Cổng popup (R-POP-7) + `pm__`:** <bảng Pass/Fail `/check-promotion <loại>` + dòng cuối `pm-gate --page` + `project-note log` đã ghi — hoặc "không phải trang promotion">
 - **Lệch chuẩn đã thấy:** <mã luật + file:line, kể cả code cũ của repo — hoặc "không có"> (R-CDN-14)
 - **Việc còn mở:** câu hỏi mở từ spec, issue minor user cần quyết, dependency chờ duyệt
 ```

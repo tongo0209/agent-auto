@@ -25,6 +25,7 @@ Bug-board là **hợp đồng chung** của cả pipeline — nhận định sai
 1. **Đọc knowledge trước khi làm** (file nào không tồn tại thì bỏ qua, không báo lỗi):
    - Toàn cục: `~/.claude/knowledge/code-developer/mistakes.md`, `improvements.md` và **`base-structure.md`** (biết trước stack Twig/SCSS/webpack và cấu trúc `products/<game>/` giúp khoanh vùng nhanh và đúng).
    - Dự án: thư mục "Knowledge dự án" manager truyền trong prompt — đọc `mistakes.md`, `improvements.md` trong đó (không truyền → `.claude/knowledge/` tại cwd).
+   - **Landing `pm__`:** prompt có dòng `[Landing pm__:] File dự án:` → Read file đó TRƯỚC khi khảo sát code (mục 1 khoá · 2 nơi code · 3 sơ đồ file · 4 bản đồ hook) — dùng làm code-map thay cho việc đào lại cả campaign. Ghi "chưa có" → `node ~/VNG/agent-auto/tools/project-note.mjs path <khu vực code>` thử 1 lần; không có thì đi tiếp (không tự `init`/`lock`).
    - (Khi dùng tool Read, thay `~` bằng đường dẫn home tuyệt đối.)
 2. **Với TỪNG bug**, theo thứ tự:
    a. Đọc kỹ Description + Comment Thread + **Bug Type** (`visual`/`content`/`functional`/`performance` — manager truyền theo cột sheet; TRỐNG → bạn suy từ mô tả rồi ghi rõ **`type-tự-suy: <type> (chắc | không-chắc)`** + 1 dòng vì sao — ma trận của manager route THEO độ chắc này (`chắc` → xử như type đó, `không-chắc` → rổ BÁO LẠI); ghi mỗi "cần user xác nhận" suông là manager không route được). Bug Type ĐỊNH HƯỚNG phân tích: `visual` → **TÁCH**: cần-ASSET (ảnh sai/mờ/thiếu, cần file mới từ GS/designer → rổ BÁO **MỌI vùng**) vs CSS/layout (lệch/căn/spacing sửa bằng code → FIX **MỌI vùng**, vì CSS là code); `functional`→logic/JS/data; `content`→text/i18n; `performance`→tối ưu render/asset/UI. (Comment Thread cũ thường chứa manh mối: ai đã trả lời gì, đang chờ ai.)
@@ -74,6 +75,7 @@ mấy bug thiếu thông tin/chờ quyết.
   - Nguyên nhân (nhận định): <file:line — vì sao>
   - Hướng fix: <file + chỗ sửa + đổi thành gì — đủ để dev không điều tra lại; không chắc → `(hướng-mở — dev tự điều tra)`>
   - Verify (ASSERTION máy-chạy-được, để checker thực thi): <selector + trạng thái/số/text — vd `expect_count('.x canvas')>=1` · `click .bullet[3] → .swiper-slide-active[data-swiper-slide-index=2]` · `expect_text('.title','…')`; layout → CSS tĩnh + số học; mơ hồ → `(checker tự lập)`>
+  - Nợ: <mã PG-*/R-* + file:line lỗi có sẵn thấy mà không liên quan bug | —>   ← chỉ landing `pm__`, bỏ dòng này nếu không phải
 ### Lượt 2 — logic: #10 — phạm vi: <...>
 - ...
 
@@ -113,6 +115,12 @@ Những điểm cần manager hỏi user hoặc điều phối thêm.
   `~/VNG/agent-auto/rules/popup-library.md` (R-POP-*) trước khi viết cột "Cần xử lý". Cấm đề xuất vá bằng
   `@media` tay, CSS đè lên hệ scale, popup tự chế, hay bê pattern legacy `src-setup` vào campaign assets-flat —
   fix kiểu đó qua được QC nhưng để lại nợ. Nghi bug do lệch chuẩn → ghi mã luật (`R-CDN-5`) làm nguyên nhân gốc.
+- 🎯 **Landing `pm__` — `~/VNG/agent-auto/rules/pm-contract.md` (R-PM-1..12, cửa vào R-PM-11):** bug nghi chạm
+  hook (nút chết, form không gửi, popup không mở) → chạy `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>` (lệnh đọc)
+  trên file liên quan khi điều tra; 🔴 `PG-*` khớp triệu chứng → ghi mã PG-*/R-PM-* làm nguyên nhân gốc. Lỗi có sẵn
+  không liên quan bug → dòng `Nợ:` của bug, không đưa vào kế hoạch fix. Hướng fix chỉ dùng hook có trong
+  AI-RULES/MASTER của gameplay đã khoá (hoặc ref); khoá = `CHƯA KHOÁ` mà fix cần đổi hook → `CẦN-QUYẾT`, CẤM đoán
+  gameplay từ hook trong file.
 
 ## Đề xuất knowledge
 

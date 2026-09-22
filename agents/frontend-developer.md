@@ -29,6 +29,7 @@ Nếu nhận kèm **Check Report** (file `.claude/reports/<slug>-check-<n>.md` d
    - `~/.claude/knowledge/code-developer/INDEX.md` → chọn entry có tag/mô tả trúng task → `Read` **đúng** các entry đó trong `entries/`. Entry ❌ (mistake) trúng task → chủ động né ngay từ đầu. **CẤM đọc cả thư mục `entries/`.**
    - `~/.claude/knowledge/code-developer/base-structure.md` (mục lục) → `Read` section trong `base/` liên quan tới việc đang làm (sửa SCSS → `05`; tạo section mới → `02`+`10`; build lỗi → `03`; wire lib → `07`). **CẤM đọc cả 10 section.**
    - Dự án: thư mục "Knowledge dự án" manager truyền trong prompt — đọc `INDEX.md` trong đó nếu có, không thì `mistakes.md`/`improvements.md` (không truyền → `.claude/knowledge/` tại cwd)
+   - **Landing `pm__`:** brief có `File dự án:` → Read file đó TRƯỚC khi đọc code (mục 1 khoá · 3 sơ đồ file · 4 bản đồ hook) — dùng nó thay cho việc đọc lại cả campaign. Brief quên dòng đó → `node ~/VNG/agent-auto/tools/project-note.mjs path <campaign>` lấy đường dẫn; báo `chưa có file` hoặc exit 1 → ghi "Cần quyết định" (không tự `init`/`lock` — việc của manager).
    - (Khi dùng tool Read, thay `~` bằng đường dẫn home tuyệt đối.)
    - ⚠ `Read` = 0.1s (đo thật 197 call). **Đừng tiết kiệm `Read` bằng cách suy luận thay** — suy luận là sinh chữ, mà sinh chữ ăn 86% thời gian phiên. Đọc thẳng file rẻ hơn nghĩ xem trong file có gì.
    - **Thứ tự ưu tiên convention khi mâu thuẫn**: (1) code thực tế của project đang làm → (2) mục `[STABLE]`/`[NEWEST]` trong base-structure.md → (3) chuẩn chung của framework. Thấy code project mới hơn mâu thuẫn base-structure.md → vẫn theo code project, và ghi nhận trong report để manager nhắc user chạy mode `learn`.
@@ -44,9 +45,10 @@ Nếu nhận kèm **Check Report** (file `.claude/reports/<slug>-check-<n>.md` d
    - **Section mới chưa có trong `config.folderUse[]` = chưa xong**; file phải = tên folder.
    - H5 (spec mục 0 Interface mode = H5) → áp Luật H5 trong `cdn-source-conventions.md`.
    - Trước khi báo xong: chạy **Convention guardrails** trong `cdn-source-conventions.md`.
+   - **Campaign MỚI / thêm section / clone-reskin**: chạy `node ~/VNG/agent-auto/tools/landing-parity.mjs <campaign>` — mỗi dòng "REF có · MỚI thiếu" phải LÀM THEO (copy từ `file:line` ref) hoặc ghi lý do bỏ vào Dev Report mục `Parity:`; 🔴 class `MS__`/`MJ__` lạ = sửa, không giữ. Đây là cách áp "làm theo landing cũ" bằng máy, không chờ user nhắc.
    - Ghi **model tier** đã chọn + lý do vào Dev Report để manager audit.
 
-   → Quy trình đầy đủ (thứ tự bước, nhận diện thế hệ `assets-flat` vs `src-setup`, tiêu chí tier): đọc **`<AGENTS_DIR>/references/reference-clone.md`** khi task thật sự có gameplay-type. `<AGENTS_DIR>` = `/Users/lap17727/VNG/promptAgent/agents` (bản plugin: `${CLAUDE_PLUGIN_ROOT}/reference`). File không tồn tại → làm theo 6 luật cấm trên.
+   → Quy trình đầy đủ (thứ tự bước, nhận diện thế hệ `assets-flat` vs `src-setup`, tiêu chí tier): đọc **`<AGENTS_DIR>/references/reference-clone.md`** khi task thật sự có gameplay-type. `<AGENTS_DIR>` = `~/VNG/agent-auto/agents` (bản plugin: `${CLAUDE_PLUGIN_ROOT}/reference`). File không tồn tại → làm theo 6 luật cấm trên.
 4. **Code**: bám spec, tái sử dụng tối đa, match style xung quanh.
 
    **💾 CHECKPOINT (chống mất lượt khi bạn bị kill giữa chừng):** ngay khi sửa/tạo xong **mỗi file đáng kể**, append 1 dòng vào Dev Report trên đĩa (`<ctx>/reports/<slug>-dev-<n>.md`) — không đợi cuối lượt mới Write cả report:
@@ -99,7 +101,8 @@ Nếu nhận kèm **Check Report** (file `.claude/reports/<slug>-check-<n>.md` d
 - Ưu tiên **tái sử dụng** component/util có sẵn; chỉ tạo mới khi không có cái phù hợp.
 - 🧱 **Chuẩn cdn-source — đọc TRƯỚC khi viết dòng đầu tiên** (không skill/agent nào tự biết, brief không copy hết):
   `~/VNG/agent-auto/rules/cdn-source-standard.md` (R-CDN-1..14) · `~/VNG/agent-auto/rules/popup-library.md` (R-POP-1..9)
-  · đưa HTML sang platform thì thêm `~/VNG/agent-auto/rules/html-handoff.md` (R-HO-1..11).
+  · đưa HTML sang platform thì thêm `~/VNG/agent-auto/rules/html-handoff.md` (R-HO-1..11)
+  · task có animation/effect thì thêm `~/VNG/agent-auto/rules/animation.md` (R-ANIM-1..7 — cây quyết định CSS/Lottie/GSAP, chốt thế hệ GSAP v2/v3 theo `package.json`, timing/easing).
   Bốn thứ hay sai nhất: **chốt thế hệ trước khi code** (assets-flat 2026 vs legacy `src-setup` — R-CDN-1, cấm trộn);
   **popup phải `{% extends '../base.html.twig' %}` + dùng module có sẵn trong `libraryMainsite-t-popup/html/module/`**,
   cấm tự dựng markup popup (R-POP-1..3); **cấm `@media` tay** (chỉ `@include mobile/pc` — R-CDN-5);
@@ -113,6 +116,14 @@ Nếu nhận kèm **Check Report** (file `.claude/reports/<slug>-check-<n>.md` d
   Cổng nghiệm thu `R-CS-7`: intern đọc một lượt từ trên xuống, không nhảy file, phải hiểu — không đạt thì
   làm phẳng code + đổi tên, **CẤM chữa bằng cách thêm comment**.
   Hook `guard-style.sh` đếm comment ngay sau mỗi lần ghi file: nhận cảnh báo `R-CS-1` thì gỡ NGAY trong lượt đó.
+- 🎯 **Landing `pm__` — `~/VNG/agent-auto/rules/pm-contract.md` (R-PM-1..12, cửa vào R-PM-11):**
+  đọc file dự án trong brief TRƯỚC khi đọc code · dùng đúng khoá (gameplay/type/ref) manager đưa — CẤM tự khoá lại,
+  CẤM đoán gameplay từ hook; brief thiếu khoá mà việc chạm hook → dừng phần đó, ghi "Cần quyết định" ·
+  chỉ dùng hook có trong AI-RULES/MASTER của gameplay đã khoá (hoặc ref khi `gameplay: none`), không bịa ·
+  landing mới: chạy được rồi làm pha tối ưu (dọn R-CS + chuẩn cdn-source, không đổi hành vi, không đụng hợp đồng) ·
+  landing cũ: chỉ dọn vùng đang chạm, phần thấy mà không chạm ghi mục `Nợ` của Dev Report ·
+  sửa xong chạy `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>` từng file `pm__` (đã build thì `--page <campaign>`) —
+  🔴 = chưa xong, dán dòng cuối vào mục `Bằng chứng`.
 - Khi fix theo Check Report: **chỉ fix issue được liệt kê**, không nhân tiện refactor lan man.
 - Báo cáo **trung thực**: lint/test fail thì nói fail kèm output; bước nào bỏ qua thì nói đã bỏ qua. CẤM báo "xong, ổn" khi chưa chạy verify.
 - **Ngân sách tool-call:** manager truyền dòng `Ngân sách: tối đa N tool-call` → tự theo dõi số call đã dùng; chạm ngưỡng → DỪNG, ghi Dev Report phần đã làm + mục "Dừng vì hết ngân sách: còn thiếu gì". Report dở trung thực TỐT HƠN chạy cố/treo.
@@ -158,6 +169,9 @@ Các lựa chọn đáng chú ý + lý do (tái sử dụng gì, đặt state �
 - lint/type-check/test: PASS/FAIL/repo không có
 - runtime console (BrowserPilot): sạch (`expect_no_console_errors` pass)/có lỗi (liệt kê từ gói chẩn đoán hoặc `read_signals`)/chưa check (lý do)
 - Self-smoke (pre-handoff): PASS (sections visible + console sạch + 2 viewport)/FAIL (lý do)/H5 1-view
+
+## Nợ (landing `pm__` cũ)
+- `<file:line>` — <lỗi có sẵn thấy mà không chạm: mã PG-*/R-*> (Không có / không phải landing `pm__` thì ghi "Không.")
 
 ## Cần quyết định / Cần hỗ trợ / Ngoài phạm vi
 Dependency cần duyệt, yêu cầu hỗ trợ (vd: cần analyst làm rõ spec mục N),

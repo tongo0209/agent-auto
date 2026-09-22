@@ -36,6 +36,10 @@ pipeline chạy tiếp KHÔNG khung. TUYỆT ĐỐI không `mkdir` folder game m
 3. `npm install` tại đích. GIỮ ảnh campaign nguồn làm placeholder — build sống ngay
    (verify 31/7: clone chengdu → đổi slug → `npm ci` 3s → `build-dev` compile 651ms, dist/
    ra bundle tên mới).
+4. Khung có `pm__` → `node ~/VNG/agent-auto/tools/project-note.mjs init <đích> [--jira KEY]` rồi khoá theo
+   `chuan-cdn-source.md` §6 (R-PM-11). Clone KHÔNG phải bằng chứng gameplay: `--ref <nguồn>` chỉ khi đã đọc
+   được loại promotion của nguồn (file dự án/ticket của nó), không suy từ tên folder. Scaffold-only chưa
+   khoá được → để `CHƯA KHOÁ`, ghi 1 dòng vào tổng kết.
 
 **3 luật cho pipeline sau scaffold** (dev/checker KHÔNG đọc file này — manager PHẢI chép
 luật 1 + đường dẫn campaign nguồn vào prompt giao việc, dạng: `Khung scaffold từ <abs path

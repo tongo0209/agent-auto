@@ -28,35 +28,35 @@ Validate file HTML landing page VNG theo loại promotion. Output bảng Pass/Fa
 | 5 | RÚT THĂM MAY MẮN & ĐỔI QUÀ | `rut-tham-doi-qua` | `02-rut-tham-may-man.md` |
 | 6 | PHÁT CODE | `phat-code`, `redeem-code`, `active-code`, `nhap-code` | `06-phat-code.md` |
 | 7 | GỬI EMAIL/CODE | `gui-email-code` | `06-phat-code.md` (tạm) |
-| 8 | PROMOTIONTYPES.SEND_EMAIL_NEXUS | `send-email-nexus` | — |
+| 8 | PROMOTIONTYPES.SEND_EMAIL_NEXUS | `send-email-nexus` | `_popup-structure.md` (structure-only) |
 | 9 | VOTE | `voting`, `vote`, `binh-chon` | `09-vote.md` |
 | 10 | HOÀN TRẢ NẠP | `hoan-tra-nap` | `13-khuyen-mai-nap.md` (tạm) |
-| 11 | NGƯỜI CŨ QUAY VỀ | `nguoi-cu-quay-ve`, `comeback` | — |
-| 12 | SHOP | `shop` | — |
+| 11 | NGƯỜI CŨ QUAY VỀ | `nguoi-cu-quay-ve`, `comeback` | `11-nguoi-cu-quay-ve.md` |
+| 12 | SHOP | `shop` | `_popup-structure.md` (structure-only) |
 | 13 | KHUYẾN MÃI NẠP | `payment`, `nap-tien`, `topup` | `13-khuyen-mai-nap.md` |
 | 14 | ĐĂNG KÝ NHẬN QUÀ | `dang-ky-nhan-qua` | `01-dang-ky-truoc.md` (tạm) |
-| 15 | CHUYỂN ĐỔI GAME | `chuyen-doi-game` | — |
-| 16 | THI ĐẤU | `thi-dau` | — |
-| 17 | BANG HỘI | `bang-hoi` | — |
-| 18 | CỜ TỶ PHÚ | `co-ty-phu` | — |
-| 19 | MAIL-METAL-SLUG | `mail-metal-slug` | — |
+| 15 | CHUYỂN ĐỔI GAME | `chuyen-doi-game` | `_popup-structure.md` (structure-only) |
+| 16 | THI ĐẤU | `thi-dau` | `_popup-structure.md` (structure-only) |
+| 17 | BANG HỘI | `bang-hoi` | `_popup-structure.md` (structure-only) |
+| 18 | CỜ TỶ PHÚ | `co-ty-phu` | `_popup-structure.md` (structure-only) |
+| 19 | MAIL-METAL-SLUG | `mail-metal-slug` | `_popup-structure.md` (structure-only) |
 | 20 | ĐĂNG KÝ TRƯỚC & MUA CHUNG GIẢM GIÁ | `dang-ky-truoc-mua-chung` | `01-dang-ky-truoc.md` (phần mua chung chưa có checklist) |
 | 21 | ĐẶT TÊN TRƯỚC | `dat-ten-truoc` | `01-dang-ky-truoc.md` (tạm) |
 | 22 | MỜI BẠN BÈ NHẬN QUÀ | `affiliate`, `moi-ban` | `22-moi-ban-be-nhan-qua.md` |
 | 23 | LÀM BÁNH | `crafting`, `lam-banh`, `che-bien` | `23-lam-banh.md` |
 | 24 | RÚT THĂM MAY MẮN & ĐỔI QUÀ V2 | `rut-tham-doi-qua-v2` | `02-rut-tham-may-man.md` |
-| 25 | ĐĂNG KÍ THI ĐẤU | `dang-ki-thi-dau` | — |
+| 25 | ĐĂNG KÍ THI ĐẤU | `dang-ki-thi-dau` | `_popup-structure.md` (structure-only) |
 | 26 | RÚT THĂM MAY MẮN & ĐỔI QUÀ V3 | `rut-tham-doi-qua-v3` | `02-rut-tham-may-man.md` |
 | 27 | ĐIỂM DANH & RÚT THĂM MAY MẮN | `checkin`, `diem-danh` | `27-diem-danh-rut-tham.md` + `02-rut-tham-may-man.md` (merge) |
 | 28 | FANTASY TEAM & ĐẶT CƯỢC | `betting`, `dat-cuoc`, `ty-le-cuoc` | `28-fantasy-team-dat-cuoc.md` |
-| 29 | SURVEY OR QUIZ | `survey-quiz` | — |
+| 29 | SURVEY OR QUIZ | `survey-quiz` | `_popup-structure.md` (structure-only) |
 | 30 | MỜI BẠN VÀ ĐỔI QUÀ V2 | `moi-ban-doi-qua-v2` | `22-moi-ban-be-nhan-qua.md` + `02-rut-tham-may-man.md` (merge) |
-| 31 | RÚT THĂM MAY MẮN & ĐỔI QUÀ V2 (trùng tên 24) | — | `02-rut-tham-may-man.md` |
-| 32 | NHẬN QUÀ THEO RANK | `nhan-qua-theo-rank` | — |
+| 31 | RÚT THĂM MAY MẮN & ĐỔI QUÀ V2 (trùng tên 24) | ◐ structure-only | `02-rut-tham-may-man.md` |
+| 32 | NHẬN QUÀ THEO RANK | `nhan-qua-theo-rank` | `_popup-structure.md` (structure-only) |
 | 33 | MỜI BẠN & ĐỔI QUÀ & RÚT THĂM | `moi-ban-doi-qua-rut-tham` | `22-moi-ban-be-nhan-qua.md` + `02-rut-tham-may-man.md` (merge) |
 | 34 | DỰ ĐOÁN QUÀ | `du-doan`, `du-doan-qua` | `28-fantasy-team-dat-cuoc.md` |
 | 35 | LOẠI BANNER | `banner` | — (banner tĩnh, không có popup flow) |
-| 36 | PROMOTIONTYPES.TINDER | `tinder` | — |
+| 36 | PROMOTIONTYPES.TINDER | `tinder` | `_popup-structure.md` (structure-only) |
 | 37 | PROMOTIONTYPES.AFFILIATE | `affiliate-platform` | `22-moi-ban-be-nhan-qua.md` |
 | 38 | PROMOTIONTYPES.VOTE_STORY | `vote-story` | `09-vote.md` (tạm) |
 | 39 | VÒNG QUAY VONG ƯU KỲ TRÂN | `spin-wheel`, `vong-quay`, `quay-so` | `39-vong-quay.md` |
@@ -65,7 +65,8 @@ Validate file HTML landing page VNG theo loại promotion. Output bảng Pass/Fa
 - File checklist trong `reference/` đặt tên theo format `<STT>-<slug>.md` của loại chính. File dùng chung cho nhiều loại thì đặt theo loại gốc (VD `02-rut-tham-may-man.md` dùng cho STT 2, 4, 5, 24, 26, 31 và các combo).
 - **(merge)**: loại combo — load TẤT CẢ file checklist được liệt kê, gộp `required_popups` (union, dedup theo popup chính; item trùng thì gộp variant).
 - **(tạm)**: chưa có checklist riêng, dùng checklist của cơ chế gần nhất.
-- **—** ở cột Checklist: chưa có checklist → báo lỗi theo skip rule ở Bước 2, KHÔNG tự dùng checklist của loại khác.
+- **`_popup-structure.md` (structure-only)** / **◐**: chưa đủ mẫu production để rút `required_popups` riêng (đo 22/9/2026: quét 4.181 template, KHÔNG nhóm popup nào đạt ≥60% xuyên suốt mọi loại ⇒ không có bộ popup bắt buộc chung để mượn). Vẫn chạy được POPUP STRUCTURE CHECK cho popup nào có mặt trong file, nhưng **KHÔNG kết luận thiếu popup** và **KHÔNG mượn `required_popups` của loại khác`**. Report phải ghi rõ "loại này chưa có checklist riêng — chỉ kiểm cấu trúc".
+- **—** ở cột Checklist: loại không có popup flow (chỉ STT 35 banner tĩnh) → không chạy.
 - Alias `affiliate` gõ trần → hiểu là STT 22 (cùng checklist với 37 nên kết quả như nhau).
 - 2 checklist phụ không gắn với type platform nào: `milestone.md` (gọi rõ `/check-promotion milestone` khi landing có milestone section) và `event.md` (generic, gọi rõ `/check-promotion su-kien`).
 
@@ -88,40 +89,40 @@ Từ prompt user, extract:
 | 5 | RÚT THĂM MAY MẮN & ĐỔI QUÀ | ✓ |
 | 6 | PHÁT CODE | ✓ |
 | 7 | GỬI EMAIL/CODE | ✓ (tạm) |
-| 8 | PROMOTIONTYPES.SEND_EMAIL_NEXUS | — |
+| 8 | PROMOTIONTYPES.SEND_EMAIL_NEXUS | ◐ structure-only |
 | 9 | VOTE | ✓ |
 | 10 | HOÀN TRẢ NẠP | ✓ (tạm) |
-| 11 | NGƯỜI CŨ QUAY VỀ | — |
-| 12 | SHOP | — |
+| 11 | NGƯỜI CŨ QUAY VỀ | ✓ |
+| 12 | SHOP | ◐ structure-only |
 | 13 | KHUYẾN MÃI NẠP | ✓ |
 | 14 | ĐĂNG KÝ NHẬN QUÀ | ✓ (tạm) |
-| 15 | CHUYỂN ĐỔI GAME | — |
-| 16 | THI ĐẤU | — |
-| 17 | BANG HỘI | — |
-| 18 | CỜ TỶ PHÚ | — |
-| 19 | MAIL-METAL-SLUG | — |
+| 15 | CHUYỂN ĐỔI GAME | ◐ structure-only |
+| 16 | THI ĐẤU | ◐ structure-only |
+| 17 | BANG HỘI | ◐ structure-only |
+| 18 | CỜ TỶ PHÚ | ◐ structure-only |
+| 19 | MAIL-METAL-SLUG | ◐ structure-only |
 | 20 | ĐĂNG KÝ TRƯỚC & MUA CHUNG GIẢM GIÁ | ✓ |
 | 21 | ĐẶT TÊN TRƯỚC | ✓ (tạm) |
 | 22 | MỜI BẠN BÈ NHẬN QUÀ | ✓ |
 | 23 | LÀM BÁNH | ✓ |
 | 24 | RÚT THĂM MAY MẮN & ĐỔI QUÀ V2 | ✓ |
-| 25 | ĐĂNG KÍ THI ĐẤU | — |
+| 25 | ĐĂNG KÍ THI ĐẤU | ◐ structure-only |
 | 26 | RÚT THĂM MAY MẮN & ĐỔI QUÀ V3 | ✓ |
 | 27 | ĐIỂM DANH & RÚT THĂM MAY MẮN | ✓ (merge) |
 | 28 | FANTASY TEAM & ĐẶT CƯỢC | ✓ |
-| 29 | SURVEY OR QUIZ | — |
+| 29 | SURVEY OR QUIZ | ◐ structure-only |
 | 30 | MỜI BẠN VÀ ĐỔI QUÀ V2 | ✓ (merge) |
 | 31 | RÚT THĂM MAY MẮN & ĐỔI QUÀ V2 | ✓ |
-| 32 | NHẬN QUÀ THEO RANK | — |
+| 32 | NHẬN QUÀ THEO RANK | ◐ structure-only |
 | 33 | MỜI BẠN & ĐỔI QUÀ & RÚT THĂM | ✓ (merge) |
 | 34 | DỰ ĐOÁN QUÀ | ✓ |
 | 35 | LOẠI BANNER | — |
-| 36 | PROMOTIONTYPES.TINDER | — |
+| 36 | PROMOTIONTYPES.TINDER | ◐ structure-only |
 | 37 | PROMOTIONTYPES.AFFILIATE | ✓ |
 | 38 | PROMOTIONTYPES.VOTE_STORY | ✓ (tạm) |
 | 39 | VÒNG QUAY VONG ƯU KỲ TRÂN | ✓ |
 
-👉 Nhập STT (1-39) hoặc tên loại để tiếp tục. (`✓` = đã có checklist; `—` = chưa có — chọn vẫn được nhưng sẽ nhận thông báo skip rule ở Bước 2.)
+👉 Nhập STT (1-39) hoặc tên loại để tiếp tục. (`✓` = có checklist đầy đủ; `◐` = chỉ kiểm cấu trúc popup, chưa đủ mẫu để rút danh sách popup bắt buộc; `—` = không có popup flow.)
 
 Ví dụ parse:
 - `/check-promotion` → thiếu loại → in bảng 39 loại + chờ user nhập STT/tên
@@ -130,7 +131,7 @@ Ví dụ parse:
 - `/check-promotion nap-tien` → STT 13 = KHUYẾN MÃI NẠP → `13-khuyen-mai-nap.md`, file = detect từ IDE
 - `/check-promotion "rút thăm may mắn & đổi quà"` → STT 5 → `02-rut-tham-may-man.md`
 - `/check-promotion abcxyz` → không match → in bảng 39 loại + chờ user nhập lại
-- `/check-promotion shop` → STT 12, chưa có checklist → báo lỗi theo skip rule (Bước 2)
+- `/check-promotion shop` → STT 12, chạy structure-only: kiểm cấu trúc popup đang có, không kết luận thiếu popup
 
 ### Bước 1 — Xác định file target
 
@@ -170,13 +171,18 @@ Tra cột **Checklist** trong bảng ở section "39 promotion type" phía trên
 
 Extract từ (các) file:
 - `required_popups` → danh sách popup bắt buộc (section `## required_popups`).
-- Popup structure rules (section `## POPUP STRUCTURE CHECK` — duplicate trong mỗi file).
+- Popup structure rules: các file trỏ về `reference/_popup-structure.md` (nguồn duy nhất) — **load thêm file đó**. File nào có section "Khác biệt của loại này" thì áp override đè lên bản chung (hiện có: `09-vote.md`, `13-khuyen-mai-nap.md`).
 
 **Merge rule (loại combo, nhiều file checklist)**: gộp `required_popups` của các file — union theo popup chính (`popup_login`, `popup_register`...), item trùng nhau thì gộp danh sách variant lại. Trong output ghi rõ item đến từ checklist nào nếu chỉ có ở 1 file.
 
 **Lưu ý**: file reference có thể chứa section `## required_pm_classes` — BỎ QUA section này, KHÔNG check pm__ class.
 
-**Skip rule**: nếu cột Checklist của loại là **—** (hoặc file được map không tồn tại) → báo lỗi: "Loại `<tên platform>` (STT X) chưa có checklist. Vui lòng tạo `reference/<STT>-<slug>.md` và cập nhật cột Checklist trước khi dùng." KHÔNG tự dùng checklist của loại khác.
+**Structure-only rule**: cột Checklist ghi `_popup-structure.md (structure-only)` → load MỖI `reference/_popup-structure.md`. Chạy POPUP STRUCTURE CHECK cho popup nào **có mặt** trong file, rồi:
+- **KHÔNG** in mục "popup bắt buộc còn thiếu" — loại này chưa có `required_popups`, không có cơ sở để nói thiếu.
+- **KHÔNG** mượn `required_popups` của loại khác (đo 22/9/2026: 4.181 template, không nhóm popup nào ≥60% xuyên loại ⇒ không tồn tại bộ chung để mượn).
+- Mở đầu report ghi rõ: "⚠️ Loại `<tên>` (STT X) chưa có checklist riêng — chỉ kiểm CẤU TRÚC popup đang có. Muốn kiểm đủ popup bắt buộc thì cần ≥3 template production của loại này để rút checklist."
+
+**Skip rule**: cột Checklist là **—** (STT 35 banner tĩnh) hoặc file map không tồn tại → báo lỗi và dừng, KHÔNG tự dùng checklist loại khác.
 
 ### Bước 3 — Parse & validate HTML
 

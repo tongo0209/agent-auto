@@ -1,0 +1,5 @@
+gameplay	kit	production	kind	evidence	reported
+*	popup_signIn	popup_login	alias	cdn-source 94 campaign popup_login vs 1 popup_signIn; gt-promotion 106 vs 0	no
+*	popup_nhanluot_signUp	popup_register	alias	cdn-source 113 campaign popup_register vs 0; gt-promotion 136 vs 0	no
+luckydraw-gift-exchange	popup_noti	-	fix	MASTER-luckydraw:499 getElementById('popup_noti') không có phần tử	no
+payment	pm__module@popup-condition	-	fix	components/popups/popup-condition.html:2 còn pm__module, MASTER đã bỏ	no

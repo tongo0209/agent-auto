@@ -1,0 +1,206 @@
+// Hợp đồng pm__ của 1 gameplay: AI-RULES + MASTER của ai-template-kit, đã áp override production.
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, extname } from 'node:path';
+import { scanHtml, ancestorsOf, tokensOf, isPattern, matcherFor } from './scan.mjs';
+import { placementViolations, MODULE_MARKER, POPUP_ID, FIELD_TAGS } from './checks.mjs';
+
+export const GAMEPLAYS = ['luckydraw-gift-exchange', 'payment', 'none'];
+const KIT_GAMEPLAYS = GAMEPLAYS.filter((g) => g !== 'none');
+const HOOK_TOKEN = /^[\w-]+\*?$/;
+const REF_SKIP_DIRS = new Set(['node_modules', 'dist', 'html-pro', 'optimized', '.git']);
+const PLACEHOLDER_HINT = 'mẫu của kit — thay N / * bằng giá trị thật (vd pm__group-1)';
+
+const rulesPath = (kitDir, g) => join(kitDir, 'gameplays', g, `AI-RULES-${g}.md`);
+const masterPath = (kitDir, g) => join(kitDir, 'gameplays', g, `MASTER-${g}.html`);
+
+export function kitFileFor(kitDir, gameplay) {
+  return gameplay === 'none' ? join(kitDir, 'components', 'common', 'popups') : rulesPath(kitDir, gameplay);
+}
+
+export function loadContract(gameplay, { kitDir, overridesPath, refDir }) {
+  const overrides = readOverrides(overridesPath, gameplay);
+  const aliases = overrides.filter((o) => o.kind === 'alias').map((o) => [o.kit, o.production]);
+  const read = (path) => applyAliases(readFileSync(path, 'utf8'), aliases);
+  const rules = gameplay === 'none' ? '' : read(rulesPath(kitDir, gameplay));
+  const master = scanHtml(gameplay === 'none' ? commonPopups(kitDir, read) : read(masterPath(kitDir, gameplay))).elements;
+
+  const catalog = parseCatalog(rules);
+  const dropped = overrides.filter((o) => o.kind === 'drop').map((o) => o.kit);
+  catalog.filter((row) => row.tokens.some((t) => dropped.includes(t))).forEach((row) => { row.required = 'no'; });
+
+  // Popup dùng chung cho cả 2 gameplay → khối lặp lấy từ AI-RULES của cả hai.
+  const lists = gameplay === 'none'
+    ? {
+      singletons: master.map((el) => el.id).filter(Boolean),
+      repeatable: [...new Set(KIT_GAMEPLAYS.flatMap((g) => parseSingletonLists(read(rulesPath(kitDir, g))).repeatable))],
+      perPopup: [],
+    }
+    : parseSingletonLists(rules);
+  const bareJs = backticked(rules.split('\n').find((l) => l.includes('Class/id "trần"')) || '');
+  const openers = new Set([
+    ...catalog.filter((row) => row.opener).flatMap((row) => row.tokens),
+    ...master.filter((el) => POPUP_ID.test(el.id)).flatMap((el) => [el.id, ...el.classes]),
+  ].filter((t) => t !== MODULE_MARKER));
+  const refHooks = refDir ? hooksOfRef(refDir) : [];
+  const vocabulary = [
+    ...master.flatMap(tokensOf), ...catalog.flatMap((row) => row.tokens), ...lists.singletons, ...lists.repeatable, ...lists.perPopup,
+    ...bareJs, ...overrides.filter((o) => o.kind === 'fix').map((o) => o.kit.split('@')[0]), ...refHooks,
+  ];
+
+  return {
+    gameplay,
+    catalog,
+    ...lists,
+    dont: parseDont(rules, catalog),
+    textLeaf: backticked(between(rules, '### 3.2.', '```')),
+    moduleWith: tableRows(between(rules, '### 3.4.', '\n## 4.')).filter((cells) => cells[2].includes('luôn kèm')).flatMap((cells) => backticked(cells[1])),
+    nest: nestRules(catalog, master, openers),
+    ...masterFields(master, lists.repeatable),
+    pairs: masterPairs(master, bareJs),
+    openers,
+    idHooks: new Set([...master.map((el) => el.id).filter(Boolean), ...catalog.filter((row) => row.kind === 'id').flatMap((row) => row.tokens)]),
+    foreign: gameplay === 'none' ? new Set() : foreignHooks(rules, master, scanHtml(read(masterPath(kitDir, KIT_GAMEPLAYS.find((g) => g !== gameplay)))).elements),
+    aliases,
+    known: new Set(vocabulary.filter((t) => !isPattern(t))),
+    patterns: [...new Set(vocabulary.filter(isPattern))].map(matcherFor),
+    refHooks,
+  };
+}
+
+function readOverrides(path, gameplay) {
+  return readFileSync(path, 'utf8').trim().split('\n').slice(1)
+    .map((line) => {
+      const [scope, kit, production, kind] = line.split('\t');
+      return { scope, kit, production, kind };
+    })
+    .filter((o) => o.scope === '*' || o.scope === gameplay);
+}
+
+function applyAliases(text, aliases) {
+  return aliases.reduce((t, [kit, production]) => t.replace(new RegExp(`\\b${kit}\\b`, 'g'), production), text);
+}
+
+function commonPopups(kitDir, read) {
+  const dir = kitFileFor(kitDir, 'none');
+  return readdirSync(dir).filter((n) => n.endsWith('.html')).map((n) => read(join(dir, n))).join('\n');
+}
+
+function between(text, from, to) {
+  const start = text.indexOf(from);
+  if (start < 0) return '';
+  const end = to ? text.indexOf(to, start + from.length) : -1;
+  return text.slice(start + from.length, end < 0 ? undefined : end);
+}
+
+const tableRows = (section) => section.split('\n').filter((l) => l.startsWith('|')).map((l) => l.split('|').map((c) => c.trim()));
+
+function backticked(text) {
+  return [...text.matchAll(/`([^`]+)`/g)].flatMap(([, t]) => t.split(/\s+/)).map((t) => t.replace(/^#/, '')).filter((t) => HOOK_TOKEN.test(t));
+}
+
+// AI-RULES §2: Hook | Loại | Bắt buộc | Đặt vào | Phải nằm trong | Số lần | …
+function parseCatalog(rules) {
+  return tableRows(between(rules, '\n## 2.', '\n## 3.'))
+    .filter((cells) => cells.length >= 9 && cells[1].startsWith('`'))
+    .map(([, hook, type, required, element, inside]) => ({
+      tokens: backticked(hook),
+      kind: hook.includes('+') ? 'mixed' : type.split(/\s/)[0],
+      pattern: type.includes('pattern'),
+      required: required.includes('✅') ? 'yes' : required.includes('🔸') ? 'extra' : 'no',
+      opener: element.includes('thẻ mở popup'),
+      sameAs: element.match(/cùng thẻ `([^`]+)`/)?.[1] || '',
+      placement: placementOf(inside),
+    }));
+}
+
+function placementOf(cell) {
+  if (cell.includes('ngoài popup')) return { type: 'outside-popup', containers: [] };
+  const containers = backticked(cell);
+  if (!containers.length) return { type: 'any', containers };
+  return { type: cell.startsWith('cha của') ? 'contains' : 'inside', containers };
+}
+
+function parseSingletonLists(rules) {
+  const lines = between(rules, '\n## 4.', '\n## 5.').split('\n');
+  const tokensOnLine = (marker) => backticked(lines.find((l) => l.includes(marker)) || '');
+  const repeatable = tokensOnLine('KHÔNG thuộc nhóm singleton');
+  const perPopup = tokensOnLine('[1/popup]');
+  const singletons = lines.filter((l) => l.startsWith('- [ ]'))
+    .flatMap((l) => backticked(l.split(' — ')[0]))
+    .filter((t) => !repeatable.includes(t) && !perPopup.includes(t));
+  return { singletons, repeatable, perPopup };
+}
+
+function parseDont(rules, catalog) {
+  const fromTable = tableRows(between(rules, '\n## 5.', '')).flatMap(([, bad = '', good = '']) => {
+    const hint = good.replace(/[`*]/g, '');
+    const invented = bad.match(/Tự thêm `([^`]+)`/);
+    const combo = bad.match(/Thêm `([^`]+)` cho `([^`]+)`/);
+    return [...(invented ? [{ classes: [invented[1]], hint }] : []), ...(combo ? [{ classes: [combo[1], combo[2]], hint }] : [])];
+  });
+  const placeholders = catalog.filter((row) => row.pattern).flatMap((row) => row.tokens).map((t) => ({ classes: [t], hint: PLACEHOLDER_HINT }));
+  return [...fromTable, ...placeholders];
+}
+
+// MASTER thắng cột "Phải nằm trong" (pm__text_agree); data-* là attr chung, để PG-PAIR.
+function nestRules(catalog, master, openers) {
+  return catalog
+    .filter((row) => row.kind !== 'data')
+    .flatMap((row) => (row.kind === 'mixed' ? row.tokens.slice(0, 1) : row.tokens).map((token) => ({ token, placement: row.placement })))
+    .filter(({ token, placement }) => placement.type !== 'any' && !placementViolations(master, token, placement, openers).length);
+}
+
+function masterFields(master, repeatable) {
+  const inputs = [];
+  const labels = [];
+  master.forEach((el, i) => {
+    const up = [...ancestorsOf(master, i)];
+    const scope = up.map((a) => master[a].id).find(Boolean);
+    const insideRepeatedBlock = [i, ...up].some((a) => master[a].classes.some((c) => repeatable.includes(c)));
+    if (!scope || insideRepeatedBlock) return;
+    if (FIELD_TAGS.has(el.tag) && el.attrs.has('name')) inputs.push({ scope, name: el.attrs.get('name'), type: el.attrs.get('type') || '', id: el.id });
+    if (el.attrs.has('for')) labels.push({ scope, for: el.attrs.get('for') });
+  });
+  return { inputs, labels };
+}
+
+// Cặp = class/data-* có trên MỌI phần tử MASTER mang hook (pm__rut → data-value).
+function masterPairs(master, bareJs) {
+  const seen = new Map();
+  for (const el of master) {
+    const data = [...el.attrs.keys()].filter((a) => a.startsWith('data-'));
+    const classes = el.classes.filter((c) => (c.startsWith('pm__') || bareJs.includes(c)) && c !== MODULE_MARKER);
+    const hooks = [...el.classes.filter((c) => c.startsWith('pm__') && c !== MODULE_MARKER), ...(el.id ? [el.id] : [])];
+    for (const hook of hooks) {
+      const partners = hook.startsWith('pm__') ? [...classes, ...data].filter((p) => p !== hook) : data;
+      seen.set(hook, [...(seen.get(hook) || []), partners]);
+    }
+  }
+  return new Map([...seen]
+    .map(([hook, lists]) => [hook, lists.reduce((common, list) => common.filter((p) => list.includes(p)))])
+    .filter(([, common]) => common.length));
+}
+
+// AI-RULES tự liệt kê hook cấm mượn (payment §2d) thì dùng list đó, không thì diff MASTER.
+function foreignHooks(rules, master, otherMaster) {
+  const declared = backticked(rules.split('\n').find((l) => l.includes('KHÔNG có') && l.includes('các hook sau')) || '');
+  const borrowedIds = [...rules.matchAll(/Dùng `id="([^"]+)"` như bản/g)].map(([, id]) => id);
+  if (declared.length) return new Set([...declared, ...borrowedIds]);
+  const hooks = (els) => new Set(els.flatMap((el) => [...el.classes.filter((c) => c.startsWith('pm__')), ...(el.id ? [el.id] : [])]));
+  const own = hooks(master);
+  return new Set([...hooks(otherMaster)].filter((t) => !own.has(t)));
+}
+
+function hooksOfRef(dir) {
+  const hooks = new Set();
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory() && !REF_SKIP_DIRS.has(entry.name)) hooksOfRef(path).forEach((h) => hooks.add(h));
+    if (!entry.isFile() || !['.html', '.twig'].includes(extname(entry.name))) continue;
+    for (const el of scanHtml(readFileSync(path, 'utf8')).elements) {
+      el.classes.filter((c) => c.startsWith('pm__') && HOOK_TOKEN.test(c)).forEach((c) => hooks.add(c));
+      if (POPUP_ID.test(el.id) && HOOK_TOKEN.test(el.id)) hooks.add(el.id);
+    }
+  }
+  return [...hooks];
+}

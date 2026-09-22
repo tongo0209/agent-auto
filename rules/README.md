@@ -8,6 +8,8 @@ luật** thay vì diễn giải lại; giao subagent thì trỏ file, khỏi cop
 | `code-style.md` | `R-CS-1..7` | **mọi repo, mọi ngôn ngữ** — cùng nguồn luật với hook `guard-style.sh` và `/clean-code` |
 | `pm-contract.md` | `R-PM-1..6` | file có class hợp đồng platform |
 | `cdn-source-standard.md` | `R-CDN-1..14`, `R-SPR-1..9` | repo assets/landing — thế hệ build, px tuyệt đối, sprite |
+| `layout-standard.md` | `R-LAY-1..7` | dựng list/danh sách — absolute vs flex/grid, gap, scroll |
+| `promo-states.md` | `R-ST-1..6` | ô nhận thưởng — đủ 3 trạng thái off/active/received |
 | `popup-library.md` | `R-POP-1..9` | popup bất kỳ (popup là design system, không phải markup rời) |
 | `html-handoff.md` | `R-HO-1..11` | đưa HTML sang repo bàn giao |
 | `repo-new-mainsite.md` | `R-TWIG-1..7` | `.twig` trong repo mainsite |

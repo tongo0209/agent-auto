@@ -2,7 +2,7 @@
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { notePathFor, readLock } from './project-lock.mjs';
+import { notePathFor, readLock, noteForAnyFile } from './project-lock.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'project-lock-'));
 process.env.PM_PROJECTS_DIR = join(root, 'projects');
@@ -40,6 +40,13 @@ check('đọc đúng 3 khoá, chỉ trong mục 1', readLock(note), { gameplay: 
 
 writeFileSync(note, '## 1. Khoá\n- gameplay: none\n- type: 27-diem-danh-rut-tham\n');
 check('gameplay none, thiếu ref → ref rỗng', readLock(note), { gameplay: 'none', type: '27-diem-danh-rut-tham', ref: '' });
+
+const handoff = join(root, 'gt-promotion-template/Foo/LandingX_12345');
+writeFileSync(note, `## 1. Khoá\n- gameplay: payment\n## 2. Nơi code\n- cdn-source: ${campaign}\n- gt-promotion: ${handoff}/Promotion\n- gt-promotion: ${handoff}/mainsite\n## 3. Sơ đồ file\n- gt-promotion: ${join(root, 'nhầm')}\n`);
+check('file cdn-source → note theo đường dẫn', noteForAnyFile(join(campaign, 'index.html')), note);
+check('file bàn giao gt-promotion → note qua mục 2', noteForAnyFile(join(handoff, 'mainsite/index.html')), note);
+check('thư mục cùng tiền tố nhưng khác tên → null', noteForAnyFile(join(handoff, 'Promotion_v2/index.html')), null);
+check('đường dẫn chỉ nằm ngoài mục 2 → null', noteForAnyFile(join(root, 'nhầm/index.html')), null);
 
 console.log(`\npass=${pass} fail=${fail}`);
 process.exit(fail ? 1 : 0);

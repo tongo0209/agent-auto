@@ -2,6 +2,7 @@
 
 > Validation checklist cho event type **milestone**.
 > Alias: `moc-thuong`
+> Checklist phụ — chạy KÈM checklist loại chính của landing, nên KHÔNG chạy Layer 2 (Popups Extra): popup khác trong file là của loại chính, không phải thừa.
 > Skill `check-promotion` này read-only — chỉ check popup bắt buộc + cấu trúc popup quan trọng (KHÔNG check pm__ class).
 
 ## required_popups

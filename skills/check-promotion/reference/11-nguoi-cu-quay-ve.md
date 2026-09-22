@@ -9,22 +9,19 @@
 
 ## required_popups
 
-- popup_rule (86% — `popupTheleNguoiCuTroVe`, `popupThele`, `popupTheleSinhNhat`)
-- popup_register (86% — `popupThongtin`, `popupDangky`)
-- popup_login (86% — `popupDangnhap`)
+- popup_rule (hoặc popupThele, popupTheleNguoiCuTroVe, popupTheleSinhNhat) — *(86%)*
+- popup_register (hoặc popupThongtin, popupDangky) — *(86%)*
+- popup_login (hoặc popupDangnhap) — *(86%)*
+- popup_inform (hoặc popupAlert) — **(optional — chỉ có khi landing có thông báo lỗi/thành công riêng)**
+- popup_history (hoặc popupLichsu) — **(optional — chỉ có khi có flow xem lịch sử nhận quà)**
+- popup_reward — **(optional — chỉ có khi mốc quà mở popup xem chi tiết)**
 
-Ba nhóm trên đi liền nhau trong hầu hết template: người cũ phải đăng nhập → xác nhận thông tin nhân vật → đọc thể lệ mốc quà hồi quy.
-
-## optional_popups
-
-- popup_inform / popupAlert — *(nếu có thông báo lỗi/thành công riêng)*
-- popup_history / popupLichsu — *(nếu có flow xem lịch sử nhận quà)*
-- popup_reward — *(nếu mốc quà mở popup xem chi tiết)*
+Ba nhóm bắt buộc đi liền nhau trong hầu hết template: người cũ phải đăng nhập → xác nhận thông tin nhân vật → đọc thể lệ mốc quà hồi quy.
 
 ## Lưu ý riêng của loại này
 
-- Tên popup thể lệ hay gắn tên chiến dịch (`popupTheleNguoiCuTroVe`, `popupTheleSinhNhat`) — match theo **chứa** `thele`/`rule`, đừng so khớp tuyệt đối.
-- Mốc quà hồi quy dùng 3 trạng thái `.off`/`.active`/`.received` như mọi gameplay khác — xem `rules/promo-states.md`.
+- Tên popup thể lệ hay gắn tên chiến dịch (`popupTheleNguoiCuTroVe`, `popupTheleSinhNhat`). Vẫn khớp ĐÚNG TÊN theo SKILL.md Layer 1 — không khớp kiểu "chứa `thele`". Gặp tên thể lệ mới → item `popup_rule` ra ❌ và tên đó hiện ở Popups Extra: người soát xác nhận rồi thêm tên vào variant ở trên.
+- Mốc quà hồi quy dùng 3 trạng thái `.off`/`.active`/`.received` như mọi gameplay khác — xem `~/VNG/agent-auto/rules/promo-states.md`.
 
 ## POPUP STRUCTURE CHECK
 

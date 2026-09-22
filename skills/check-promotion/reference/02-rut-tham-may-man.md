@@ -5,6 +5,7 @@
 > Validation checklist cho event type **lucky-draw** (PromoTypeID = 9).
 > Alias: `rut-tham`
 > Skill `check-promotion` này read-only — chỉ check popup bắt buộc + cấu trúc popup quan trọng (KHÔNG check pm__ class).
+> Gameplay kit: `luckydraw-gift-exchange` (MASTER-luckydraw) — id kit đã nằm trong variant; `popup_bxh`, `popup_confirm` của MASTER là popup chuẩn kit, không tính thừa (SKILL.md Layer 2).
 > **Evidence base**: phân tích 499 template lucky-draw-gift-exchange production. Threshold: ≥60% required, 40-59% required-conditional.
 
 ## required_popups

@@ -5,7 +5,7 @@ description: Validate file HTML landing page VNG đã đủ popup và cấu trú
 
 # Skill: check-promotion
 
-Validate file HTML landing page VNG theo loại promotion. Output bảng Pass/Fail checklist kiểm tra đủ popup và cấu trúc popup đúng chuẩn. KHÔNG check pm__ class (nếu cần điền/kiểm tra pm__ class → dùng skill `fill-pm-class`).
+Validate file HTML landing page VNG theo loại promotion. Output bảng Pass/Fail checklist kiểm tra đủ popup và cấu trúc popup đúng chuẩn. KHÔNG check pm__ class — hợp đồng `pm__`/`id`/`data-*` soát bằng `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>` (gameplay đọc từ mục Khoá của file dự án; sau build: `--page <campaignDir>`) theo `~/VNG/agent-auto/rules/pm-contract.md` R-PM-8; không dùng skill tự điền `pm__` (cấm theo R-PM-12).
 
 ## Cách gọi
 
@@ -51,7 +51,7 @@ Validate file HTML landing page VNG theo loại promotion. Output bảng Pass/Fa
 | 28 | FANTASY TEAM & ĐẶT CƯỢC | `betting`, `dat-cuoc`, `ty-le-cuoc` | `28-fantasy-team-dat-cuoc.md` |
 | 29 | SURVEY OR QUIZ | `survey-quiz` | `_popup-structure.md` (structure-only) |
 | 30 | MỜI BẠN VÀ ĐỔI QUÀ V2 | `moi-ban-doi-qua-v2` | `22-moi-ban-be-nhan-qua.md` + `02-rut-tham-may-man.md` (merge) |
-| 31 | RÚT THĂM MAY MẮN & ĐỔI QUÀ V2 (trùng tên 24) | ◐ structure-only | `02-rut-tham-may-man.md` |
+| 31 | RÚT THĂM MAY MẮN & ĐỔI QUÀ V2 (trùng tên 24) | — (gọi bằng STT 31) | `02-rut-tham-may-man.md` |
 | 32 | NHẬN QUÀ THEO RANK | `nhan-qua-theo-rank` | `_popup-structure.md` (structure-only) |
 | 33 | MỜI BẠN & ĐỔI QUÀ & RÚT THĂM | `moi-ban-doi-qua-rut-tham` | `22-moi-ban-be-nhan-qua.md` + `02-rut-tham-may-man.md` (merge) |
 | 34 | DỰ ĐOÁN QUÀ | `du-doan`, `du-doan-qua` | `28-fantasy-team-dat-cuoc.md` |
@@ -65,7 +65,7 @@ Validate file HTML landing page VNG theo loại promotion. Output bảng Pass/Fa
 - File checklist trong `reference/` đặt tên theo format `<STT>-<slug>.md` của loại chính. File dùng chung cho nhiều loại thì đặt theo loại gốc (VD `02-rut-tham-may-man.md` dùng cho STT 2, 4, 5, 24, 26, 31 và các combo).
 - **(merge)**: loại combo — load TẤT CẢ file checklist được liệt kê, gộp `required_popups` (union, dedup theo popup chính; item trùng thì gộp variant).
 - **(tạm)**: chưa có checklist riêng, dùng checklist của cơ chế gần nhất.
-- **`_popup-structure.md` (structure-only)** / **◐**: chưa đủ mẫu production để rút `required_popups` riêng (đo 22/9/2026: quét 4.181 template, KHÔNG nhóm popup nào đạt ≥60% xuyên suốt mọi loại ⇒ không có bộ popup bắt buộc chung để mượn). Vẫn chạy được POPUP STRUCTURE CHECK cho popup nào có mặt trong file, nhưng **KHÔNG kết luận thiếu popup** và **KHÔNG mượn `required_popups` của loại khác`**. Report phải ghi rõ "loại này chưa có checklist riêng — chỉ kiểm cấu trúc".
+- **`_popup-structure.md` (structure-only)** / **◐**: chưa đủ mẫu production để rút `required_popups` riêng (đo 22/9/2026: quét 4.181 template, KHÔNG nhóm popup nào đạt ≥60% xuyên suốt mọi loại ⇒ không có bộ popup bắt buộc chung để mượn). Vẫn chạy được POPUP STRUCTURE CHECK cho popup nào có mặt trong file, nhưng **KHÔNG kết luận thiếu popup** và **KHÔNG mượn `required_popups` của loại khác**. Report phải ghi rõ "loại này chưa có checklist riêng — chỉ kiểm cấu trúc".
 - **—** ở cột Checklist: loại không có popup flow (chỉ STT 35 banner tĩnh) → không chạy.
 - Alias `affiliate` gõ trần → hiểu là STT 22 (cùng checklist với 37 nên kết quả như nhau).
 - 2 checklist phụ không gắn với type platform nào: `milestone.md` (gọi rõ `/check-promotion milestone` khi landing có milestone section) và `event.md` (generic, gọi rõ `/check-promotion su-kien`).
@@ -135,7 +135,7 @@ Ví dụ parse:
 
 ### Bước 1 — Xác định file target
 
-**Reuse logic từ skill `fill-pm-class`** (cùng thứ tự ưu tiên):
+Thứ tự ưu tiên:
 
 #### 1.1. SCAN MESSAGE HIỆN TẠI tìm tag `<ide_opened_file>`
 
@@ -180,7 +180,9 @@ Extract từ (các) file:
 **Structure-only rule**: cột Checklist ghi `_popup-structure.md (structure-only)` → load MỖI `reference/_popup-structure.md`. Chạy POPUP STRUCTURE CHECK cho popup nào **có mặt** trong file, rồi:
 - **KHÔNG** in mục "popup bắt buộc còn thiếu" — loại này chưa có `required_popups`, không có cơ sở để nói thiếu.
 - **KHÔNG** mượn `required_popups` của loại khác (đo 22/9/2026: 4.181 template, không nhóm popup nào ≥60% xuyên loại ⇒ không tồn tại bộ chung để mượn).
+- **KHÔNG** chạy Layer 1 lẫn Layer 2 (không có danh sách để so ⇒ không có cơ sở nói thiếu hay thừa) — chỉ chạy Layer 3.
 - Mở đầu report ghi rõ: "⚠️ Loại `<tên>` (STT X) chưa có checklist riêng — chỉ kiểm CẤU TRÚC popup đang có. Muốn kiểm đủ popup bắt buộc thì cần ≥3 template production của loại này để rút checklist."
+- Icon tổng kết tối đa ◐ (xem Bước 4) — loại này KHÔNG BAO GIỜ ra ✅.
 
 **Skip rule**: cột Checklist là **—** (STT 35 banner tĩnh) hoặc file map không tồn tại → báo lỗi và dừng, KHÔNG tự dùng checklist loại khác.
 
@@ -192,37 +194,37 @@ Extract từ (các) file:
 
 **Scan**: Tìm tất cả element container có `id` bắt đầu bằng `popup` — thường là `<section>` nhưng một số template (VD TLBB) dùng `<div id="popup_*">` bọc trong section khác. Regex: `<(?:section|div)[^>]*id="(popup[^"]*)"`.
 
-**Match logic**: Mỗi item trong `required_popups` có thể list nhiều variant ID (cách nhau bởi "hoặc"). Item pass nếu BẤT KỲ variant nào match với popup ID tìm được trong file.
+**Id kit ≡ id production**: trước khi so, đọc `~/VNG/agent-auto/rules/pm-kit-overrides.tsv`, các dòng `kind=alias`: id cột `kit` và id cột `production` là CÙNG MỘT popup (production thắng kit). VD trang dựng từ MASTER có `popup_signIn` → khớp item `popup_login`; `popup_nhanluot_signUp` → khớp item `popup_register`. Áp cho MỌI checklist, kể cả checklist chưa liệt kê id kit trong variant.
 
-Ví dụ: `popup_login (hoặc popup_dangnhap, popupDangnhap)` → pass nếu file có `popup_login` HOẶC `popup_dangnhap` HOẶC `popupDangnhap`.
+**Match logic**: Mỗi item trong `required_popups` có thể list nhiều variant ID (cách nhau bởi "hoặc"). Item pass nếu BẤT KỲ variant nào (hoặc id alias của nó) trùng ĐÚNG TÊN với popup ID tìm được trong file — không khớp kiểu "chứa chuỗi".
 
-**Optional popup**: item có đánh dấu **(optional...)** trong `required_popups` → BỎ QUA hoàn toàn: KHÔNG check Pass/Fail ở Layer 1, KHÔNG tính vào X/Y ở Tổng kết; nếu popup (hoặc variant) tồn tại trong file → KHÔNG tính là popup thừa ở Layer 2 và KHÔNG chạy structure check Layer 3 cho popup đó. Không hiện trong bảng Popups Required (hoặc hiện với status ⏭️ Skip, không tính điểm). VD: `popup_condition` là optional với checklist payment (`13-khuyen-mai-nap.md`).
+Ví dụ: `popup_login (hoặc popup_dangnhap, popupDangnhap)` → pass nếu file có `popup_login` HOẶC `popup_dangnhap` HOẶC `popupDangnhap` HOẶC `popup_signIn` (alias kit).
 
-**Kết quả**: Mỗi item (trừ optional) → ✅ Pass (ghi popup ID match được) hoặc ❌ Fail.
+**Ghi chú sau item quyết định mức** — đọc theo dấu, không theo con số:
+
+| Ghi chú sau item | Mức | Popup có trong file | Popup không có |
+|---|---|---|---|
+| Không ghi chú, hoặc ghi chú không chứa `(optional` và không có chữ "nếu" — VD `*(75% — popup hiển thị quà nhận được)*` | bắt buộc | ✅ Pass | ❌ Fail |
+| Ghi chú nghiêng có chữ "nếu" — VD `*(59% — nếu yêu cầu login)*` | có điều kiện: chỉ bắt buộc khi landing có đúng điều kiện đó | ✅ Pass | ⚠️ Warning "chỉ bắt buộc nếu <điều kiện> — dev tự xác nhận", KHÔNG tính X/Y |
+| Đậm **(optional …)** | tuỳ chọn | ⏭️ Skip — không Pass/Fail, không tính thừa (Layer 2), không chạy Layer 3 | ⏭️ Skip |
+
+`nn%` trong ghi chú là tỉ lệ corpus production lúc rút checklist (≥60% bắt buộc, 40-59% có điều kiện) — chỉ để tham khảo. VD optional: `popup_selectrole` trong `02`/`13`.
+
+**Popup UI tự do**: `popup_rule` (mọi gameplay) và `popup_reward` (ngoài Lucky Draw — MASTER Payment không có; MASTER Lucky Draw có `popup_reward` kèm `rewardContainer`) KHÔNG phải hook bắt buộc của kit: dev tự dựng như popup UI riêng — được thêm, pm-gate không đòi. Checklist vẫn đòi vì đa số production có ⇒ dựng thẳng từ MASTER mà thiếu thì Fail là đúng (thiếu popup UI), không phải lỗi kit.
+
+**Kết quả**: Mỗi item (trừ optional) → ✅ Pass (ghi popup ID match được), ❌ Fail, hoặc ⚠️ (item có điều kiện vắng mặt).
 
 #### Layer 2 — Popups Extra
 
-**So sánh**: Lấy tất cả popup ID trong file TRỪ những ID đã match ở Layer 1 VÀ TRỪ các variant của item **(optional)**.
+**So sánh**: Lấy tất cả popup ID trong file TRỪ: ID đã match ở Layer 1, variant của item **(optional)**, và **popup chuẩn kit** — id popup có trong 2 MASTER của kit (kèm id production qua alias): `popup_signIn`/`popup_login`, `popup_nhanluot_signUp`/`popup_register`, `popup_selectrole`, `popup_condition`, `popupCondition`, `popup_history`, `popup_inform`, `popup_bxh`, `popup_reward`, `popup_confirm`. Dựng theo MASTER là đúng chuẩn ⇒ popup chuẩn kit không bao giờ là thừa, kể cả khi checklist loại không liệt kê.
+
+**Không chạy Layer 2** với loại structure-only (không có danh sách để so) và checklist phụ `milestone` (chạy kèm loại chính — popup khác trong file là của loại chính).
 
 **Kết quả**: Mỗi popup extra → ⚠️ Warning.
 
 #### Layer 3 — Cấu trúc Popup Quan Trọng
 
-Chỉ check cho popup **đã tồn tại** trong file. Đọc section "POPUP STRUCTURE CHECK" trong checklist — **rules trong file checklist của loại đang check là CHUẨN và GHI ĐÈ default dưới đây**. Default dưới đây chỉ áp dụng khi file checklist không định nghĩa riêng.
-
-**popup_register** (hoặc variant — popup đăng ký thông tin): Check bên trong popup đó có (áp dụng cho MỌI loại promotion):
-1. `<form>` bên trong popup → ✅/❌
-2. Trong form: `select[name="ServerID"]` với `<option>` ĐẦU TIÊN có class `server-select-title` → ✅/❌ (select có nhưng option đầu sai/thiếu class → ❌, ghi lý do)
-3. Trong form: select thứ 2 `select[name="CharacterID"]` với `<option>` ĐẦU TIÊN có class `character-select-title` → ✅/❌
-4. Trong form: `button[type="submit"]` hoặc button/a đóng vai trò submit → ✅/❌
-
-**popup_condition** (hoặc variant): Check bên trong popup đó có:
-1. `form` có `id` chứa "condition" → ✅/❌
-2. Ít nhất 1 `input` → ✅/❌
-3. MỌI thẻ `<form>` trong popup có button submit RIÊNG nằm trong form đó (`button[type="submit"]` hoặc button/a submit) → ✅/❌ — **NGOẠI TRỪ form invite** (id/class/name chứa `invite`/`loimoi`/`moiban`) **và form share FB** (id/class/name chứa `share`/`fb`/`facebook`): 2 dạng này bỏ qua không check submit. Mỗi form vi phạm → 1 dòng ❌ Fail riêng, ghi rõ form (id/class + line).
-
-**popup_inform** (hoặc variant): Check bên trong section đó có:
-1. `<p>` trong `.MS__content`/`.content` → ✅/❌
+Chỉ check cho popup **đã tồn tại** trong file (trừ item optional). Chuẩn là `reference/_popup-structure.md` — nguồn duy nhất cho popup đăng ký, điều kiện, thông báo, kèm danh sách tên nhận diện (gồm id kit). File checklist của loại có mục "Khác biệt của loại này" thì phần đó GHI ĐÈ bản chung.
 
 **QUAN TRỌNG**: Khi check "bên trong popup", giới hạn scope từ tag mở của element popup (`<section id="popup_xxx">` hoặc `<div id="popup_xxx">`) đến tag đóng tương ứng của nó. Không check toàn bộ file.
 
@@ -257,7 +259,7 @@ Print output theo format sau:
 | popup_condition | form id chứa "condition" | ✅ Pass |
 | popup_condition | input | ✅ Pass |
 | popup_condition | button submit | ✅ Pass |
-| popup_inform | <p> trong content | ✅ Pass |
+| popup_inform | vùng chữ thông báo (`pm__inform-text` hoặc `<p>` trong content) | ✅ Pass |
 
 (Chỉ show popup nào tồn tại trong file. Popup không tồn tại → không hiện trong bảng này.)
 
@@ -266,14 +268,15 @@ Print output theo format sau:
 ⚠️ Warning: [danh sách warnings — popup thừa + ServerID thiếu]
 ```
 
-**Quy tắc tính X/Y ở Tổng kết:** Y = tổng số item required popups (Layer 1) + tổng số structure check đã chạy (Layer 3, chỉ các popup tồn tại trong file). X = số item ✅ Pass trong đó. Warning không tính vào X/Y.
+**Quy tắc tính X/Y ở Tổng kết:** Y = số item Layer 1 ra ✅/❌ (không tính optional và item có điều kiện vắng mặt) + tổng số structure check đã chạy (Layer 3, chỉ các popup tồn tại trong file). X = số item ✅ Pass trong đó. Warning không tính vào X/Y.
 
 **Header cho checklist phụ** (milestone/event — không có STT): ghi `📋 Loại: Checklist phụ — <milestone|event> — checklist: <file>.md`.
 
-**Quy tắc icon tổng kết:**
-- Tất cả Pass + không warning → ✅
-- Tất cả Pass + có warning → ⚠️
+**Quy tắc icon tổng kết** (xét từ trên xuống, gặp dòng nào khớp thì dừng):
 - Có ít nhất 1 Fail → ❌
+- Loại structure-only (◐ trong bảng 39 loại) → ◐, kèm dòng "◐ Chỉ kiểm cấu trúc — loại này chưa có checklist popup bắt buộc, CHƯA kết luận đủ popup". Loại này không bao giờ ra ✅.
+- Tất cả Pass + có warning → ⚠️
+- Tất cả Pass + không warning → ✅
 
 ### Bước 5 — Kết thúc
 
@@ -286,6 +289,6 @@ Gợi ý cho user nếu có fail:
 
 1. **Read-only**: Chỉ đọc và báo cáo. KHÔNG sửa file.
 2. **Flexible ID matching**: Popup ID có nhiều variant giữa các game — match bất kỳ variant nào.
-3. **KHÔNG check pm__ class**: skill này chỉ check popup + cấu trúc popup. Section `required_pm_classes` trong reference (nếu có) → bỏ qua. Việc điền pm__ class thuộc skill `fill-pm-class`.
+3. **KHÔNG check pm__ class**: skill này chỉ check popup + cấu trúc popup. Section `required_pm_classes` trong reference (nếu có) → bỏ qua. Hợp đồng `pm__` soát bằng `pm-gate` (R-PM-8 trong `~/VNG/agent-auto/rules/pm-contract.md`); không dùng skill tự điền `pm__` (R-PM-12).
 4. **Popup structure scope**: Check cấu trúc bên trong đúng popup section, không phải toàn file.
 5. **Warning vs Fail**: Popup thừa = Warning. Mọi mục structure check của popup_register (form, ServerID + option class, CharacterID + option class, button submit) thiếu = Fail — áp dụng cho TẤT CẢ loại promotion. Còn lại theo checklist của loại.

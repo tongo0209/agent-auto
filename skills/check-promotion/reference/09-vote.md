@@ -20,5 +20,6 @@ Theo [`_popup-structure.md`](_popup-structure.md), **trừ các khác biệt dư
 
 ### Khác biệt của loại này
 
+- `popup_mrmiss_reg` (popup đăng ký dự thi) là popup đăng ký → áp ĐỦ 4 mục bắt buộc của popup đăng ký trong `_popup-structure.md` (form, ServerID, CharacterID, submit) như bản team; thiếu mục nào → ❌ Fail.
 - `popup_register` / `popup_mrmiss_reg`: form đăng ký dự thi thường có thêm `input[type="file"][name="MediaImage[0..3]"]` (ảnh thí sinh).
   Có flow dự thi mà thiếu input file → ⚠️ Warning (không fail).

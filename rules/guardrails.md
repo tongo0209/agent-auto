@@ -29,11 +29,21 @@ KHÔNG chặn ghi, chỉ báo — **nhận cảnh báo thì gỡ ngay trong lư�
 
 ## `guard-pm.sh` (PostToolUse `Write|Edit`)
 
-Ghi xong file `.html`/`.twig` **có `pm__`** → chạy `tools/pm-gate.mjs`, đối chiếu `AI-RULES` của gameplay
-trong `ai-template-kit`. Chỉ 🔴 mới lên tiếng (hook nhân đôi · đặt sai container · còn `<any>`), 🟡 im.
-Im lặng cả khi: file không có `pm__` · không nhận ra gameplay (kit mới phủ 2 gameplay) · chưa pull kit.
-Bị báo thì sửa rồi chạy lại `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>`, **đừng đổi tên hook cho qua cổng**.
-Self-test: `bash ~/.claude/hooks/guard-pm.test.sh`.
+Ghi xong file `.html`/`.htm`/`.twig` **có `pm__`** (trừ `node_modules`/`vendor`/`.min.`/`dist`) → chạy
+`node "$AGENT_AUTO/tools/pm-gate.mjs" <file>` (`AGENT_AUTO` tính từ vị trí thật của hook, fallback `~/VNG/agent-auto`).
+Gameplay đọc từ file dự án; baseline mặc định `HEAD` nên sửa landing cũ chỉ chặn lỗi MỚI (R-PM-8).
+
+| Gate trả | Hook làm |
+|---|---|
+| exit 1 (có 🔴) | in nguyên output gate ra stderr + **exit 2 = chặn**, ghi `GUARD_LOG`, model đọc được, sửa trong lượt |
+| exit 1 vì `PG-GAME` "chưa khoá gameplay" | file mới → chặn như trên. File đã có ở `HEAD` (landing cũ) → nhắc khoá qua `additionalContext`, exit 0. Cả hai: làm bước khoá R-PM-11 (`project-note lock`) trước khi sửa tiếp, **không** truyền `--gameplay` đoán mò |
+| exit 0 có 🟡 | đưa nguyên output vào context model qua `additionalContext` (stderr ở exit 0 model không thấy), exit 0 — không chặn, vẫn phải soát tay |
+| exit 2 (lỗi dùng: cờ sai, thiếu kit…) | đưa `[guard-pm] pm-gate lỗi dùng — …` vào `additionalContext`, exit 0 — không chặn nhưng **không im** |
+
+Im lặng chỉ khi: file không có `pm__` · đuôi/thư mục bị loại trừ ở trên · máy không có `node`/không thấy `pm-gate.mjs` · gate sạch.
+⚠️ Hook chỉ soát **file vừa ghi**: file partial (không `<body`) không chạy `PG-REQ`/`PG-REF` ⇒ hook im ≠ trang đủ hook — sau build vẫn phải `pm-gate --page <campaignDir>`. Ghi file bằng Bash (`sed`, heredoc) **không qua hook** — tự chạy gate.
+Bị báo thì sửa rồi chạy lại `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>`, **đừng đổi tên hook cho qua cổng**. Mã lỗi `PG-*`: `pm-contract.md`.
+Self-test: `bash ~/.claude/hooks/guard-pm.test.sh` (dùng `HOME` + `GUARD_LOG` tạm, không ghi `~/.claude/hooks/guard.log` thật).
 
 ## `token-watch.sh` (UserPromptSubmit)
 

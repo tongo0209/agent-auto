@@ -6,7 +6,7 @@ luật** thay vì diễn giải lại; giao subagent thì trỏ file, khỏi cop
 | File | Mã | Áp khi chạm tới |
 |---|---|---|
 | `code-style.md` | `R-CS-1..7` | **mọi repo, mọi ngôn ngữ** — cùng nguồn luật với hook `guard-style.sh` và `/clean-code` |
-| `pm-contract.md` | `R-PM-1..6` | file có class hợp đồng platform |
+| `pm-contract.md` | `R-PM-1..12`, mã cổng `PG-*` | file có class hợp đồng platform — kèm `pm-kit-overrides.tsv` (chỗ kit lệch production, R-PM-9) |
 | `cdn-source-standard.md` | `R-CDN-1..14`, `R-SPR-1..9` | repo assets/landing — thế hệ build, px tuyệt đối, sprite |
 | `layout-standard.md` | `R-LAY-1..8` | dựng list/danh sách — absolute vs flex/grid, gap, scroll |
 | `promo-states.md` | `R-ST-1..8` | ô nhận thưởng — đủ 3 trạng thái off/active/received |

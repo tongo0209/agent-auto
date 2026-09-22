@@ -21,7 +21,7 @@ Tên class lấy theo thực tế repo (đếm 22/9/2026 trên `cdn-source`): `.
 | **R-ST-3** | MUST | **Trạng thái đặt trên khối bọc item**, không rải lên từng thành phần con. `<div class="day-1 received">` — chứ không phải vừa `btn-received` vừa `text-received` vừa `icon-received` rời nhau. Kéo theo `R-LAY-3`. |
 | **R-ST-4** | MUST | **Chỉ `.active` mới bấm được.** `.off` và `.received` phải chặn ở CSS (`pointer-events: none`) chứ không chỉ đổi màu — đổi màu suông thì vẫn bấm được và vẫn bắn API. |
 | **R-ST-5** | SHOULD | Nếu PSD/Figma có show đủ 3 trạng thái thì **bóc đủ 3 sprite**, đừng chỉ bóc cái đẹp nhất rồi làm 2 cái kia bằng filter CSS. |
-| **R-ST-6** | MUST | Trạng thái là **class thêm vào**, không thay thế class gốc của item và **không đụng vào hợp đồng `pm__`** (xem `pm-contract.md`). |
+| **R-ST-6** | MUST | Trạng thái là **class thêm vào**, không thay thế class gốc của item và **không đụng vào hợp đồng `pm__`** (xem `pm-contract.md`). **`.active` còn là class trần mà JS platform (pm bundle) có thể bật** — kit liệt kê nó cạnh `box-item`, `close`, `page-link` (README §6.3, AI-RULES §5), không chỉ là class CSS của campaign. Trên trang `pm__`: không đổi `.active` sang tên khác (kể cả khi R-ST-7 giữ hệ từ vựng khác cho ô quà), và style `.active` phải đúng cả khi platform bật chứ không chỉ khi JS riêng bật (R-PM-10). |
 
 
 ## Phía `gt-promotion-template`: hai hệ từ vựng, phải map

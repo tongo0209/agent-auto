@@ -14,6 +14,8 @@ luật** thay vì diễn giải lại; giao subagent thì trỏ file, khỏi cop
 | `repo-vportal2view.md` | `R-VP2-1..6` | `.twig` trong repo portal |
 | `repo-gt-promotion.md` | `R-GTP-1..6` | repo template chiến dịch |
 | `animation.md` | `R-ANIM-1..7` | effect/animation bất kỳ (CSS/Lottie/GSAP) — viết mới hoặc fix bug QC |
+| `git-workflow.md` | `R-GIT-1..6` | commit / push / tạo MR — 2 hệ format, luồng nhánh `cdn-source` |
+| `guardrails.md` | `G-*` | bị hook chặn — mẫu deny/ask, hợp đồng state, ngưỡng context |
 | `agent-evidence.md` | `R-EV-1..7` | báo cáo bất kỳ của agent/subagent — số liệu, trạng thái, verdict |
 
 Bảng trong `~/.claude/CLAUDE.md` **sinh lại từ `templates/rules-index.tsv`** và chỉ in dòng nào có

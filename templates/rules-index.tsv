@@ -1,11 +1,15 @@
 # <file rules>	<cột "Chạm tới">	<cột "Đọc TRƯỚC khi sửa">
-# installer chỉ in dòng nào có file thật trong rules/ — bản public thiếu file thì dòng đó biến mất.
+# installer chỉ in dòng nào có file thật trong repo — bản public thiếu file thì dòng đó biến mất.
 rules/pm-contract.md	File có `pm__` (mọi repo)	`rules/pm-contract.md` — R-PM-1..6
-rules/repo-new-mainsite.md	`.twig` trong **new-mainsite**	`rules/repo-new-mainsite.md` — R-TWIG-1..7. **Máy KHÔNG có php/docker ⇒ không build/render được, cấm claim "đã verify runtime"**
+rules/cdn-source-standard.md	**`cdn-source`** (viết/sửa bất cứ gì)	`rules/cdn-source-standard.md` — R-CDN-1..14 (assets-flat vs legacy, config.js, px tuyệt đối, cấm `@media` tay) + **R-SPR-1..9** (sprite: `@include sprite()`, cấm gõ `background-position` tay) + `rules/pm-contract.md`
+tools/landing-parity.mjs	**Campaign/section MỚI hoặc clone-reskin trong cdn-source**	`node ~/VNG/agent-auto/tools/landing-parity.mjs <campaign>` trước khi báo xong — "landing cũ có mà mới thiếu" là danh sách phải xử (kèm `file:line`), không chờ user nhắc; 🔴 class `MS__`/`MJ__` lạ = sửa. Lệch vị trí: `/ui-check --autofix`
+rules/popup-library.md	**Popup bất kỳ** (landing/skin/promotion)	`rules/popup-library.md` — R-POP-1..9. Popup là design system: extends `base.html.twig`, dùng module có sẵn, cổng `/check-promotion` trước khi báo xong
+rules/animation.md	**Animation/effect bất kỳ** (CSS/Lottie/GSAP)	`rules/animation.md` — R-ANIM-1..7. Cây quyết định lib, thế hệ GSAP v2/v3, timing/easing, bảng chẩn đoán bug
+rules/html-handoff.md	**Đưa HTML sang `gt-promotion-template` / `new-mainsite`**	`rules/html-handoff.md` — R-HO-1..11 (URL CDN tuyệt đối, giữ `<% MODULE_CONTENT %>`, soát cả 2 thư mục)
+rules/repo-new-mainsite.md	`.twig` trong **new-mainsite**	`rules/repo-new-mainsite.md` — R-TWIG-1..7. **Máy KHÔNG có php/docker ⇒ cấm claim "đã verify runtime"**
 rules/repo-vportal2view.md	`.twig` trong **vportal2view**	`rules/repo-vportal2view.md` — R-VP2-1..6. 37.718 file, nhánh `master`, cũng không render được ở local
 rules/repo-gt-promotion.md	**gt-promotion-template**	`rules/repo-gt-promotion.md` — R-GTP-1..6. Fix phải soát CẢ `Promotion/` LẪN `mainsite/`
-rules/cdn-source-standard.md	**`cdn-source`** (viết/sửa bất cứ gì)	`rules/cdn-source-standard.md` — R-CDN-1..14 (thế hệ assets-flat vs legacy, config.js, px tuyệt đối, cấm `@media` tay, engine gameplay) **+ R-SPR-1..9 (sprite: `@include sprite()`, cấm gõ `background-position` tay)** + `rules/pm-contract.md`
-rules/popup-library.md	**Popup bất kỳ** (landing/skin/promotion)	`rules/popup-library.md` — R-POP-1..9. Popup là design system: extends `base.html.twig`, dùng module có sẵn, cổng `/check-promotion` trước khi báo xong
-rules/html-handoff.md	**Đưa HTML sang `gt-promotion-template` / `new-mainsite`**	`rules/html-handoff.md` — R-HO-1..11 (URL CDN tuyệt đối, giữ `<% MODULE_CONTENT %>`, soát cả 2 thư mục)
-rules/code-style.md	**Viết code bất kỳ** (mọi repo, mọi ngôn ngữ)	`rules/code-style.md` — R-CS-1..7 (bản rút gọn ở mục "Code style" dưới, đủ dùng; đọc file khi cần ví dụ ❌/✅)
-rules/agent-evidence.md	**Báo cáo bất kỳ của agent/subagent** (số liệu, trạng thái, verdict)	`rules/agent-evidence.md` — R-EV-1..7. Đọc ngược sau khi ghi, cấm "xong/verify" cho thứ chưa chạy, cấm suy từ tên file, mục `Bằng chứng:` bắt buộc trong report
+rules/code-style.md	**Viết code bất kỳ** (mọi repo, mọi ngôn ngữ)	`rules/code-style.md` — R-CS-1..7 (tóm tắt ở mục "Code style" dưới; đọc file khi cần ví dụ ❌/✅)
+rules/git-workflow.md	**Commit / push / tạo MR**	`rules/git-workflow.md` — R-GIT-1..6 (tóm tắt ở mục "Git" dưới; đọc file khi cần bối cảnh cdn-source)
+rules/guardrails.md	**Bị hook chặn** (`G-*`)	`rules/guardrails.md` — mẫu deny/ask của `guard-bash`, hợp đồng `guard-state`, giới hạn `guard-style`, ngưỡng `token-watch`
+rules/agent-evidence.md	**Báo cáo bất kỳ của agent/subagent**	`rules/agent-evidence.md` — R-EV-1..7. Đọc ngược sau khi ghi mới được nói; cấm "xong/verify" cho thứ chưa chạy; report phải có mục `Bằng chứng:`

@@ -23,6 +23,34 @@ Tên class lấy theo thực tế repo (đếm 22/9/2026 trên `cdn-source`): `.
 | **R-ST-5** | SHOULD | Nếu PSD/Figma có show đủ 3 trạng thái thì **bóc đủ 3 sprite**, đừng chỉ bóc cái đẹp nhất rồi làm 2 cái kia bằng filter CSS. |
 | **R-ST-6** | MUST | Trạng thái là **class thêm vào**, không thay thế class gốc của item và **không đụng vào hợp đồng `pm__`** (xem `pm-contract.md`). |
 
+
+## Phía `gt-promotion-template`: hai hệ từ vựng, phải map
+
+HTML đã bàn giao **không** dùng thống nhất `.off`/`.active`/`.received`. Đếm thật trên 226 file (22/9/2026):
+
+| Hệ | Từ dùng | Số lần |
+|---|---|---|
+| Tiếng Anh | `received`, `is-active`, `disabled` | `column-received` 32 · `is-active` 79 · `disabled` 13 |
+| Tiếng Việt | `dat` (đạt) · `chua` (chưa) · `lock` · `tick` · `nhan` | `nhan` 553 · `chua` 534 · `dat` 504 · `tick` 232 · `lock` 202 |
+
+Map khi bàn giao hoặc khi đọc ngược code cũ:
+
+| Trạng thái | cdn-source | gt-promotion (Anh) | gt-promotion (Việt) |
+|---|---|---|---|
+| chưa đủ điều kiện | `.off` | `disabled` | `chua`, `lock` |
+| đủ, chưa nhận | `.active` | `is-active` | `dat` (chưa có `tick`) |
+| đã nhận | `.received` | `received` | `tick`, `da-nhan` |
+
+**R-ST-7 MUST** · Code mới trong `cdn-source` luôn dùng `.off`/`.active`/`.received`. Khi bàn giao sang `gt-promotion-template`, **giữ nguyên tên đang có của file đích** nếu file đó đã dùng hệ khác — đổi tên hàng loạt là rủi ro JS platform, không phải dọn dẹp. Ghi rõ trong report đã map thế nào.
+
+**R-ST-8 SHOULD** · Ví dụ ca thật `GunnyMobi/LandingTrungThu2026/mainsite/diemdanh.html`: 42 `cell`, mỗi cell có `numbg-dat`/`numbg-chua` + sprite `cell-dat`/`cell-chua`/`lock`/`tick` — tức **chỉ 2 trạng thái nền + 1 lớp tick phủ lên**. Đọc kiểu này đừng kết luận "thiếu trạng thái"; kiểm `tick`/`lock` trước khi báo `R-ST-1`.
+
+## Quy ước đặt tên phía promotion (đếm thật, không phải ý kiến)
+
+kebab-case **29.506** · một-từ **19.319** · BEM `a__b` **9.793** · snake_case **2.956**.
+
+⇒ Viết mới thì **kebab-case hoặc BEM**; tránh `snake_case` (thiểu số, chỉ còn ở file cũ). Không đụng `pm__`/`MS__`/`MJ__` — đó là hợp đồng, xem [`pm-contract.md`](pm-contract.md).
+
 ## Áp cho gameplay nào
 
 Đếm module thật trong `cdn-source/products` (22/9/2026): **vòng quay 28 · milestone/mốc quà 27 · điểm danh 20 · đổi quà 19 · nhiệm vụ 5 · mốc nạp 4**.

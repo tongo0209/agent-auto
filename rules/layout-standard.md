@@ -24,6 +24,36 @@
 | **R-LAY-5** | SHOULD | Lưới không đều (item cuối lệch, hàng cuối thiếu) vẫn dùng `grid` + `grid-column`/`grid-area` cho ô lệch, thay vì bỏ cả lưới về absolute. |
 | **R-LAY-6** | MUST | **Không đặt `width`/`height` cứng cho khối chứa text sinh từ dữ liệu** (tên người chơi, tên vật phẩm, số lượng). Dùng `min-width` + padding, hoặc cho phép xuống dòng. Tên dài hơn design là chuyện thường ngày. |
 | **R-LAY-7** | SHOULD | Sau khi chuyển list sang grid/flex, **đo lại bằng `/ui-check --autofix`** — lệch so với `coords.json` thì sửa `gap`/`padding` của container, đừng quay về gắn toạ độ từng item. |
+| **R-LAY-8** | MUST | **Nền art đã bake vị trí KHÔNG đều ⇒ neo theo toạ độ design, nhưng sinh bằng SCSS list + `@for`, không gõ tay từng khối.** Đây là mức 2 của thang, dùng khi `R-LAY-1` không áp được. |
+
+## Mẫu vàng: `jx1m/2026-tinh-quang-chi-da`
+
+Campaign duy nhất tìm được làm đúng cả hai phía. Markup (`452_JX1M/.../promotion/index.html`) gói trọn một mốc trong một khối — đúng `R-LAY-3`:
+
+```html
+<div class="milestone-item pm__milestone" data-milestone="30">
+  <div class="milestone-item__pin"></div>
+  <a class="milestone-item__chest MS__hover" data-fancybox href="…"><img loading="lazy" alt="Mốc 30 lượt"/></a>
+  <a href="#" class="btn-cta milestone-item__claim pm__btn-claim" data-image="X1" aria-label="Nhận thưởng"></a>
+</div>
+```
+
+SCSS (`assets/Frame2/Frame2.scss:32`) là ca `R-LAY-8` điển hình — item pitch đều 191px, nhưng vòng/biển đã bake trong `bg-thuong-moc.png` ở khoảng cách lệch nhau (438, 629, 823, 1019… hiệu 191/194/196/192), nên rương và nút phải neo theo x tuyệt đối đo từ design:
+
+```scss
+$chest-design-x: 438px, 629px, 823px, 1019px, 1211px, 1403px, 1594px, 1779px;
+$chest-top:      128px, 129px, 129px, 128px, 129px, 128px, 130px, 128px;
+
+@for $i from 1 through 8 {
+  $item-left: 382px + 191px * ($i - 1);
+  &:nth-child(#{$i}) {
+    left: $item-left;
+    .milestone-item__chest { left: nth($chest-design-x, $i) - $frame2-left - $item-left; top: nth($chest-top, $i); }
+  }
+}
+```
+
+Thêm/bớt một mốc = sửa 3 danh sách, không phải 8 khối CSS. `layout-gate.mjs` đã kiểm: campaign này **không** bị bắt `R-LAY-1` — cổng phân biệt được loop với gắn cứng.
 
 ## Vì sao có luật này (đo thật 22/9/2026)
 
@@ -34,7 +64,7 @@ Quét toàn bộ `cdn-source/products`: **411 chỗ** có ≥4 item cùng gốc 
 - `mulucdia/2025-dau-si-thuc-tinh` — vòng quay 41 nhánh
 - `tanomg3q/2026-khai-xuan-binh-ngo` — 42 nhánh
 
-Không campaign nào trong repo hiện đạt chuẩn để làm mẫu vàng (điểm cao nhất 60/100; tỷ lệ flex+grid so với absolute tốt nhất vẫn là 70/101). **Chuẩn này là thứ phải dựng mới, không phải thứ đi chép lại từ campaign cũ.**
+Chấm 40 campaign sửa gần nhất theo tỷ lệ flex+grid/absolute + gap + scroll + đủ 3 trạng thái: điểm cao nhất chỉ 60/100, tỷ lệ tốt nhất vẫn là 70 flex+grid so với 101 absolute. **Không có campaign nào để chép nguyên** — `jx1m/2026-tinh-quang-chi-da` ở trên là mẫu đúng cho `R-LAY-3`/`R-LAY-8`, nhưng phần list đều thì vẫn phải dựng theo `R-LAY-1` thay vì chép nó.
 
 Lưu ý ca vòng quay: 41–42 nhánh absolute quanh tâm là **đúng** — chúng phân bố theo góc, không theo lưới. `R-LAY-1` không áp vào đó.
 

@@ -1,6 +1,6 @@
 # <file rules>	<cột "Chạm tới">	<cột "Đọc TRƯỚC khi sửa">
 # installer chỉ in dòng nào có file thật trong repo — bản public thiếu file thì dòng đó biến mất.
-rules/pm-contract.md	File có `pm__` (mọi repo)	`rules/pm-contract.md` — R-PM-1..6
+rules/pm-contract.md	File có `pm__` (mọi repo)	`rules/pm-contract.md` — R-PM-1..8. Landing promotion: vào bằng `gt-promotion-template/standard-html-templates/ai-template-kit/AI-GUIDE.md` (bộ quy chuẩn team), soát SINGLETON trước khi báo xong
 rules/cdn-source-standard.md	**`cdn-source`** (viết/sửa bất cứ gì)	`rules/cdn-source-standard.md` — R-CDN-1..14 (assets-flat vs legacy, config.js, px tuyệt đối, cấm `@media` tay) + **R-SPR-1..9** (sprite: `@include sprite()`, cấm gõ `background-position` tay) + `rules/pm-contract.md`
 tools/landing-parity.mjs	**Campaign/section MỚI hoặc clone-reskin trong cdn-source**	`node ~/VNG/agent-auto/tools/landing-parity.mjs <campaign>` trước khi báo xong — "landing cũ có mà mới thiếu" là danh sách phải xử (kèm `file:line`), không chờ user nhắc; 🔴 class `MS__`/`MJ__` lạ = sửa. Lệch vị trí: `/ui-check --autofix`
 rules/layout-standard.md	**Dựng list/danh sách bất kỳ** (điểm danh, mốc quà, ô quà, tab)	`rules/layout-standard.md` — R-LAY-1..8. KHÔNG cấm `absolute`; cấm gắn toạ độ TỪNG item của list đều. Cổng: `node tools/layout-gate.mjs <path>`

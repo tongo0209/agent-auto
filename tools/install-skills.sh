@@ -164,7 +164,7 @@ if [ ! -f "$CLAUDEMD" ]; then
   if [ "$CHECK_ONLY" = 1 ]; then bad "CLAUDE.md chưa có — cài xong sẽ tạo từ templates/CLAUDE.md"
   else mkdir -p "$CLAUDE_DIR"; render_claude_md > "$CLAUDEMD"; add "CLAUDE.md — tạo từ templates/CLAUDE.md"
   fi
-elif grep -q "## Rules có ID" "$CLAUDEMD" && grep -qF "$REPO/rules" "$CLAUDEMD"; then
+elif grep -q "## Rules có mã" "$CLAUDEMD" && grep -qF "$REPO/rules" "$CLAUDEMD"; then
   good "CLAUDE.md — đã có luật chung, trỏ đúng repo"
 else
   # KHÔNG đè: đây là file của người dùng, có thể đã có luật riêng.
@@ -260,7 +260,7 @@ say "1) Kết nối MCP (gõ /mcp): Atlassian (bắt buộc — /daily quét Jir
 say "   buglist sheet + design host Drive) · Microsoft 365 (dò SharePoint)."
 say "2) Sửa $REPO/config.json — 3 chỗ: 'cloudId' (hỏi Claude: \"cho tôi cloudId Jira\" — cần MCP"
 say "   bước 1), 'gitAuthor' (= git config user.email), 'repos' (đường dẫn tuyệt đối máy bạn)."
-if [ -f "$CLAUDEMD" ] && grep -q "## Rules có ID" "$CLAUDEMD"; then
+if [ -f "$CLAUDEMD" ] && grep -q "## Rules có mã" "$CLAUDEMD"; then
   say "3) Luật chung trong CLAUDE.md: đã có ✓"
 else
   say "3) Dán luật chung vào ~/.claude/CLAUDE.md: bash tools/install-skills.sh --print-claude-md"

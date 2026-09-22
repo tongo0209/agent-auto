@@ -2,7 +2,8 @@
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 const TAG_OR_TWIG_BRANCH = /<(\/?)([a-zA-Z][\w:-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>|{%-?\s*(if|elseif|else|endif)\b[\s\S]*?%}/g;
 const ATTR = /([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
-const RAW_TEXT = /(<(script|style)\b[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi;
+// Nội dung không thành phần tử DOM: <template> trơ, <noscript> là chữ khi trình duyệt bật JS.
+const RAW_TEXT = /(<(script|style|template|noscript)\b[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi;
 const COMMENTS = [/<!--[\s\S]*?-->/g, /{#[\s\S]*?#}/g];
 
 const blank = (text) => text.replace(/[^\n]/g, ' ');

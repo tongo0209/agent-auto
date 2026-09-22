@@ -10,6 +10,7 @@ const KIT = process.env.PM_KIT_DIR || join(homedir(), 'VNG/git-vng/gt-promotion-
 const L = 'luckydraw-gift-exchange';
 const P = 'payment';
 const ALIASES = [['popup_signIn', 'popup_login'], ['popup_nhanluot_signUp', 'popup_register']];
+const MILESTONE_VALUE = '100';
 
 if (!existsSync(join(KIT, 'gameplays'))) {
   console.log(`SKIP — không thấy ai-template-kit ở ${KIT}`);
@@ -31,7 +32,8 @@ function base(g) {
   let group = 0;
   return text.replace(/pm__group-N/g, () => `pm__group-${++group}`)
     .replaceAll('pm__option-N', 'pm__option-1')
-    .replaceAll('pm__remain-*', 'pm__remain-canhen');
+    .replaceAll('pm__remain-*', 'pm__remain-canhen')
+    .replaceAll('data-milestone=""', `data-milestone="${MILESTONE_VALUE}"`);
 }
 
 function once(text, from, to) {
@@ -67,9 +69,12 @@ function run(args, env = {}) {
 
 const gate = (g, text, name) => run([writeCase(text, name), '--gameplay', g, '--baseline', 'none']);
 const codes = (list) => list.map((f) => f.code);
-const describe = (r) => (r.json
-  ? `exit=${r.exit} 🔴[${codes(r.json.fails)}] 🟡[${codes(r.json.warns)}] nợ[${codes(r.json.preexisting ?? [])}]`
-  : `exit=${r.exit} stderr=${r.stderr.trim().split('\n')[0]}`);
+const describeOne = (json) => `🔴[${json.fails.map((f) => `${f.code} ${f.token}`)}] 🟡[${codes(json.warns)}] nợ[${codes(json.preexisting ?? [])}]`;
+const describe = (r) => {
+  if (!r.json) return `exit=${r.exit} stderr=${r.stderr.trim().split('\n')[0]}`;
+  const pages = [].concat(r.json);
+  return `exit=${r.exit} ${pages.map((page) => (pages.length > 1 ? `${page.file.split('/').pop()}: ` : '') + describeOne(page)).join(' | ')}`;
+};
 
 const red = (code) => (r) => Boolean(r.json) && codes(r.json.fails).includes(code);
 const noRed = (r) => Boolean(r.json) && r.json.fails.length === 0;
@@ -79,17 +84,25 @@ const redWithout = (code) => (r) => r.exit !== 2 && Boolean(r.json) && !codes(r.
 
 const SHARE_BUTTON = '<a class="pm__btn-share" title="Share ngay" href="javascript:;" onclick="feedToWall()">Share Facebook</a>';
 
-function baselineCase() {
+function baselineRun(committed, edited) {
   const repo = mkdtempSync(join(root, 'repo-'));
   const file = join(repo, 'index.html');
   const git = (...args) => execFileSync('git', ['-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { stdio: 'ignore' });
   git('init', '-q');
-  writeFileSync(file, once(base(L), '<a href="#" class="pm__menu-selectrole"></a>', '<a href="#" class="pm__menu-selectrole"></a>\n  <span class="pm__point">0</span>'));
+  writeFileSync(file, committed);
   git('add', 'index.html');
   git('commit', '-qm', 'fixture');
-  writeFileSync(file, once(readFileSync(file, 'utf8'), 'class="pm__login pm__anchor"', 'class="pm__loginn pm__anchor"'));
+  writeFileSync(file, edited);
   return run([file, '--gameplay', L, '--baseline', 'HEAD']);
 }
+
+function baselineCase() {
+  const withDebt = once(base(L), '<a href="#" class="pm__menu-selectrole"></a>', '<a href="#" class="pm__menu-selectrole"></a>\n  <span class="pm__point">0</span>');
+  return baselineRun(withDebt, once(withDebt, 'class="pm__login pm__anchor"', 'class="pm__loginn pm__anchor"'));
+}
+
+const BARE_MILESTONE = '<div class="list"><div class="pm__milestone" data-milestone="5"></div></div>';
+const withBareMilestones = (count) => once(base(L), '</body>', `${BARE_MILESTONE.repeat(count)}\n</body>`);
 
 function lockedByNoteCase() {
   const projects = join(root, 'projects');
@@ -101,17 +114,66 @@ function lockedByNoteCase() {
   return run([join(campaign, 'index.html'), '--baseline', 'none'], { PM_PROJECTS_DIR: projects });
 }
 
-function refCase() {
+function refCaseWith(refBody) {
   const ref = mkdtempSync(join(root, 'ref-'));
-  writeFileSync(join(ref, 'index.html'), '<body><a href="#" class="pm__btn-history"></a><div id="popup_history" class="pm__history-module"></div></body>');
+  writeFileSync(join(ref, 'index.html'), `<body>${refBody}</body>`);
   const file = writeCase('<body><div id="popup_history" class="pm__history-module"></div></body>');
   return run([file, '--gameplay', 'none', '--ref', ref, '--baseline', 'none']);
 }
+
+function refDistCase(targetBody) {
+  const ref = mkdtempSync(join(root, 'ref-'));
+  mkdirSync(join(ref, 'dist'));
+  mkdirSync(join(ref, 'assets', 'module'), { recursive: true });
+  writeFileSync(join(ref, 'dist', 'index.html'), '<body><div id="popup_login"><a class="pm__btn-login pm__email"></a></div><a class="pm__btn-history"></a></body>');
+  writeFileSync(join(ref, 'assets', 'module', 'popup_condition.html.twig'), '<div id="popup_condition" class="pm__condition-module"></div>');
+  return run([writeCase(`<body>${targetBody}</body>`), '--gameplay', 'none', '--ref', ref, '--baseline', 'none']);
+}
+
+const refCase = () => refCaseWith('<a href="#" class="pm__btn-history"></a><div id="popup_history" class="pm__history-module"></div>');
+
+function pageCase(g, pages) {
+  const campaign = mkdtempSync(join(root, 'page-'));
+  for (const [path, text] of Object.entries(pages)) {
+    mkdirSync(dirname(join(campaign, 'dist', path)), { recursive: true });
+    writeFileSync(join(campaign, 'dist', path), text);
+  }
+  return run(['--page', campaign, '--gameplay', g, '--baseline', 'none']);
+}
+
+const pageOf = (r, name) => r.json?.find((page) => page.file.endsWith(`/${name}`));
+const lacks = (r, code, token) => Boolean(r.json) && !r.json.fails.some((f) => f.code === code && f.token === token);
+const redOn = (code, token) => (r) => Boolean(r.json) && r.json.fails.some((f) => f.code === code && f.token === token);
+
+function between(text, from, to) {
+  const start = text.indexOf(from);
+  const end = text.indexOf(to, start);
+  if (start < 0 || end < 0) throw new Error(`fixture lệch MASTER — không thấy khối ${from} … ${to}`);
+  return text.slice(0, start) + text.slice(end);
+}
+
+// Trang H5 (webview trong game) đã đăng nhập sẵn: không nút/popup đăng nhập, không popup đăng ký.
+function withoutLogin(text) {
+  const noButtons = once(once(text, '<a href="#" class="pm__login pm__anchor"></a>', ''), '<a href="#" class="pm__logout pm__anchor"></a>', '');
+  return between(noButtons, '<!-- Module đăng nhập MTO -->', '<!-- Popup đổi/chọn role');
+}
+
+const withoutPopups = (text) => between(text, '<!-- ══════════ POPUP ══════════ -->', '<!-- Popup kết quả quay');
+// cdn-source ghép trang từ partial: index-vn.html.twig include libraryMainsite-t-popup (totalfootball, ddtank chengdu…).
+const popupsIncluded = (text) => once(withoutPopups(text), '<!-- Popup kết quả quay',
+  "{% include './libraryMainsite-t-popup/libraryMainsite-t-popup.html.twig' %}\n<!-- Popup kết quả quay");
+const withoutConditionAndHistory =(text) => between(between(text, '<!-- ═══════════ ② KHUNG', '<!-- Popup lịch sử -->'), '<!-- Popup lịch sử -->', '<!-- Popup thông báo -->');
+const H5_FLAG = '<script>var varMS = { H5: true, onlyPC: false };</script>\n</body>';
+const noRut = (text) => text.replace(/ class="pm__rut" data-value="\d+"/g, ' class="spin"').replace('class="pm__point"', 'class="counter"');
+const noClaim = (text) => text.replaceAll('class="pm__btn-claim"', 'class="gift"');
 
 function popupConditionPartial() {
   const text = base(L);
   return text.slice(text.indexOf('<div id="popup_condition"'), text.indexOf('<!-- Popup lịch sử -->'));
 }
+
+const POINT = '<div class="pm__point">0</div>';
+const PARTIAL_WITH_BODY_IN_SCRIPT = '<div id="popup_history" class="pm__history-module"><div class="pm__form-history"></div></div>\n<script>\n  // tên quà theo class của <body class="vn">\n</script>';
 
 const TWIG_PARTIAL = '{% if a %}<form id="sso-login-form"><input type="text" name="u"></form>{% else %}<form id="sso-login-form"><input type="text" name="u"></form>{% endif %}';
 
@@ -154,7 +216,7 @@ const CASES = [
   ]],
   ['9 input lệch name/id/type → PG-INPUT', () => [
     ['name', gate(L, once(base(L), 'name="Fullname"', 'name="fullname"')), red('PG-INPUT')],
-    ['id', gate(L, once(base(L), 'id="input-phone"', 'id="phone-number"')), red('PG-INPUT')],
+    ['id', gate(L, once(base(L), 'name="u" id="u"', 'name="u" id="user"')), red('PG-INPUT')],
     ['type', gate(L, once(base(L), 'type="tel" name="Phone"', 'type="text" name="Phone"')), red('PG-INPUT')],
   ]],
   ['10 L: pm__rut mất data-value → PG-PAIR', () => [
@@ -221,6 +283,123 @@ const CASES = [
   ]],
   ['30 P: pm__btn-share ra ngoài form id → PG-NEST 🔴', () => [
     ['P', gate(P, once(once(base(P), SHARE_BUTTON, ''), '<form id="pm__invite-form">', `${SHARE_BUTTON}\n        <form id="pm__invite-form">`)), red('PG-NEST')],
+  ]],
+  ['31 --page: trang nằm trong dist/<thư mục con> vẫn được soi', () => [
+    ['main/', pageCase(L, { 'main/index.html': base(L) }), (r) => r.exit === 0 && r.json?.length === 1 && r.json[0].fails.length === 0],
+  ]],
+  ['32 --page: hook bắt buộc ở trang khác cùng bộ → không PG-REQ; bản ngôn ngữ thiếu → PG-REQ', () => [
+    ['2 trang', pageCase(L, { 'index.html': once(base(L), 'class="pm__point"', 'class="counter"'), 'quayso.html': '<body><span class="pm__point">0</span></body>' }),
+      (r) => r.json?.length === 2 && r.json.every((page) => lacks({ json: page }, 'PG-REQ', 'pm__point'))],
+    ['index-en', pageCase(L, { 'index.html': base(L), 'index-en.html': once(base(L), 'class="pm__point"', 'class="counter"') }),
+      (r) => lacks({ json: pageOf(r, 'index.html') }, 'PG-REQ', 'pm__point') && redOn('PG-REQ', 'pm__point')({ json: pageOf(r, 'index-en.html') })],
+  ]],
+  ['33 L: chỉ quay hoặc chỉ đổi quà (production) → không PG-REQ; không cả hai → PG-REQ', () => [
+    ['chỉ quay', gate(L, noClaim(base(L))), noRed],
+    ['chỉ đổi', gate(L, noRut(base(L))), noRed],
+    ['không cả hai', gate(L, noClaim(noRut(base(L)))), redOn('PG-REQ', 'pm__rut / pm__btn-claim')],
+  ]],
+  ['34 trang H5 không nút/popup đăng nhập → không PG-REQ; trang web thì PG-REQ', () => [
+    ['H5', gate(L, once(withoutLogin(base(L)), '</body>', H5_FLAG)), noRed],
+    ['web', gate(L, withoutLogin(base(L))), redOn('PG-REQ', 'pm__login')],
+  ]],
+  ['34b trang H5 Lucky không popup điều kiện/lịch sử (lượt từ trong game) → không PG-REQ; trang web thì PG-REQ', () => [
+    ['H5', gate(L, once(withoutConditionAndHistory(base(L)), '</body>', H5_FLAG)), noRed],
+    ['web', gate(L, withoutConditionAndHistory(base(L))), (r) => redOn('PG-REQ', 'popup_condition / popupCondition')(r) && redOn('PG-REQ', 'popup_history')(r)],
+  ]],
+  ['35 bỏ khối mto-login-form (production) → không 🔴; pm__btn-login ra ngoài pm__login-module → PG-NEST', () => [
+    ['bỏ wrapper', gate(L, once(base(L), '<div id="mto-login-form">', '<div>')), noRed],
+    ['ra ngoài', gate(L, once(once(base(L), '<div id="mto-login-form">', '<div>'), '<a href="#" class="pm__menu-selectrole"></a>',
+      '<a href="#" class="pm__menu-selectrole"></a>\n  <a href="#" class="pm__btn-login pm__zing"></a>')), redOn('PG-NEST', 'pm__btn-login')],
+  ]],
+  ['36 pm__login/pm__logout không kèm pm__anchor (production) → không 🔴; nút quiz vẫn phải kèm', () => [
+    ['L', gate(L, once(once(once(base(L), 'class="pm__login pm__anchor"', 'class="pm__login"'), 'class="pm__logout pm__anchor"', 'class="pm__logout"'),
+      'class="pm__anchor pm__text_get_point"', 'class="pm__text_get_point"')),
+    (r) => lacks(r, 'PG-REQ', 'pm__anchor') && lacks(r, 'PG-PAIR', 'pm__login') && lacks(r, 'PG-PAIR', 'pm__logout') && redOn('PG-PAIR', 'pm__text_get_point')(r)],
+  ]],
+  ['37 pm__login ×2 (header + menu mobile, production) → không PG-ONCE', () => [
+    ['L', gate(L, once(base(L), '<a href="#" class="pm__login pm__anchor"></a>', '<a href="#" class="pm__login pm__anchor"></a><a href="#" class="pm__login pm__anchor"></a>')), noRed],
+    ['P', gate(P, once(base(P), '<a href="#" class="pm__logout">Đăng xuất</a>', '<a href="#" class="pm__logout">Đăng xuất</a><a href="#" class="pm__logout">Đăng xuất</a>')), noRed],
+  ]],
+  ['38 pm__menu-invite trong popup điều kiện (production) → không PG-NEST', () => [
+    ['L', gate(L, once(base(L), '<div class="pm__condition_list_popup_title"></div>', '<div class="pm__condition_list_popup_title"></div><a href="#" class="pm__menu-invite"></a>')), noRed],
+  ]],
+  ['39 popup điều kiện nhận cả popup_condition lẫn popupCondition ở cả 2 gameplay', () => [
+    ['P popup_condition', gate(P, once(base(P), 'id="popupCondition"', 'id="popup_condition"')), noRed],
+    ['L popupCondition', gate(L, once(base(L), 'id="popup_condition"', 'id="popupCondition"')), noRed],
+    ['P không có cả hai', gate(P, once(base(P), 'id="popupCondition" ', '')), redOn('PG-REQ', 'popupCondition / popup_condition')],
+  ]],
+  ['40 P: pm__condition-form (production) → không PG-GAME; captcha-image vẫn PG-GAME', () => [
+    ['condition-form', gate(P, once(base(P), '<div class="pm__title-form">LỊCH SỬ NHẬN</div>', '<div class="pm__title-form">LỊCH SỬ NHẬN</div><form id="pm__condition-form"></form>')), noRed],
+    ['captcha', gate(P, once(base(P), '<div class="pm__title-form">LỊCH SỬ NHẬN</div>', '<div class="pm__title-form">LỊCH SỬ NHẬN</div><img id="captcha-image" src="#">')), redOn('PG-GAME', 'captcha-image')],
+  ]],
+  ['41 id popup đánh số (popup_reward2) → không PG-TYPO; popup_resgister vẫn PG-TYPO', () => [
+    ['popup_reward2', gate(L, once(base(L), '<!-- Popup xác nhận đổi quà (nếu cần) -->', '<div id="popup_reward2"></div>')), noRed],
+    ['popup_resgister', gate(L, once(base(L), 'id="popup_register"', 'id="popup_resgister"')), red('PG-TYPO')],
+  ]],
+  ['42 ô Phone không mang id="input-phone" (production 0 file) → không PG-INPUT', () => [
+    ['L', gate(L, once(base(L), '<input id="input-phone" type="tel" name="Phone">', '<input type="tel" name="Phone">')), noRed],
+  ]],
+  ['43 [1/popup] không gộp phần tử ngoài popup; pm__pagination trong pm__*-module (production) → không 🔴', () => [
+    ['L', gate(L, once(base(L), '</body>', `${'<div class="pm__vote-module"><ul class="pm__pagination"></ul></div>'.repeat(2)}\n</body>`)), noRed],
+  ]],
+  ['44 pm__pagination kèm pm__rankchar-pagination ngoài popup (production) → không PG-NEST', () => [
+    ['L', gate(L, once(base(L), '</body>', '<ul class="pm__pagination pm__rankchar-pagination"></ul>\n</body>')), noRed],
+  ]],
+  ['45 pm__milestone trong pm__total*-milestone khác (production) → không PG-NEST; ngoài mọi wrapper → PG-NEST', () => [
+    ['byguild', gate(L, once(base(L), '</body>', '<div class="pm__totalmodulebyguild-milestone"><div class="pm__milestone" data-milestone="5"></div></div>\n</body>')), noRed],
+    ['trần', gate(L, once(base(L), '</body>', '<div class="list"><div class="pm__milestone" data-milestone="5"></div></div>\n</body>')), redOn('PG-NEST', 'pm__milestone')],
+  ]],
+  ['46 id hook trùng tên class ở phần tử khác (form-profile) → không PG-ONCE; trùng id → PG-ONCE', () => [
+    ['class', gate(L, once(base(L), '<div class="pm__role">', '<div class="pm__role form-profile">')), noRed],
+    ['id', gate(L, once(base(L), '<div class="pm__role">', '<div class="pm__role" id="form-profile">')), redOn('PG-ONCE', 'form-profile')],
+  ]],
+  ['47 MTO-login-form (biến thể của hook production đã bỏ) → không PG-TYPO', () => [
+    ['L', gate(L, once(base(L), 'id="mto-login-form"', 'id="MTO-login-form"')), noRed],
+  ]],
+  ['48 --ref: popup riêng của ref (popup_chucmung) không phải hợp đồng → không PG-REF; popup platform vẫn bắt', () => [
+    ['riêng', refCaseWith('<div id="popup_chucmung"></div><div id="popup_history" class="pm__history-module"></div>'), (r) => lacks(r, 'PG-REF', 'popup_chucmung')],
+    ['platform', refCaseWith('<div id="popup_inform"></div><div id="popup_history" class="pm__history-module"></div>'), redOn('PG-REF', 'popup_inform')],
+  ]],
+  ['50 provider pm__playnow (production) cạnh pm__btn-login → không 🔴', () => [
+    ['L', gate(L, once(base(L), 'class="pm__btn-login pm__facebook"', 'class="pm__btn-login pm__playnow"')), noRed],
+  ]],
+  ['51 --ref có dist/: hook lấy từ trang ref đã build, không từ popup thư viện chưa include', () => [
+    ['web', refDistCase('<a class="pm__btn-history"></a>'), (r) => lacks(r, 'PG-REF', 'pm__condition-module') && redOn('PG-REF', 'pm__email')(r)],
+  ]],
+  ['52 --ref: trang H5 không bị đòi hook đăng nhập của ref (production H5 0/9)', () => [
+    ['H5', refDistCase(`<a class="pm__btn-history"></a>${H5_FLAG}`), noRed],
+  ]],
+  ['53 L: pm__title-form thẳng trong pm__condition-module (production, như kit Payment) → không PG-NEST', () => [
+    ['L', gate(L, once(once(base(L), 'class="pm__title-form"', 'class="title"'), '<div class="pm__condition_list_popup_title"></div>',
+      '<div class="pm__condition_list_popup_title"></div><div class="pm__title-form"></div>')), noRed],
+  ]],
+  ['49 pm__charactername ×2 (PC + MB, production) → không PG-ONCE; pm__point ×2 vẫn PG-ONCE', () => [
+    ['charactername', gate(L, once(base(L), '<a href="#" class="pm__menu-selectrole"></a>', '<a href="#" class="pm__menu-selectrole"></a><span class="MS__pc"><span class="pm__charactername"></span></span><span class="MS__mb"><span class="pm__charactername"></span></span>')),
+      (r) => lacks(r, 'PG-ONCE', 'pm__charactername')],
+    ['point', gate(L, once(base(L), '<div class="pm__point">0</div>', '<div class="pm__point">0</div><span class="pm__point">0</span>')), redOn('PG-ONCE', 'pm__point')],
+  ]],
+  ['54 hook chỉ nằm trong <template>/<noscript> (không vào DOM) → PG-REQ', () => ['template', 'noscript'].map((tag) => [tag,
+    gate(L, once(base(L), POINT, `<${tag}>${POINT}</${tag}>`)), redOn('PG-REQ', 'pm__point')])],
+  ['55 partial có chữ <body> trong comment JS (cfl configProduction) → không PG-REQ', () => [
+    ['partial', gate(L, PARTIAL_WITH_BODY_IN_SCRIPT, 'config.html.twig'), redWithout('PG-REQ')],
+  ]],
+  ['56 baseline: chép thêm 1 khối đang sai → 🔴; sửa bớt 1 khối → vẫn là nợ', () => [
+    ['thêm', baselineRun(withBareMilestones(1), withBareMilestones(2)), redOn('PG-NEST', 'pm__milestone')],
+    ['bớt', baselineRun(withBareMilestones(2), withBareMilestones(1)), (r) => noRed(r) && codes(r.json.preexisting).includes('PG-NEST')],
+  ]],
+  ['57 data-value / data-milestone / data-rate rỗng → PG-PAIR; data-msg_invalid rỗng (MASTER) → không', () => [
+    ['data-value', gate(L, once(base(L), 'data-value="10"', 'data-value=""')), redOn('PG-PAIR', 'pm__rut')],
+    ['data-milestone như MASTER', gate(L, base(L).replaceAll(`data-milestone="${MILESTONE_VALUE}"`, 'data-milestone=""')), redOn('PG-PAIR', 'pm__milestone')],
+    ['data-rate', gate(P, once(base(P), 'data-rate="1"', 'data-rate=""')), redOn('PG-PAIR', 'pm__totalCash')],
+  ]],
+  ['58 Twig if/else: nhánh else có 2 bản singleton → PG-ONCE (lấy max các nhánh)', () => [
+    ['L', gate(L, once(base(L), POINT, `{% if a %}${POINT}{% else %}${POINT}${POINT}{% endif %}`), 'index.twig'), redOn('PG-ONCE', 'pm__point')],
+  ]],
+  ['59 trang Twig có <body> + {% include %} popup (19 campaign cdn-source) → không PG-REQ; không include mà thiếu popup → PG-REQ', () => [
+    ['include', gate(L, popupsIncluded(base(L)), 'index-vn.html.twig'), noRed],
+    ['không include', gate(L, withoutPopups(base(L)), 'index-vn.html.twig'), redOn('PG-REQ', 'popup_login')],
+    ['include + popup mất class module (bomber/2026-worldcup)', gate(L, once(once(base(L), 'id="popup_register" class="pm__module pm__profileinfo-module"', 'id="popup_register"'),
+      '</body>', "{% include './main/html/configProduction.html.twig' %}\n</body>"), 'index.html.twig'), redOn('PG-NEST', 'pm__profile-form')],
   ]],
 ];
 

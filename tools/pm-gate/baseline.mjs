@@ -13,8 +13,10 @@ export function baselineText(file, ref) {
   return shown.status === 0 ? shown.stdout : null;
 }
 
+// Chép thêm 1 khối đang sai = lỗi mới dù cùng mã/token/câu: so cả số phần tử dính lỗi.
 export function splitNew(current, base) {
   const key = (f) => `${f.code}|${f.token}|${f.msg}`;
-  const old = new Set(base.map(key));
-  return { fresh: current.filter((f) => !old.has(key(f))), preexisting: current.filter((f) => old.has(key(f))) };
+  const oldCount = new Map(base.map((f) => [key(f), f.lines.length]));
+  const isOld = (f) => oldCount.has(key(f)) && f.lines.length <= oldCount.get(key(f));
+  return { fresh: current.filter((f) => !isOld(f)), preexisting: current.filter(isOld) };
 }

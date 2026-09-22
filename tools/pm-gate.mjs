@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Cổng hợp đồng pm__ (R-PM-7/8) theo ai-template-kit — luật từng mã PG-* ở tools/pm-gate/checks.mjs.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { scanHtml } from './pm-gate/scan.mjs';
+import { scanHtml, tokensOf } from './pm-gate/scan.mjs';
 import { loadContract, kitFileFor, GAMEPLAYS } from './pm-gate/contract.mjs';
 import { runChecks, WARN_CODES } from './pm-gate/checks.mjs';
 import { baselineText, splitNew } from './pm-gate/baseline.mjs';
@@ -14,6 +14,11 @@ const USAGE = 'Dùng: node tools/pm-gate.mjs <file> [--page <campaignDir>] [--ga
 const KIT_DIR = process.env.PM_KIT_DIR || join(homedir(), 'VNG/git-vng/gt-promotion-template/standard-html-templates/ai-template-kit');
 const OVERRIDES = fileURLToPath(new URL('../rules/pm-kit-overrides.tsv', import.meta.url));
 const VALUE_FLAGS = ['--page', '--gameplay', '--type', '--ref', '--baseline'];
+// index-en.html là bản tiếng Anh của index.html: soi cùng bộ với các trang -en khác, không mượn hook của bản gốc.
+const LANG_SUFFIX = /-(en|vn|vi|th|id|cn|tw|kr|ko|jp|ja|ph|my|ms|sg|es|pt|br|ru|tr|ar|fr|de)$/i;
+const IS_H5 = /\bH5\s*:\s*true\b/;
+// Trang Twig ghép partial: hook nằm ở file được include — PG-REQ/PG-REF để --page trên dist/ soát.
+const TWIG_COMPOSED = /{%-?\s*(include|embed|extends)\b|{{\s*include\(/;
 
 function usageError(msg) {
   console.error(`pm-gate lỗi dùng: ${msg}\n${USAGE}`);
@@ -42,23 +47,31 @@ function targetsOf(opts) {
   }
   const dist = join(opts.page, 'dist');
   if (!existsSync(dist)) usageError(`${dist} chưa có — build trước`);
-  const pages = readdirSync(dist).filter((n) => n.endsWith('.html')).map((n) => join(dist, n))
+  const pages = readdirSync(dist, { recursive: true }).filter((n) => n.endsWith('.html')).map((n) => join(dist, n))
     .filter((f) => readFileSync(f, 'utf8').includes('pm__'));
   if (!pages.length) usageError(`${dist} không có trang .html nào chứa pm__ — build trước`);
   return pages;
 }
 
-function gateFile(file, contract, lock, opts) {
+const pageSet = (file) => `${dirname(file)}|${basename(file, '.html').match(LANG_SUFFIX)?.[1].toLowerCase() ?? ''}`;
+
+function gateFile(file, contract, lock, opts, elsewhere) {
   const text = readFileSync(file, 'utf8');
   const mode = opts.page ? 'page' : 'file';
-  const fullDocument = mode === 'page' || /<body[\s>]/i.test(text);
-  const findings = runChecks(scanHtml(text), contract, { fullDocument });
+  const hasBody = mode === 'page' || scanHtml(text).elements.some((el) => el.tag === 'body');
+  const fullDocument = hasBody && (mode === 'page' || !TWIG_COMPOSED.test(text));
+  const check = (html) => runChecks(scanHtml(html), contract, { fullDocument, hasBody, h5: IS_H5.test(html), elsewhere });
+  const findings = check(text);
   const base = opts.baseline === 'none' ? null : baselineText(file, opts.baseline || 'HEAD');
   const blocking = findings.filter((f) => !WARN_CODES.has(f.code));
-  const { fresh, preexisting } = base === null
-    ? { fresh: blocking, preexisting: [] }
-    : splitNew(blocking, runChecks(scanHtml(base), contract, { fullDocument }));
+  const { fresh, preexisting } = base === null ? { fresh: blocking, preexisting: [] } : splitNew(blocking, check(base));
   return { file, ...lock, mode, fails: fresh, warns: findings.filter((f) => WARN_CODES.has(f.code)), preexisting };
+}
+
+// Trang khác cùng bộ (cùng thư mục, cùng ngôn ngữ) — landing nhiều trang chia hook cho nhau.
+function siblingTokens(targets) {
+  const tokens = new Map(targets.map((f) => [f, scanHtml(readFileSync(f, 'utf8')).elements.flatMap(tokensOf)]));
+  return (file) => targets.filter((f) => f !== file && pageSet(f) === pageSet(file)).flatMap((f) => tokens.get(f));
 }
 
 function unlockedResult(file, lock, opts) {
@@ -89,7 +102,8 @@ if (lock.gameplay && !GAMEPLAYS.includes(lock.gameplay)) usageError(`gameplay "$
 if (lock.gameplay && !existsSync(kitFileFor(KIT_DIR, lock.gameplay))) usageError(`không thấy ${kitFileFor(KIT_DIR, lock.gameplay)} — kiểm PM_KIT_DIR hoặc pull gt-promotion-template`);
 
 const contract = lock.gameplay && loadContract(lock.gameplay, { kitDir: KIT_DIR, overridesPath: OVERRIDES, refDir: lock.ref });
-const results = targets.map((file) => (contract ? gateFile(file, contract, lock, opts) : unlockedResult(file, lock, opts)));
+const elsewhereOf = opts.page ? siblingTokens(targets) : () => [];
+const results = targets.map((file) => (contract ? gateFile(file, contract, lock, opts, elsewhereOf(file)) : unlockedResult(file, lock, opts)));
 
 if (opts.json) console.log(JSON.stringify(opts.page ? results : results[0], null, 2));
 else results.forEach(printText);

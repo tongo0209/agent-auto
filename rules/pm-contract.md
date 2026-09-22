@@ -43,13 +43,13 @@ Báo lỗi thì trích mã gate kèm luật gốc (`PG-CLAIM → R-PM-3 MUST`). 
 |---|---|---|---|
 | `PG-GAME` | 🔴 | chưa khoá gameplay; có hook độc quyền của gameplay kia (trộn) | R-PM-7, R-PM-11 |
 | `PG-CLAIM` | 🔴 | `-claim`/`_claim` sai gameplay, gồm ngoại lệ `pm__popup-confirm` của Payment | R-PM-3 |
-| `PG-REQ` | 🔴 | thiếu hook bắt buộc ✅ (🔸 khi khối chứa nó có mặt), gồm popup id + class module — chỉ chạy trên trang đủ (`<body` hoặc `--page`) | R-PM-1 |
-| `PG-ONCE` | 🔴 | SINGLETON > 1 toàn trang; `[1/popup]` > 1 trong cùng popup. Twig tính theo nhánh `{% if %}`, không cộng các nhánh | R-PM-8 |
+| `PG-REQ` | 🔴 | thiếu hook bắt buộc ✅ (🔸 khi khối chứa nó có mặt), gồm popup id + class module — chỉ chạy trên trang đủ (`<body` hoặc `--page`); trang Twig có `<body>` mà ghép `{% include/embed/extends %}` để `--page` trên `dist/` soát. Hook nằm trong `<template>`/`<noscript>` không tính (không vào DOM) | R-PM-1 |
+| `PG-ONCE` | 🔴 | SINGLETON > 1 toàn trang; `[1/popup]` > 1 trong cùng popup. Twig tính theo nhánh `{% if %}`: lấy nhánh nhiều nhất, không cộng các nhánh | R-PM-8 |
 | `PG-NEST` | 🔴 | lồng sai (kể cả container là form theo `id`); hook "ngoài popup" nằm trong popup | R-PM-1 |
 | `PG-OPEN` | 🔴 | class module popup không ở thẻ mở của phần tử mang id popup (AI-RULES §3.1) | R-PM-8 |
 | `PG-FORM` | 🔴 | form dò theo `id` bị đổi sang class / đổi id (§3.3) | R-PM-8 |
 | `PG-INPUT` | 🔴 | input lệch `name`/`type`/`id`/`for` so với MASTER | R-PM-2 |
-| `PG-PAIR` | 🔴 | thiếu thuộc tính/class đi cùng (`data-value`, `data-milestone`, `data-rate`, class provider, `pm__ajax`…) | R-PM-1 |
+| `PG-PAIR` | 🔴 | thiếu thuộc tính/class đi cùng (`data-value`, `data-milestone`, `data-rate`, class provider, `pm__ajax`…); `data-value`/`data-milestone`/`data-rate` để rỗng như MASTER cũng tính là thiếu | R-PM-1 |
 | `PG-DONT` | 🔴 | vi phạm bảng DON'T của AI-RULES §5 (`pm__btn-rank`, `pm__group-N` để nguyên, sửa `sumbit`, `pm__module` trên `pm__inform`) | R-PM-7 |
 | `PG-TYPO` | 🔴 | hook gần trùng hook đã biết (lệch 1 ký tự, `-`↔`_`, hoa/thường) — nút chết | R-PM-1 |
 | `PG-ANY` | 🔴 | còn `<any>` (đếm theo phần tử) | R-PM-4 |

@@ -80,7 +80,7 @@ Phân giải gameplay (theo thứ tự): cờ `--gameplay` → file dự án c�
 Nguồn hợp đồng:
 - **Cây hook của MASTER** gameplay đã khoá: mỗi hook (`pm__*`, id đặc biệt, `data-*`) + chuỗi tổ tiên là hook + thuộc tính đi kèm trên cùng phần tử + input (`name`/`type`/`id`/`for`).
 - **AI-RULES**: cột bắt buộc (✅, 🔸), SINGLETON (kể cả `pm__text_*` wildcard), `[1/popup]`, `[≥2]`, "phải nằm trong"/"ngoài popup", bảng DON'T. Dòng nhiều token (popup id + class) phải được hiểu, không bỏ qua.
-- **`rules/pm-kit-overrides.tsv`** (production thắng kit): cột `gameplay | kit | production | kind(alias|drop|fix) | evidence | reported`. Tối thiểu: `popup_signIn→popup_login`, `popup_nhanluot_signUp→popup_register`, `popupCondition` giữ (payment, 21 campaign), `popup_noti` (kit lỗi), `pm__module` thừa ở payment popup-condition.
+- **`rules/pm-kit-overrides.tsv`** (production thắng kit): cột `gameplay | kit | production | kind(alias|drop|fix) | evidence | reported`. Tối thiểu: `popup_signIn→popup_login`, `popup_nhanluot_signUp→popup_register`, `popupCondition`/`popup_condition` nhận cả hai ở cả 2 gameplay (21 campaign cdn dùng `popupCondition` đều KHÔNG phải payment; payment + bàn giao dùng `popup_condition`), `popup_noti` (kit lỗi), `pm__module` thừa ở payment popup-condition.
 - **Ngoài kit (`gameplay: none`)**: 5 luật bất biến + popup dùng chung (`components/common/popups`, id qua override) + hook của `--ref` (tái dùng `tools/landing-parity.mjs` ở chế độ hook, hoặc hàm dùng chung tách từ nó) — hook `pm__`/id popup có ở ref mà file thiếu = 🔴.
 
 Luật chặn (🔴) — mỗi luật một mã để trích:

@@ -13,6 +13,8 @@ const PAYMENT_CONFIRM = 'pm__popup-confirm';
 const MIN_TYPO_LENGTH = 6;
 // Chỉ id ghép (sso-login-form) mới soi gõ nhầm; id 1 từ (Email) để PG-INPUT giữ.
 const COMPOUND_ID = /[-_]/;
+// popup_reward2 / popup_reward_2: popup thứ 2 cùng loại (14 campaign production), không phải gõ nhầm popup_reward.
+const NUMBERED = /^(.+?)[-_]?\d+$/;
 
 function elementsWith(els, token) {
   const match = matcherFor(token);
@@ -23,8 +25,13 @@ function popupOf(els, index, openers) {
   return [index, ...ancestorsOf(els, index)].find((i) => POPUP_ID.test(els[i].id) || els[i].classes.some((c) => openers.has(c))) ?? -1;
 }
 
-export function placementViolations(els, token, placement, openers) {
-  const found = elementsWith(els, token);
+// Hook là id (form-profile) chỉ tính phần tử mang id đó — class trùng tên là CSS riêng, JS dò #id.
+function carriersOf(els, token, idHooks) {
+  return idHooks.has(token) ? els.flatMap((el, i) => (el.id === token ? [i] : [])) : elementsWith(els, token);
+}
+
+export function placementViolations(els, token, placement, openers, idHooks = new Set()) {
+  const found = carriersOf(els, token, idHooks);
   const carriesContainer = (i) => placement.containers.some((c) => tokensOf(els[i]).some(matcherFor(c)));
   if (placement.type === 'outside-popup') return found.filter((i) => popupOf(els, i, openers) >= 0);
   if (placement.type === 'inside') return found.filter((i) => ![i, ...ancestorsOf(els, i)].some(carriesContainer));
@@ -32,9 +39,11 @@ export function placementViolations(els, token, placement, openers) {
   return [];
 }
 
-export function runChecks(scan, contract, { fullDocument }) {
+// elsewhere = token của các trang cùng bộ (--page): hook bắt buộc chỉ cần có ở một trang.
+// hasBody = file là gốc cây DOM (tổ tiên mọi hook ở đây); fullDocument = thêm cả mọi hook của trang ở đây.
+export function runChecks(scan, contract, { fullDocument, hasBody, h5 = false, elsewhere = [] }) {
   const findings = [];
-  const ctx = { els: scan.elements, anyCount: scan.anyCount, contract, fullDocument, explained: new Set() };
+  const ctx = { els: scan.elements, anyCount: scan.anyCount, contract, fullDocument, hasBody, h5, elsewhere, explained: new Set() };
   ctx.add = (code, token, msg, indexes = []) => findings.push({ code, msg, token, lines: indexes.map((i) => scan.elements[i].line) });
   for (const check of CHECKS) check(ctx);
   return findings;
@@ -46,19 +55,23 @@ function collect(els, pick) {
   return byToken;
 }
 
-// 2 phần tử ở 2 nhánh khác nhau của cùng một {% if %} không bao giờ cùng render.
-function canRenderTogether(a, b) {
-  const arms = new Map(a.split('/').filter(Boolean).map((p) => p.split(':')));
-  return b.split('/').filter(Boolean).every((p) => {
-    const [id, arm] = p.split(':');
-    return !arms.has(id) || arms.get(id) === arm;
-  });
-}
-
-function maxRenderedTogether(els, indexes) {
-  const kept = [];
-  for (const i of indexes) if (kept.every((k) => canRenderTogether(els[k].branch, els[i].branch))) kept.push(i);
-  return kept.length;
+// Mỗi {% if %} chỉ render 1 nhánh: lấy nhánh nhiều phần tử nhất, cộng các khối if đứng cạnh nhau.
+function maxRenderedTogether(els, indexes, depth = 0) {
+  let count = 0;
+  const armsByIf = new Map();
+  for (const i of indexes) {
+    const step = els[i].branch.split('/').filter(Boolean)[depth];
+    if (!step) {
+      count++;
+      continue;
+    }
+    const [ifId, arm] = step.split(':');
+    const arms = armsByIf.get(ifId) || new Map();
+    arms.set(arm, [...(arms.get(arm) || []), i]);
+    armsByIf.set(ifId, arms);
+  }
+  for (const arms of armsByIf.values()) count += Math.max(...[...arms.values()].map((inArm) => maxRenderedTogether(els, inArm, depth + 1)));
+  return count;
 }
 
 function oneEditApart(a, b) {
@@ -139,7 +152,8 @@ function checkNames({ els, contract, add, explained }) {
   ]);
   for (const [token, found] of candidates) {
     if (contract.known.has(token) || explained.has(token)) continue;
-    const near = [...contract.known].find((k) => looselyEqual(token, k));
+    const numberedPopup = POPUP_ID.test(token) && contract.known.has(token.match(NUMBERED)?.[1]);
+    const near = !numberedPopup && [...contract.known].find((k) => !contract.retired.has(k) && looselyEqual(token, k));
     if (near) {
       add('PG-TYPO', token, `\`${token}\` gần trùng \`${near}\` — lệch 1 ký tự / gạch / hoa-thường là nút chết`, found);
       explained.add(near);
@@ -152,14 +166,13 @@ function checkNames({ els, contract, add, explained }) {
   }
 }
 
-function checkRequired({ els, contract, fullDocument, add, explained }) {
+function checkRequired({ els, contract, fullDocument, h5, elsewhere, add, explained }) {
   if (!fullDocument) return;
-  const present = (t) => explained.has(t) || elementsWith(els, t).length > 0;
-  for (const row of contract.catalog.filter((r) => r.required === 'yes')) {
-    const tokens = row.tokens.filter((t) => t !== MODULE_MARKER);
-    const anyOfList = row.kind !== 'mixed' && tokens.length > 1;
-    if (anyOfList && !tokens.some(present)) add('PG-REQ', tokens.join(' / '), `thiếu hook bắt buộc — cần ít nhất 1 trong \`${tokens.join('` `')}\``);
-    if (!anyOfList) tokens.filter((t) => !present(t)).forEach((t) => add('PG-REQ', t, `thiếu hook bắt buộc \`${t}\``));
+  const present = (t) => explained.has(t) || elementsWith(els, t).length > 0 || elsewhere.some(matcherFor(t));
+  for (const { tokens, when, webOnly } of contract.required) {
+    if ((webOnly && h5) || (when && !present(when)) || tokens.some(present)) continue;
+    const msg = tokens.length > 1 ? `thiếu hook bắt buộc — cần ít nhất 1 trong \`${tokens.join('` `')}\`` : `thiếu hook bắt buộc \`${tokens[0]}\``;
+    add('PG-REQ', tokens.join(' / '), msg);
   }
 }
 
@@ -171,12 +184,13 @@ function checkOnce({ els, contract, add }) {
     els.flatMap((el) => el.classes).filter((c) => match(c) && !listedElsewhere(c)).forEach((c) => singletons.add(c));
   }
   for (const token of singletons) {
-    const found = elementsWith(els, token);
+    const found = carriersOf(els, token, contract.idHooks);
     const count = maxRenderedTogether(els, found);
     if (count > 1) add('PG-ONCE', token, `\`${token}\` là SINGLETON nhưng có ${count} phần tử`, found);
   }
   for (const token of contract.perPopup) {
     const byPopup = collect(els, (el, i) => (el.classes.includes(token) ? [popupOf(els, i, contract.openers)] : []));
+    byPopup.delete(-1); // -1 = ngoài mọi popup: [1/popup] không áp
     for (const found of byPopup.values()) {
       const count = maxRenderedTogether(els, found);
       if (count > 1) add('PG-ONCE', token, `\`${token}\` chỉ 1 lần mỗi popup — có ${count} trong cùng popup`, found);
@@ -184,13 +198,13 @@ function checkOnce({ els, contract, add }) {
   }
 }
 
-function checkNesting({ els, contract, fullDocument, add, explained }) {
+function checkNesting({ els, contract, hasBody, add, explained }) {
   const where = { 'outside-popup': () => 'phải nằm NGOÀI mọi popup', inside: (c) => `phải nằm trong \`${c}\``, contains: (c) => `phải là cha của \`${c}\`` };
-  // Partial (Twig include) thiếu container thì container ở file cha — không phán.
+  // Partial (chưa có <body>) thiếu container thì container ở file cha — không phán.
   const containerAbsent = ({ containers }) => !containers.some((c) => elementsWith(els, c).length);
   for (const { token, placement } of contract.nest) {
-    if (explained.has(token) || (!fullDocument && placement.containers.length && containerAbsent(placement))) continue;
-    const misplaced = placementViolations(els, token, placement, contract.openers);
+    if (explained.has(token) || (!hasBody && placement.containers.length && containerAbsent(placement))) continue;
+    const misplaced = placementViolations(els, token, placement, contract.openers, contract.idHooks);
     if (misplaced.length) add('PG-NEST', token, `\`${token}\` ${where[placement.type](placement.containers.join('` / `'))}`, misplaced);
   }
 }
@@ -236,6 +250,14 @@ function checkPairs({ els, contract, add }) {
     const [hook, partner] = pair.split('|');
     add('PG-PAIR', hook, `\`${hook}\` phải đi kèm \`${partner}\` trên cùng thẻ`, found);
   }
+  // MASTER để data-milestone="" chờ điền; production không trang nào để trống data-* của hook pm__.
+  const emptyData = (el) => el.classes.filter((c) => c.startsWith('pm__')).flatMap((hook) => (contract.pairs.get(hook) || [])
+    .filter((p) => p.startsWith('data-') && el.attrs.get(p) === '')
+    .map((p) => `${hook}|${p}`));
+  for (const [pair, found] of collect(els, emptyData)) {
+    const [hook, partner] = pair.split('|');
+    add('PG-PAIR', hook, `\`${hook}\` có \`${partner}\` rỗng — điền giá trị thật của campaign`, found);
+  }
   for (const row of contract.catalog.filter((r) => r.sameAs)) {
     const alone = elementsWith(els, row.sameAs).filter((i) => !row.tokens.some((t) => els[i].classes.includes(t)));
     if (alone.length) add('PG-PAIR', row.sameAs, `\`${row.sameAs}\` phải đi cùng 1 class: \`${row.tokens.join('` `')}\``, alone);
@@ -257,9 +279,9 @@ function checkModuleWith({ els, contract, add }) {
   }
 }
 
-function checkRef({ els, contract, fullDocument, add }) {
+function checkRef({ els, contract, fullDocument, h5, elsewhere, add }) {
   if (contract.gameplay !== 'none' || !fullDocument) return;
-  contract.refHooks.filter((h) => !elementsWith(els, h).length)
+  contract.refHooks.filter((h) => !elementsWith(els, h).length && !elsewhere.includes(h) && !(h5 && contract.h5Exempt.has(h)))
     .forEach((h) => add('PG-REF', h, `ref có \`${h}\` mà file thiếu — landing ngoài kit bám hợp đồng của ref`));
 }
 

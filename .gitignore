@@ -34,6 +34,9 @@ history/*
 knowledge/gates/*
 !knowledge/gates/.gitkeep
 knowledge/metrics.jsonl
+# File dự án campaign (tools/project-note.mjs) — map đường dẫn + hook nghiệp vụ, repo public
+projects/*
+!projects/.gitkeep
 # knowledge/lessons.md thì NGƯỢC LẠI — bài học chung cả team, phải vào git.
 
 # Ngữ cảnh riêng từng máy của Claude Code (report/scratch cá nhân) — không vào git

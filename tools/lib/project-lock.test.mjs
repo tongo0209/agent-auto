@@ -41,6 +41,9 @@ check('đọc đúng 3 khoá, chỉ trong mục 1', readLock(note), { gameplay: 
 writeFileSync(note, '## 1. Khoá\n- gameplay: none\n- type: 27-diem-danh-rut-tham\n');
 check('gameplay none, thiếu ref → ref rỗng', readLock(note), { gameplay: 'none', type: '27-diem-danh-rut-tham', ref: '' });
 
+writeFileSync(note, '## 1. Khoá\n- gameplay: payment\n- type:\n- ref:\n- nguồn chuẩn:\n## 2. Nơi code\n');
+check('dòng khoá để trống → rỗng, không ăn sang dòng dưới', readLock(note), { gameplay: 'payment', type: '', ref: '' });
+
 const handoff = join(root, 'gt-promotion-template/Foo/LandingX_12345');
 writeFileSync(note, `## 1. Khoá\n- gameplay: payment\n## 2. Nơi code\n- cdn-source: ${campaign}\n- gt-promotion: ${handoff}/Promotion\n- gt-promotion: ${handoff}/mainsite\n## 3. Sơ đồ file\n- gt-promotion: ${join(root, 'nhầm')}\n`);
 check('file cdn-source → note theo đường dẫn', noteForAnyFile(join(campaign, 'index.html')), note);

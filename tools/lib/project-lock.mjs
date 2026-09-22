@@ -43,7 +43,7 @@ export function noteForAnyFile(file) {
 export function readLock(notePath) {
   if (!notePath || !existsSync(notePath)) return null;
   const section = readFileSync(notePath, 'utf8').split(/^## 1\. Khoá\s*$/m)[1]?.split(/^## /m)[0] || '';
-  const lock = Object.fromEntries(LOCK_KEYS.map((k) => [k, (section.match(new RegExp(`^- ${k}:\\s*(.+)$`, 'm'))?.[1] || '').trim()]));
+  const lock = Object.fromEntries(LOCK_KEYS.map((k) => [k, (section.match(new RegExp(`^- ${k}:[ \\t]*(.+)$`, 'm'))?.[1] || '').trim()]));
   if (!lock.gameplay || lock.gameplay === 'CHƯA KHOÁ') return null;
   return lock;
 }

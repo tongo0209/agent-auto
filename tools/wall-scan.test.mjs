@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { sliceTimeline, scanSession, OUTSIDE, ORPHAN } from './wall-scan.mjs';
+import { sliceTimeline, scanSession, summarize, OUTSIDE, ORPHAN } from './wall-scan.mjs';
 
 const at = (sec) => new Date(Date.UTC(2026, 8, 20, 0, 0, sec)).toISOString();
 const asst = (sec, { skill, id = `m${sec}`, tool, effort = 'xhigh', ctx = 10_000 } = {}) => ({
@@ -76,4 +76,28 @@ test('subagent nhận skill của dòng gọi Agent; không nối được thì 
 test('lần chạy skill tách khi skill đổi', () => {
   const { slices } = sliceTimeline([say(0), asst(2, { skill: 'a' }), asst(3, { skill: 'b' }), asst(5, { skill: 'a' })], { session: 's' });
   assert.deepStrictEqual(slices.map((s) => `${s.skill}#${s.run}`), ['a#1', 'b#2', 'a#3']);
+});
+
+test('summarize gộp theo skill: lần chạy, lượt model, effort, bash chậm', () => {
+  const { slices } = sliceTimeline([
+    say(0),
+    asst(2, { skill: 'a', id: 'x' }),
+    asst(4, { skill: 'a', id: 'x', tool: { id: 't', name: 'Bash', input: { command: 'sleep 9' } } }),
+    result(13, 't'),
+    asst(15, { skill: 'a', id: 'y', effort: 'medium', ctx: 400_000 }),
+    say(60),
+    asst(61, { skill: 'b' }),
+    asst(64, { skill: 'a', id: 'z' }),
+  ], { session: 's' });
+  const { totals, skills } = summarize(slices);
+  assert.deepStrictEqual(totals, { mainModel: 10, mainTool: 9, subModel: 0, subTool: 0, wait: 45 });
+  const a = skills.find((s) => s.skill === 'a');
+  assert.strictEqual(a.machine, 18);
+  assert.strictEqual(a.runs, 2);
+  assert.strictEqual(a.runMedian, 15);
+  assert.strictEqual(a.turnsPerRun, 1.5);
+  assert.deepStrictEqual(a.effort, { xhigh: { turns: 2, seconds: 7 }, medium: { turns: 1, seconds: 2 } });
+  assert.deepStrictEqual(a.ctx['>300k'], { turns: 1, seconds: 2 });
+  assert.deepStrictEqual(a.slowBash, [{ cmd: 'sleep 9', seconds: 9 }]);
+  assert.strictEqual(skills[0].skill, 'a');
 });

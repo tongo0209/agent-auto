@@ -76,3 +76,57 @@ export function scanSession({ session, main, subagents = {} }) {
   }
   return slices;
 }
+
+const quantile = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0;
+
+export function summarize(slices) {
+  const totals = { mainModel: 0, mainTool: 0, subModel: 0, subTool: 0, wait: 0 };
+  const bySkill = new Map();
+  const entry = (skill) => {
+    if (!bySkill.has(skill)) bySkill.set(skill, { skill, model: 0, sub: 0, wait: 0, tools: {}, effort: {}, ctx: {}, runs: new Map(), bash: [] });
+    return bySkill.get(skill);
+  };
+  const addTurn = (bucket, key, msgId, seconds) => {
+    bucket[key] ??= { turns: new Set(), seconds: 0 };
+    bucket[key].turns.add(msgId);
+    bucket[key].seconds += seconds;
+  };
+  for (const s of slices) {
+    const e = entry(s.skill);
+    if (s.kind === 'wait') { totals.wait += s.seconds; e.wait += s.seconds; continue; }
+    if (s.sub) {
+      totals[s.kind === 'model' ? 'subModel' : 'subTool'] += s.seconds;
+      e.sub += s.seconds;
+      continue;
+    }
+    const run = e.runs.get(`${s.session}#${s.run}`) ?? { seconds: 0, turns: new Set() };
+    e.runs.set(`${s.session}#${s.run}`, run);
+    run.seconds += s.seconds;
+    if (s.kind === 'model') {
+      totals.mainModel += s.seconds;
+      e.model += s.seconds;
+      run.turns.add(s.msgId);
+      addTurn(e.effort, s.effort, s.msgId, s.seconds);
+      addTurn(e.ctx, s.ctx, s.msgId, s.seconds);
+      continue;
+    }
+    totals.mainTool += s.seconds;
+    e.tools[s.tool] = (e.tools[s.tool] ?? 0) + s.seconds;
+    if (s.tool === 'Bash') e.bash.push({ cmd: String(s.cmd ?? '').replace(/\s+/g, ' ').slice(0, 100), seconds: s.seconds });
+  }
+  const counted = (bucket) => Object.fromEntries(Object.entries(bucket).map(([k, v]) => [k, { turns: v.turns.size, seconds: v.seconds }]));
+  const skills = [...bySkill.values()].map((e) => {
+    const runs = [...e.runs.values()];
+    const durations = runs.map((r) => r.seconds).sort((x, y) => x - y);
+    const toolSeconds = Object.values(e.tools).reduce((n, v) => n + v, 0);
+    return {
+      skill: e.skill, machine: e.model + toolSeconds, model: e.model, sub: e.sub, wait: e.wait, tools: e.tools,
+      effort: counted(e.effort), ctx: counted(e.ctx),
+      runs: runs.length, runMedian: quantile(durations, 0.5), runP90: quantile(durations, 0.9),
+      turnsPerRun: runs.length ? runs.reduce((n, r) => n + r.turns.size, 0) / runs.length : 0,
+      slowBash: e.bash.sort((x, y) => y.seconds - x.seconds).slice(0, 10),
+    };
+  });
+  skills.sort((x, y) => y.machine + y.sub - (x.machine + x.sub));
+  return { totals, skills };
+}

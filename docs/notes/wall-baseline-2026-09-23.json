@@ -1,0 +1,2065 @@
+{
+  "days": 14,
+  "sessions": 1304,
+  "totals": {
+    "mainModel": 275189.45200133324,
+    "mainTool": 74319.38099217415,
+    "subModel": 92741.4879937172,
+    "subTool": 14806.001007795334,
+    "wait": 330770.2439997196
+  },
+  "skills": [
+    {
+      "skill": "(ngoài skill)",
+      "machine": 112304.55299568176,
+      "model": 91747.47299909592,
+      "sub": 5646.74199962616,
+      "wait": 78409.81799793243,
+      "tools": {
+        "Skill": 2.7029998302459717,
+        "Bash": 13464.106993198395,
+        "ToolSearch": 26.850996732711792,
+        "mcp:browserpilot": 1803.2790021896362,
+        "Read": 14.634002923965454,
+        "Artifact": 15.470999956130981,
+        "mcp:claude_ai_Microsoft_365": 3304.84100151062,
+        "bash": 0.00800013542175293,
+        "Agent": 352.74999928474426,
+        "SendMessage": 1.878000020980835,
+        "ScheduleWakeup": 3.7189998626708984,
+        "Write": 16.92300033569336,
+        "mcp:claude-in-chrome": 1421.630000591278,
+        "TaskStop": 0.03299999237060547,
+        "Edit": 18.95199966430664,
+        "Monitor": 3.1440000534057617,
+        "PushNotification": 0.006000041961669922,
+        "mcp:claude_ai_Figma": 74.37499976158142,
+        "mcp:claude_ai_Atlassian": 20.106000185012817,
+        "SendUserFile": 7.583000183105469,
+        "Workflow": 1.0350000858306885,
+        "WebFetch": 3.052000045776367
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 4188,
+          "seconds": 55078.76000237465
+        },
+        "high": {
+          "turns": 39,
+          "seconds": 594.3489992618561
+        },
+        "không rõ": {
+          "turns": 3987,
+          "seconds": 36074.36399745941
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 2109,
+          "seconds": 26091.036005735397
+        },
+        "150-300k": {
+          "turns": 1537,
+          "seconds": 21337.468995571136
+        },
+        "<50k": {
+          "turns": 3864,
+          "seconds": 32692.424998283386
+        },
+        ">300k": {
+          "turns": 704,
+          "seconds": 11626.542999505997
+        }
+      },
+      "runs": 1204,
+      "runMedian": 19.475000143051147,
+      "runP90": 136.6579999923706,
+      "turnsPerRun": 6.822259136212624,
+      "slowBash": [
+        {
+          "cmd": "export DEVELOPER_DIR=/Library/Developer/CommandLineTools && npm run build 2>&1 | grep -E \"ERROR|erro",
+          "seconds": 602.6369998455048
+        },
+        {
+          "cmd": "git push -o merge_request.create -o merge_request.target=master -o merge_request.remove_source_branc",
+          "seconds": 425.3289999961853
+        },
+        {
+          "cmd": "python3 - <<'PY' import re p='detail.mmd'; s=open(p).read() # gom 4 nhánh quay-lui về 1 nút trung ch",
+          "seconds": 421.55399990081787
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source git push \\ -o merge_request.create \\ -o merge_request.targ",
+          "seconds": 376.29500007629395
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source && git checkout -- products/mwly/landing/2026-dang-nhap-nh",
+          "seconds": 364.4800000190735
+        },
+        {
+          "cmd": "git checkout -- HTML-pro/index.html 2>/dev/null || cp /dev/null /dev/null; git status --short HTML-p",
+          "seconds": 302.94400000572205
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/gt-promotion-template && git push origin develop 2>&1 | tail -8",
+          "seconds": 188.42799997329712
+        },
+        {
+          "cmd": "SP=/private/tmp/claude-501/-Users-lap17727-VNG/8507260b-7d9c-453f-99fe-08071975f89f/scratchpad && cd",
+          "seconds": 181.7039999961853
+        },
+        {
+          "cmd": "S=/tmp/claude-501/-Users-lap17727-VNG/3b3a94ec-b268-45d4-a92d-2fd0715b7b9b/scratchpad T=$(cat ~/.con",
+          "seconds": 124.6340000629425
+        },
+        {
+          "cmd": "SP=/private/tmp/claude-501/-Users-lap17727-VNG/e196ae6f-6f93-45c6-a13a-11ffa5e97308/scratchpad; for ",
+          "seconds": 123.0789999961853
+        }
+      ]
+    },
+    {
+      "skill": "bug-fixer-lite",
+      "machine": 39861.44800019264,
+      "model": 30313.7079975605,
+      "sub": 25699.934000253677,
+      "wait": 18565.92699956894,
+      "tools": {
+        "Bash": 5911.839001893997,
+        "ToolSearch": 0.413999080657959,
+        "mcp:claude-in-chrome": 2520.337999343872,
+        "mcp:claude_ai_Google_Drive": 5.871999979019165,
+        "Agent": 607.2550005912781,
+        "TaskStop": 0.06100010871887207,
+        "mcp:claude_ai_Microsoft_365": 142.9770004749298,
+        "Write": 21.627999782562256,
+        "Read": 2.2740001678466797,
+        "Skill": 3.607999801635742,
+        "SendMessage": 21.0600004196167,
+        "Edit": 4.8540003299713135,
+        "mcp:browserpilot": 293.56500029563904,
+        "ListAgents": 0.9779999256134033,
+        "Monitor": 10.998000144958496,
+        "ReadNotifications": 0.01900029182434082
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 1448,
+          "seconds": 28731.1839966774
+        },
+        "high": {
+          "turns": 32,
+          "seconds": 824.2820007801056
+        },
+        "medium": {
+          "turns": 105,
+          "seconds": 758.2420001029968
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 191,
+          "seconds": 1954.4279992580414
+        },
+        "150-300k": {
+          "turns": 849,
+          "seconds": 20211.991995334625
+        },
+        ">300k": {
+          "turns": 545,
+          "seconds": 8147.2880029678345
+        }
+      },
+      "runs": 13,
+      "runMedian": 2996.408999681473,
+      "runP90": 5023.584999799728,
+      "turnsPerRun": 121.92307692307692,
+      "slowBash": [
+        {
+          "cmd": "B=/Users/lap17727/VNG/git-vng/cdn-source/products/ananta/.claude/bugs-lite for i in $(seq 1 60); do ",
+          "seconds": 602.9679999351501
+        },
+        {
+          "cmd": "B=/Users/lap17727/VNG/git-vng/cdn-source/products/ananta/.claude/bugs-lite for i in $(seq 1 55); do ",
+          "seconds": 553.7140002250671
+        },
+        {
+          "cmd": "export DEVELOPER_DIR=/Library/Developer/CommandLineTools; cd /Users/lap17727/VNG/git-vng/gt-promotio",
+          "seconds": 432.0840001106262
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto/tools && timeout_guard() { :; }; python3 bug-sheet-tick.py --dry-run 2>&1 & PID=",
+          "seconds": 121.98099994659424
+        },
+        {
+          "cmd": "CTX=/Users/lap17727/VNG/git-vng/cdn-source/products/ananta/.claude/bugs-lite sleep 240 for l in 17 1",
+          "seconds": 121.66700005531311
+        },
+        {
+          "cmd": "CTX=/Users/lap17727/VNG/git-vng/cdn-source/products/ananta/.claude/bugs-lite sleep 90 for l in 17 18",
+          "seconds": 91.63499999046326
+        },
+        {
+          "cmd": "cd ~/VNG/git-vng/gt-promotion-template && python3 - <<'PY' import subprocess, difflib for f in [\"622",
+          "seconds": 73.69700002670288
+        },
+        {
+          "cmd": "cd ~/VNG/git-vng/cdn-source/products && for p in gno zsm gnmobinew gpn ovensmash; do d=$p/landing/20",
+          "seconds": 67.85800004005432
+        },
+        {
+          "cmd": "cd ~/VNG/git-vng/cdn-source/products && for p in gno zsm gnmobinew gpn ovensmash; do d=$p/landing/20",
+          "seconds": 67.80999994277954
+        },
+        {
+          "cmd": "cd ~/VNG/git-vng/cdn-source/products && for p in gno zsm gnmobinew gpn ovensmash; do d=$p/landing/20",
+          "seconds": 66.01200008392334
+        }
+      ]
+    },
+    {
+      "skill": "daily",
+      "machine": 53889.198001384735,
+      "model": 41920.142000198364,
+      "sub": 5999.775000095367,
+      "wait": 59608.316999197006,
+      "tools": {
+        "Bash": 9791.652000904083,
+        "mcp:claude_ai_Atlassian": 201.78500175476074,
+        "mcp:claude_ai_Figma": 5.51200008392334,
+        "ToolSearch": 29.535000324249268,
+        "mcp:claude-in-chrome": 1328.3969991207123,
+        "Skill": 0.3209998607635498,
+        "Write": 0.6500000953674316,
+        "mcp:browserpilot": 567.7729995250702,
+        "Read": 0.869999885559082,
+        "SendUserFile": 1.5269999504089355,
+        "Monitor": 1.4749999046325684,
+        "Agent": 5.062000036239624,
+        "SendMessage": 1.7269999980926514,
+        "TaskStop": 0.007999897003173828,
+        "mcp:claude_ai_Google_Drive": 32.15399956703186,
+        "Grep": 0.37000012397766113,
+        "Edit": 0.23800015449523926
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 2727,
+          "seconds": 39363.53600168228
+        },
+        "không rõ": {
+          "turns": 6,
+          "seconds": 1404.8209998607635
+        },
+        "high": {
+          "turns": 106,
+          "seconds": 1151.7849986553192
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 1790,
+          "seconds": 24590.195994853973
+        },
+        "150-300k": {
+          "turns": 762,
+          "seconds": 10784.477001667023
+        },
+        ">300k": {
+          "turns": 281,
+          "seconds": 5140.648003816605
+        },
+        "<50k": {
+          "turns": 6,
+          "seconds": 1404.8209998607635
+        }
+      },
+      "runs": 107,
+      "runMedian": 277.2960000038147,
+      "runP90": 557.7799999713898,
+      "turnsPerRun": 26.53271028037383,
+      "slowBash": [
+        {
+          "cmd": "cd /tmp split -l 60 imgs-u.txt chunk_ n=0 : > /tmp/img-bad.txt for f in chunk_*; do # mỗi URL 1 dòng",
+          "seconds": 550.3029999732971
+        },
+        {
+          "cmd": "git push origin master 2>&1 | tail -3",
+          "seconds": 438.55000019073486
+        },
+        {
+          "cmd": "for r in cdn-source new-mainsite vportal2view gt-promotion-template; do d=\"/Users/lap17727/VNG/git-v",
+          "seconds": 302.2850000858307
+        },
+        {
+          "cmd": "git push origin master 2>&1 | tail -2",
+          "seconds": 209.30299997329712
+        },
+        {
+          "cmd": "SC=/private/tmp/claude-501/-Users-lap17727-VNG/807fc439-0039-4a93-bd54-271543f2afe5/scratchpad pytho",
+          "seconds": 174.94900012016296
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG && for p in \"\" /tin-tuc /vo-tuong /binh-chung /vat-pham /vat-pham-trang-bi /v",
+          "seconds": 166.25500011444092
+        },
+        {
+          "cmd": "git push origin master 2>&1 | tail -2",
+          "seconds": 156.8659999370575
+        },
+        {
+          "cmd": "SC=/private/tmp/claude-501/-Users-lap17727-VNG/807fc439-0039-4a93-bd54-271543f2afe5/scratchpad cd /U",
+          "seconds": 153.48499989509583
+        },
+        {
+          "cmd": "SC=/private/tmp/claude-501/-Users-lap17727-VNG/807fc439-0039-4a93-bd54-271543f2afe5/scratchpad mkdir",
+          "seconds": 144.42600011825562
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG && python3 - <<'PY' import urllib.request, collections from concurrent.future",
+          "seconds": 140.69400000572205
+        }
+      ]
+    },
+    {
+      "skill": "superpowers:brainstorming",
+      "machine": 31306.99599814415,
+      "model": 25587.682000875473,
+      "sub": 7620.919000387192,
+      "wait": 90659.75400137901,
+      "tools": {
+        "Bash": 4587.012999534607,
+        "Write": 23.265000104904175,
+        "Edit": 6.551999568939209,
+        "Read": 1.5199995040893555,
+        "ToolSearch": 0.1979997158050537,
+        "WebFetch": 55.94799995422363,
+        "mcp:claude_ai_Microsoft_365": 36.81800055503845,
+        "mcp:claude-in-chrome": 247.9419982433319,
+        "Workflow": 5.573000192642212,
+        "TaskOutput": 300.07999992370605,
+        "Skill": 0.4120001792907715,
+        "TaskStop": 0.019999980926513672,
+        "mcp:claude_ai_Google_Drive": 2.8540000915527344,
+        "WebSearch": 17.09600019454956,
+        "Agent": 5.5269999504089355,
+        "mcp:browserpilot": 423.10099959373474,
+        "mcp:claude_ai_Atlassian": 5.394999980926514
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 1327,
+          "seconds": 25408.778000831604
+        },
+        "không rõ": {
+          "turns": 3,
+          "seconds": 2.566999912261963
+        },
+        "high": {
+          "turns": 17,
+          "seconds": 176.33700013160706
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 322,
+          "seconds": 6958.628999710083
+        },
+        "150-300k": {
+          "turns": 419,
+          "seconds": 8627.02800154686
+        },
+        ">300k": {
+          "turns": 602,
+          "seconds": 9998.802999734879
+        },
+        "<50k": {
+          "turns": 4,
+          "seconds": 3.2219998836517334
+        }
+      },
+      "runs": 14,
+      "runMedian": 1802.5349996089935,
+      "runP90": 3470.453999519348,
+      "turnsPerRun": 96.21428571428571,
+      "slowBash": [
+        {
+          "cmd": "cd /private/tmp/claude-501/-Users-lap17727-VNG-tont-source/d7228551-e659-4af6-93ab-8511696959cc/scra",
+          "seconds": 121.9300000667572
+        },
+        {
+          "cmd": "cd ~/VNG/git-vng/cdn-source/products/gnmobinew/landing && ls; echo \"=== parity probe: 2026-trung-thu",
+          "seconds": 116.50699996948242
+        },
+        {
+          "cmd": "sleep_until=$((SECONDS+100)); while [ $SECONDS -lt $sleep_until ]; do :; done 2>/dev/null; cat /priv",
+          "seconds": 101.80299997329712
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && node --check bin/tick.mjs && echo \"đã vá\" && node -e 'setTimeout(()",
+          "seconds": 71.82000017166138
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && grep -n \"^async function answer\\|^import\\|^const cfg\\|^const token\\",
+          "seconds": 70.52900004386902
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && node -e ' const fs=require(\"fs\"); const edit=(f,a,b)=>{const s=fs.r",
+          "seconds": 66.15100002288818
+        },
+        {
+          "cmd": "vercel deploy --prod --yes 2>&1 | tail -20",
+          "seconds": 64.56299996376038
+        },
+        {
+          "cmd": "vercel deploy --prod --yes 2>&1 | grep -E \"readyState|Aliased|Error\" | head -3",
+          "seconds": 62.42300009727478
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && node -e ' const fs=require(\"fs\");let s=fs.readFileSync(\"docs/guide.",
+          "seconds": 54.86800003051758
+        },
+        {
+          "cmd": "npm test 2>&1 | grep -E \"Test Files|Tests |FAIL\" | head -3; npx eslint app components 2>&1 | tail -2",
+          "seconds": 54.42200016975403
+        }
+      ]
+    },
+    {
+      "skill": "superpowers:systematic-debugging",
+      "machine": 35421.166001319885,
+      "model": 25476.39600300789,
+      "sub": 0,
+      "wait": 8278.862998962402,
+      "tools": {
+        "Bash": 5230.630997657776,
+        "Write": 4.141000032424927,
+        "mcp:claude-in-chrome": 271.06699895858765,
+        "Skill": 0.2200002670288086,
+        "ToolSearch": 0.16299962997436523,
+        "mcp:browserpilot": 4414.959001779556,
+        "Read": 3.3929989337921143,
+        "Edit": 2.4840006828308105,
+        "Monitor": 8.8510000705719,
+        "SendUserFile": 8.861000299453735
+      },
+      "effort": {
+        "high": {
+          "turns": 141,
+          "seconds": 1400.1760017871857
+        },
+        "xhigh": {
+          "turns": 1579,
+          "seconds": 24076.220001220703
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 480,
+          "seconds": 5614.252002239227
+        },
+        "150-300k": {
+          "turns": 574,
+          "seconds": 8051.310002326965
+        },
+        ">300k": {
+          "turns": 666,
+          "seconds": 11810.833998441696
+        }
+      },
+      "runs": 13,
+      "runMedian": 1128.6289999485016,
+      "runP90": 4907.731000185013,
+      "turnsPerRun": 132.30769230769232,
+      "slowBash": [
+        {
+          "cmd": "cd /private/tmp/claude-501/-Users-lap17727-VNG-git-vng-cdn-source-products-mwly-landing-2026-dang-nh",
+          "seconds": 508.1029999256134
+        },
+        {
+          "cmd": "B=http://dev.m.ngoalong.zing.vn/app_dev.php/ngoa-long-wiki P=\"'' /tin-tuc /vo-tuong /binh-chung /vat",
+          "seconds": 123.02800011634827
+        },
+        {
+          "cmd": "echo \"=== nguồn local (đã commit & push) có đủ thẻ không? ===\" cd /Users/lap17727/VNG/git-vng/vporta",
+          "seconds": 122.6010000705719
+        },
+        {
+          "cmd": "B=\"http://dev.m.ngoalong.zing.vn/app_dev.php/ngoa-long-wiki\" for r in /dinh-phu/xuat-su /dinh-phu/th",
+          "seconds": 122.32800006866455
+        },
+        {
+          "cmd": "B=http://dev.m.ngoalong.zing.vn/app_dev.php/ngoa-long-wiki for p in /an-thanh-tuu /the-gioi-moi /vat",
+          "seconds": 122.30299997329712
+        },
+        {
+          "cmd": "cd /private/tmp/claude-501/-Users-lap17727-VNG-git-vng-cdn-source-products-mwly-landing-2026-dang-nh",
+          "seconds": 97.16599988937378
+        },
+        {
+          "cmd": "B=http://dev.m.ngoalong.zing.vn/app_dev.php/ngoa-long-wiki echo \"=== binh-chung (route cu, noi dung ",
+          "seconds": 83.36800003051758
+        },
+        {
+          "cmd": "U=\"http://dev.m.ngoalong.zing.vn/app_dev.php/ngoa-long-wiki/vo-tuong\" for t in 1 2 3; do curl -s --h",
+          "seconds": 75.67400002479553
+        },
+        {
+          "cmd": "cd ~/VNG/git-vng/gt-promotion-template && git commit -m \"(fix): nút mua gói quà dùng button submit (",
+          "seconds": 69.26100015640259
+        },
+        {
+          "cmd": "B=\"http://dev.m.ngoalong.zing.vn/app_dev.php/ngoa-long-wiki\" for r in /khac-van /dinh-phu /ma-truong",
+          "seconds": 69.23800015449524
+        }
+      ]
+    },
+    {
+      "skill": "superpowers:writing-plans",
+      "machine": 3459.2899997234344,
+      "model": 3005.6000015735626,
+      "sub": 30378.37399983406,
+      "wait": 7045.352999925613,
+      "tools": {
+        "Bash": 429.65299916267395,
+        "Write": 3.7709991931915283,
+        "Edit": 8.437000036239624,
+        "Skill": 0.2349998950958252,
+        "Read": 0.12800002098083496,
+        "Workflow": 6.364000082015991,
+        "ToolSearch": 0.019999980926513672,
+        "TaskStop": 0.019999980926513672,
+        "mcp:claude_ai_Atlassian": 5.061999797821045
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 224,
+          "seconds": 2817.3920016288757
+        },
+        "high": {
+          "turns": 4,
+          "seconds": 188.2079999446869
+        }
+      },
+      "ctx": {
+        "150-300k": {
+          "turns": 116,
+          "seconds": 1638.3790004253387
+        },
+        ">300k": {
+          "turns": 107,
+          "seconds": 1150.0190012454987
+        },
+        "50-150k": {
+          "turns": 5,
+          "seconds": 217.20199990272522
+        }
+      },
+      "runs": 6,
+      "runMedian": 683.1889998912811,
+      "runP90": 1276.412999868393,
+      "turnsPerRun": 38,
+      "slowBash": [
+        {
+          "cmd": "npm test 2>&1 | tail -4 && npm run lint 2>&1 | tail -5 && git add -A && git commit -q -F - <<'EOF' [",
+          "seconds": 22.38100004196167
+        },
+        {
+          "cmd": "npm run lint 2>&1 | grep -oE \"^/Users[^ ]*\" | sed 's|.*manager-wedding/||' | cut -d/ -f1 | sort | un",
+          "seconds": 16.088000059127808
+        },
+        {
+          "cmd": "python3 - <<'PY' p = 'components/editor/canvas-editor.tsx' s = open(p).read() old = \"\"\" {device === ",
+          "seconds": 10.839999914169312
+        },
+        {
+          "cmd": "echo \"=== test:\"; npm test 2>&1 | tail -4; echo \"=== build:\"; npm run build 2>&1 | grep -E \"Compiled",
+          "seconds": 10.144000053405762
+        },
+        {
+          "cmd": "python3 - <<'PY' p = 'tests/rls/wedding-lifecycle.test.ts' s = open(p).read() s = s.replace( \"import",
+          "seconds": 9.440000057220459
+        },
+        {
+          "cmd": "npm test 2>&1 | tail -5",
+          "seconds": 8.773000001907349
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto && for t in tools/pm-gate.test.mjs tools/project-note.test.mjs tools/lib/project",
+          "seconds": 8.654000043869019
+        },
+        {
+          "cmd": "npm test 2>&1 | tail -5 && git add -A && git commit -q -F - <<'EOF' [manager-wedding] Retune the app",
+          "seconds": 8.33899998664856
+        },
+        {
+          "cmd": "npm test 2>&1 | tail -4 && python3 - <<'PY' import pathlib p = pathlib.Path('docs/superpowers/specs/",
+          "seconds": 7.76200008392334
+        },
+        {
+          "cmd": "npx eslint app components lib 2>&1 | grep -E \"error|unused\" | head -10; npm test 2>&1 | tail -4",
+          "seconds": 7.658999919891357
+        }
+      ]
+    },
+    {
+      "skill": "loop",
+      "machine": 16829.98599910736,
+      "model": 13571.069993495941,
+      "sub": 16095.398000240326,
+      "wait": 11697.11400103569,
+      "tools": {
+        "Bash": 1295.0020015239716,
+        "ToolSearch": 0.13899993896484375,
+        "CronCreate": 4.573000192642212,
+        "mcp:claude-in-chrome": 1535.3520023822784,
+        "CronList": 0.018000125885009766,
+        "mcp:claude_ai_Microsoft_365": 14.476999998092651,
+        "Agent": 28.076000452041626,
+        "SendMessage": 24.328999757766724,
+        "CronDelete": 0.013000011444091797,
+        "Read": 1.751999855041504,
+        "Edit": 4.099000453948975,
+        "mcp:browserpilot": 343.00000071525574,
+        "Write": 8.086000204086304
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 602,
+          "seconds": 13571.069993495941
+        }
+      },
+      "ctx": {
+        ">300k": {
+          "turns": 511,
+          "seconds": 11741.434995651245
+        },
+        "150-300k": {
+          "turns": 91,
+          "seconds": 1829.634997844696
+        }
+      },
+      "runs": 2,
+      "runMedian": 13716.447998523712,
+      "runP90": 13716.447998523712,
+      "turnsPerRun": 301,
+      "slowBash": [
+        {
+          "cmd": "cat > /tmp/claude-501/-Users-lap17727-VNG/4895bab4-4380-4446-b134-dfaafe281658/scratchpad/difflocale",
+          "seconds": 301.84999990463257
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source/products/ananta/landing/thuc-pham-phuc-bao/assets ls | gre",
+          "seconds": 121.95000004768372
+        },
+        {
+          "cmd": "osascript -e 'tell application \"Finder\" to duplicate POSIX file \"/Users/lap17727/Downloads/BugList A",
+          "seconds": 75.90300011634827
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source/products/ananta/landing for d in an-ninh-thien-khung giai-",
+          "seconds": 43.593000173568726
+        },
+        {
+          "cmd": "G=/Applications/Xcode.app/Contents/Developer/usr/bin/git cd /Users/lap17727/VNG/git-vng/cdn-source G",
+          "seconds": 41.555999994277954
+        },
+        {
+          "cmd": "for i in $(seq 1 40); do if ls ~/Downloads/*.crdownload >/dev/null 2>&1; then sleep 5; else break; f",
+          "seconds": 37.59400010108948
+        },
+        {
+          "cmd": "until [ -f ~/Downloads/\"BugList ANATA (1).xlsx\" ] && ! ls ~/Downloads/*.crdownload >/dev/null 2>&1; ",
+          "seconds": 26.5939998626709
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source/products/ananta/landing sed -i '' 's|<html lang=\"zh-CN\" da",
+          "seconds": 23.417999982833862
+        },
+        {
+          "cmd": "G=/Applications/Xcode.app/Contents/Developer/usr/bin/git cd /Users/lap17727/VNG/git-vng/cdn-source G",
+          "seconds": 21.42799997329712
+        },
+        {
+          "cmd": "G=/Applications/Xcode.app/Contents/Developer/usr/bin/git cd /Users/lap17727/VNG/git-vng/cdn-source G",
+          "seconds": 20.65499997138977
+        }
+      ]
+    },
+    {
+      "skill": "code-developer",
+      "machine": 6971.2379994392395,
+      "model": 5792.003998756409,
+      "sub": 8472.94100022316,
+      "wait": 7411.021000623703,
+      "tools": {
+        "Bash": 982.3080008029938,
+        "Skill": 0.10700011253356934,
+        "Read": 0.3580000400543213,
+        "Agent": 20.533999919891357,
+        "SendMessage": 23.839999675750732,
+        "Write": 0.05900001525878906,
+        "mcp:claude_ai_Figma": 80.96600008010864,
+        "ListAgents": 3.2009999752044678,
+        "ToolSearch": 0.026000261306762695,
+        "TaskStop": 0.013000011444091797,
+        "mcp:browserpilot": 67.8219997882843
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 264,
+          "seconds": 5430.2839987277985
+        },
+        "không rõ": {
+          "turns": 2,
+          "seconds": 361.72000002861023
+        }
+      },
+      "ctx": {
+        "150-300k": {
+          "turns": 83,
+          "seconds": 1987.5399990081787
+        },
+        "50-150k": {
+          "turns": 36,
+          "seconds": 1044.0159997940063
+        },
+        ">300k": {
+          "turns": 145,
+          "seconds": 2398.7279999256134
+        },
+        "<50k": {
+          "turns": 2,
+          "seconds": 361.72000002861023
+        }
+      },
+      "runs": 4,
+      "runMedian": 3153.106999874115,
+      "runP90": 3513.6079998016357,
+      "turnsPerRun": 66.5,
+      "slowBash": [
+        {
+          "cmd": "for t in *.test.py; do python3 $t 2>&1 | tail -1; done; echo \"=== chạy lại figma-cut cho GW-796 ===\"",
+          "seconds": 482.8120000362396
+        },
+        {
+          "cmd": "cd /private/tmp/claude-501/-Users-lap17727-VNG-agent-auto/cc625fd3-69f8-4d3b-844b-0b9b15065801/scrat",
+          "seconds": 122.10000014305115
+        },
+        {
+          "cmd": "find / -path '*/.browserpilot/shots/gw796-tab1-2.png' 2>/dev/null | head -2",
+          "seconds": 21.876999855041504
+        },
+        {
+          "cmd": "sleep 20; cat /private/tmp/claude-501/-Users-lap17727-VNG-agent-auto/cc625fd3-69f8-4d3b-844b-0b9b150",
+          "seconds": 20.14800000190735
+        },
+        {
+          "cmd": "DST=/Users/lap17727/VNG/git-vng/cdn-source/products/gn/landing/2026-pbm-t10 echo \"=== có hardcode UR",
+          "seconds": 10.424999952316284
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/agent-auto && ID=$(node -e \" const st=require('./state.json'); for(const [id,",
+          "seconds": 6.577999830245972
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/agent-auto && node tools/bug-radar.mjs list 2>/dev/null | node -e \"let s='';p",
+          "seconds": 5.921000003814697
+        },
+        {
+          "cmd": "cd ~/VNG/git-vng/cdn-source/products/zsm/landing/2026-dua-co-hoi-h5 && RUN_START=$(date +%s); echo \"",
+          "seconds": 5.88100004196167
+        },
+        {
+          "cmd": "npm run build-pro 2>&1 | tail -20; echo \"EXIT=${PIPESTATUS[0]}\"",
+          "seconds": 5.20199990272522
+        },
+        {
+          "cmd": "OUT=~/VNG/agent-auto/designs/GW-796/_auto-export/figma-chJXuFfcYUBgsunVKHuGzm && mkdir -p $OUT/frame",
+          "seconds": 5.120999813079834
+        }
+      ]
+    },
+    {
+      "skill": "claude-in-chrome",
+      "machine": 10069.544999599457,
+      "model": 7288.478003025055,
+      "sub": 0,
+      "wait": 1823.9430003166199,
+      "tools": {
+        "ToolSearch": 0.21699976921081543,
+        "mcp:claude-in-chrome": 1039.708002090454,
+        "Bash": 1369.004996061325,
+        "Skill": 0.2069995403289795,
+        "Read": 0.9759995937347412,
+        "WebSearch": 6.917999982833862,
+        "mcp:claude_ai_Atlassian": 3.3969998359680176,
+        "Write": 0.1550004482269287,
+        "mcp:claude_ai_Microsoft_365": 8.6659996509552,
+        "mcp:browserpilot": 350.3389995098114,
+        "Edit": 1.4709999561309814,
+        "TaskStop": 0.00800013542175293
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 531,
+          "seconds": 6508.714003562927
+        },
+        "high": {
+          "turns": 71,
+          "seconds": 779.7639994621277
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 129,
+          "seconds": 1146.1280012130737
+        },
+        "150-300k": {
+          "turns": 299,
+          "seconds": 4251.652002811432
+        },
+        ">300k": {
+          "turns": 174,
+          "seconds": 1890.6979990005493
+        }
+      },
+      "runs": 7,
+      "runMedian": 1360.3619997501373,
+      "runP90": 2663.0799996852875,
+      "turnsPerRun": 86,
+      "slowBash": [
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source && git restore --source=77196afd8 --staged --worktree prod",
+          "seconds": 75.8180000782013
+        },
+        {
+          "cmd": "D=~/VNG/agent-auto/designs/GW-844; mkdir -p $D/_docs $D/_raw && mv ~/Downloads/'GN-Request_PBM Tháng",
+          "seconds": 61.91799998283386
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/agent-auto/designs/GW-796 && TOK=$(cat ~/.config/figma-cut/token) && curl -s ",
+          "seconds": 45.99900007247925
+        },
+        {
+          "cmd": "for p in daitiecsinhnhat17 index.html daichientranhtai; do echo \"$p → $(curl -s -m 15 -o /dev/null -",
+          "seconds": 43.98400020599365
+        },
+        {
+          "cmd": "S=/private/tmp/claude-501/-Users-lap17727-VNG-agent-auto/4da29de0-8c1a-4028-90fc-acf94b518be9/scratc",
+          "seconds": 43.63800001144409
+        },
+        {
+          "cmd": "npm test 2>&1 | tail -6",
+          "seconds": 38.21599984169006
+        },
+        {
+          "cmd": "npm run build:showcase 2>&1 | tail -5 && npm test 2>&1 | tail -4",
+          "seconds": 35.25200009346008
+        },
+        {
+          "cmd": "node -e \" const fs=require('fs');const f='effects/showcase-summaries.json';const s=JSON.parse(fs.rea",
+          "seconds": 34.90499997138977
+        },
+        {
+          "cmd": "git checkout -- products/zsm/landing/2026-dua-co-hoi-h5/dist/ && rm -rf products/zsm/landing/2026-du",
+          "seconds": 33.769999980926514
+        },
+        {
+          "cmd": "node scripts/fx-radar.mjs --json --since=120d --limit=40 --no-fetch --all --mined-before=2026-08-10 ",
+          "seconds": 30.73300004005432
+        }
+      ]
+    },
+    {
+      "skill": "superpowers:subagent-driven-development",
+      "machine": 4389.33899974823,
+      "model": 4301.10200047493,
+      "sub": 3775.9160001277924,
+      "wait": 620.0370001792908,
+      "tools": {
+        "Bash": 48.79699945449829,
+        "Agent": 35.58299970626831,
+        "SendMessage": 3.8570001125335693
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 69,
+          "seconds": 4301.10200047493
+        }
+      },
+      "ctx": {
+        ">300k": {
+          "turns": 69,
+          "seconds": 4301.10200047493
+        }
+      },
+      "runs": 1,
+      "runMedian": 4389.33899974823,
+      "runP90": 4389.33899974823,
+      "turnsPerRun": 69,
+      "slowBash": [
+        {
+          "cmd": "cat >> .superpowers/sdd/progress.md <<'EOF' Task 5: complete (commits 20bb637..4564f1c, review spec✅",
+          "seconds": 5.144999980926514
+        },
+        {
+          "cmd": "/Users/lap17727/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/skills/subagent-driven-devel",
+          "seconds": 2.9579999446868896
+        },
+        {
+          "cmd": "git show --stat --oneline b57680e | head -5 && cd console && node --test server/lib/alerts.test.mjs ",
+          "seconds": 2.6449999809265137
+        },
+        {
+          "cmd": "/Users/lap17727/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/skills/subagent-driven-devel",
+          "seconds": 2.6019999980926514
+        },
+        {
+          "cmd": "/Users/lap17727/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/skills/subagent-driven-devel",
+          "seconds": 2.5279998779296875
+        },
+        {
+          "cmd": "S=/Users/lap17727/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/skills/subagent-driven-dev",
+          "seconds": 2.513000011444092
+        },
+        {
+          "cmd": "S=/Users/lap17727/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/skills/subagent-driven-dev",
+          "seconds": 2.492999792098999
+        },
+        {
+          "cmd": "S=/Users/lap17727/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/skills/subagent-driven-dev",
+          "seconds": 2.4010000228881836
+        },
+        {
+          "cmd": "S=/Users/lap17727/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/skills/subagent-driven-dev",
+          "seconds": 2.38100004196167
+        },
+        {
+          "cmd": "P=/Users/lap17727/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/skills; wc -l \"$P\"/verific",
+          "seconds": 2.312000036239624
+        }
+      ]
+    },
+    {
+      "skill": "commit",
+      "machine": 7754.419999361038,
+      "model": 5299.618999004364,
+      "sub": 0,
+      "wait": 1882.492000579834,
+      "tools": {
+        "Bash": 1515.563999414444,
+        "ToolSearch": 0.028999805450439453,
+        "mcp:claude-in-chrome": 757.3820004463196,
+        "Read": 0.3229994773864746,
+        "mcp:browserpilot": 180.46800065040588,
+        "Edit": 0.746999979019165,
+        "Skill": 0.06000018119812012,
+        "Write": 0.19500041007995605,
+        "SendFeedback": 0.03299999237060547
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 538,
+          "seconds": 5299.618999004364
+        }
+      },
+      "ctx": {
+        "150-300k": {
+          "turns": 210,
+          "seconds": 2111.534998655319
+        },
+        ">300k": {
+          "turns": 237,
+          "seconds": 2257.676999807358
+        },
+        "50-150k": {
+          "turns": 91,
+          "seconds": 930.407000541687
+        }
+      },
+      "runs": 10,
+      "runMedian": 420.0880000591278,
+      "runP90": 3763.15700006485,
+      "turnsPerRun": 53.8,
+      "slowBash": [
+        {
+          "cmd": "git push origin dev 2>&1 | tail -8",
+          "seconds": 264.03600001335144
+        },
+        {
+          "cmd": "export DEVELOPER_DIR=/Library/Developer/CommandLineTools; cd /Users/lap17727/VNG/git-vng/cdn-source ",
+          "seconds": 171.07400012016296
+        },
+        {
+          "cmd": "cat > /private/tmp/claude-501/-Users-lap17727-VNG/b3a29153-95ed-4981-9c63-56b663480f1f/scratchpad/mk",
+          "seconds": 44.812000036239624
+        },
+        {
+          "cmd": "python3 - <<'PY' import re, pathlib, difflib SCRATCH = pathlib.Path(\"/private/tmp/claude-501/-Users-",
+          "seconds": 43.992000102996826
+        },
+        {
+          "cmd": "osascript <<'AS' 2>&1 | head -12 tell application \"Microsoft Edge\" activate set out to \"\" repeat wit",
+          "seconds": 39.35899996757507
+        },
+        {
+          "cmd": "export DEVELOPER_DIR=/Library/Developer/CommandLineTools; cd /Users/lap17727/VNG/git-vng/gt-promotio",
+          "seconds": 35.02800011634827
+        },
+        {
+          "cmd": "git pull --no-rebase origin develop 2>&1 | tail -3 && git push origin develop 2>&1 | tail -4",
+          "seconds": 25.667999982833862
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source/products && for p in gpn zsm gnmobinew; do echo \"=== $p\"; ",
+          "seconds": 25.128999948501587
+        },
+        {
+          "cmd": "osascript <<'AS' 2>&1 | tail -3 tell application \"Microsoft Edge\" activate repeat with w from 1 to (",
+          "seconds": 24.402999877929688
+        },
+        {
+          "cmd": "git -C /Users/lap17727/VNG/git-vng/cdn-source log -1 --format='%B' c9bad8480 | tail -8",
+          "seconds": 23.85800004005432
+        }
+      ]
+    },
+    {
+      "skill": "superpowers:executing-plans",
+      "machine": 6247.455999851227,
+      "model": 4750.942001104355,
+      "sub": 1140.4740002155304,
+      "wait": 1026.2880001068115,
+      "tools": {
+        "Bash": 1178.4039993286133,
+        "Write": 6.579998731613159,
+        "Edit": 0.8399999141693115,
+        "ToolSearch": 0.09200024604797363,
+        "mcp:claude-in-chrome": 150.1770007610321,
+        "mcp:browserpilot": 154.50999975204468,
+        "Read": 0.8589999675750732,
+        "Agent": 5.052000045776367
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 448,
+          "seconds": 4615.046000957489
+        },
+        "high": {
+          "turns": 18,
+          "seconds": 135.89600014686584
+        }
+      },
+      "ctx": {
+        "150-300k": {
+          "turns": 163,
+          "seconds": 889.3040001392365
+        },
+        ">300k": {
+          "turns": 285,
+          "seconds": 3725.7420008182526
+        },
+        "50-150k": {
+          "turns": 18,
+          "seconds": 135.89600014686584
+        }
+      },
+      "runs": 2,
+      "runMedian": 6078.534999847412,
+      "runP90": 6078.534999847412,
+      "turnsPerRun": 233,
+      "slowBash": [
+        {
+          "cmd": "npx --yes create-next-app@latest tmp-scaffold -e with-supabase --use-npm 2>&1 | tail -20",
+          "seconds": 65.02300000190735
+        },
+        {
+          "cmd": "python3 - <<'PY' import io f='tailwind.config.ts' s=io.open(f,encoding='utf-8').read() old=''' conte",
+          "seconds": 62.51800012588501
+        },
+        {
+          "cmd": "vercel deploy --target preview 2>&1 | tail -12",
+          "seconds": 52.0789999961853
+        },
+        {
+          "cmd": "pkill -f \"next start\" 2>/dev/null; sleep 1; npm run build > /private/tmp/claude-501/-Users-lap17727-",
+          "seconds": 31.48800015449524
+        },
+        {
+          "cmd": "vercel integration add supabase --plan free -m region=sin1 --no-claim 2>&1 | tail -25",
+          "seconds": 23.632999897003174
+        },
+        {
+          "cmd": "pkill -f \"next dev\" 2>/dev/null; pkill -9 -f \"next-server\" 2>/dev/null; sleep 2; lsof -ti:3000,3001 ",
+          "seconds": 20.54200005531311
+        },
+        {
+          "cmd": "pkill -f \"next dev\"; sleep 2; rm -rf .next; npm run dev > /private/tmp/claude-501/-Users-lap17727-Co",
+          "seconds": 20.438999891281128
+        },
+        {
+          "cmd": "pkill -f \"next dev\"; sleep 2; rm -rf .next; npm run dev > /private/tmp/claude-501/-Users-lap17727-Co",
+          "seconds": 19.80999994277954
+        },
+        {
+          "cmd": "python3 - <<'PY' import io f='tailwind.config.ts' s=io.open(f,encoding='utf-8').read() old = ''' con",
+          "seconds": 19.625999927520752
+        },
+        {
+          "cmd": "pkill -f \"next dev\" 2>/dev/null; pkill -f \"next start\" 2>/dev/null; sleep 2; rm -rf .next node_modul",
+          "seconds": 17.97000002861023
+        }
+      ]
+    },
+    {
+      "skill": "psd-cut",
+      "machine": 3680.0530002117157,
+      "model": 2870.1920013427734,
+      "sub": 1313.9939999580383,
+      "wait": 1223.2639999389648,
+      "tools": {
+        "Bash": 660.9959995746613,
+        "SendMessage": 1.4839999675750732,
+        "mcp:claude-in-chrome": 44.12499928474426,
+        "Agent": 7.825999975204468,
+        "Read": 0.01699995994567871,
+        "ToolSearch": 0.029999971389770508,
+        "mcp:browserpilot": 90.1729998588562,
+        "mcp:claude_ai_Atlassian": 3.074000120162964,
+        "Write": 2.121999979019165,
+        "Skill": 0.014000177383422852
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 67,
+          "seconds": 833.7000007629395
+        },
+        "high": {
+          "turns": 127,
+          "seconds": 2036.492000579834
+        }
+      },
+      "ctx": {
+        ">300k": {
+          "turns": 51,
+          "seconds": 714.6350002288818
+        },
+        "50-150k": {
+          "turns": 17,
+          "seconds": 123.90300035476685
+        },
+        "150-300k": {
+          "turns": 126,
+          "seconds": 2031.6540007591248
+        }
+      },
+      "runs": 2,
+      "runMedian": 2808.2270002365112,
+      "runP90": 2808.2270002365112,
+      "turnsPerRun": 97,
+      "slowBash": [
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source && git status --short | grep -v \"products/gn/landing/2026-",
+          "seconds": 77.56699991226196
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source && git pull --autostash origin master 2>&1 | head -5; git ",
+          "seconds": 77.31900000572205
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/vportal2view && git grep -n -i \"daitiecsinhnhat17\\|2026-sinhnhat-17\" ",
+          "seconds": 74.69099998474121
+        },
+        {
+          "cmd": "OUT=/Users/lap17727/VNG/agent-auto/designs/GW-477/_auto-export/3-shop bash ~/VNG/agent-auto/skills/p",
+          "seconds": 32.200000047683716
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source && git log -1 --format='%an %ad' --date=short b9b32d70f &&",
+          "seconds": 26.282000064849854
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto && S=/private/tmp/claude-501/-Users-lap17727-VNG-agent-auto/4da29de0-8c1a-4028-9",
+          "seconds": 19.54699993133545
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto && O=designs/GW-844/_auto-export/pbm-daichientranhtai-pc-optimized; python3 - <<",
+          "seconds": 13.315999984741211
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto && O=designs/GW-844/_auto-export/pbm-daichientranhtai-pc-optimized; python3 - <<",
+          "seconds": 12.664999961853027
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto && S=/private/tmp/claude-501/-Users-lap17727-VNG-agent-auto/4da29de0-8c1a-4028-9",
+          "seconds": 11.96500015258789
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto && S=/private/tmp/claude-501/-Users-lap17727-VNG-agent-auto/4da29de0-8c1a-4028-9",
+          "seconds": 11.921000003814697
+        }
+      ]
+    },
+    {
+      "skill": "vercel:vercel-storage",
+      "machine": 2260.5499999523163,
+      "model": 1549.166000366211,
+      "sub": 1321.6820001602173,
+      "wait": 12076.950999975204,
+      "tools": {
+        "Bash": 546.9789991378784,
+        "Agent": 9.385000228881836,
+        "ToolSearch": 0.03900003433227539,
+        "mcp:claude-in-chrome": 154.96400022506714,
+        "TaskStop": 0.01699995994567871
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 143,
+          "seconds": 1549.166000366211
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 49,
+          "seconds": 714.215000629425
+        },
+        "150-300k": {
+          "turns": 94,
+          "seconds": 834.9509997367859
+        }
+      },
+      "runs": 1,
+      "runMedian": 2260.5499999523163,
+      "runP90": 2260.5499999523163,
+      "turnsPerRun": 143,
+      "slowBash": [
+        {
+          "cmd": "/bin/sleep 60; npx eslint . 2>&1 | tail -6; echo \"ESLINT done\"; grep -c \"hideRecentOnEntry\\|hideRece",
+          "seconds": 62.73399996757507
+        },
+        {
+          "cmd": "/bin/sleep 45; npx tsc --noEmit 2>&1 | tail -5; echo \"--- mtimes ---\"; ls -lT src/app/page.tsx src/a",
+          "seconds": 47.07599997520447
+        },
+        {
+          "cmd": "vercel deploy --prod 2>&1 | tail -6",
+          "seconds": 42.94099998474121
+        },
+        {
+          "cmd": "cat > .gitignore.append <<'EOF' EOF rm -f .gitignore.append grep -qxF '.vercel' .gitignore || echo '",
+          "seconds": 38.37100005149841
+        },
+        {
+          "cmd": "vercel deploy --prod 2>&1 | tail -8",
+          "seconds": 25.636000156402588
+        },
+        {
+          "cmd": "/bin/sleep 20; vercel ls form-voting 2>&1 | grep -E 'Ready|Building|Error|Queued' | head -4",
+          "seconds": 23.430999994277954
+        },
+        {
+          "cmd": "for i in 1 2 3 4 5 6 7 8 9 10; do if curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/ 2",
+          "seconds": 21.86299991607666
+        },
+        {
+          "cmd": "npx --yes create-next-app@latest . --ts --tailwind --eslint --app --src-dir --import-alias \"@/*\" --u",
+          "seconds": 16.871999979019165
+        },
+        {
+          "cmd": "vercel integration add neon --json 2>&1 | tail -30",
+          "seconds": 16.72099995613098
+        },
+        {
+          "cmd": "npx drizzle-kit push --force 2>&1 | grep -vE '^\\[2K|Pulling' | tail -6",
+          "seconds": 16.371000051498413
+        }
+      ]
+    },
+    {
+      "skill": "clean-code",
+      "machine": 2819.558000087738,
+      "model": 2044.345999956131,
+      "sub": 0,
+      "wait": 1389.789999961853,
+      "tools": {
+        "Bash": 756.1289999485016,
+        "Write": 0.4549999237060547,
+        "Edit": 0.7850003242492676,
+        "mcp:claude_ai_Microsoft_365": 9.76199984550476,
+        "WebFetch": 8.081000089645386
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 117,
+          "seconds": 2044.345999956131
+        }
+      },
+      "ctx": {
+        "150-300k": {
+          "turns": 14,
+          "seconds": 203.20399975776672
+        },
+        ">300k": {
+          "turns": 103,
+          "seconds": 1841.1420001983643
+        }
+      },
+      "runs": 1,
+      "runMedian": 2819.558000087738,
+      "runP90": 2819.558000087738,
+      "turnsPerRun": 117,
+      "slowBash": [
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && export DEVELOPER_DIR=/Library/Developer/CommandLineTools && git add",
+          "seconds": 292.7330000400543
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && export DEVELOPER_DIR=/Library/Developer/CommandLineTools && git add",
+          "seconds": 102.04599976539612
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && node --test 'test/*.test.mjs' 2>&1 | grep -E '^ℹ (tests|pass|fail)'",
+          "seconds": 46.91199994087219
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && node bin/tick.mjs --dry --force 2>&1 | tail -6 && cp launchd/com.to",
+          "seconds": 31.3270001411438
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && node -e ' const fs=require(\"fs\"); const edit=(f,a,b)=>{const s=fs.r",
+          "seconds": 22.509999990463257
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && node --check bin/tick.mjs && node -e ' const fs=require(\"fs\");const",
+          "seconds": 20.775999784469604
+        },
+        {
+          "cmd": "out=/private/tmp/claude-501/-Users-lap17727/98de65b6-ded3-4643-9f57-3304862cd72c/tasks/bentxe12l.out",
+          "seconds": 17.09500002861023
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && node --test 'test/*.test.mjs' 2>&1 | grep -E '^ℹ (tests|pass|fail)'",
+          "seconds": 7.447999954223633
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && cp launchd/com.tont.chat-radar.bot.plist ~/Library/LaunchAgents/ &&",
+          "seconds": 7.44599986076355
+        },
+        {
+          "cmd": "cd ~/Code-Personal/chat-radar && cp launchd/com.tont.chat-radar.bot.plist ~/Library/LaunchAgents/ &&",
+          "seconds": 7.400000095367432
+        }
+      ]
+    },
+    {
+      "skill": "ui-check",
+      "machine": 2791.898000240326,
+      "model": 2350.555997610092,
+      "sub": 0,
+      "wait": 6377.1269998550415,
+      "tools": {
+        "Bash": 261.32600116729736,
+        "ToolSearch": 0.018000125885009766,
+        "mcp:browserpilot": 153.76500034332275,
+        "Read": 1.1350009441375732,
+        "mcp:claude-in-chrome": 25.098000049591064
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 167,
+          "seconds": 2350.555997610092
+        }
+      },
+      "ctx": {
+        ">300k": {
+          "turns": 167,
+          "seconds": 2350.555997610092
+        }
+      },
+      "runs": 2,
+      "runMedian": 1980.2380001544952,
+      "runP90": 1980.2380001544952,
+      "turnsPerRun": 83.5,
+      "slowBash": [
+        {
+          "cmd": "ls -t ~/.browserpilot/shots/ 2>/dev/null | head; ls -td /Users/lap17727/VNG/**/.browserpilot 2>/dev/",
+          "seconds": 25.391000032424927
+        },
+        {
+          "cmd": "cd /tmp && TOK=$(cat ~/.config/figma-cut/token) && curl -s -m 120 -H \"X-Figma-Token: $TOK\" \"https://",
+          "seconds": 22.016000032424927
+        },
+        {
+          "cmd": "git push origin develop 2>&1 | tail -6 && echo \"local $(git rev-parse HEAD)\" && echo \"remote $(git l",
+          "seconds": 12.996000051498413
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source && git add products/zsm/landing/2026-dua-co-hoi-h5/HTML-pr",
+          "seconds": 9.378999948501587
+        },
+        {
+          "cmd": "for d in /Users/lap17727/VNG/.browserpilot/shots /Users/lap17727/.browserpilot/shots /Users/lap17727",
+          "seconds": 8.397000074386597
+        },
+        {
+          "cmd": "pkill -f \"http-server dist -p 8137\" 2>/dev/null; sleep 1 cd /Users/lap17727/VNG/git-vng/cdn-source/p",
+          "seconds": 6.710000038146973
+        },
+        {
+          "cmd": "cd /tmp && for w in 80 100 120 150 180 200 250; do cp handoff-old.html t.html; npx --yes prettier --",
+          "seconds": 6.527000188827515
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source/products/zsm/landing/2026-dua-co-hoi-h5/assets/zsm-ld-duah",
+          "seconds": 6.2209999561309814
+        },
+        {
+          "cmd": "lsof -nP -iTCP:8137 -sTCP:LISTEN 2>/dev/null | head -2 || echo \"port 8137 trống\" cd /Users/lap17727/",
+          "seconds": 5.703999996185303
+        },
+        {
+          "cmd": "pkill -f \"http.server 8811\" 2>/dev/null; cd /Users/lap17727/VNG/git-vng/cdn-source && git pull --no-",
+          "seconds": 5.427999973297119
+        }
+      ]
+    },
+    {
+      "skill": "video-digest",
+      "machine": 2791.3429996967316,
+      "model": 1761.2510013580322,
+      "sub": 0,
+      "wait": 5395.648000001907,
+      "tools": {
+        "Bash": 775.8459982872009,
+        "Read": 0.34999990463256836,
+        "mcp:browserpilot": 248.67300009727478,
+        "Write": 3.0959999561309814,
+        "ToolSearch": 0.013000011444091797,
+        "Edit": 2.114000082015991
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 94,
+          "seconds": 1761.2510013580322
+        }
+      },
+      "ctx": {
+        "150-300k": {
+          "turns": 64,
+          "seconds": 1146.5049996376038
+        },
+        "50-150k": {
+          "turns": 30,
+          "seconds": 614.7460017204285
+        }
+      },
+      "runs": 2,
+      "runMedian": 1860.3099999427795,
+      "runP90": 1860.3099999427795,
+      "turnsPerRun": 47,
+      "slowBash": [
+        {
+          "cmd": "export DEVELOPER_DIR=/Library/Developer/CommandLineTools; pkill -f \"http.server 884\" 2>/dev/null; cd",
+          "seconds": 459.99699997901917
+        },
+        {
+          "cmd": "export DEVELOPER_DIR=/Library/Developer/CommandLineTools; cd ~/VNG/agent-auto/skills/video-digest/sc",
+          "seconds": 81.52999997138977
+        },
+        {
+          "cmd": "ls -lh /Users/lap17727/Downloads/MicrosoftTeams-video.mp4 && bash ~/VNG/agent-auto/skills/video-dige",
+          "seconds": 55.937000036239624
+        },
+        {
+          "cmd": "cat > /private/tmp/claude-501/-Users-lap17727-VNG-git-vng-cdn-source-products-lan-landing-2026-trung",
+          "seconds": 16.65399980545044
+        },
+        {
+          "cmd": "npm run build-optimize 2>&1 | grep -iE \"ERROR in|compiled|copy-v2\" | tail -3; echo \"=== dist v2 ===\"",
+          "seconds": 16.232999801635742
+        },
+        {
+          "cmd": "export DEVELOPER_DIR=/Library/Developer/CommandLineTools; cd /Users/lap17727/VNG/git-vng/cdn-source/",
+          "seconds": 7.906000137329102
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source/products && echo \"=== rotate-phone trong 2 project metalsl",
+          "seconds": 7.632999897003174
+        },
+        {
+          "cmd": "export DEVELOPER_DIR=/Library/Developer/CommandLineTools; cd /Users/lap17727/VNG/git-vng/cdn-source/",
+          "seconds": 7.2820000648498535
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source/products/lan/landing/2026-trung-thu/dist && (npx --yes htt",
+          "seconds": 4.444000005722046
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source && git log --oneline origin/tont..tont | cat && git mr 2>&",
+          "seconds": 4.4040000438690186
+        }
+      ]
+    },
+    {
+      "skill": "superpowers:writing-skills",
+      "machine": 1650.9110000133514,
+      "model": 1433.8609998226166,
+      "sub": 81.34000039100647,
+      "wait": 33.431999921798706,
+      "tools": {
+        "Bash": 213.18600010871887,
+        "Write": 0.6739997863769531,
+        "Edit": 0.057000160217285156,
+        "Agent": 3.0179998874664307,
+        "Read": 0.07500028610229492,
+        "Skill": 0.039999961853027344
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 70,
+          "seconds": 1433.8609998226166
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 8,
+          "seconds": 148.23800039291382
+        },
+        "150-300k": {
+          "turns": 52,
+          "seconds": 1213.4449994564056
+        },
+        ">300k": {
+          "turns": 10,
+          "seconds": 72.17799997329712
+        }
+      },
+      "runs": 1,
+      "runMedian": 1650.9110000133514,
+      "runP90": 1650.9110000133514,
+      "turnsPerRun": 70,
+      "slowBash": [
+        {
+          "cmd": "bash run.sh \"https://www.figma.com/design/chJXuFfcYUBgsunVKHuGzm/Website-Content-A04---VNGGames-Stud",
+          "seconds": 45.86899995803833
+        },
+        {
+          "cmd": "chmod +x run.sh && rm -rf ~/VNG/agent-auto/designs/GW-796 && bash run.sh https://www.figma.com/desig",
+          "seconds": 43.115999937057495
+        },
+        {
+          "cmd": "python3 - <<'PY' p='fig-trim.py'; s=open(p,encoding='utf-8').read() s=s.replace(' usable = a[..., 3]",
+          "seconds": 26.117000102996826
+        },
+        {
+          "cmd": "python3 - <<'PY' p='fig-trim.py'; s=open(p,encoding='utf-8').read() s=s.replace(''' by = {n[\"id\"]: n",
+          "seconds": 24.504000186920166
+        },
+        {
+          "cmd": "mkdir -p ~/.config/figma-cut && printf '%s' 'figd_REDACTED' > ~/.con",
+          "seconds": 3.493000030517578
+        },
+        {
+          "cmd": "cd /private/tmp/claude-501/-Users-lap17727-VNG-agent-auto/cc625fd3-69f8-4d3b-844b-0b9b15065801/scrat",
+          "seconds": 3.319000005722046
+        },
+        {
+          "cmd": "python3 - <<'PY' p='fig-fetch.py'; s=open(p,encoding='utf-8').read() s=s.replace(\"import urllib.erro",
+          "seconds": 3.047999858856201
+        },
+        {
+          "cmd": "python3 - <<'PY' p='fig-trim.py'; s=open(p,encoding='utf-8').read() s=s.replace(''' best = None for ",
+          "seconds": 2.9769999980926514
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/agent-auto/skills/figma-cut/scripts && echo \"=== figma-cut ===\" && for t in *",
+          "seconds": 2.937999963760376
+        },
+        {
+          "cmd": "for t in psdlib.test.py psd-plan.test.py psd-gate.test.py psd-trim.test.py; do echo \"== $t\"; python3",
+          "seconds": 2.7269999980926514
+        }
+      ]
+    },
+    {
+      "skill": "artifact-design",
+      "machine": 1547.4919998645782,
+      "model": 1505.5719997882843,
+      "sub": 0,
+      "wait": 16670.19000005722,
+      "tools": {
+        "Bash": 29.063999891281128,
+        "Artifact": 12.856000185012817
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 28,
+          "seconds": 1505.5719997882843
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 17,
+          "seconds": 1174.9950001239777
+        },
+        "150-300k": {
+          "turns": 11,
+          "seconds": 330.57699966430664
+        }
+      },
+      "runs": 2,
+      "runMedian": 1105.808000087738,
+      "runP90": 1105.808000087738,
+      "turnsPerRun": 14,
+      "slowBash": [
+        {
+          "cmd": "python3 - <<'PY' from pathlib import Path p = Path(\"docs/present/qc-psd-gate.html\") s = p.read_text(",
+          "seconds": 3.759000062942505
+        },
+        {
+          "cmd": "cat > /private/tmp/claude-501/-Users-lap17727/0c131d61-7230-4e52-b6f3-8c3f1c95eb21/scratchpad/hop-nh",
+          "seconds": 3.5189998149871826
+        },
+        {
+          "cmd": "python3 - <<'PY' from pathlib import Path p = Path(\"docs/present/qc-psd-gate.html\") s = p.read_text(",
+          "seconds": 2.9710001945495605
+        },
+        {
+          "cmd": "cat > /Users/lap17727/VNG/agent-auto/docs/present/qc-psd-gate.html <<'HTMLEOF' <title>Cổng soát PSD<",
+          "seconds": 2.8399999141693115
+        },
+        {
+          "cmd": "python3 - <<'PY' from pathlib import Path p = Path(\"docs/present/qc-psd-gate.html\") s = p.read_text(",
+          "seconds": 1.936000108718872
+        },
+        {
+          "cmd": "cat > /Users/lap17727/VNG/agent-auto/docs/present/qc-psd-gate.html <<'HTMLEOF' <title>Cổng soát PSD<",
+          "seconds": 1.875
+        },
+        {
+          "cmd": "python3 - <<'PY' from pathlib import Path p = Path(\"docs/present/qc-psd-gate.html\") s = p.read_text(",
+          "seconds": 1.8380000591278076
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/agent-auto echo \"=== psd-cut: photoshop? ===\"; grep -niE \"photoshop|osascript",
+          "seconds": 1.7929999828338623
+        },
+        {
+          "cmd": "cd /private/tmp/claude-501/-Users-lap17727/0c131d61-7230-4e52-b6f3-8c3f1c95eb21/scratchpad && sed -i",
+          "seconds": 1.741999864578247
+        },
+        {
+          "cmd": "python3 - <<'PY' from pathlib import Path p = Path(\"docs/present/qc-psd-gate.html\") s = p.read_text(",
+          "seconds": 1.6850001811981201
+        }
+      ]
+    },
+    {
+      "skill": "dataviz",
+      "machine": 1321.2050001621246,
+      "model": 991.2080008983612,
+      "sub": 0,
+      "wait": 0,
+      "tools": {
+        "Bash": 329.5579991340637,
+        "Write": 0.43900012969970703
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 98,
+          "seconds": 991.2080008983612
+        }
+      },
+      "ctx": {
+        "150-300k": {
+          "turns": 45,
+          "seconds": 465.0720007419586
+        },
+        ">300k": {
+          "turns": 53,
+          "seconds": 526.1360001564026
+        }
+      },
+      "runs": 1,
+      "runMedian": 1321.2050001621246,
+      "runP90": 1321.2050001621246,
+      "turnsPerRun": 98,
+      "slowBash": [
+        {
+          "cmd": "npm test 2>&1 | grep -E \"Tests |Test Files|FAIL\" | head -5 && npx eslint app components lib 2>&1 | g",
+          "seconds": 14.39299988746643
+        },
+        {
+          "cmd": "npm run build 2>&1 | grep -E \"Compiled|Type error|error\" | head -4 && npx eslint app components lib ",
+          "seconds": 11.49399995803833
+        },
+        {
+          "cmd": "npm run build 2>&1 | grep -E \"Compiled successfully\" && npm test 2>&1 | grep -E \"Test Files|Tests \" ",
+          "seconds": 11.348999977111816
+        },
+        {
+          "cmd": "python3 - <<'PY' import pathlib p = pathlib.Path('app/page.tsx'); s = p.read_text() s = s.replace('<",
+          "seconds": 11.343000173568726
+        },
+        {
+          "cmd": "python3 - <<'PY' import pathlib # noindex cho toan bo phan sau dang nhap p = pathlib.Path('app/(app)",
+          "seconds": 11.045000076293945
+        },
+        {
+          "cmd": "npm run build 2>&1 | grep -E \"Compiled|Type error|error\" | head -4 && npx eslint app components lib ",
+          "seconds": 10.930999994277954
+        },
+        {
+          "cmd": "npm run build 2>&1 | grep -E \"Compiled|Type error\" | head -3 && npx eslint app components lib 2>&1 |",
+          "seconds": 10.878000020980835
+        },
+        {
+          "cmd": "python3 - <<'PY' import pathlib for f in ['components/login-form.tsx','components/sign-up-form.tsx',",
+          "seconds": 10.25600004196167
+        },
+        {
+          "cmd": "npm run build 2>&1 | grep -E \"Compiled|Type error|error\" | head -4 && npm test 2>&1 | tail -4",
+          "seconds": 10.128999948501587
+        },
+        {
+          "cmd": "npx eslint app components lib 2>&1 | grep -E \"error\" | head -5; npm test 2>&1 | grep -E \"Tests |Test",
+          "seconds": 8.70799994468689
+        }
+      ]
+    },
+    {
+      "skill": "superpowers:test-driven-development",
+      "machine": 885.298999786377,
+      "model": 674.2060012817383,
+      "sub": 0,
+      "wait": 547.813000202179,
+      "tools": {
+        "Bash": 150.46799898147583,
+        "mcp:claude-in-chrome": 60.62499952316284
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 61,
+          "seconds": 674.2060012817383
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 25,
+          "seconds": 269.8350009918213
+        },
+        "150-300k": {
+          "turns": 36,
+          "seconds": 404.371000289917
+        }
+      },
+      "runs": 2,
+      "runMedian": 466.0590000152588,
+      "runP90": 466.0590000152588,
+      "turnsPerRun": 30.5,
+      "slowBash": [
+        {
+          "cmd": "git push origin main 2>&1 | tail -15",
+          "seconds": 51.78699994087219
+        },
+        {
+          "cmd": "SP=/private/tmp/claude-501/-Users-lap17727-Code-Personal/38c00b26-095c-4719-8b27-c79d98a0a778/scratc",
+          "seconds": 11.911999940872192
+        },
+        {
+          "cmd": "grep -nE '^(import|from) ' src/extractor.py | head -20; echo \"--- pypi reachable? ---\"; curl -s -o /",
+          "seconds": 10.896999835968018
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto && echo \"=== FULL tools ===\" && node --test tools/*.test.mjs 2>&1 | grep -E \"^ℹ ",
+          "seconds": 2.4119999408721924
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto && echo \"=== tools ===\" && node --test tools/*.test.mjs 2>&1 | grep -E \"^ℹ (test",
+          "seconds": 2.2260000705718994
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto && cat package.json 2>/dev/null | grep -A6 '\"scripts\"' ; echo \"=== chạy toàn bộ ",
+          "seconds": 2.1470000743865967
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto && python3 - <<'PYEOF' import io p='tools/radar-tick.test.mjs' t=io.open(p,encod",
+          "seconds": 2.003000020980835
+        },
+        {
+          "cmd": "cd ~/VNG/agent-auto && cat >> tools/autoclose.test.mjs <<'EOF' test('thiếu schema/vocab.json thì báo",
+          "seconds": 1.9920001029968262
+        },
+        {
+          "cmd": "mkdir -p tests && cat > tests/test_excel_header_roles.py <<'PY' import sys from pathlib import Path ",
+          "seconds": 1.9689998626708984
+        },
+        {
+          "cmd": "MD=/Users/lap17727/.claude/projects/-Users-lap17727-Code-Personal/memory; ls -1 $MD 2>/dev/null; ech",
+          "seconds": 1.8910000324249268
+        }
+      ]
+    },
+    {
+      "skill": "vercel:marketplace",
+      "machine": 516.0320000648499,
+      "model": 487.478000164032,
+      "sub": 0,
+      "wait": 0,
+      "tools": {
+        "Bash": 27.82800006866455,
+        "Skill": 0.13300013542175293,
+        "Write": 0.08999991416931152,
+        "Edit": 0.5029997825622559
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 19,
+          "seconds": 487.478000164032
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 6,
+          "seconds": 245.0199999809265
+        },
+        "150-300k": {
+          "turns": 13,
+          "seconds": 242.45800018310547
+        }
+      },
+      "runs": 2,
+      "runMedian": 487.2980000972748,
+      "runP90": 487.2980000972748,
+      "turnsPerRun": 9.5,
+      "slowBash": [
+        {
+          "cmd": "npm i -g vercel 2>&1 | tail -5; echo \"---\"; vercel --version 2>&1 | tail -2",
+          "seconds": 14.094000101089478
+        },
+        {
+          "cmd": "vercel integration discover --category storage 2>&1 | head -30",
+          "seconds": 3.6619999408721924
+        },
+        {
+          "cmd": "vercel integration guide supabase --framework nextjs 2>&1 | head -60",
+          "seconds": 2.5950000286102295
+        },
+        {
+          "cmd": "echo \"--- pwd/ls ---\"; pwd; ls -la 2>/dev/null | head -20; echo \"--- node ---\"; node -v 2>/dev/null ",
+          "seconds": 2.2060000896453857
+        },
+        {
+          "cmd": "cd /Users/lap17727/Code-Personal/manager-wedding/docs/superpowers/plans && grep -n \"Step [0-9]\" 2026",
+          "seconds": 1.940999984741211
+        },
+        {
+          "cmd": "cd /Users/lap17727/Code-Personal/manager-wedding && git add -A && git commit -q -m \"$(printf '%s\\n' ",
+          "seconds": 1.621999979019165
+        },
+        {
+          "cmd": "f=2026-09-17-p0-platform-core.md echo \"=== placeholder scan ===\"; grep -niE \"TBD|TODO|fill in|implem",
+          "seconds": 1.5509998798370361
+        },
+        {
+          "cmd": "f=2026-09-17-p0-platform-core.md sed -n '126,145p' \"$f\"",
+          "seconds": 0.09100008010864258
+        },
+        {
+          "cmd": "mkdir -p /Users/lap17727/Code-Personal/manager-wedding/docs/superpowers/plans && cat > /Users/lap177",
+          "seconds": 0.06599998474121094
+        }
+      ]
+    },
+    {
+      "skill": "figma-cut",
+      "machine": 393.75300002098083,
+      "model": 217.96500039100647,
+      "sub": 0,
+      "wait": 0,
+      "tools": {
+        "Bash": 168.1459996700287,
+        "ToolSearch": 0.005000114440917969,
+        "mcp:claude_ai_Figma": 7.569999933242798,
+        "Skill": 0.06699991226196289
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 26,
+          "seconds": 217.96500039100647
+        }
+      },
+      "ctx": {
+        "50-150k": {
+          "turns": 26,
+          "seconds": 217.96500039100647
+        }
+      },
+      "runs": 1,
+      "runMedian": 393.75300002098083,
+      "runP90": 393.75300002098083,
+      "turnsPerRun": 26,
+      "slowBash": [
+        {
+          "cmd": "python3 -c \" import importlib.util,sys spec=importlib.util.spec_from_file_location('ff','fig-fetch.p",
+          "seconds": 121.46399998664856
+        },
+        {
+          "cmd": "sleep 20; cat /private/tmp/claude-501/-Users-lap17727-VNG/875307ea-dbcf-4ca1-8181-34135e8c3f89/tasks",
+          "seconds": 20.080999851226807
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source && git log --oneline -12 -- products/zsm/landing/2026-dua-",
+          "seconds": 3.6449999809265137
+        },
+        {
+          "cmd": "pkill -f \"fig-fetch\" 2>/dev/null; cd /Users/lap17727/VNG/agent-auto/skills/figma-cut/scripts && TOK=",
+          "seconds": 2.1710000038146973
+        },
+        {
+          "cmd": "cat /Users/lap17727/.claude/projects/-Users-lap17727-VNG/memory/figma-api-starter-khoa-files-full.md",
+          "seconds": 1.7000000476837158
+        },
+        {
+          "cmd": "python3 -c \" import json,re old=json.load(open('agent-auto/designs/GW-796/_auto-export/figma-chJXuFf",
+          "seconds": 1.564000129699707
+        },
+        {
+          "cmd": "grep -nE '^\\s{0,4}<(section|frame|canvas)' /tmp/fig796-meta.xml | sed 's/ */ /g' | head -60",
+          "seconds": 1.5420000553131104
+        },
+        {
+          "cmd": "cd /Users/lap17727/VNG/git-vng/cdn-source/products/zsm/landing/2026-dua-co-hoi-h5 && find . -path ./",
+          "seconds": 1.5169999599456787
+        },
+        {
+          "cmd": "sed -n '410,425p' /tmp/fig796-meta.xml | sed 's/ */ /g'",
+          "seconds": 1.5160000324249268
+        },
+        {
+          "cmd": "sed -n '699,800p' /tmp/fig796-meta.xml",
+          "seconds": 1.4790000915527344
+        }
+      ]
+    },
+    {
+      "skill": "check-promotion",
+      "machine": 259.539999961853,
+      "model": 181.80099987983704,
+      "sub": 0,
+      "wait": 27.10199999809265,
+      "tools": {
+        "Bash": 76.71000027656555,
+        "Write": 1.0289998054504395
+      },
+      "effort": {
+        "xhigh": {
+          "turns": 14,
+          "seconds": 181.80099987983704
+        }
+      },
+      "ctx": {
+        "150-300k": {
+          "turns": 14,
+          "seconds": 181.80099987983704
+        }
+      },
+      "runs": 1,
+      "runMedian": 259.539999961853,
+      "runP90": 259.539999961853,
+      "turnsPerRun": 14,
+      "slowBash": [
+        {
+          "cmd": "cd ~/VNG/git-vng/gt-promotion-template && git push origin develop 2>&1 | tail -6",
+          "seconds": 56.27900004386902
+        },
+        {
+          "cmd": "cd ~/VNG/git-vng/gt-promotion-template && git pull 2>&1 | tail -3 && git status --short GunnyMobi/La",
+          "seconds": 2.5399999618530273
+        },
+        {
+          "cmd": "cd ~/VNG/git-vng/gt-promotion-template && git branch --show-current && git log --oneline -3 && echo ",
+          "seconds": 1.88100004196167
+        },
+        {
+          "cmd": "G=~/VNG/git-vng/gt-promotion-template/GunnyMobi/LandingTrungThu2026_58596/mainsite/gno.html python3 ",
+          "seconds": 1.8529999256134033
+        },
+        {
+          "cmd": "cd /Users/lap17727/.claude/projects/-Users-lap17727-VNG-git-vng-cdn-source/memory && python3 - <<'PY",
+          "seconds": 1.7680001258850098
+        },
+        {
+          "cmd": "G=~/VNG/git-vng/gt-promotion-template/GunnyMobi/LandingTrungThu2026_58596/mainsite/gno.html; grep -n",
+          "seconds": 1.7290000915527344
+        },
+        {
+          "cmd": "cd /Users/lap17727/.claude/projects/-Users-lap17727-VNG-git-vng-cdn-source/memory && python3 - <<'PY",
+          "seconds": 1.7030000686645508
+        },
+        {
+          "cmd": "cd ~/VNG/git-vng/gt-promotion-template && git status --short GunnyMobi/LandingTrungThu2026_58596; ec",
+          "seconds": 1.69100022315979
+        },
+        {
+          "cmd": "cd ~/VNG/git-vng/gt-promotion-template && git commit --file - -- GunnyMobi/LandingTrungThu2026_58596",
+          "seconds": 1.688999891281128
+        },
+        {
+          "cmd": "cd ~/.claude/skills/check-promotion/reference && sed -n '1,80p' 02-rut-tham-may-man.md",
+          "seconds": 1.6349999904632568
+        }
+      ]
+    },
+    {
+      "skill": "update-config",
+      "machine": 86.56399989128113,
+      "model": 67.63400030136108,
+      "sub": 0,
+      "wait": 0,
+      "tools": {
+        "Read": 0.04399991035461426,
+        "Edit": 7.236999988555908,
+        "Bash": 11.440999746322632,
+        "ToolSearch": 0.009999990463256836,
+        "mcp:claude-in-chrome": 0.1979999542236328
+      },
+      "effort": {
+        "medium": {
+          "turns": 9,
+          "seconds": 67.63400030136108
+        }
+      },
+      "ctx": {
+        ">300k": {
+          "turns": 9,
+          "seconds": 67.63400030136108
+        }
+      },
+      "runs": 1,
+      "runMedian": 86.56399989128113,
+      "runP90": 86.56399989128113,
+      "turnsPerRun": 9,
+      "slowBash": [
+        {
+          "cmd": "jq -e '.permissions.allow' /Users/lap17727/.claude/settings.json",
+          "seconds": 11.056999921798706
+        },
+        {
+          "cmd": "python3 - <<'EOF' p='.claude/state.md'; s=open(p).read() mark='- 19/9 (phiên sau) — GHI LẠI:' if mar",
+          "seconds": 0.14499998092651367
+        },
+        {
+          "cmd": "ls .claude/state.md 2>/dev/null && grep -n \"bugfix-lite-bomber\" .claude/state.md | head -5",
+          "seconds": 0.12599992752075195
+        },
+        {
+          "cmd": "sed -n '1,12p' .claude/state.md",
+          "seconds": 0.11299991607666016
+        }
+      ]
+    }
+  ]
+}

@@ -29,11 +29,11 @@ node tools/wall-scan.mjs [--days 14] [--project <chuỗi>] [--skill <tên>] [--j
 | Tool | `tool_use` → `tool_result` cùng id. Khoảng > 1 giờ bỏ |
 | AskUserQuestion | tính vào chờ user, không vào máy chạy |
 | Chờ user | trả lời cuối của model → tin user thật (không phải tool_result, không `isMeta`). Khoảng > 24 giờ bỏ |
-| Skill của một khoảng | `attributionSkill` của dòng assistant kết thúc khoảng (model) hoặc dòng assistant chứa `tool_use` (tool). Không có → `(ngoài skill)` |
+| Skill của một khoảng | skill của dòng assistant kết thúc khoảng (model) hoặc dòng assistant chứa `tool_use` (tool). Skill của dòng = `attributionSkill` gần nhất trong phiên, **giữ qua các lượt user**; ngắt khi user vắng > 30 phút. Không có → `(ngoài skill)` |
 | Một lần chạy skill | chuỗi dòng assistant liên tiếp cùng `attributionSkill`; thời gian = tổng máy chạy trong chuỗi (không tính chờ user) |
-| Subagent | file dưới `<phiên>/subagents/**`: khoảng model + tool tính như trên, gắn vào skill của dòng assistant phát ra `Agent` tương ứng (nối qua `toolUseResult.agentId` ↔ tên file `agent-<id>.jsonl`). Không nối được → `(subagent không rõ skill)` |
+| Subagent | file dưới `<phiên>/subagents/**`: khoảng model + tool tính như trên, gắn vào skill của dòng assistant phát ra `Agent` tương ứng (nối qua `toolUseResult.agentId` ↔ tên file `agent-<id>.jsonl`). Agent của Workflow nằm ở `subagents/workflows/<runId>/agent-*.jsonl`, nối qua `toolUseResult.runId` của tool `Workflow`. Không nối được → `(subagent không rõ skill)` |
 
-`attributionSkill` chỉ gắn trên dòng assistant (đã kiểm 3 ngày: 3.172/11.370 dòng assistant, 0 dòng loại khác), nên không được giữ "dính" qua các dòng.
+`attributionSkill` chỉ gắn trên dòng assistant (đã kiểm 3 ngày: 3.172/11.370 dòng assistant, 0 dòng loại khác) và **chỉ trong lượt user đã gọi skill** — lượt user sau ("oke triển đi") mất nhãn dù vẫn là việc của skill đó. Đo không giữ nhãn: `(ngoài skill)` = 71,6h/92h máy chạy; giữ nhãn qua lượt user + ngắt 30 phút: 31,2h. Giới hạn đã biết: đổi sang việc khác trong cùng phiên mà không vắng 30 phút thì vẫn tính vào skill cũ.
 
 ## Cấu trúc
 

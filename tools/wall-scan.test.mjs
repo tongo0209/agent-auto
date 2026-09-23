@@ -1,5 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { sliceTimeline, scanSession, summarize, OUTSIDE, ORPHAN } from './wall-scan.mjs';
 
 const at = (sec) => new Date(Date.UTC(2026, 8, 20, 0, 0, sec)).toISOString();
@@ -100,4 +104,38 @@ test('summarize gộp theo skill: lần chạy, lượt model, effort, bash ch�
   assert.deepStrictEqual(a.ctx['>300k'], { turns: 1, seconds: 2 });
   assert.deepStrictEqual(a.slowBash, [{ cmd: 'sleep 9', seconds: 9 }]);
   assert.strictEqual(skills[0].skill, 'a');
+});
+
+test('CLI đọc phiên + subagent trên đĩa và in JSON', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wall-'));
+  const jsonl = (rows) => rows.map((r) => JSON.stringify(r)).join('\n') + '\n';
+  fs.mkdirSync(path.join(root, 'proj', 'sess1', 'subagents'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'proj', 'sess1.jsonl'), jsonl([
+    asst(0, { skill: 'daily', tool: { id: 'ag', name: 'Agent' } }),
+    result(1, 'ag', { toolUseResult: { agentId: 'abc' } }),
+    asst(2, { skill: 'daily', tool: { id: 'wf', name: 'Workflow' } }),
+    result(3, 'wf', { toolUseResult: { runId: 'wf_1' } }),
+  ]));
+  fs.writeFileSync(path.join(root, 'proj', 'sess1', 'subagents', 'agent-abc.jsonl'), jsonl([say(0), asst(7)]));
+  fs.mkdirSync(path.join(root, 'proj', 'sess1', 'subagents', 'workflows', 'wf_1'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'proj', 'sess1', 'subagents', 'workflows', 'wf_1', 'agent-q.jsonl'), jsonl([say(0), asst(3)]));
+  const out = JSON.parse(execFileSync('node', [path.resolve(import.meta.dirname, 'wall-scan.mjs'), '--root', root, '--days', '100000', '--json'], { encoding: 'utf8' }));
+  assert.strictEqual(out.sessions, 1);
+  assert.strictEqual(out.skills.find((s) => s.skill === 'daily').sub, 10);
+});
+test('nhãn skill giữ qua lượt user, ngắt khi user vắng quá 30 phút', () => {
+  const { slices } = sliceTimeline([say(0), asst(2, { skill: 'a' }), say(60), asst(65), say(2000), asst(2004)], { session: 's' });
+  assert.deepStrictEqual(slices.filter((s) => s.kind === 'model').map((s) => s.skill), ['a', 'a', OUTSIDE]);
+});
+
+test('agent của Workflow nối về skill cha qua runId', () => {
+  const slices = scanSession({
+    session: 's',
+    main: [
+      asst(0, { skill: 'daily', tool: { id: 'wf', name: 'Workflow' } }),
+      result(1, 'wf', { toolUseResult: { runId: 'wf_1' } }),
+    ],
+    subagents: { 'wf_1/xyz': [say(0), asst(4)] },
+  });
+  assert.deepStrictEqual(pick(slices.filter((s) => s.sub)), [{ kind: 'model', skill: 'daily', seconds: 4 }]);
 });

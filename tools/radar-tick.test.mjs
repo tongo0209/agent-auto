@@ -18,6 +18,7 @@ import {
   runTick,
   ALLOWED_TOOLS,
   stepCheck,
+  effortFor,
 } from './radar-tick.mjs';
 
 /** 10/8/2026 là thứ Hai — `at(0,…)` = T2, `at(5,…)` = T7, `at(6,…)` = CN */
@@ -720,4 +721,13 @@ test('lượt delta "ok" mà bỏ ghi board thì ghi sổ stepsMissing và báo 
   });
   assert.deepEqual(row.stepsMissing, ['board']);
   assert.match(sent[0], /bỏ bước: board/);
+});
+
+test('effort chỉ áp cho prompt đã qua cổng đủ bước — bugwatch chưa có cổng thì giữ mặc định', () => {
+  const d = root({ effort: 'medium' });
+  const seen = [];
+  runTick({ root: d, now: monday, argv: ['--force'], notify: () => {}, runClaude: (prompt, opts) => (seen.push([prompt, opts.effort]), doSteps(d, monday), { ok: true, ms: 1 }) });
+  assert.deepEqual(seen, [['/daily delta', 'medium']]);
+  assert.equal(effortFor('/daily bugwatch', { effort: 'medium' }), null);
+  assert.equal(effortFor('/daily bugwatch', { effort: 'medium', effortPrompts: ['/daily delta', '/daily bugwatch'] }), 'medium');
 });

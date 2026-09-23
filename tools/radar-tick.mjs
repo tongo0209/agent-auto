@@ -161,6 +161,15 @@ export function buildArgs(prompt = '/daily delta', model = null, effort = null) 
 }
 
 /**
+ * Hạ effort chỉ an toàn ở prompt có cổng đủ bước đỡ phía sau — mặc định chỉ delta.
+ * Muốn mở cho prompt khác thì phải dựng cổng cho nó trước rồi mới thêm vào `effortPrompts`.
+ */
+export function effortFor(prompt, cfg) {
+  const allowed = cfg.effortPrompts ?? ['/daily delta'];
+  return cfg.effort && allowed.includes(prompt) ? cfg.effort : null;
+}
+
+/**
  * Cổng đủ bước của lượt delta: hạ model/effort từng làm lượt "ok" mà bỏ bước ghi board (13/8),
  * nên phải kiểm bằng dấu vết trên đĩa chứ không tin kết quả claude tự báo.
  */
@@ -352,9 +361,10 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
     const timeoutMin = choice.prompt === '/daily bugwatch' ? cfg.timeoutMinBugwatch || 15 : cfg.timeoutMin;
     const startedMs = Date.now();
     const lastRunBefore = state.lastRun;
-    const res = (runClaude || (() => realClaude(root, timeoutMin * 60e3, cfg.model || null, choice.prompt, cfg.effort || null)))(
-      choice.prompt,
-    );
+    const effort = effortFor(choice.prompt, cfg);
+    const res = (runClaude || (() => realClaude(root, timeoutMin * 60e3, cfg.model || null, choice.prompt, effort)))(choice.prompt, {
+      effort,
+    });
     const steps = res.ok && choice.prompt === '/daily delta' ? stepCheck({ root, startedMs, lastRunBefore, now }) : undefined;
     const stepsMissing = steps ? Object.keys(steps).filter((k) => !steps[k]) : [];
     if (choice.prompt === '/daily bugwatch') stampPoll(root, now, state);
@@ -383,7 +393,7 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
       skipped: null,
       prompt: choice.prompt,
       ms: res.ms,
-      effort: cfg.effort || undefined,
+      effort: effort || undefined,
       steps,
       stepsMissing: stepsMissing.length ? stepsMissing : undefined,
       changed,

@@ -31,8 +31,14 @@ Team (gọi qua tool Agent, `subagent_type` đúng tên):
 
 Tham số: `$ARGUMENTS`.
 
-1. **Mode**: token đầu = `report` → chỉ chạy giai đoạn [5] GHI-CHROME từ board có sẵn (không intake/fix lại). Token đầu = `turbo` → chạy trọn luồng nhưng bật SONG SONG SÂU (xem "Mode `turbo`" trong GIAI ĐOẠN [2]). Không có token mode → chạy trọn luồng (mặc định: cap-3 + model kế thừa). Phần còn lại của args: URL sheet (`docs.google.com/spreadsheets`) / URL OneDrive-SharePoint / path-URL file `.xlsx/.pdf/.pptx/.docx` / text dán / project slug / rỗng.
-2. **Nhận diện nguồn (INTAKE ADAPTER):** args có URL `docs.google.com/spreadsheets` → `gsheet` (luồng chuẩn bên dưới). URL `docs.google.com/document` → `gdoc` (Drive MCP `read_file_content`). URL `drive.google.com/file/d/` → `drive-file` (Drive MCP `download_file_content` → Read local). URL sharepoint/onedrive/office.com → `excel-online`. File local hoặc URL tải được đuôi `.xlsx/.pdf/.pptx/.docx` → `file`. User dán text/chat/email → `text`. Nguồn ≠ gsheet → xem mục INTAKE ADAPTER cuối file (bóc về bug-record chuẩn rồi chạy pipeline y hệt) — KHÔNG từ chối, KHÔNG trỏ skill khác.
+0. **Cổng phiên dài — việc ĐẦU TIÊN, trước cả đọc sheet:** lượt gọi skill có dòng `[G-CTX-1] Context phiên
+   đang ~<n>k` (hook `token-watch`, ngưỡng 200k) ⇒ DỪNG, in đúng 1 dòng: `Phiên đã ~<n>k token — đợt fix
+   ~120 lượt sẽ gửi lại chỗ đó mỗi lượt, chạy chậm ~2×. Gõ /clear rồi dán lại đúng lệnh này.` Args có
+   `--keep-context` ⇒ bỏ qua cổng và gỡ token đó khỏi args trước bước 1. Đo 14 ngày tới 23/9/2026: manager
+   chạy ở context TB 265k (có lần vào skill đã 424k); lượt 150–300k mất 23,8s so với 10,2s ở 50–150k.
+
+1. **Mode**: token đầu = `report` → chỉ chạy giai đoạn [5] GHI-CHROME từ board có sẵn (không intake/fix lại). Token đầu = `turbo` → chạy trọn luồng nhưng bật SONG SONG SÂU (xem `reference/mode-turbo.md` — trỏ ở GIAI ĐOẠN [2]). Không có token mode → chạy trọn luồng (mặc định: cap-3 + model kế thừa). Phần còn lại của args: URL sheet (`docs.google.com/spreadsheets`) / URL OneDrive-SharePoint / path-URL file `.xlsx/.pdf/.pptx/.docx` / text dán / project slug / rỗng.
+2. **Nhận diện nguồn (INTAKE ADAPTER):** args có URL `docs.google.com/spreadsheets` → `gsheet` (luồng chuẩn bên dưới). URL `docs.google.com/document` → `gdoc` (Drive MCP `read_file_content`). URL `drive.google.com/file/d/` → `drive-file` (Drive MCP `download_file_content` → Read local). URL sharepoint/onedrive/office.com → `excel-online`. File local hoặc URL tải được đuôi `.xlsx/.pdf/.pptx/.docx` → `file`. User dán text/chat/email → `text`. Nguồn ≠ gsheet → Read `reference/intake-adapter.md` (bóc về bug-record chuẩn rồi chạy pipeline y hệt) — KHÔNG từ chối, KHÔNG trỏ skill khác.
 2b. **Đưa sheet vào theo dõi NGAY (cơ học, KHÔNG hỏi user):** nguồn có URL → chạy
    `node ~/VNG/agent-auto/tools/bug-radar.mjs add "<url>" [--key <JIRA-KEY>] [--title "<tên task>"]`
    (key suy được từ args/branch/registry thì gắn, không suy được thì bỏ; title = tên task).
@@ -117,7 +123,7 @@ Tham số: `$ARGUMENTS`.
    - `bugid_col` = chữ cái cột chứa BugID; `status_col` = chữ cái cột `DEV Check Status`; `notes_col` = chữ cái cột `Notes` (sheet không có cột Notes → `notes_col=—`, note routing đi đường feedback-block); `recimg_col` = chữ cái cột `RecommendImage` (không có → `—`); `header_row` = số row của dòng header.
    - Ghi vào header board: `<!-- sheet-map: header_row=<n>; bugid_col=<X>; status_col=<Y>; notes_col=<Z>; recimg_col=<W> -->`
    - ⚠ Cột ẩn/merge có thể làm lệch — bước GHI có đối-chiếu-BugID per-row nên lệch sẽ bị bắt, không ghi bừa.
-5. **Ảnh nhúng trong cell**: xem mục ẢNH-NHÚNG (cuối file — 3 nấc fallback, không có webhook). Sheet có cột `RecommendImage` → xem thêm mục **ẢNH RECOMMEND** (resolver + gate; chạy SAU triage đợt 1, không phải ở đây).
+5. **Ảnh nhúng trong cell**: xem `reference/sheet-images.md` mục ẢNH-NHÚNG (3 nấc fallback, không có webhook). Sheet có cột `RecommendImage` → xem thêm mục **ẢNH RECOMMEND** (resolver + gate; chạy SAU triage đợt 1, không phải ở đây).
 6. **Khu vực code** (CẤM đoán folder theo tên URL). Thứ tự: **[0] cwd-first** — cwd khớp `…/products/<X>/…` → codeDir = `<repo>/products/<X>`; có link test thì vẫn resolve để cross-check, lệch → tin LINK TEST (bằng chứng chạy thật mạnh hơn vị trí đứng), ghi chú 1 dòng trong đợt 1 — không hỏi. **[1] registry `codeDirs`** (value tuyệt đối). **[2] curl resolve link test**:
    ```bash
    curl -sL "<link-test>" | grep -oE '/products/[^"'\'' ]+' | grep -v libraryMainsite \
@@ -156,7 +162,7 @@ Tham số: `$ARGUMENTS`.
 ```
 (Block `🔧 Môi trường` ở Bước 0.9 đã in NGAY TRƯỚC bảng này — mọi thành phần đang thiếu + cách bật user thấy ngay từ đầu phiên.)
 
-**→ LẤY ẢNH RECOMMEND — chỉ khi sheet có cột `RecommendImage`:** NGAY SAU khi in bảng đợt 1, TRƯỚC khi dispatch lane, chạy resolver + gate theo mục **ẢNH RECOMMEND** (cuối file). Chèn đúng chỗ này vì 2 lý do đều cứng: (a) bảng đợt 1 phải ra trong phút đầu — CẤM đặt khâu chậm trước nó; (b) gate cần biết bug nào thuộc nhóm ❓, mà nhóm ❓ chỉ có SAU triage. Không có cột → bỏ qua, đi thẳng GIAI ĐOẠN [2].
+**→ LẤY ẢNH RECOMMEND — chỉ khi sheet có cột `RecommendImage`:** NGAY SAU khi in bảng đợt 1, TRƯỚC khi dispatch lane, chạy resolver + gate theo `reference/sheet-images.md` mục **ẢNH RECOMMEND**. Chèn đúng chỗ này vì 2 lý do đều cứng: (a) bảng đợt 1 phải ra trong phút đầu — CẤM đặt khâu chậm trước nó; (b) gate cần biết bug nào thuộc nhóm ❓, mà nhóm ❓ chỉ có SAU triage. Không có cột → bỏ qua, đi thẳng GIAI ĐOẠN [2].
 
 **→ CHỐT NHÓM `↪?` (ngay sau khâu lấy ảnh, trước dispatch) — manager chỉ xét 2 dấu hiệu CƠ HỌC, KHÔNG mở ảnh ra phân tích:**
 - (a) **tải được ảnh về không?** và (b) **SỔ RANH GIỚI có cho FE sửa asset ở vùng đó không?**
@@ -186,60 +192,9 @@ Tham số: `$ARGUMENTS`.
 
 ⚠ **Hai bẫy đã đo được:** (a) **đừng ghép `sonnet` + `effort low`** khi sheet CÓ cột ảnh recommend — rẻ nhất ($2.33) và fix vẫn đúng 11/11, nhưng lane **bỏ dòng ghi nhãn ảnh** trong board, tức mất vết kiểm của chính tính năng A/B/C. (b) **`turbo` KHÔNG phải lever tiết kiệm token trên phiên sonnet** — per-lane tiering tự NÂNG lane khó lên opus nên `sonnet+turbo` ($5.95) đắt hơn `sonnet` thường ($4.08).
 
-### Mode `turbo` — TỐC ĐỘ THUẦN, opt-in (chỉ khi token đầu = `turbo`)
+### Mode `turbo` — opt-in (chỉ khi token đầu = `turbo`)
 
-Mặc định (KHÔNG có token `turbo`) GIỮ NGUYÊN: cap-3 + model kế thừa + fusion (điều tra+fix 1 context) + gộp verify. Chỉ khi user gọi `turbo` thì bung thêm — CHẤP NHẬN TỐN TOKEN, đổi lấy wall-clock; tiêu chí đúng-sai (ma trận, sổ ranh giới, 3-ca-hỏi, ghi sớm 2-burst) KHÔNG đổi:
-
-- **(a) LIFT CAP theo CỤM FILE KHÔNG GIAO NHAU (không phải theo folder):** bỏ trần 3, chạy đồng thời **mỗi cụm bug có tập file riêng = 1 lane**, không barrier giữa lane. **Lane cùng một folder VẪN được chạy song song** — lane bị CẤM build nên không bao giờ ghi `dist/`, không có xung đột nào để tránh; điều kiện duy nhất là 2 lane không sửa cùng FILE (bug nghi cùng file → bắt buộc cùng lane, như luật chia lane ở trên). *(Sửa 2026-07-29: bản trước ghi "cap thật = số folder disjoint" với lý do "đụng chung `dist/`" — lý do đó không đúng vì lane không build, và với dự án 1 folder (hình dạng phổ biến nhất của cdn-source: 1 campaign = 1 folder) luật cũ cho ra **1 lane**, làm turbo CHẬM HƠN default cap-3. Đo thật cho thấy manager phải tự phớt lờ luật này mới chạy đúng 3 lane.)*
-- **(b) PER-LANE TIERING (override model khi dispatch — CHỈ turbo):** `sonnet` cho lane dễ (typo/text/CSS rõ), `opus` cho lane khó·routing-relevant·CSS-layout-tinh. Phân vân → `opus` (đúng-1-lần rẻ hơn FAIL→reopen). *(căn cứ đo thật bug-fixer 2026-06-29: swap model là hòa/tệ về tốc độ; tiering chỉ để tiết kiệm token lane dễ, KHÔNG phải lever tốc độ chính — lever chính là lift-cap + không-barrier.)*
-- **(c) CHECKER FAN-OUT + FLAIL-STOP:** thay 1 checker/list → fan-out **2–3 checker/browser**, mỗi con `session new_tab isolated` + close sau xong. Op browser (goto/expect/screenshot) fail sau 1 retry → **DỪNG NGAY** con đó, verdict `KHÔNG-CHECK-ĐƯỢC (browser-state)`, đẩy bug sang delta — CẤM retry vòng (chống outlier treo tab). >3 bug/lane → chia đợt 2–3 con.
-- **(d) Tổng kết turbo:** ghi rõ số lane, model mỗi lane, số checker bung, và ⏱/🪙. *(Đo thật lần đầu 2026-07-29 trên buglist 9 bug / 1 folder: turbo **18m08s · $8.09 · out 179k** vs default **21m20s–24m13s · $8.83–11.33 · out 238–287k** → turbo NHANH HƠN và KHÔNG đắt hơn, nhờ per-lane tiering hạ token lane dễ. Nên bỏ mặc định "turbo chủ đích tốn token": đúng hơn là **turbo ĐỔI độ-song-song lấy rủi ro flail**, còn token thì hòa. Cỡ mẫu n=1 và biên dao động giữa 2 lần chạy y hệt đã là ±28% chi phí → đừng coi $8.09 là con số chắc.)*
-
-**Dispatch — MỘT message nhiều Agent (chạy đồng thời), tool Agent với `subagent_type: "bug-lane"`, prompt từng lane:**
-```
-Task: bugfix-lite <project> — lane <N>: <module> (#9, #7, #12❓)
-Cụm bug (đã lọc queue <queue>): dán bảng —
-  SheetRow | BugID | Device | Bug Type | Description | Comment Thread | trạng thái (open/reopen/BLOCKED?) | nhóm-triage (🔧 hay ❓)
-Ảnh hiện trạng (nếu có): <path tuyệt đối + anchor row — xem mục ẢNH-NHÚNG> — dùng để ĐỊNH VỊ chỗ lỗi
-Ảnh recommend (nếu có): <path tuyệt đối> — prefix QC: ĐÚNG | LỖI | ASSET | (không có prefix)
-Luật dùng ảnh recommend: bạn TỰ gắn nhãn khi QC không gõ prefix (tiêu chí trong file agent).
-  CHỈ nhãn ĐÚNG mới được làm ĐÍCH, và chỉ rút assertion theo QUAN HỆ (canh giữa/đều/thứ tự/
-  cùng baseline) — CẤM rút px tuyệt đối vì không biết scale ảnh. Mọi trạng thái mơ hồ →
-  CHƯA-CHẮC = chỉ định vị. Ảnh trái mô tả chữ → MÔ TẢ THẮNG + ghi Câu hỏi mở. Ảnh không liên
-  quan bug → bỏ ảnh, ghi "nghi map sai".
-ASSET-SWAP được phép cho bug: <#N, #M | "không có"> — thay file asset theo THỦ TỤC ASSET-SWAP
-  trong file agent (đủ 6 điều kiện mới thay; thiếu 1 điều kiện → KHÔNG thay, chuyển Note-routing).
-  Bug asset KHÔNG nằm trong danh sách này → cấm thay file, xử như rổ BÁO.
-Khu vực code: <path TUYỆT ĐỐI folder — CHỈ đụng trong đây> (cụm bug text thuần HTML không có source local → khu vực = promoHtmlDir)
-Nơi cần đáp fix (fix phải đáp xuống MỌI nơi có đoạn matching): local <codeDir> · HTML <promoHtmlDir — soát CẢ Promotion/ lẫn mainsite/> · Twig <twigDir> (nơi nào null → ghi "—")
-Luật đáp fix: dò chỗ matching bằng grep chuỗi/selector quanh chỗ sửa; nơi không có bản sao → ghi "không có bản sao" vào board (không phải lỗi); Twig chỗ text nằm trong BIẾN/logic render ({{ ... }}) → KHÔNG đoán, soạn Note-routing backend. **ASSET-SWAP: file ảnh cũng phải đáp đa-nơi** — dò theo TÊN FILE ở các nơi trên, thấy bản sao thì `cp` đè y hệt. Mỗi bug FIX ghi dòng `Nơi đã sửa:` vào board — chỉ được ghi SAU khi đọc lại file trên đĩa xác nhận đã đổi (R-EV-1, ~/VNG/agent-auto/rules/agent-evidence.md), không phải sau khi chạy lệnh sửa.
-Ranh giới sở hữu (từ SỔ RANH GIỚI): <vùng nào đã bàn giao backend — CHỈ được sửa .scss/.js + text/HTML trong promoHtmlDir, CẤM template/logic render động; vùng nào của bên khác — cấm hẳn; không có entry → ghi "không có ranh giới đặc biệt">
-Tag routing (dùng khi soạn Note-routing): <devTag>
-Knowledge dự án: <ctx>/knowledge/
-[Landing pm__:] File dự án: <note path | "chưa có"> — đọc mục 1-4 TRƯỚC khi đọc code · Khoá: <gameplay>[ · type <STT-slug> · ref <dir>] | "CHƯA KHOÁ — cấm đụng hook pm__, chỉ CSS/text" · Luật: ~/VNG/agent-auto/rules/pm-contract.md (R-PM-1..12) + ~/VNG/git-vng/gt-promotion-template/standard-html-templates/ai-template-kit/AI-GUIDE.md + <AI-RULES + MASTER của gameplay đã khoá | ref nếu gameplay none>. Dọn trong vùng đang chạm; lỗi có sẵn thấy mà không chạm → dòng `Nợ:` của bug trong board (không sửa lan).
-File triage sớm — GHI TRƯỚC KHI ĐIỀU TRA SÂU: <ctx>/bugs-lite/<project>-<ngày>--lane<N>-triage.md
-Partial board — ghi vào: <ctx>/bugs-lite/<project>-<ngày>--lane<N>.md
-[Delta: board path trên đã pre-seed entry carry-forward — CHỈ Edit bug delta: #…, GIỮ NGUYÊN phần còn lại.]
-Chuẩn code BẮT BUỘC (đọc trước khi sửa dòng đầu): ~/VNG/agent-auto/rules/cdn-source-standard.md (R-CDN-*) · popup-library.md (R-POP-*) · code-style.md (R-CS-*) · html-handoff.md (R-HO-*) khi đáp fix xuống gt-promotion/new-mainsite · pm-contract.md (R-PM-1..12) cho MỌI file có class pm__: hook pm__/id/data-* là hợp đồng JS, bộ chuẩn = dòng `[Landing pm__:]` trên, sửa xong chạy cổng `node ~/VNG/agent-auto/tools/pm-gate.mjs <file>` trên từng file pm__ đã sửa (🔴 = chưa được báo xong, dán dòng cuối vào `Bằng chứng:`) · agent-evidence.md (R-EV-*) — cấm claim "đã sửa/PASS" chưa chạy trong lượt này, partial board BẮT BUỘC mục `Bằng chứng:` per bug. Vá bug KHÔNG được lệch chuẩn: cấm @media tay (dùng @include mobile/pc), cấm dựng popup tự chế (extends base.html.twig + module có sẵn), cấm bê pattern legacy src-setup vào campaign assets-flat, không tự viết engine gameplay, comment tối giản 1 dòng đúng 3 loại. Fix nào buộc phải lệch → ghi lý do vào board, không lệch âm thầm.
-Trình tự BẮT BUỘC: chốt ❓ (ghi file triage sớm) → điều tra → ghi board → fix theo board.
-CẤM: build/watch, ghi sheet, sửa file ngoài khu vực, thêm dependency.
-```
-Sheet là dữ liệu manager dán vào prompt — lane không đọc được MCP.
-
-**Trong lúc lane chạy:** poll file `--lane<N>-triage.md` → BÁO ĐỢT 2 (xem GIAI ĐOẠN [1]). Bug ❓ lane chốt asset/của-bên-khác → thành ↪ TỰ-CHUYỂN: soạn note routing vào board tổng (GIAI ĐOẠN [5] ghi lên sheet), KHÔNG dispatch lại, KHÔNG biến thành việc tay của user.
-
-**Khi mọi lane trả về — MERGE (manager, cơ học):** ghép các partial board → canonical `<ctx>/bugs-lite/<project>-<ngày>.md` (giữ nguyên văn entry; gộp theo 5 mục template; header gộp: sheet-map + started_epoch).
-
-> ⛔ **CỔNG ĐẾM SỐ — BẮT BUỘC, làm TRƯỚC khi post board và TRƯỚC BURST NOTE.** Bug ↪/✋ chốt ở TRIAGE đợt 1 **KHÔNG đi qua lane**, nên không có partial board nào mang chúng sang — nếu manager không tự tay viết thì chúng **rơi khỏi board trong im lặng**, và BURST NOTE sẽ không có gì để ghi ⇒ bug nằm im trên sheet, QC/GS không bao giờ nhận được phản hồi. Vì vậy:
-> 1. Đếm: `số entry trong mục 2 + 3 + 4 của board canonical` **phải bằng** tổng số bug lấy từ nguồn (sau khi bỏ row trống/không Description). Bug delta → so với tập delta + carry-forward.
-> 2. Thiếu bug nào → **VIẾT BỔ SUNG NGAY vào mục 3 BÁO** (mỗi bug: 1 dòng mô tả + `Loại: ↪ …` + `Bằng chứng` + `Note-routing: "<devTag> …" — pending`). CẤM đi tiếp khi chưa đủ số.
-> 3. In 1 dòng đối chiếu vào phần post board: `Đối chiếu: <n>/<N> bug có entry trong board` — để lệch là thấy ngay.
->
-> *(Đo thật 2026-07-30, effort `low`: 1 trong 3 lần chạy ra board chỉ có **7/9** entry — #6 (SDK) và #10 (Promotion) đã được báo ↪ đúng ở bảng đợt 1 và cả ở Tổng kết, nhưng KHÔNG có dòng nào trong board ⇒ note routing của 2 bug đó sẽ không bao giờ tới sheet. Chỉ đọc Tổng kết thì không phát hiện được — nó vẫn ghi "#6 ↪ SDK · #10 ↪ Promotion" như thường.)*
-
-**Post board canonical cho user xem (chốt-xem-sớm #1)**, kèm dòng đối chiếu ở trên.
-
-→ **GHI SỚM:** ngay sau MERGE, chạy **BURST NOTE** (GIAI ĐOẠN [5]) — ghi note-routing các bug ↪/BÁO lên sheet NGAY (trước build/verify), vì ↪ không cần verify. Rồi mới sang BUILD.
+**Token đầu = `turbo` ⇒ Read `reference/mode-turbo.md` (cạnh file này) TRƯỚC khi dispatch lane** — lift cap theo folder, tiering sonnet/opus từng lane, checker fan-out 2–3, flail-stop. Không có `turbo` ⇒ bỏ qua, giữ mặc định cap-3 + model kế thừa.
 
 ## GIAI ĐOẠN [3] BUILD — đúng 1 lần, manager chạy
 
@@ -319,12 +274,7 @@ Pipeline vẫn tính hoàn thành. Ghi rõ ở Tổng kết: bug nào `done` (Ch
 
 ## Mode `report` — chạy lại riêng bước ghi
 
-> ⛔ **CỔNG 30 GIÂY — việc ĐẦU TIÊN của mode `report`, TRƯỚC cả khi đọc board:** ToolSearch `+claude-in-chrome` → `list_connected_browsers` (đây là lần gọi DUY NHẤT của mode này).
-> Rỗng/toolset vắng → in đúng 1 block hướng dẫn rồi **DỪNG PHIÊN NGAY**. KHÔNG đọc board, KHÔNG dựng lại danh sách pending, KHÔNG thử đường khác, KHÔNG gọi lại. Lý do: `report` chỉ có **một** việc là ghi lên sheet — không nối được browser thì mọi thứ còn lại đều vô nghĩa.
-> Block in ra: *"Chưa nối được extension Claude in Chrome. Đang ở VS Code panel? → mở integrated terminal, chạy `claude` tại thư mục project rồi gọi lại `report` ở đó (panel KHÔNG nạp toolset chrome). Đang ở CLI? → mở trình duyệt mặc định đã login, gõ `/chrome` (chọn 'Enabled by default' để phiên sau tự nối), rồi gọi lại. Chưa ghi ô nào — board giữ nguyên `pending`, không mất gì."*
-> *(Đo thật 23/7: 4 lượt `report` hỏng chạy từ 2m36s tới 9m04s rồi mới chịu báo, tổng 22.5 phút + 253k output token cho 0 ô ghi được. Cổng này cắt còn dưới 30 giây.)*
-
-Có browser rồi mới làm tiếp: đọc board `bugs-lite` mới nhất của project → lấy bug PASS có `Ghi-sheet: pending|manual` + bug có `Note-routing: pending|manual` → chạy GIAI ĐOẠN [5] y nguyên (pre-flight + xác nhận header + 2 nhịp verify). **Trong `report` KHÔNG có merge/verify** nên gộp BURST NOTE + BURST DONE thành **1 lượt ghi** (mở tab 1 lần, ghi hết pending). Nguồn `file`/`text`/`gdoc`/`drive-file` → in lại kết quả-block. Không có board → báo user chạy trọn luồng trước. Đây là đường chuẩn khi phiên fix trước thiếu Chrome/rớt giữa chừng — user chỉ cần mở phiên có Chrome và gọi `report`, không dán tay.
+**Token đầu = `report` ⇒ Read `reference/mode-report.md` rồi làm đúng theo đó** (có cổng 30 giây kiểm Chrome là việc ĐẦU TIÊN, trước cả đọc board).
 
 ## Chạy lại theo delta (lần chạy sau trên cùng sheet)
 
@@ -373,26 +323,7 @@ Trước khi in: chạy `<SCRIPTS>/run-metrics.sh <RUN_START>` → dán nguyên 
 
 ## INTAKE ADAPTER — buglist ngoài Google Sheet (xử lý TẠI CHỖ, không từ chối)
 
-Mọi nguồn bóc về **bug-record chuẩn** (đúng bộ trường ở INTAKE.3) rồi chạy pipeline y hệt từ TRIAGE. Khác nhau DUY NHẤT: cách ĐỌC và cách GHI NGƯỢC.
-
-| Nguồn | Đọc | srcRef (thay SheetRow) | Ghi ngược |
-|---|---|---|---|
-| Google Sheet | Drive MCP (luồng chuẩn) | SheetRow | Chrome Sheets — GIAI ĐOẠN [5] |
-| Google Doc | Drive MCP `read_file_content` (URL `document/d/`) | đoạn/quote gốc | kết quả-block |
-| Drive file (pdf…) | Drive MCP `download_file_content` (URL `file/d/`) → Read local (pdf theo `pages`) | trang + STT | kết quả-block |
-| Excel Online (OneDrive/SharePoint) | M365 MCP: ToolSearch `+sharepoint` → `sharepoint_search`/`read_resource`; hoặc tải file xlsx | SheetRow | Chrome trên Excel Online (Name Box y hệt) — GIAI ĐOẠN [5]; lần đầu chưa nghiệm thu → 3 ô đầu chậm |
-| File `.xlsx` đính kèm/tải về | **chữ:** `node <SCRIPTS>/extract-xlsx-text.js <file.xlsx>` → mỗi dòng 1 JSON `{"row":<SheetRow>,"cells":{"A":…,"G":…}}` (khoá theo CHỮ CÁI CỘT → khớp thẳng sheet-map; `row` dùng luôn làm srcRef). **ảnh:** `extract-xlsx-images.js` (ẢNH-NHÚNG nấc 2) | `row` trong file | kết quả-block |
-| `.pdf` | Read trực tiếp (đọc theo `pages`, thấy cả ảnh) | trang + STT | kết quả-block |
-| `.pptx` / `.docx` | script `node <SCRIPTS>/extract-office-text.js` (bóc text + ảnh theo slide/đoạn) | slide/đoạn + STT | kết quả-block |
-| Text/chat/email dán | parse trực tiếp | STT | kết quả-block |
-
-Luật chung:
-- ⚠ **CẤM tự viết parser cho `.xlsx`** — đã có `extract-xlsx-text.js` (chữ) + `extract-xlsx-images.js` (ảnh) trong `<SCRIPTS>`, dùng thẳng. *(Đo thật 2026-07-29: chưa có extractor chữ nên manager phải `unzip -Z1` khảo sát rồi tự Write parser python mỗi phiên — việc lặp lại và dễ sai ở sharedStrings/inlineStr/entity/ô-công-thức.)* Script fail/thiếu `node`+`unzip` → khi đó mới tự parse, và ghi 1 dòng lý do vào board.
-- **BugID:** nguồn có ID thì dùng; không có → tự sinh `L1, L2…` theo thứ tự xuất hiện, lưu kèm 40 ký tự đầu Description trong board (delta lần sau đối chiếu theo đoạn mô tả này, KHÔNG theo vị trí — nguồn phi cấu trúc hay xáo thứ tự).
-- **Bóc xong in bảng bug-record NGAY TRONG ĐỢT 1** kèm 1 dòng: "nguồn phi cấu trúc — bóc được <n> bug, sai/thiếu thì nhắn, tôi vẫn đang chạy" — KHÔNG dừng chờ confirm (zero-babysit; fix chỉ đụng code, xem lại được bằng git diff; ghi ngược nguồn chỉ xảy ra với sheet ghi được).
-- **Thiếu trường:** không có Bug Type → lane tự suy như luật sẵn có; không có Device → `defaults.device` registry; không có status → mọi bug coi như open.
-- **Kết quả-block (đường ghi CHÍNH THỨC của nguồn chỉ-đọc, không phải fallback lỗi):** cuối phiên in bảng dán-được `BugID | Kết quả (Done/FAIL/↪) | Note <devTag>` để user gửi lại kênh gốc (reply chat/email/comment). Ghi rõ ở Tổng kết.
-- Registry: lưu `sourceType` + URL/path nguồn — lần sau nhận ra ngay, không hỏi lại.
+**Nguồn KHÔNG phải Google Sheet chuẩn** (Google Doc, Drive file/pdf, Excel Online/OneDrive/SharePoint, xlsx/pdf/pptx/docx, text/chat dán) **⇒ Read `reference/intake-adapter.md` TRƯỚC INTAKE.** Mọi nguồn bóc về bug-record chuẩn rồi chạy pipeline y hệt từ TRIAGE.
 
 ## SỔ RANH GIỚI — bộ nhớ sở hữu per-project (hỏi 1 lần, nhớ mãi)
 
@@ -412,77 +343,7 @@ File: `~/.claude/knowledge/bug-fixer-lite/ownership/<project>.md` — tạo khi 
 - **Ghi** ở tail knowledge cuối phiên (single-pass như knowledge). Entry mâu thuẫn thực tế mới → sửa entry + cập nhật ngày, không giữ 2 bản.
 - Vùng CHƯA có trong sổ + bug mơ hồ sở hữu → lane điều tra bằng chứng như thường (confidence gate quyết định); KHÔNG lấy thiếu-entry làm cớ hỏi user.
 
-## ẢNH-NHÚNG trong cell — 3 nấc, KHÔNG webhook
+## ẢNH trong sheet — ẢNH-NHÚNG + ẢNH RECOMMEND
 
-Chỉ chạy khi có bug tham chiếu hình ("như hình", "line này") mà không có link. Cell-scan nhẹ trước, đừng chạy vô điều kiện. Ảnh lưu về `<ctx>/bugs-lite/images/<project>-<ngày>/`.
-
-1. **Nấc 1 — Chrome screenshot (luồng chuẩn — phiên có Chrome):** mở sheet, cuộn tới row của bug, click ảnh trong cell (phóng to), screenshot lưu vào thư mục trên, map theo row đang xem. Map CHẮC NHẤT (chụp đúng ô đang nhìn) và không phụ thuộc Google lưu ảnh kiểu gì bên dưới. Chỉ làm cho bug thật sự cần ảnh (từng ảnh một).
-2. **Nấc 2 — xlsx export (CHỈ khi không Chrome VÀ sheet nhỏ/ít ảnh):** ⚠ connector `download_file_content` trả base64 thẳng vào context — sheet nhiều ảnh sẽ phình context nguy hiểm, CẤM dùng cho sheet lớn. Tải xlsx qua Drive MCP (ToolSearch `select:mcp__claude_ai_Google_Drive__download_file_content`) → chạy:
-   ```bash
-   node <SCRIPTS>/extract-xlsx-images.js <file.xlsx> <ctx>/bugs-lite/images/<project>-<ngày>
-   ```
-   → mỗi **ANCHOR** 1 dòng JSON `{"name","row","col","colLetter","path"}`. Map ảnh→bug theo `row` = SheetRow; **sheet có NHIỀU cột ảnh** (vd `Image` + `RecommendImage`) → lọc thêm theo `colLetter` khớp `recimg_col` trong sheet-map, nếu không sẽ lẫn 2 loại ảnh cùng dòng. Ảnh DÙNG LẠI ở nhiều ô → **nhiều dòng cùng `name`/`path`, khác row/col** (từ 2026-07-27 script xuất đủ mọi anchor, không còn cảnh giữ-anchor-cuối nên `row` tin được). `row/col: null` (ảnh in-cell kiểu mới — Google đang chuyển dần sang kiểu này nên nấc xlsx sẽ yếu dần theo thời gian) → đưa cả danh sách path cho lane tự đối chiếu nội dung; lane không chắc ảnh nào của bug nào → nấc 3, KHÔNG gán bừa. Connector không export được xlsx (chỉ trả text) → nấc 3.
-3. **Nấc 3 — CẦN-ẢNH (tự route, không treo pipeline):** không lấy được ảnh → soạn note routing `<devTag> Ảnh nhúng không đọc được — nhờ QC đính LINK ảnh hoặc mô tả vị trí cụ thể` (GIAI ĐOẠN [5] tự ghi lên Notes cho QC thấy) + bug vào nhóm ↪/✋ đợt 1/đợt 2. User cũng có thể tự screenshot ảnh đó dán vào phiên — người chọn ảnh thì không bao giờ map sai. Khuyến nghị QC: ảnh nên dán link thay vì nhúng.
-
-Khi giao lane: truyền **đường dẫn file ảnh tường minh** trong prompt.
-
-## ẢNH RECOMMEND — cột QC gợi ý "sửa cho đúng" (chạy SAU triage đợt 1, TRƯỚC dispatch lane)
-
-Chỉ chạy khi INTAKE.3 map được cột `RecommendImage`. Không có cột → bỏ qua toàn mục, luồng y như cũ.
-
-**Vì sao phải gate:** ảnh recommend là lever **độ chính xác + tiến độ**, KHÔNG phải lever tốc độ — bóc ảnh nhúng là khâu chậm nhất cả pipeline (mỗi ảnh nấc Chrome ~4 lượt browser). Bật đại trà thì mất nhiều hơn được.
-
-**Gate tầng 1 — bug nào được lấy ảnh.** Chỉ lấy khi bug rơi vào ít nhất một trong: nhóm **❓** (ưu tiên cao nhất) · `Bug Type = visual` · mô tả nhắc hình ("như hình", "xem ảnh", "hình bên", "line này") · cell recommend có prefix `ASSET:`.
-KHÔNG lấy: bug `Done`/`Skip` không reopen · bug đã chắc chắn ↪ của bên khác theo sổ ranh giới · bug functional/content thuần chữ.
-
-**Gate tầng 2 — hai cap, hai loại chi phí khác nhau:**
-
-| Cap | Mặc định | Chặn cái gì |
-|---|---|---|
-| `maxEmbeddedImages` | 12 | lượt thao tác browser (ảnh nhúng) — chi phí **wall-clock** |
-| `maxRecommendImages` | 30 | tổng ảnh đưa vào context lane — chi phí **token** (~1.5k/ảnh) |
-
-Vượt cap nào cũng xử như nhau: ưu tiên **❓ → visual → còn lại**; bug bị cắt ghi `Ảnh recommend: bỏ (vượt cap <tên cap>)` vào board và **vẫn chạy bình thường** — không chặn pipeline, không đẻ việc tay cho user.
-
-**Resolver — 3 nấc, dừng ở nấc đầu thành công:**
-
-1. **L1 — LINK trong cell (ưu tiên tuyệt đối, rẻ hơn nhúng ~1 bậc).** Nhận diện theo dạng link:
-
-   | Dạng link | Cách bóc |
-   |---|---|
-   | URL ảnh trực tiếp (CDN/imgur/`.png`…) | `curl -sL --max-time 10 --max-filesize 5000000 -o <dest> "<url>"` → kiểm `content-type: image/*` **hoặc magic bytes**. Không phải ảnh → thất bại, xuống L2 |
-   | Drive **1 file** `/file/d/<id>` | **curl trước:** `curl -sL --max-time 10 -o <dest> "https://drive.google.com/uc?export=download&id=<id>"` — ăn khi link chia sẻ "anyone with link" (ca thường gặp khi QC gửi). Tải về ra HTML đăng nhập (kiểm magic bytes) → thử Chrome tải; cùng đường mới tới MCP (xem ⚠ base64 dưới) |
-   | Drive **thư mục** `/drive/folders/<id>` | `search_files` với `query: "parentId = '<id>' and mimeType contains 'image/'"` → được danh sách **tên + fileId** → **map theo TÊN FILE** (luật dưới) → CHỈ tải đúng file đã map, **KHÔNG tải cả bộ** |
-   | File `.zip` bộ asset | `unzip -Z1 <zip>` liệt kê tên → map theo TÊN FILE → `unzip -j <zip> <đúng-1-entry> -d <dest>` |
-   | Trang web có nhiều `<img>` | `curl` trang → rút `src` → nhận khi **đúng 1 ảnh** hoặc tên file khớp asset trong code; nhiều ảnh không phân biệt được → CẦN-ẢNH |
-   | Google Doc/Slides | ảnh **nhúng** trong Doc: KHÔNG bóc được đường rẻ → CẦN-ẢNH, note nhờ QC gửi link ảnh trực tiếp. Ảnh có link trong Doc thì xử như URL trực tiếp |
-
-   ⚠ **`download_file_content` là ĐƯỜNG CUỐI cho ảnh, KHÔNG phải đường đầu** — nó trả **base64 thẳng vào context**: ảnh 1 MB ≈ 340k token, đủ giết cả phiên (đúng cái bẫy đã ghi ở ẢNH-NHÚNG nấc 2 cho xlsx). Chỉ dùng khi curl lẫn Chrome đều fail, **và** `get_file_metadata` cho thấy file **< 300 KB**; không xác định được kích thước → **KHÔNG dùng**, đi CẦN-ẢNH.
-   ⚠ **Cạm bẫy đã biết:** ô dùng công thức `=IMAGE("url")` thì CSV export lẫn Drive MCP đều trả **ô RỖNG** (đọc được giá trị hiển thị, không đọc được công thức) → không lấy link kiểu này bằng đường đọc text, rơi thẳng xuống L2. Đừng mất thời gian debug lại chuyện này.
-
-   **LUẬT MAP khi link chứa NHIỀU ảnh** (cùng hạng rủi ro với map-sai-dòng ở nấc xlsx — sai là thay nhầm ảnh vào code):
-
-   | Tình huống | Kết luận |
-   |---|---|
-   | **Tên file trùng tên asset đang có trong code** (grep tên file trong khu vực bug) | **map CHẮC** → được ASSET-SWAP. Bằng chứng mạnh nhất, và GS/QC export thường giữ nguyên tên |
-   | Bộ chỉ có **đúng 1 ảnh** và bug cũng chỉ có 1 | map chắc |
-   | Tên file chứa chuỗi đặc trưng từ Description | map **nghi** → chỉ làm tham khảo cho lane, **KHÔNG** tự swap |
-   | Còn lại | **KHÔNG map, KHÔNG tải** → Note-routing `<devTag> Có bộ ảnh nhưng không xác định được ảnh nào cho bug nào — nhờ QC ghi rõ TÊN FILE` |
-
-   **CẤM map theo thứ tự xuất hiện** trong thư mục/zip. Thứ tự không phải bằng chứng.
-2. **L2 — ảnh nhúng (đắt):** dùng nguyên 3 nấc mục ẢNH-NHÚNG, thêm ràng buộc **phân biệt cột** — nấc Chrome cuộn tới đúng ô `<recimg_col><SheetRow>` rồi click; nấc xlsx lọc theo `colLetter == recimg_col`. Tab sheet mở ở đây thì **GIỮ LẠI** cho BURST NOTE (GIAI ĐOẠN [5]) dùng, không mở 2 lần.
-3. **L3 — không lấy được:** board ghi `Ảnh recommend: — (không có)` hoặc `— (lấy thất bại: <lý do>)`. **Không phải lỗi, KHÔNG vào mục "Cần bạn"** — bug vẫn chạy như trước khi có cột này.
-
-**Nơi lưu — tên tất định:** `<ctx>/bugs-lite/images/<project>-<ngày>/rec-<BugID>.<ext>` (ảnh recommend) và `cur-<BugID>.<ext>` (ảnh hiện trạng). Vừa hết lẫn 2 loại, vừa được lợi phụ: **chạy delta lần sau thấy file đã tồn tại thì DÙNG LẠI, không tải/chụp lại**.
-
-**Nhãn ảnh — manager KHÔNG gắn.** Manager chỉ đọc `prefix` thô đầu cell (`ĐÚNG:` / `LỖI:` / `ASSET:` nếu QC có gõ) và truyền nguyên vào prompt lane. Việc gắn nhãn khi thiếu prefix là của **lane** — nó là chỗ duy nhất vừa nhìn được ảnh vừa đọc được code, và giữ đúng ràng buộc "Manager KHÔNG tự phân tích bug".
-
-**Ảnh recommend được dùng ở ĐÚNG 3 chỗ, không hơn:**
-
-| Nhãn | Chỗ dùng | Hiệu lực |
-|---|---|---|
-| mọi nhãn | đầu vào cho lane (chốt ❓, định vị) | luôn |
-| `ASSET` | **ASSET-SWAP** — bug asset chuyển từ ↪ sang 🔧, lane tự thay file | chỉ khi đủ 6 điều kiện của lane **và** sổ ranh giới cho phép sửa asset ở vùng đó |
-| `ĐÚNG` | **ảnh đích cho `design-checker`** (GIAI ĐOẠN [4]) | so ảnh MỘT CHIỀU — chỉ hạ verdict xuống `PASS-nghi-visual`, **không bao giờ nâng** thành PASS |
-
-Cả 3 chỗ đều lệch về phía an toàn: không chắc thì mất giá trị, chứ không ra kết quả sai. Tắt hẳn phần so ảnh: `config.visualCompare: "off"`.
+**Sheet có ảnh in-cell mà bug tham chiếu hình, HOẶC INTAKE.3 map được cột `RecommendImage` ⇒ Read `reference/sheet-images.md` TRƯỚC khi dispatch lane** (ảnh recommend chạy SAU triage đợt 1). Không có cả hai ⇒ bỏ qua.
+Luật cứng nhắc lại ở lõi: chỉ nhãn ĐÚNG mới được làm đích, mơ hồ chỉ để định vị — KHÔNG bao giờ fix ngược; design-checker so ảnh MỘT CHIỀU — chỉ được HẠ verdict, TUYỆT ĐỐI không nâng FAIL thành PASS.

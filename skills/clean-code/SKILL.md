@@ -46,7 +46,7 @@ selector hoặc đổi tên class làm chết nút trên production.
 | **Phòng thủ thừa** | Gỡ `try-catch` bọc DOM query, `if (!el) return`, `?.` cho thứ luôn tồn tại. **Chỉ gỡ khi đã xác minh** element/field có trong markup cùng file hoặc luôn có trong response. Không xác minh được → giữ nguyên. | R-CS-2 |
 | **Trừu tượng 1-lần-dùng** | Inline hàm/biến trung gian/util chỉ có đúng 1 chỗ gọi. Grep toàn repo trước khi inline — có ≥2 chỗ dùng thì GIỮ. | R-CS-3 |
 | **Lặp & tên** | Gộp selector CSS trùng thuộc tính, thay thứ viết tay bằng mixin/class repo đã có, magic number → hằng có tên. | R-CS-4, R-CS-5 |
-| **Chuẩn landing `cdn-source`** | Chỉ với file thuộc `cdn-source/products/**`: dò dấu hiệu ở bảng dưới, **Dọn** mục an toàn, còn lại ghi **Nợ**. | R-JS-*, R-CDN-*, R-SPR-*, R-LAY-1 |
+| **Chuẩn landing `cdn-source`** | Chỉ với file thuộc `cdn-source/products/**`: dò dấu hiệu ở bảng dưới, **Dọn** mục an toàn, còn lại ghi **Nợ**. | R-JS-*, R-CDN-*, R-SPR-*, R-STR-*, R-LAY-1 |
 
 Không tự thêm tính năng, không đổi kiến trúc, không refactor ngoài 5 nhóm trên.
 
@@ -57,7 +57,7 @@ hay xoá class `MS__`/`MJ__` "thừa". Thấy code lệch chuẩn ngoài 5 nhóm
 ghi mục 7 Nợ, không tự sửa.
 
 ### Nhóm 5 — chuẩn landing `cdn-source` (JS/SCSS)
-Đọc `~/VNG/agent-auto/rules/landing-js.md` + `cdn-source-standard.md` trước. **Dọn** = chuyển về ✅ mà hành vi
+Đọc `~/VNG/agent-auto/rules/landing-js.md` + `cdn-source-standard.md` + `landing-structure.md` trước. **Dọn** = chuyển về ✅ mà hành vi
 giữ nguyên (cùng giá trị, cùng thứ tự chạy). **Nợ** = chuyển sẽ đổi hành vi/thời điểm chạy, hoặc là bug — không sửa,
 ghi báo cáo + mục 7. Dò nhanh trong phạm vi:
 ```
@@ -79,12 +79,27 @@ grep -rnE '@media|background-position: *-?[0-9]|images/sprite/' <phạm vi SCSS>
 | `setInterval(` dò DOM, `dispatchEvent(new Event('resize'))` rải ở frame, `.off('resize')` | R-JS-5, R-JS-6 | Nợ |
 | nút gọi API/engine không có cờ bận, hoặc cờ không chặn | R-JS-7 | bug → Nợ |
 | cờ mock gõ tay, FE tự gắn `.received` sau claim | R-JS-8 | Nợ |
-| `innerWidth <= 768`, `userAgent`, reload khi `orientationchange`, ngôn ngữ từ class `body`/`?locale=` | R-JS-12, R-JS-13 | Nợ |
+| `innerWidth <= 768`, `userAgent`, reload khi `orientationchange`, ngôn ngữ từ `<html lang>`/class `<html>`/`?locale=` (nguồn đúng: class `<body>`) | R-JS-12, R-JS-13 | Nợ |
 | `promotion3.js`, `class MJPromotion`, vòng quay tự viết | R-CDN-8 | Nợ |
 | SCSS `@media` tay | R-CDN-5 | **Dọn** khi điều kiện trùng thân mixin `mobile`/`pc` trong `additionalData` của `webpack.config.js`; khác → Nợ |
 | SCSS `width`/`height` viết lại cạnh `@include sprite()` | R-SPR-7 | **Dọn** khi bằng đúng số trong biến sprite; khác → Nợ |
 | SCSS `background-position` số cứng, `url()` trỏ PNG lẻ trong `images/sprite/` | R-SPR-5 | Nợ (phải build lại atlas, đổi hình) |
 | list gắn toạ độ từng item | R-LAY-1 | `node ~/VNG/agent-auto/tools/layout-gate.mjs <path>` → Nợ |
+| SCSS `@import` `main/scss/mixin`, khai `$maxWidthMB:`/`$minWidthPC:`/`@mixin mobile`/`@mixin pc` | R-CDN-15 | **Dọn** (xoá import + file) khi giá trị và thân mixin trùng `additionalData` của `webpack.config.js` + `config.js`; khác (vd H5 `maxWidthMB: '0'`) → bug → Nợ |
+| `url()` trỏ `.ttf`/`.ttc`/`.otf`, `@font-face` thiếu `font-display`, `.MS__<font>` gõ tay từng cái | R-CDN-16 | Gom về map `$fonts` + `@each` là **Dọn** khi giữ nguyên font-family và tên class; đổi định dạng/subset/thêm `swap` → Nợ |
+| cùng hex/font-family/`z-index` ở ≥2 section: `grep -rhoE '#[0-9a-fA-F]{6}\b' <phạm vi SCSS> \| sort \| uniq -c \| sort -rn` | R-CDN-17 | **Dọn** sang `var(--…)` trong `main/scss/_tokens.scss`, giữ đúng giá trị |
+| SCSS section có `url("../<section khác>/` hoặc `url("/assets/<section khác>/`; khối CSS giống hệt ở ≥2 section | R-CDN-18, R-CS-4 | Ảnh → Nợ (chuyển file là đổi URL). Khối CSS → **Dọn** thành class global ở `main.scss` khi twig các section đều trong phạm vi |
+| `.MS__pc`/`.MS__mb` khai ngoài `main/` | R-CDN-19 | **Dọn** (xoá) khi trùng bản ở `main.scss`; khác → Nợ |
+| `<img` mang `MS__pc`/`MS__mb` có `src=` ở section không phải màn đầu; `loading="lazy"` | R-CDN-20 | Nợ (đổi thời điểm tải ảnh) |
+| PNG đục (lệnh kiểm alpha của R-CDN-21 in `(255, 255)` hoặc `no-alpha`) >300KB; PNG art lớn trong `images/sprite/` | R-CDN-21, R-SPR-11 | Nợ (đổi file, build lại atlas) |
+| `@include ms-sprites(` không nằm trong `#<section> {` | R-SPR-12 | Nợ (bọc là đổi độ ưu tiên selector) |
+| rule top-level của `<x>.scss` không phải `#<x> {`; `id` của `<section>` khác tên folder | R-STR-1 | Nợ (bọc là đổi độ ưu tiên selector) |
+| selector SCSS bám `.pm__…` hoặc `.MS__sprite-<tên>` để định vị/style | R-STR-2 | **Dọn** khi twig cùng phạm vi: thêm class vai trò, đổi selector sang nó, giữ nguyên số class trong selector; DOM do engine render → giữ |
+| `name: 'AI_Agent'`, `name`/folder mang mã campaign cũ, class snake_case mới | R-STR-3 | Nợ — campaign đã bàn giao KHÔNG đổi tên |
+| `grep -ohE 'prod-source/[0-9.]+' assets/*.html.twig \| sort -u` ra >1 dòng; `<head>` chép ở ≥2 trang | R-STR-5 | Nợ |
+| ≥3 khối twig giống nhau chỉ khác số (`moc-5`, `item-1`…) | R-STR-6 | **Dọn** sang `{% set %}` + `{% for %}` khi `dist/*.html` sinh ra giống hệt trước/sau (`diff`) |
+| `generateFile` có trang tài liệu (`huong-dan`, `docs`…) | R-STR-8 | Nợ |
+| `<body class="…">` có hơn 1 mã, hoặc `<body>` trống ở trang có gameplay | R-STR-9 | Nợ (lib tra theo nguyên chuỗi class) |
 
 ## Quy trình
 
@@ -101,7 +116,7 @@ grep -rnE '@media|background-position: *-?[0-9]|images/sprite/' <phạm vi SCSS>
    Có build → chạy build TRƯỚC khi dọn, lưu kết quả làm mốc so sánh. **Build đã fail từ trước khi dọn**
    → dừng, báo user: không có mốc thì không chứng minh được "dọn xong vẫn chạy".
 3. **Đọc luật.** `rules/code-style.md`; file nào có `pm__` thì đọc thêm `rules/pm-contract.md`; file thuộc
-   cdn-source thì đọc thêm `rules/landing-js.md` + `rules/cdn-source-standard.md` (nhóm 5).
+   cdn-source thì đọc thêm `rules/landing-js.md` + `rules/cdn-source-standard.md` + `rules/landing-structure.md` (nhóm 5).
 4. **Dọn từng file**, theo thứ tự 5 nhóm trên. File >300 dòng thì dọn theo khối, không rewrite cả file.
 5. **Verify — bắt buộc, không được bỏ:**
    - Build lại (`npm run build` hoặc lệnh của repo). Build fail → **revert file vừa dọn**, báo user, dừng.

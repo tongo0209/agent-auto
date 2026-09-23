@@ -24,6 +24,7 @@ chạy). Kiểu tốt thành luật; kiểu chưa tốt ghi ❌ cũ / ✅ chuẩ
 | `MJ__close-popup`, `MJ__toogleActive`, `MJ__openIframe` | bind thẳng lên phần tử, handler `return false` | click không lan lên `document` |
 | Thiết bị | lib gắn `data-device-type` + `data-scale-ratio` lên `body` lúc scale | JS đọc cờ này, không tự đoán |
 | Config runtime | `varMS` (`H5`, `scaleWidthPC/MB`) khai trong `main/html/configProduction.html.twig` | điều kiện theo loại trang đọc từ `varMS` |
+| Ngôn ngữ | tên quà `names[$("body").attr("class")][indexWord]` và câu hết lượt `notEnoughCp[$("body").attr("class")]` (khoá `en` `vn` `id` `cn` `th`) — tra theo **nguyên chuỗi class của `<body>`**; lib không dùng `<html lang>` để chọn ngôn ngữ | JS đọc ngôn ngữ cùng nguồn đó (R-JS-13); body chỉ mang 1 mã (R-STR-9) |
 
 ## Luật
 
@@ -41,7 +42,7 @@ chạy). Kiểu tốt thành luật; kiểu chưa tốt ghi ❌ cũ / ✅ chuẩ
 | **R-JS-10** | SHOULD | Thanh tiến độ mốc: ngưỡng nằm trên DOM, 1 hàm nội suy dùng chung PC/MB |
 | **R-JS-11** | SHOULD | Mỗi campaign 1 global namespace; helper dùng ≥2 frame đặt ở `main/` |
 | **R-JS-12** | SHOULD | Thiết bị/hướng màn: đọc `body[data-device-type]` + `varMS`, không đoán bằng 768/UA |
-| **R-JS-13** | SHOULD | Ngôn ngữ đọc đúng 1 nguồn (`<html lang>` của từng trang `generateFile[]`), 1 chỗ trong `main/` |
+| **R-JS-13** | SHOULD | Ngôn ngữ đọc từ class của `<body>` — cùng nguồn lib tra tên quà; 1 lần trong `main/`, cấm nguồn thứ 2 (`<html lang>`, `?locale=`) |
 
 ### R-JS-1 · MUST · Nối engine promotion
 `el` luôn khai đủ `cp, action, reward, inform, informContent, rewardContainer`. `informContent` luôn là
@@ -293,21 +294,24 @@ const needsRotate = () => varMS.H5 && matchMedia('(orientation: portrait)').matc
 ```
 Dẫn chứng ❌: `omg3q/2026-sinh-nhat-9/assets/main/main.js:31` · `tqht/2026-trung-thu-menh-hon/assets/vongquay/vongquay.js:26` · `pwm/2026-v34-ani/assets/main/main.js:1-15` (UA) · `ghoststory/2026-2nd-anniverary/assets/frame1/frame1.js:9` (dọc = mobile) · `jxm/2026-vo-lam-tinh-tu/assets/main/main.js:7-22` ngược logic với `pwm/2026-v34-ani/assets/main/main.js:41-58` · `jx1m/2026-tinh-quang-chi-da/assets/main/main.js:60-62` (reload mọi lần xoay). ✅ nguồn cờ: `zsm/2026-dua-co-hoi-h5/assets/zsm-ld-duahoi/zsm-ld-duahoi.js:91`, `taydu2/2026-tam-gioi-ky-ngo/assets/main/main.js:3` (đọc `data-scale-ratio` của `body`).
 
-### R-JS-13 · SHOULD · Ngôn ngữ đọc 1 nguồn
-Mỗi trang trong `generateFile[]` (`index`, `index-en`, `index-th`…) set `<html lang="<mã>">` đúng ngôn ngữ của nó;
-JS đọc `document.documentElement.lang` **1 lần** trong `main/` rồi dùng chung. Cấm mỗi frame tự đọc một kiểu
-(class của `body`/`html`, `?locale=`). Campaign cũ để `lang="en"` ở mọi trang và phân biệt bằng class trên
-`<html>` → sửa `lang` trong twig khi chạm, chưa chạm thì ghi mục 7 Nợ; ngôn ngữ do BE chuyển bằng query thì ghi
-nguồn đó vào mục 5 file dự án.
+### R-JS-13 · SHOULD · Ngôn ngữ đọc từ class `<body>` — cùng nguồn với lib
+Lib tra tên quà và câu báo theo nguyên chuỗi class của `<body>` (Facts). JS của campaign đọc **đúng nguồn đó**:
+`document.body.className` **1 lần** trong `main/`, mọi frame dùng lại. Body chỉ mang 1 mã locate (R-STR-9) nên
+không cần tách chuỗi. Cấm nguồn thứ 2: `<html lang>` (đo 23/9 trên twig 2026: 270/352 thẻ `<html>` để `lang="en"`
+bất kể trang nào; mã `vi` còn khác khoá `vn` của lib), class của `<html>`, `?locale=`. Hai nguồn lệch nhau là UI một
+thứ tiếng, tên quà của lib một thứ tiếng. `<html lang>` vẫn đặt đúng cho SEO/trình đọc màn hình, chỉ là JS không đọc.
+Campaign cũ đang đọc `<html lang>` → chuyển khi chạm, chưa chạm thì ghi mục 7 Nợ; ngôn ngữ do BE chuyển bằng query
+thì ghi nguồn đó vào mục 5 file dự án.
 ```js
 // ❌
-const lang = document.body.classList[0];
+const lang = document.documentElement.lang;           // "en" ở cả trang th
+const lang = document.documentElement.classList[0];
 const lang = params.get('locale');
 
-// ✅ main/main.js
-XX.lang = document.documentElement.lang;
+// ✅ main/main.js — cùng khoá lib: vn | en | th | id | cn
+XX.lang = document.body.className;
 ```
-Dẫn chứng: `lan/2026-trung-thu/assets/main/_state.js:10-17` (đọc `<html lang>`, 3 trang set đúng) · `dream/2026-landing-tet/assets/vxphl-ld-25-a-milestone/vxphl-ld-25-a-milestone.js:9,40-50` (dò cả lang lẫn class vì twig để `lang="en"` + class `th`/`vn`) · `ghoststory/2026-2nd-anniverary/assets/frame2/frame2.js:5` (`?locale=`) · `ghoststory/2026-bingo-h5/assets/Frame1/Frame1.js:50-53` (class `body`).
+Dẫn chứng ✅ nguồn: lib `libraryMainsite/prod-source/1.3.0/dist/libraryMainsite-1.3.0.js` (`notEnoughCp[i("body").attr("class")]`) · body đúng mã: `jxm/2026-vo-lam-tinh-tu-bh/assets/index.html.twig:10`, `lan/2026-trung-thu/assets/index-th.html.twig:61`. ❌: `dream/2026-landing-tet/assets/index-th.html.twig:2` (`lang="en" class="th"`) + `vxphl-ld-25-a-milestone/vxphl-ld-25-a-milestone.js:40-50` (dò class `<html>`) · `lan/2026-trung-thu/assets/main/_state.js:10-17` (đọc `<html lang>`, phải tự quy `vi`/`vn`) · `ghoststory/2026-2nd-anniverary/assets/frame2/frame2.js:5` (`?locale=`) · `ghoststory/2026-bingo-h5/assets/Frame1/Frame1.js:51` (phải tách chuỗi vì body mang thêm `h5frame`). `vi` ≠ `vn`: `jx1m/2026-tinh-quang-chi-da/assets/index.html.twig:2,20` (`lang="vi"`, body `vn` — markup đúng cả hai, JS nào đọc `lang` ở đây là trượt khoá lib).
 
 ## Luật cũ vẫn bị vi phạm lặp lại (không đẻ luật mới)
 - **R-CDN-8** — chép engine riêng (`main/promotion3.js`, `class MJPromotion`, `import md5`) hoặc tự viết vòng quay:
@@ -321,6 +325,7 @@ Dẫn chứng: `lan/2026-trung-thu/assets/main/_state.js:10-17` (đọc `<html l
 
 ## Quan hệ với các luật khác
 - Hook platform: [`pm-contract.md`](pm-contract.md) — R-PM-*. Thế hệ build, engine, prefix: [`cdn-source-standard.md`](cdn-source-standard.md) — R-CDN-*.
+- Cấu trúc section/trang, `<body class>`, đặt tên khi clone: [`landing-structure.md`](landing-structure.md) — R-STR-*.
 - Popup markup: [`popup-library.md`](popup-library.md) — R-POP-*. Trạng thái ô quà: [`promo-states.md`](promo-states.md) — R-ST-*.
 - Timing/easing hiệu ứng: [`animation.md`](animation.md) — R-ANIM-*. Cách viết code: [`code-style.md`](code-style.md) — R-CS-*.
 - Dọn code theo file này: `/clean-code` (nhóm 5).

@@ -17,6 +17,7 @@ import {
   buildArgs,
   runTick,
   ALLOWED_TOOLS,
+  stepCheck,
 } from './radar-tick.mjs';
 
 /** 10/8/2026 là thứ Hai — `at(0,…)` = T2, `at(5,…)` = T7, `at(6,…)` = CN */
@@ -174,13 +175,16 @@ test('chạy xong: ghi sổ, phát hiện dòng mới, bắn báo, và NHẢ LOC
     notify: (t, m) => sent.push([t, m]),
     runClaude: () => {
       fs.appendFileSync(path.join(d, 'history/issues.jsonl'), '{"key":"GW-1"}\n');
+      doSteps(d, monday);
       return { ok: true, ms: 4200, costUsd: 0.1, err: null };
     },
   });
   assert.equal(row.ok, true);
   assert.equal(row.changed, true);
   assert.deepEqual(row.newRows, { issues: 1 });
+  assert.equal(row.stepsMissing, undefined);
   assert.equal(sent.length, 1);
+  assert.match(sent[0][1], /^Có thay đổi mới/);
   assert.equal(fs.existsSync(path.join(d, '.locks/radar.lock')), false);
   assert.equal(countLines(path.join(d, 'history/radar.jsonl')), 1);
 });
@@ -669,4 +673,51 @@ test('--dry KHÔNG được ghi state dù có ticket đủ điều kiện đóng
   runTick({ root: d, now: monday, argv: ['--dry'], runClaude: () => ({ ok: true, ms: 1 }), notify: () => {} });
 
   assert.equal(fs.readFileSync(path.join(d, 'state.json'), 'utf8'), before);
+});
+
+test('effort để trống thì KHÔNG truyền --effort; có thì truyền', () => {
+  assert.equal(buildArgs('/daily delta').includes('--effort'), false);
+  assert.deepEqual(buildArgs('/daily delta', null, 'medium').slice(-2), ['--effort', 'medium']);
+});
+
+test('cổng đủ bước: board ghi sau lúc bắt đầu, lastRun đổi, months của hôm nay', () => {
+  const d = tmp('steps-');
+  const now = new Date(2026, 8, 23, 11, 0);
+  fs.mkdirSync(path.join(d, 'boards'), { recursive: true });
+  fs.mkdirSync(path.join(d, 'history'), { recursive: true });
+  fs.writeFileSync(path.join(d, 'boards/2026-09-23.md'), 'x');
+  fs.writeFileSync(path.join(d, 'state.json'), JSON.stringify({ lastRun: 'mới' }));
+  fs.writeFileSync(path.join(d, 'history/months.json'), JSON.stringify({ generatedAt: '2026-09-22' }));
+  assert.deepEqual(stepCheck({ root: d, startedMs: Date.now() - 60e3, lastRunBefore: 'cũ', now }), { board: true, lastRun: true, months: false });
+  assert.deepEqual(stepCheck({ root: d, startedMs: Date.now() + 60e3, lastRunBefore: 'mới', now }), { board: false, lastRun: false, months: false });
+});
+
+test('bỏ bước thì báo NGAY, đứng sau lỗi hỏng/đăng nhập', () => {
+  assert.deepEqual(decideNotify({ ok: true, stepsMissing: ['board'] }), { send: true, kind: 'steps' });
+  assert.deepEqual(decideNotify({ ok: false, err: 'please /login', stepsMissing: ['board'] }), { send: true, kind: 'auth' });
+});
+
+function doSteps(d, now) {
+  const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  fs.mkdirSync(path.join(d, 'boards'), { recursive: true });
+  fs.writeFileSync(path.join(d, 'boards', `${day}.md`), '- delta');
+  fs.writeFileSync(path.join(d, 'state.json'), JSON.stringify({ lastRun: `${day}T10:00:00Z`, bugWatch: {} }));
+  fs.writeFileSync(path.join(d, 'history/months.json'), JSON.stringify({ generatedAt: day }));
+}
+
+test('lượt delta "ok" mà bỏ ghi board thì ghi sổ stepsMissing và báo NGAY', () => {
+  const d = root();
+  const sent = [];
+  const row = runTick({
+    root: d,
+    now: monday,
+    notify: (t, m) => sent.push(m),
+    runClaude: () => {
+      doSteps(d, monday);
+      fs.rmSync(path.join(d, 'boards'), { recursive: true });
+      return { ok: true, ms: 1, err: null };
+    },
+  });
+  assert.deepEqual(row.stepsMissing, ['board']);
+  assert.match(sent[0], /bỏ bước: board/);
 });

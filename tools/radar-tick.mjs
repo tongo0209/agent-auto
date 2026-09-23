@@ -110,9 +110,10 @@ export function failStreak(rows = []) {
  */
 const AUTH_ERR = /invalid api key|\/login|unauthor|authenticat|credential|token.*expir/i;
 
-export function decideNotify({ ok, err = '', changed = false, streak = 0, bugsAdded = {}, openAdded = {} }) {
+export function decideNotify({ ok, err = '', changed = false, streak = 0, bugsAdded = {}, openAdded = {}, stepsMissing = [] }) {
   if (!ok && AUTH_ERR.test(err)) return { send: true, kind: 'auth' };
   if (!ok) return streak >= 3 ? { send: true, kind: 'dead' } : { send: false, kind: null };
+  if (stepsMissing.length) return { send: true, kind: 'steps' };
   if (openAdded.total) return { send: true, kind: 'newbug' };
   if (bugsAdded.verified || bugsAdded.unverified) return { send: true, kind: 'bugfix' };
   return changed ? { send: true, kind: 'change' } : { send: false, kind: null };
@@ -152,9 +153,32 @@ export const ALLOWED_TOOLS = [
  * đo thật 13/8 một lượt mặc định tốn ~$1.0, nên đây là nút vặn chi phí duy nhất đáng có
  * (hạ nhịp là mất độ nhạy, còn hạ model thì việc của delta phần lớn là cơ học).
  */
-export function buildArgs(prompt = '/daily delta', model = null) {
+export function buildArgs(prompt = '/daily delta', model = null, effort = null) {
   const args = ['-p', prompt, '--allowedTools', ALLOWED_TOOLS, '--output-format', 'json'];
-  return model ? [...args, '--model', model] : args;
+  if (model) args.push('--model', model);
+  if (effort) args.push('--effort', effort);
+  return args;
+}
+
+/**
+ * Cổng đủ bước của lượt delta: hạ model/effort từng làm lượt "ok" mà bỏ bước ghi board (13/8),
+ * nên phải kiểm bằng dấu vết trên đĩa chứ không tin kết quả claude tự báo.
+ */
+export function stepCheck({ root, startedMs, lastRunBefore, now }) {
+  const mtime = (p) => {
+    try {
+      return fs.statSync(p).mtimeMs;
+    } catch {
+      return 0;
+    }
+  };
+  const today = todayStr(now);
+  const generatedAt = String(readJSON(path.join(root, 'history', 'months.json'), {}).generatedAt ?? '');
+  return {
+    board: mtime(path.join(root, 'boards', `${today}.md`)) >= startedMs,
+    lastRun: readJSON(path.join(root, 'state.json'), {}).lastRun !== lastRunBefore,
+    months: generatedAt.startsWith(today),
+  };
 }
 
 /**
@@ -185,10 +209,10 @@ const todayStr = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /** Gọi claude thật — tách riêng để test tiêm bản giả vào, không phải đốt token mỗi lần chạy test */
-function realClaude(root, timeoutMs, model = null, prompt = '/daily delta') {
+function realClaude(root, timeoutMs, model = null, prompt = '/daily delta', effort = null) {
   const t0 = Date.now();
   try {
-    const out = execFileSync('claude', buildArgs(prompt, model), {
+    const out = execFileSync('claude', buildArgs(prompt, model, effort), {
       cwd: root,
       timeout: timeoutMs,
       encoding: 'utf8',
@@ -268,6 +292,7 @@ const MSG = {
       )
       .join('\n') + '\nmở console :4747 tab Bug',
   auth: () => 'Phiên Claude hết hạn — radar đang quét ra trắng. Chạy /login.',
+  steps: (r) => `Lượt delta chạy xong nhưng bỏ bước: ${r.stepsMissing.join(', ')} — console có thể đang hiện số cũ.`,
   dead: (r) => `Radar hỏng ${r.streak} lượt liên tiếp: ${String(r.err).slice(0, 120)}`,
 };
 
@@ -325,9 +350,13 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
     if (argv.includes('--dry')) return { at: stamp(), skipped: 'dry' };
 
     const timeoutMin = choice.prompt === '/daily bugwatch' ? cfg.timeoutMinBugwatch || 15 : cfg.timeoutMin;
-    const res = (runClaude || (() => realClaude(root, timeoutMin * 60e3, cfg.model || null, choice.prompt)))(
+    const startedMs = Date.now();
+    const lastRunBefore = state.lastRun;
+    const res = (runClaude || (() => realClaude(root, timeoutMin * 60e3, cfg.model || null, choice.prompt, cfg.effort || null)))(
       choice.prompt,
     );
+    const steps = res.ok && choice.prompt === '/daily delta' ? stepCheck({ root, startedMs, lastRunBefore, now }) : undefined;
+    const stepsMissing = steps ? Object.keys(steps).filter((k) => !steps[k]) : [];
     if (choice.prompt === '/daily bugwatch') stampPoll(root, now, state);
     const { changed, newRows } = diffCounts(before, snap());
     const stateAfter = readJSON(path.join(root, 'state.json'), {});
@@ -354,6 +383,9 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
       skipped: null,
       prompt: choice.prompt,
       ms: res.ms,
+      effort: cfg.effort || undefined,
+      steps,
+      stepsMissing: stepsMissing.length ? stepsMissing : undefined,
       changed,
       newRows,
       costUsd: res.costUsd,
@@ -364,8 +396,8 @@ export function runTick({ root, now = new Date(), argv = [], runClaude, notify =
       openSheets,
     });
     const streak = failStreak([...rows, row]);
-    const { send, kind } = decideNotify({ ok: res.ok, err: res.err || '', changed, streak, bugsAdded, openAdded });
-    if (send) notify('Radar — agent-auto', MSG[kind]({ ...row, streak, bugsAdded, openAdded, openSheets }));
+    const { send, kind } = decideNotify({ ok: res.ok, err: res.err || '', changed, streak, bugsAdded, openAdded, stepsMissing });
+    if (send) notify('Radar — agent-auto', MSG[kind]({ ...row, streak, bugsAdded, openAdded, openSheets, stepsMissing }));
     return row;
   } catch (err) {
     return write({

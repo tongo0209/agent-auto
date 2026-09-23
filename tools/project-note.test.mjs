@@ -93,6 +93,7 @@ check('9 heading đúng thứ tự spec §5.1',
 check('tiêu đề lấy <title> của index', first.split('\n')[0], '# foo/2026-landingx — Landing X Trung Thu');
 check('mục 1 CHƯA KHOÁ → readLock null', readLock(note), null);
 check('mục 1 có đủ nhãn khoá', ['gameplay: CHƯA KHOÁ', 'type:', 'ref:', 'nguồn chuẩn:', 'ngày khoá:'].every((k) => section(first, '1. Khoá').includes(`- ${k}`)), true);
+check('mục 1 mặc định hooks-at: handoff', section(first, '1. Khoá').includes('- hooks-at: handoff\n'), true);
 
 const places = section(first, '2. Nơi code');
 check('mục 2 có cdn-source tuyệt đối', places.includes(`- cdn-source: ${campaign}\n`), true);
@@ -137,8 +138,14 @@ const unlocked = run('check', campaign);
 check('check note mới → exit 1 vì chưa khoá', unlocked.code === 1 && unlocked.out.includes('chưa khoá'), true);
 
 check('lock gameplay lạ → exit 2', run('lock', campaign, '--gameplay', 'paymnet').code, 2);
+check('lock --hooks-at lạ → exit 2', run('lock', campaign, '--gameplay', 'payment', '--hooks-at', 'sorce').code, 2);
+check('lock --hooks-at source → hooksAt source', run('lock', campaign, '--gameplay', 'payment', '--hooks-at', 'source').code === 0 && readLock(note).hooksAt, 'source');
 check('lock → exit 0', run('lock', campaign, '--gameplay', 'payment', '--type', '13-khuyen-mai-nap', '--by', 'ai').code, 0);
-check('lock → readLock đọc được, ref trống', JSON.stringify(readLock(note)), JSON.stringify({ gameplay: 'payment', type: '13-khuyen-mai-nap', ref: '' }));
+check('lock lại không truyền --hooks-at → giữ source, không tụt về handoff', readLock(note).hooksAt, 'source');
+run('lock', campaign, '--gameplay', 'payment');
+check('lock lại không truyền --type → giữ type cũ', readLock(note).type, '13-khuyen-mai-nap');
+check('lock → readLock đọc được, ref trống, không cờ → giữ hooks-at đã khoá (source)', JSON.stringify(readLock(note)), JSON.stringify({ gameplay: 'payment', type: '13-khuyen-mai-nap', ref: '', hooksAt: 'source' }));
+check('lock không nhân đôi dòng hooks-at', section(readFileSync(note, 'utf8'), '1. Khoá').match(/^- hooks-at:/gm)?.length, 1);
 const lockSection = section(readFileSync(note, 'utf8'), '1. Khoá');
 check('lock ghi ngày + ai khoá + commit kit', [`- ngày khoá: ${today}`, '- ai khoá: ai', `- nguồn chuẩn: kit ${kitSha}`].every((l) => lockSection.includes(l)), true);
 check('check sau khoá, đĩa chưa đổi → exit 0', run('check', campaign).code, 0);

@@ -36,13 +36,19 @@ writeFileSync(note, [
   '## 2. Nơi code',
   '- gameplay: luckydraw-gift-exchange',
 ].join('\n'));
-check('đọc đúng 3 khoá, chỉ trong mục 1', readLock(note), { gameplay: 'payment', type: '13-khuyen-mai-nap', ref: 'products/cfl/landing/2026-rung-ky-bi' });
+check('đọc đúng 3 khoá, chỉ trong mục 1; thiếu hooks-at → handoff', readLock(note), { gameplay: 'payment', type: '13-khuyen-mai-nap', ref: 'products/cfl/landing/2026-rung-ky-bi', hooksAt: 'handoff' });
 
 writeFileSync(note, '## 1. Khoá\n- gameplay: none\n- type: 27-diem-danh-rut-tham\n');
-check('gameplay none, thiếu ref → ref rỗng', readLock(note), { gameplay: 'none', type: '27-diem-danh-rut-tham', ref: '' });
+check('gameplay none, thiếu ref → ref rỗng', readLock(note), { gameplay: 'none', type: '27-diem-danh-rut-tham', ref: '', hooksAt: 'handoff' });
 
-writeFileSync(note, '## 1. Khoá\n- gameplay: payment\n- type:\n- ref:\n- nguồn chuẩn:\n## 2. Nơi code\n');
-check('dòng khoá để trống → rỗng, không ăn sang dòng dưới', readLock(note), { gameplay: 'payment', type: '', ref: '' });
+writeFileSync(note, '## 1. Khoá\n- gameplay: payment\n- type:\n- ref:\n- hooks-at:\n- nguồn chuẩn:\n## 2. Nơi code\n');
+check('dòng khoá để trống → rỗng, không ăn sang dòng dưới; hooks-at trống → handoff', readLock(note), { gameplay: 'payment', type: '', ref: '', hooksAt: 'handoff' });
+
+writeFileSync(note, '## 1. Khoá\n- gameplay: payment\n- hooks-at: source\n## 2. Nơi code\n- hooks-at: handoff\n');
+check('hooks-at: source → source, chỉ đọc trong mục 1', readLock(note).hooksAt, 'source');
+
+writeFileSync(note, '## 1. Khoá\n- gameplay: payment\n- hooks-at: sorce\n');
+check('hooks-at lạ → giữ nguyên để gate báo lỗi dùng', readLock(note).hooksAt, 'sorce');
 
 const handoff = join(root, 'gt-promotion-template/Foo/LandingX_12345');
 writeFileSync(note, `## 1. Khoá\n- gameplay: payment\n## 2. Nơi code\n- cdn-source: ${campaign}\n- gt-promotion: ${handoff}/Promotion\n- gt-promotion: ${handoff}/mainsite\n## 3. Sơ đồ file\n- gt-promotion: ${join(root, 'nhầm')}\n`);

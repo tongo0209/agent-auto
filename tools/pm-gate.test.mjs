@@ -130,6 +130,29 @@ function refDistCase(targetBody) {
   return run([writeCase(`<body>${targetBody}</body>`), '--gameplay', 'none', '--ref', ref, '--baseline', 'none']);
 }
 
+const HOOKS_PROJECTS = join(root, 'hooks-at-projects');
+const missingPoint = () => once(base(L), 'class="pm__point"', 'class="counter"');
+const HISTORY_ONLY = '<body><div id="popup_history" class="pm__history-module"></div></body>';
+
+// Note khoá Lucky + dòng hooks-at; file đặt trong campaign cdn-source hoặc ở thư mục bàn giao gt-promotion (mục 2).
+function hooksAtCase(slug, hooksAtLine, text, { handoff = false, args = [] } = {}) {
+  const dir = handoff ? join(root, 'gt-promotion', slug, 'Promotion') : join(root, 'cdn-source/products/g/landing', slug);
+  mkdirSync(dir, { recursive: true });
+  mkdirSync(join(HOOKS_PROJECTS, 'g'), { recursive: true });
+  const places = handoff ? `- gt-promotion: ${dir}\n` : '';
+  writeFileSync(join(HOOKS_PROJECTS, 'g', `${slug}.md`), `## 1. Khoá\n- gameplay: ${L}\n${hooksAtLine}\n## 2. Nơi code\n${places}`);
+  writeFileSync(join(dir, 'index.html'), text);
+  return run([join(dir, 'index.html'), '--baseline', 'none', ...args], { PM_PROJECTS_DIR: HOOKS_PROJECTS });
+}
+
+function refDir() {
+  const ref = mkdtempSync(join(root, 'ref-'));
+  writeFileSync(join(ref, 'index.html'), '<body><a href="#" class="pm__btn-history"></a><div id="popup_history" class="pm__history-module"></div></body>');
+  return ref;
+}
+
+const deferredWarn = (code) => (r) => r.exit === 0 && noRed(r) && r.json.warns.some((f) => f.code === code && f.msg.includes('hooks-at: handoff'));
+
 const refCase = () => refCaseWith('<a href="#" class="pm__btn-history"></a><div id="popup_history" class="pm__history-module"></div>');
 
 function pageCase(g, pages) {
@@ -400,6 +423,20 @@ const CASES = [
     ['không include', gate(L, withoutPopups(base(L)), 'index-vn.html.twig'), redOn('PG-REQ', 'popup_login')],
     ['include + popup mất class module (bomber/2026-worldcup)', gate(L, once(once(base(L), 'id="popup_register" class="pm__module pm__profileinfo-module"', 'id="popup_register"'),
       '</body>', "{% include './main/html/configProduction.html.twig' %}\n</body>"), 'index.html.twig'), redOn('PG-NEST', 'pm__profile-form')],
+  ]],
+  ['60 hooks-at: cdn-source + handoff thiếu hook → 🟡 PG-REQ/PG-REF; source / file bàn giao → 🔴; hook đã gắn sai vẫn 🔴', () => [
+    ['cdn + handoff', hooksAtCase('h-handoff', '- hooks-at: handoff', missingPoint()), deferredWarn('PG-REQ')],
+    ['cdn, note không ghi hooks-at → handoff', hooksAtCase('h-default', '', missingPoint()), deferredWarn('PG-REQ')],
+    ['cdn + source', hooksAtCase('h-source', '- hooks-at: source', missingPoint()), redOn('PG-REQ', 'pm__point')],
+    ['cờ --hooks-at source thắng note', hooksAtCase('h-flag', '- hooks-at: handoff', missingPoint(), { args: ['--hooks-at', 'source'] }), redOn('PG-REQ', 'pm__point')],
+    ['file bàn giao gt-promotion + handoff', hooksAtCase('h-gt', '- hooks-at: handoff', missingPoint(), { handoff: true }), redOn('PG-REQ', 'pm__point')],
+    ['cdn + handoff mà nhầm -claim', hooksAtCase('h-claim', '- hooks-at: handoff', once(missingPoint(), 'class="pm__btn-claim">gift', 'class="pm__btn_claim">gift')),
+      (r) => r.exit === 1 && red('PG-CLAIM')(r) && lacks(r, 'PG-REQ', 'pm__point')],
+    ['cdn + handoff, gameplay none thiếu hook của ref', hooksAtCase('h-ref', '- hooks-at: handoff', HISTORY_ONLY, { args: ['--gameplay', 'none', '--ref', refDir()] }), deferredWarn('PG-REF')],
+  ]],
+  ['61 hooks-at lạ (cờ hoặc note) → exit 2', () => [
+    ['cờ', hooksAtCase('h-bad-flag', '', base(L), { args: ['--hooks-at', 'sorce'] }), (r) => r.exit === 2 && r.stderr.includes('hooks-at "sorce"')],
+    ['note', hooksAtCase('h-bad-note', '- hooks-at: sorce', base(L)), (r) => r.exit === 2 && r.stderr.includes('hooks-at "sorce"')],
   ]],
 ];
 

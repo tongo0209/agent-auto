@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { campaignOf, notePathFor, noteForAnyFile, readLock } from './lib/project-lock.mjs';
+import { campaignOf, notePathFor, noteForAnyFile, readLock, HOOKS_AT, HOOKS_AT_DEFAULT } from './lib/project-lock.mjs';
 
 const AGENT_AUTO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const GT_PROMOTION = process.env.PM_GT_PROMOTION_DIR || join(homedir(), 'VNG/git-vng/gt-promotion-template');
@@ -33,7 +33,8 @@ const HINT = {
   commands: '_chạy trong thư mục campaign_',
   log: '_ngày · task/bug · đổi gì · commit_',
 };
-const LOCK_FIELDS = ['gameplay', 'type', 'ref', 'nguồn chuẩn', 'ngày khoá', 'ai khoá'];
+const LOCK_FIELDS = ['gameplay', 'type', 'ref', 'hooks-at', 'nguồn chuẩn', 'ngày khoá', 'ai khoá'];
+const UNLOCKED = { gameplay: 'CHƯA KHOÁ', 'hooks-at': HOOKS_AT_DEFAULT };
 const GAMEPLAYS = ['luckydraw-gift-exchange', 'payment', 'none'];
 const LISTED_FILE = /\.(html|twig|js|scss|md)$/;
 const FILE_ROW = /^- `([^`]+)`(.*)$/;
@@ -46,6 +47,7 @@ const NOT_MARKUP = /<!--[\s\S]*?-->|\{#[\s\S]*?#\}|<script\b[\s\S]*?<\/script>|<
 const TAG_OR_INCLUDE = /<(\/?)([a-zA-Z][\w-]*)([^>]*)>|\{%-?\s*(?:include|embed)\s+['"]([^'"]+)['"]/g;
 
 const today = () => new Date().toLocaleDateString('sv-SE');
+const lockLine = (field, value) => (value ? `- ${field}: ${value}` : `- ${field}:`);
 
 function fail(message, code) {
   console.error(message);
@@ -177,7 +179,7 @@ function init(target, flag) {
   const pkg = join(dir, 'package.json');
   const scripts = existsSync(pkg) ? JSON.parse(readFileSync(pkg, 'utf8')).scripts || {} : {};
   const body = {
-    lock: [HINT.lock, '- gameplay: CHƯA KHOÁ', ...LOCK_FIELDS.slice(1).map((field) => `- ${field}:`)],
+    lock: [HINT.lock, ...LOCK_FIELDS.map((field) => lockLine(field, UNLOCKED[field]))],
     places: [
       HINT.places,
       `- cdn-source: ${dir}`,
@@ -240,15 +242,27 @@ function lock(target, flag) {
   const gameplay = flag('gameplay');
   if (!GAMEPLAYS.includes(gameplay)) fail(`--gameplay phải là: ${GAMEPLAYS.join(' | ')}`, 2);
   const { note, text } = openNote(target);
+  // Lock lại mà thiếu cờ thì giữ giá trị đang có: tụt hooks-at source → handoff là cổng lỏng đi không báo.
+  const current = (field) => sectionBody(text, SECTION.lock).match(new RegExp(`^- ${field}:[ \\t]*(.*)$`, 'm'))?.[1].trim() || '';
+  const hooksAt = flag('hooks-at') || current('hooks-at') || HOOKS_AT_DEFAULT;
+  if (!HOOKS_AT.includes(hooksAt)) fail(`--hooks-at phải là: ${HOOKS_AT.join(' | ')}`, 2);
   const kitSha = existsSync(KIT) ? execFileSync('git', ['-C', KIT, 'log', '-1', '--format=%h', '--', '.'], { encoding: 'utf8' }).trim() : '';
-  const values = { gameplay, type: flag('type'), ref: flag('ref'), 'nguồn chuẩn': kitSha && `kit ${kitSha}`, 'ngày khoá': today(), 'ai khoá': flag('by') };
+  const values = {
+    gameplay,
+    type: flag('type') || current('type'),
+    ref: flag('ref') || current('ref'),
+    'hooks-at': hooksAt,
+    'nguồn chuẩn': kitSha && `kit ${kitSha}`,
+    'ngày khoá': today(),
+    'ai khoá': flag('by') || current('ai khoá'),
+  };
   const setField = (body, field) => {
-    const line = values[field] ? `- ${field}: ${values[field]}` : `- ${field}:`;
+    const line = lockLine(field, values[field]);
     const pattern = new RegExp(`^- ${field}:.*$`, 'm');
     return pattern.test(body) ? body.replace(pattern, line) : `${body}\n${line}`;
   };
   writeFileSync(note, editSection(text, SECTION.lock, (body) => LOCK_FIELDS.reduce(setField, body)));
-  console.log(`đã khoá gameplay: ${gameplay} → ${note}`);
+  console.log(`đã khoá gameplay: ${gameplay} · hooks-at: ${hooksAt} → ${note}`);
 }
 
 function debt(target, flag) {

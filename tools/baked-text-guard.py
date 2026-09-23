@@ -9,12 +9,12 @@ lại ở .header__sub, cả 4 ngôn ngữ.
 Nguyên nhân gốc: spec liệt kê một chuỗi ở mục "render bằng HTML" trong khi job cắt ảnh cũng gom
 layer chữ đó vào. Hai nguồn sự thật, không ai đối chiếu.
 
-    python3 baked-text-guard.py --job <job.json> [--job ...] --dist <thư mục dist>
+    python3 baked-text-guard.py --job <job.json|coords.json> [--job ...] --dist <thư mục dist>
 
---job = chính file job đã đưa cho psd-export.py, nên danh sách "đã bake" luôn khớp ảnh thật,
-không phải khai lại bằng tay. State "_control" bị bỏ qua (nó bật mọi layer, không phải ảnh giao).
+--job nhận job psd-cut (đọc chữ từ PSD theo showPath), job figma-cut hoặc coords.json đời mới (đọc
+`textInside` từng row, không cần PSD). Row/state tên "_…" bị bỏ qua (tấm tham chiếu, không phải ảnh giao).
 
-Exit 0 = sạch · 1 = có chuỗi lồng 2 lớp.
+Exit 0 = sạch · 1 = có chuỗi lồng 2 lớp · 2 = input thiếu field, không chấm đủ.
 """
 import argparse
 import glob
@@ -23,8 +23,6 @@ import json
 import os
 import re
 import sys
-
-from psd_tools import PSDImage
 
 MIN_LEN = 12
 CONTAIN_RATIO = 0.6
@@ -65,21 +63,38 @@ def show_keys(state):
     return keys
 
 
-def baked_strings(job_path):
-    job = json.load(open(job_path, encoding="utf-8"))
+def baked_strings(path):
+    """→ (chuỗi đã bake, [vì sao không chấm đủ]). Thiếu field thì nói tên field, không chết KeyError."""
+    data = json.load(open(path, encoding="utf-8"))
+    rows = data if isinstance(data, list) else data.get("states") or data.get("assets")
+    if not isinstance(rows, list):
+        return set(), [f"{path}: không thấy states[] (job psd) hay assets[] (job figma / coords.json)"]
+    rows = [r for r in rows if not r.get("name", "").startswith("_")]
+    out = {t for r in rows for t in r.get("textInside") or []}
+    need_psd = [r for r in rows if "textInside" not in r and show_keys(r)]
+    no_text = [r.get("name", "?") for r in rows if "textInside" not in r and not show_keys(r)]
+    problems = []
+    if no_text:
+        problems.append(f"{path}: {len(no_text)}/{len(rows)} row thiếu field 'textInside' (bản trim đời cũ): "
+                        f"{', '.join(no_text[:5])} — chạy lại trim, hoặc đưa --job của psd-cut")
+    if not need_psd:
+        return out, problems
+    psd = data.get("psd") if isinstance(data, dict) else None
+    if not psd or not os.path.exists(psd):
+        problems.append(f"{path}: {len(need_psd)} state cần đọc chữ từ PSD nhưng field 'psd' "
+                        f"{'không có' if not psd else 'trỏ file không tồn tại: ' + psd}")
+        return out, problems
+    from psd_tools import PSDImage
     nodes = {}
-    index_tree(PSDImage.open(job["psd"]), [], nodes)
-    out = set()
-    for state in job["states"]:
-        if state["name"].startswith("_"):
-            continue
-        for path in show_keys(state):
-            layer = nodes.get(path)
+    index_tree(PSDImage.open(psd), [], nodes)
+    for state in need_psd:
+        for key in show_keys(state):
+            layer = nodes.get(key)
             if layer is None:
-                print(f"  ⚠ job trỏ layer không có thật: {path}", file=sys.stderr)
+                problems.append(f"{path}: state \"{state.get('name', '?')}\" trỏ layer không có thật: {key}")
                 continue
             out.update(texts_under(layer))
-    return out
+    return out, problems
 
 
 def normalize(s):
@@ -94,14 +109,16 @@ def html_text_nodes(path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--job", action="append", required=True)
+    ap.add_argument("--job", "--coords", dest="inputs", action="append", required=True)
     ap.add_argument("--dist", required=True)
     ap.add_argument("--min-len", type=int, default=MIN_LEN)
     args = ap.parse_args()
 
-    baked = set()
-    for job in args.job:
-        baked |= baked_strings(job)
+    baked, problems = set(), []
+    for path in args.inputs:
+        strings, why = baked_strings(path)
+        baked |= strings
+        problems += why
     baked = {normalize(b) for b in baked}
     baked = {b for b in baked if len(b) >= args.min_len}
 
@@ -118,7 +135,12 @@ def main():
                     hits.append((os.path.basename(page), b, node))
 
     print(f"baked-text-guard: {len(baked)} chuỗi đã bake · {len(pages)} trang")
+    for why in problems:
+        print(f"  ✗ không chấm đủ: {why}")
     if not hits:
+        if problems:
+            print("✗ KHÔNG CHẤM ĐỦ — input thiếu field, chưa được coi là sạch")
+            return 2
         print("✓ PASS — không có chuỗi nào vừa bake vừa render HTML")
         return 0
 

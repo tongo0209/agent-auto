@@ -13,6 +13,7 @@
  * Exit code: 0 = sạch · 1 = có ERROR (hoặc có WARN khi --strict) · 2 = sai tham số.
  * Không dependency ngoài (cdn-source cấm thêm dep; script phải chạy được ở mọi repo).
  */
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -252,6 +253,10 @@ const add = (level, check, message, where = '') => findings.push({ level, check,
 
 const cssFiles = walk(DIST, ['.css']);
 const htmlFiles = walk(DIST, ['.html', '.htm']);
+const SRC_CANDIDATES = ['assets', 'src', 'source'];
+const campaignDir = path.dirname(DIST);
+const srcDirs = SRC_CANDIDATES.map((d) => path.join(campaignDir, d)).filter(isDir);
+const CODE_EXT = ['.js', '.ts', '.scss', '.css', '.twig', '.html', '.json'];
 const allFontFaces = [];
 const fontUsage = new Map();
 /** ref → { url, from, candidates } */
@@ -348,6 +353,41 @@ for (const r of refs) {
   add('ERROR', 'ref-image-used', `ảnh chỉ-để-đối-chiếu đang dùng thật: ${r.url}`, rel(r.from));
 }
 
+function pngSize(p) {
+  const head = Buffer.alloc(24);
+  const fd = fs.openSync(p, 'r');
+  fs.readSync(fd, head, 0, 24, 0);
+  fs.closeSync(fd);
+  return head.toString('latin1', 12, 16) === 'IHDR' ? { w: head.readUInt32BE(16), h: head.readUInt32BE(20) } : null;
+}
+
+/** coords.json 3 đời: {runId, gateStatus, assets[]} · mảng row · map "file" → {left, top, width, height} */
+function readCut(file) {
+  const doc = JSON.parse(read(file));
+  const list = Array.isArray(doc) ? doc : Array.isArray(doc.assets) ? doc.assets : Object.values(doc).filter((r) => r?.file);
+  const cut = { file, gateStatus: doc.gateStatus, runId: doc.runId };
+  cut.rows = list.map((r) => {
+    const p = path.join(path.dirname(file), r.file);
+    return { cut, name: r.name ?? r.file, path: p, real: isFile(p) ? pngSize(p) : null,
+             w: r.w ?? r.width, h: r.h ?? r.height, flags: r.flags ?? [] };
+  });
+  return cut;
+}
+
+const cuts = [];
+const SIDECAR = /(^|\/)(.*backup.*|.*-base)(\/|$)/i;
+if (DESIGN) {
+  for (const f of walk(DESIGN)) {
+    if (path.basename(f) !== 'coords.json' || SIDECAR.test(path.relative(DESIGN, path.dirname(f)))) continue;
+    try {
+      cuts.push(readCut(f));
+    } catch (e) {
+      add('ERROR', 'coords-unreadable', `coords.json đọc không được: ${e.message}`, path.relative(DESIGN, f));
+    }
+  }
+}
+const cutRows = cuts.flatMap((c) => c.rows);
+
 /* ── check 8: asset design bóc ra mà dist không dùng ──
    Anh em với check 4 nhưng cho ẢNH: hoặc quên code một mảng, hoặc là rác cần dọn.
    Chỉ soi thư mục CÓ `coords.json` — đó là bản psd-cut đã trim và giao; ảnh thô ngoài đó,
@@ -356,12 +396,11 @@ for (const r of refs) {
 if (DESIGN) {
   const nm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const usedImgs = nm([...refs.map((r) => path.basename(cleanUrl(r.url))), ...walk(DIST, IMG_EXT).map((f) => path.basename(f))].join(' '));
-  const SIDECAR = /(^|\/)(.*backup.*|.*-base)(\/|$)/i;
-  const shipped = new Set(walk(DESIGN).filter((f) => path.basename(f) === 'coords.json').map((f) => path.dirname(f)));
+  const shipped = new Set(cuts.map((c) => path.dirname(c.file)));
   const perDir = new Map();
   for (const f of walk(DESIGN, IMG_EXT)) {
     const dir = path.dirname(f);
-    if (!shipped.has(dir) || SIDECAR.test(path.relative(DESIGN, dir))) continue;
+    if (!shipped.has(dir)) continue;
     const base = path.basename(f, path.extname(f));
     if (base.startsWith('_')) continue; // _control/_scope là ảnh tham chiếu của psd-cut
     const key = path.relative(DESIGN, dir);
@@ -378,12 +417,112 @@ if (DESIGN) {
   }
 }
 
+/* ── check 9–11: ảnh dist/source là bản sao asset coords.json khi cùng md5 HOẶC cùng tên + cùng cỡ ── */
+// Tên trần không đủ: title.png/bg.png của popup library trùng tên row bản cắt (GW-727)
+const md5 = (p) => crypto.createHash('md5').update(fs.readFileSync(p)).digest('hex');
+const groupBy = (list, key) => list.reduce((m, x) => m.set(key(x), [...(m.get(key(x)) || []), x]), new Map());
+const sameDims = (a, b) => Boolean(a && b && a.w === b.w && a.h === b.h);
+const cutRowsByName = groupBy(cutRows, (r) => path.basename(r.path));
+const cutRowsBySize = groupBy(cutRows.filter((r) => r.real), (r) => size(r.path));
+const shippedImgs = [...walk(DIST, IMG_EXT), ...srcDirs.flatMap((d) => walk(d, IMG_EXT))];
+const copies = [];
+for (const img of shippedImgs) {
+  const real = pngSize(img);
+  const byName = (cutRowsByName.get(path.basename(img)) || []).filter((r) => sameDims(r.real, real));
+  const byContent = (cutRowsBySize.get(size(img)) || []).filter((r) => md5(r.path) === md5(img));
+  const rows = [...new Set([...byName, ...byContent])];
+  if (rows.length) copies.push({ img, rows });
+}
+
+/* ── check 9: asset mang cờ plan mà vẫn dùng làm ảnh (img src / background / sprite) ── */
+const FLAG_RULES = {
+  'DATA-ZONE': ['ERROR', 'vùng dữ liệu động tên/điểm/số — phải render bằng HTML'],
+  'FONT-SUBST': ['ERROR', 'chữ nướng bằng font thay thế vì font PSD chưa cài — sai nét'],
+  BAKE: ['WARN', 'đã nướng kèm nền bên dưới vì blend lạ — chỉ đúng khi đặt đúng toạ độ trên đúng nền'],
+  'CỤC': ['WARN', 'gộp nhiều vật rời trong 1 ảnh — nên tách'],
+};
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const flaggedCopies = copies.filter((c) => c.rows.some((r) => r.flags.some((fl) => FLAG_RULES[fl])));
+const codeFiles = flaggedCopies.length
+  ? [...walk(DIST, CODE_EXT), ...srcDirs.flatMap((d) => walk(d, CODE_EXT))].map((f) => ({ f, lines: read(f).split('\n') }))
+  : [];
+const seenFlagged = new Set();
+for (const { img, rows } of flaggedCopies) {
+  const base = path.basename(img);
+  const stem = path.basename(img, path.extname(img));
+  const usedAt = new RegExp(`(?<![\\w-])${escRe(base)}|sprite\\(\\s*\\$${escRe(stem)}\\s*\\)|MS__sprite-${escRe(stem)}(?![\\w-])`);
+  const wheres = codeFiles.flatMap(({ f, lines }) => lines.flatMap((l, i) => (usedAt.test(l) ? [`${rel(f)}:${i + 1}`] : [])));
+  for (const row of rows) {
+    for (const flag of row.flags.filter((fl) => FLAG_RULES[fl])) {
+      const [level, meaning] = FLAG_RULES[flag];
+      // Không thấy dòng tham chiếu vẫn báo: sprite gộp nguyên thư mục, dist chép là đã ship
+      for (const where of wheres.length ? wheres : [rel(img)]) {
+        const key = `${flag}|${row.name}|${where}`;
+        if (seenFlagged.has(key)) continue;
+        seenFlagged.add(key);
+        add(level, 'flagged-asset-used', `ảnh cờ ${flag} (${meaning}) đang dùng làm ảnh: ${base} ← bản cắt "${row.name}"`, where);
+      }
+    }
+  }
+}
+
+/* ── check 10: ảnh dist cùng tên + cùng tỉ lệ khung với slot coords mà không phải 1×/2× (bitmap gốc Figma) ── */
+const SCALE_TOLERANCE = 0.03;
+const nearScale = (ratio, k) => Math.abs(ratio / k - 1) <= SCALE_TOLERANCE;
+for (const img of walk(DIST, ['.png'])) {
+  const real = pngSize(img);
+  if (!real) continue;
+  const slots = (cutRowsByName.get(path.basename(img)) || [])
+    .filter((r) => r.w && r.h && nearScale(real.w / real.h / (r.w / r.h), 1));
+  if (!slots.length) continue;
+  if (slots.some((r) => [1, 2].some((k) => nearScale(real.w / r.w, k) && nearScale(real.h / r.h, k)))) continue;
+  const slot = slots[0];
+  add('WARN', 'scale-odd',
+      `${path.basename(img)} cỡ thật ${real.w}×${real.h} = ${(real.w / slot.w).toFixed(2)}× slot ${slot.w}×${slot.h} của ${path.relative(DESIGN, slot.cut.file)}` +
+      ' — không phải 1×/2×: cùng ảnh thì browser co giãn lẻ (mờ), ảnh của viewport khác thì bỏ qua', rel(img));
+}
+
+/* ── check 11: asset từ lượt cắt ĐỎ (gateStatus=FAIL) — chỉ overrides.json có lý do + số đo gạt được ── */
+const OVERRIDE_GATES = ['C2', 'C5'];
+const OVERRIDE_REASON_MIN = 10;
+/** override C5 chỉ gạt đúng asset nó nêu tên; C2 gạt theo region (vùng ghép, không map được về asset) */
+function readOverrides(file) {
+  if (!isFile(file)) return { valid: [], problems: ['không có overrides.json'] };
+  let list;
+  try {
+    list = JSON.parse(read(file));
+  } catch (e) {
+    return { valid: [], problems: [`overrides.json hỏng: ${e.message}`] };
+  }
+  if (!Array.isArray(list) || !list.length) return { valid: [], problems: ['overrides.json rỗng hoặc không phải mảng'] };
+  const valid = [];
+  const problems = list.flatMap((o) => {
+    const why = [
+      !OVERRIDE_GATES.includes(o.gate) && 'gate chỉ C2/C5',
+      !(o.asset || o.region) && 'thiếu asset/region',
+      String(o.reason ?? '').trim().length < OVERRIDE_REASON_MIN && `reason <${OVERRIDE_REASON_MIN} ký tự`,
+      typeof o.measured !== 'number' && 'thiếu measured (số đo)',
+    ].filter(Boolean);
+    if (!why.length) valid.push(o);
+    return why.length ? [`${o.gate} ${o.asset || o.region}: ${why.join(', ')}`] : [];
+  });
+  return { valid, problems };
+}
+for (const cut of cuts.filter((c) => c.gateStatus === 'FAIL')) {
+  const { valid, problems } = readOverrides(path.join(path.dirname(cut.file), 'overrides.json'));
+  const waived = (name) => valid.some((o) => o.asset === name || (o.gate === 'C2' && o.region));
+  const used = [...new Set(copies.flatMap((c) => c.rows).filter((r) => r.cut === cut).map((r) => r.name))]
+    .filter((name) => !waived(name));
+  if (!used.length) continue;
+  if (valid.length) problems.push(`override hợp lệ không nêu asset đang dùng (${used.slice(0, 5).join(', ')})`);
+  add('ERROR', 'cut-gate-red',
+      `asset từ lượt cắt đỏ (gateStatus=FAIL, runId ${cut.runId}): ${used.length} asset đang dùng — ${used.slice(0, 5).join(', ')}. ` +
+      `Cắt lại cho xanh, hoặc ghi overrides.json [{gate C2|C5, asset|region, reason ≥${OVERRIDE_REASON_MIN} ký tự, measured}] · ${problems.join('; ')}`,
+      path.relative(DESIGN, cut.file));
+}
+
 /* ── check 6: dist cũ hơn source ── */
-const SRC_CANDIDATES = ['assets', 'src', 'source'];
-const campaignDir = path.dirname(DIST);
-const srcDirs = SRC_CANDIDATES.map((d) => path.join(campaignDir, d)).filter(isDir);
 if (srcDirs.length) {
-  const CODE_EXT = ['.js', '.ts', '.scss', '.css', '.twig', '.html', '.json'];
   const srcM = Math.max(...srcDirs.map((d) => maxMtime(d, CODE_EXT)));
   const distM = maxMtime(DIST);
   if (srcM && distM && srcM > distM) {
@@ -404,7 +543,10 @@ const report = {
   at: new Date().toISOString(),
   dist: DIST,
   design: DESIGN || null,
-  scanned: { css: cssFiles.length, html: htmlFiles.length, fontFaces: allFontFaces.length, refs: refs.length },
+  scanned: {
+    css: cssFiles.length, html: htmlFiles.length, fontFaces: allFontFaces.length, refs: refs.length,
+    coords: cuts.length, cutAssets: cutRows.length, cutCopies: copies.length,
+  },
   counts: { error: errors.length, warn: warns.length },
   pass: !failed,
   findings,
@@ -446,6 +588,7 @@ if (!opts.quiet) {
   L('');
   L(`fe-gate · ${DIST}`);
   L(`  quét: ${cssFiles.length} css · ${htmlFiles.length} html · ${allFontFaces.length} @font-face · ${refs.length} ref`);
+  if (DESIGN) L(`        ${cuts.length} coords.json · ${cutRows.length} asset cắt · ${copies.length} ảnh dist/source là bản sao của chúng`);
   if (!findings.length) {
     L('  ✓ PASS — 0 ERROR, 0 WARN');
   } else {

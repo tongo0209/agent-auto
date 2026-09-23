@@ -184,6 +184,151 @@ console.log('\nfe-gate self-test\n');
   expect('_control là ảnh tham chiếu, không phải asset giao', !un.some((x) => x.message.includes('_control')), JSON.stringify(un.map((x) => x.message)));
 }
 
+/* ── fixture bản cắt psd-cut/figma-cut: PNG thật (IHDR đọc được cỡ) + coords.json ── */
+const png = (wd, ht, salt = '') => {
+  const ihdr = Buffer.alloc(25);
+  ihdr.writeUInt32BE(13, 0);
+  ihdr.write('IHDR', 4);
+  ihdr.writeUInt32BE(wd, 8);
+  ihdr.writeUInt32BE(ht, 12);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), ihdr, Buffer.from(salt)]);
+};
+const row = (name, wd, ht, flags = [], extra = {}) =>
+  ({ name, file: name + '.png', x: 0, y: 0, w: wd, h: ht, flags, textInside: [], z: 0, runId: 'r1', ...extra });
+const writeCut = (dir, doc) => w(path.join(dir, 'coords.json'), JSON.stringify(doc));
+const hourAgo = new Date(Date.now() - 3600 * 1000);
+const writeSrc = (p, s) => (w(p, s), fs.utimesSync(p, hourAgo, hourAgo), p);
+const flagged = (r) => r.findings.filter((x) => x.check === 'flagged-asset-used');
+
+/* ── ca 11: asset cờ DATA-ZONE/FONT-SUBST bị bê làm ảnh (ca GW-723: 1-misc → point-1.png) ── */
+{
+  const dist = cleanFixture('flag-data-zone');
+  const camp = path.dirname(dist);
+  const cut = path.join(ROOT, 'flag-data-zone-src/_auto-export/gnm-mb/assets');
+  w(path.join(cut, '1-misc.png'), png(120, 40, 'misc'));
+  w(path.join(cut, 'score.png'), png(60, 20, 'score'));
+  w(path.join(cut, 'frame-3.png'), png(100, 100, 'frame'));
+  writeCut(cut, { runId: 'r1', gateStatus: 'PASS', assets: [
+    row('1-misc', 120, 40, ['TEXT', 'DATA-ZONE']), row('score', 60, 20, ['FONT-SUBST']), row('frame-3', 100, 100)] });
+  writeSrc(path.join(camp, 'assets/sec/images/sprite/point-1.png'), png(120, 40, 'misc'));
+  writeSrc(path.join(camp, 'assets/sec/scss/sec.scss'), '.a{}\n.b{}\n.point{ @include sprite($point-1); }\n');
+  w(path.join(dist, 'images/score.png'), png(60, 20, 'score'));
+  w(path.join(dist, 'images/frame-3.png'), png(100, 100, 'frame'));
+  fs.appendFileSync(path.join(dist, 'index.html'), '\n<img src="images/score.png"><img src="images/frame-3.png">');
+  const r = runGate(dist, ['--quiet', '--design', path.join(ROOT, 'flag-data-zone-src')]);
+  const f = flagged(r);
+  const dz = f.find((x) => x.message.includes('DATA-ZONE'));
+  expect('DATA-ZONE copy đổi tên vào sprite → ERROR', dz?.level === 'ERROR', JSON.stringify(f));
+  expect('  chỉ đúng file:line dòng @include sprite', dz?.where === '../assets/sec/scss/sec.scss:3', dz?.where);
+  const fs2 = f.find((x) => x.message.includes('FONT-SUBST'));
+  expect('FONT-SUBST dùng qua <img src> → ERROR', fs2?.level === 'ERROR', JSON.stringify(f));
+  expect('  chỉ đúng index.html:3', fs2?.where === 'index.html:3', fs2?.where);
+  expect('asset không cờ không bị kết oan', !f.some((x) => x.message.includes('frame-3')), JSON.stringify(f));
+  expect('  và gate FAIL', r.pass === false);
+}
+
+/* ── ca 11b: trùng TÊN mà khác cỡ + khác nội dung là ảnh khác (đo GW-727: title.png popup library) ── */
+{
+  const dist = cleanFixture('flag-same-name');
+  const cut = path.join(ROOT, 'flag-same-name-src/assets');
+  w(path.join(cut, 'title.png'), png(102, 26, 'nick'));
+  writeCut(cut, { runId: 'r1', gateStatus: 'FAIL', assets: [row('title', 102, 26, ['DATA-ZONE'])] });
+  w(path.join(dist, 'popup/images/title.png'), png(557, 90, 'lib'));
+  fs.appendFileSync(path.join(dist, 'app.css'), '\n.pop{background:url(popup/images/title.png)}');
+  const r = runGate(dist, ['--quiet', '--design', path.join(ROOT, 'flag-same-name-src')]);
+  expect('trùng tên, khác cỡ → không ERROR flagged/cut-gate-red', r.counts.error === 0, JSON.stringify(r.findings));
+}
+
+/* ── ca 12: cờ CỤC / BAKE chỉ WARN — không chặn ── */
+{
+  const dist = cleanFixture('flag-cluster');
+  const cut = path.join(ROOT, 'flag-cluster-src/assets');
+  w(path.join(cut, 'qua-1.png'), png(80, 120, 'q'));
+  w(path.join(cut, 'glow.png'), png(50, 50, 'g'));
+  writeCut(cut, { runId: 'r1', gateStatus: 'PASS', assets: [row('qua-1', 80, 120, ['CỤC']), row('glow', 50, 50, ['BAKE'])] });
+  w(path.join(dist, 'images/qua-1.png'), png(80, 120, 'q'));
+  w(path.join(dist, 'images/glow.png'), png(50, 50, 'g'));
+  fs.appendFileSync(path.join(dist, 'app.css'), '\n.qua{background:url(images/qua-1.png)}\n.glow{background:url(images/glow.png)}');
+  const r = runGate(dist, ['--quiet', '--design', path.join(ROOT, 'flag-cluster-src')]);
+  const f = flagged(r);
+  expect('CỤC dùng làm ảnh → WARN', f.some((x) => x.level === 'WARN' && x.message.includes('CỤC')), JSON.stringify(f));
+  expect('BAKE dùng làm ảnh → WARN', f.some((x) => x.level === 'WARN' && x.message.includes('BAKE')), JSON.stringify(f));
+  expect('  chỉ WARN nên vẫn pass', r.pass === true, JSON.stringify(r.findings));
+}
+
+/* ── ca 13: coords đời cũ (mảng / map left-top) vẫn đọc được, không nổ ── */
+{
+  const dist = cleanFixture('coords-old');
+  const design = path.join(ROOT, 'coords-old-src');
+  w(path.join(design, 'a/assets/hero.png'), png(10, 10));
+  w(path.join(design, 'a/assets/coords.json'), JSON.stringify([{ name: 'hero', x: 0, y: 0, w: 10, h: 10, file: 'hero.png' }]));
+  w(path.join(design, '_cut/assets/bg.png'), png(20, 20));
+  w(path.join(design, '_cut/coords.json'), JSON.stringify({ 'assets/bg.png': { file: 'assets/bg.png', left: 0, top: 0, width: 20, height: 20 } }));
+  const r = runGate(dist, ['--quiet', '--design', design]);
+  expect('coords cũ → không ERROR nào', r.counts?.error === 0, JSON.stringify(r.findings));
+  expect('  và đếm được asset cắt (không im lặng như 0)', r.scanned?.cutAssets === 2, JSON.stringify(r.scanned));
+}
+
+/* ── ca 14: bitmap gốc khác cỡ slot (figma lessons 28-32: 396×101 cho slot 243×62) ── */
+{
+  const dist = cleanFixture('scale-odd');
+  const cut = path.join(ROOT, 'scale-odd-src/assets');
+  for (const n of ['btn', 'btn2x', 'btn1x']) w(path.join(cut, `${n}.png`), png(396, 101, n));
+  w(path.join(cut, 'bg.png'), png(71, 47, 'nut'));
+  w(path.join(dist, 'images/btn.png'), png(396, 101, 'btn'));
+  w(path.join(dist, 'images/btn2x.png'), png(486, 124, 'opt'));
+  w(path.join(dist, 'images/btn1x.png'), png(243, 62, 'opt'));
+  writeCut(cut, { runId: 'r1', gateStatus: 'PASS', assets: [
+    row('btn', 243, 62, [], { srcSize: [396, 101] }), row('btn2x', 243, 62), row('btn1x', 243, 62), row('bg', 71, 47)] });
+  w(path.join(dist, 'popup/images/bg.png'), png(1532, 913, 'lib'));
+  const r = runGate(dist, ['--quiet', '--design', path.join(ROOT, 'scale-odd-src')]);
+  const odd = r.findings.filter((x) => x.check === 'scale-odd');
+  expect('396×101 cho slot 243×62 → WARN scale-odd', odd.some((x) => x.message.includes('396×101') && x.message.includes('243×62')), JSON.stringify(odd));
+  expect('  2× (486×124) không bị báo', !odd.some((x) => x.message.includes('btn2x')), JSON.stringify(odd));
+  expect('  1× (243×62) không bị báo', !odd.some((x) => x.message.includes('btn1x')), JSON.stringify(odd));
+  expect('  trùng tên khác tỉ lệ khung (bg 1532×913 vs 71×47) là ảnh khác → không báo', !odd.some((x) => x.message.includes('bg.png')), JSON.stringify(odd));
+}
+
+/* ── ca 15: asset từ lượt cắt ĐỎ (ca GW-745: gate C2 FAIL mà trim vẫn ra coords, dev dùng luôn) ── */
+{
+  const dist = cleanFixture('gate-red');
+  const design = path.join(ROOT, 'gate-red-src');
+  const red = path.join(design, 'cos-mb/assets');
+  const idle = path.join(design, 'cos-popup/assets');
+  w(path.join(red, 'cos-bg.png'), png(30, 30, 'bg'));
+  w(path.join(idle, 'popup-khung.png'), png(40, 40, 'k'));
+  writeCut(red, { runId: 'r-745', gateStatus: 'FAIL', assets: [row('cos-bg', 30, 30)] });
+  writeCut(idle, { runId: 'r-746', gateStatus: 'FAIL', assets: [row('popup-khung', 40, 40)] });
+  w(path.join(dist, 'images/cos-bg.png'), png(30, 30, 'bg'));
+  fs.appendFileSync(path.join(dist, 'app.css'), '\n.cos{background:url(images/cos-bg.png)}');
+  const reds = (res) => res.findings.filter((x) => x.check === 'cut-gate-red');
+
+  const r = runGate(dist, ['--quiet', '--design', design]);
+  const e = reds(r);
+  expect('gateStatus=FAIL mà dist dùng asset → ERROR cut-gate-red', e.length === 1 && e[0].level === 'ERROR', JSON.stringify(e));
+  expect('  nêu "lượt cắt đỏ" + runId', /lượt cắt đỏ/.test(e[0]?.message) && e[0]?.message.includes('r-745'), e[0]?.message);
+  expect('  lượt đỏ mà dist không dùng asset nào → không chặn', !e.some((x) => x.where.includes('cos-popup')), JSON.stringify(e));
+
+  w(path.join(red, 'overrides.json'), JSON.stringify([{ gate: 'C2', region: 'nen', reason: 'ok', measured: 19.2 }]));
+  const r2 = runGate(dist, ['--quiet', '--design', design]);
+  expect('override lý do <10 ký tự → vẫn ERROR, nêu vì sao bị loại', reds(r2).some((x) => /reason/.test(x.message)), JSON.stringify(reds(r2)));
+
+  w(path.join(red, 'overrides.json'), JSON.stringify([
+    { gate: 'C2', region: 'nen', reason: 'nền mờ khác preview do blend Overlay, đã so tay', measured: 19.2 }]));
+  const r3 = runGate(dist, ['--quiet', '--design', design]);
+  expect('overrides.json hợp lệ (gate, region, reason ≥10, measured) → hết ERROR', !reds(r3).length, JSON.stringify(reds(r3)));
+
+  w(path.join(red, 'overrides.json'), JSON.stringify([
+    { gate: 'C5', asset: 'asset-khac-khong-dung', reason: 'đã đối chiếu với design chốt', measured: 5 }]));
+  const r4 = runGate(dist, ['--quiet', '--design', design]);
+  expect('override C5 hợp lệ nhưng cho asset KHÁC → vẫn ERROR (reviewer 23/9: 1 dòng lạc gạt cả lượt đỏ)',
+         reds(r4).some((x) => x.level === 'ERROR' && x.message.includes('cos-bg')), JSON.stringify(reds(r4)));
+  w(path.join(red, 'overrides.json'), JSON.stringify([
+    { gate: 'C5', asset: 'cos-bg', reason: 'đã đối chiếu với design chốt', measured: 5 }]));
+  const r5 = runGate(dist, ['--quiet', '--design', design]);
+  expect('override C5 đúng asset đang dùng → hết ERROR', !reds(r5).length, JSON.stringify(reds(r5)));
+}
+
 /* ── dọn ── */
 fs.rmSync(ROOT, { recursive: true, force: true });
 

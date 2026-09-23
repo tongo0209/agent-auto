@@ -56,4 +56,4 @@ Vì sao cần — đo thật 22/9/2026 trên 1.792 phiên / 95.943 lượt:
 - Baseline mỗi phiên là 68–73k token trước khi user gõ chữ đầu tiên ⇒ 6,7 tỷ token/tháng chỉ để gửi lại phần cố định (35% khối lượng, ~24% chi phí quy đổi).
 
 Ngưỡng đổi bằng biến môi trường `CLAUDE_CTX_WARN`. Self-test: `bash ~/.claude/hooks/token-watch.test.sh`.
-Đo lịch sử: `node ~/VNG/agent-auto/tools/token-scan.mjs`.
+Đo lịch sử: `node ~/VNG/agent-auto/tools/token-scan.mjs` (token) · `node ~/VNG/agent-auto/tools/wall-scan.mjs [--skill <tên>]` (thời gian thật theo skill).

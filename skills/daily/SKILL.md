@@ -98,9 +98,18 @@ Token đầu của `$ARGUMENTS`:
   phân loại như task thường (buglist → đường bug, việc code → đường code). ADHOC cũng có phase.
   Link là buglist → đăng ký theo dõi luôn bằng `node tools/bug-radar.mjs add "<link>" --key ADHOC-<n>
   --title "<tên task>"` (cùng đường ghi với `/bug-fixer-lite`), user khỏi dán lại ở tab Bug.
-- `delta` → radar nhẹ, KHÔNG hỏi gì, chạy <1 phút: (1) JQL `assignee = currentUser() AND
-  updated >= "<state.lastRun lùi 30 phút, format yyyy-MM-dd HH:mm>"` — fallback `-4h` chỉ khi
-  state thiếu `lastRun`. ⚠ CẤM quay về `-4h` cứng: cửa sổ cố định hụt mọi thay đổi rơi vào khe
+- `delta` → radar nhẹ, KHÔNG hỏi gì, chạy <1 phút:
+  (0) **`node <AGENT_AUTO>/tools/delta-scan.mjs` TRƯỚC TIÊN** — 1 lệnh (~2s) làm sẵn phần cơ học, in JSON:
+  `window` (cửa sổ JQL), `repos` (gt-promotion `pull --ff-only`, 3 repo còn lại `fetch`, rồi `log --all`
+  từ mốc), `byTicket` (commit đã nối vào ticket đang theo dõi qua `state.issues[KEY].paths`, bỏ `closed`),
+  `monthsStale`, `designScanDue`, `driveCheck`. **KHÔNG tự gõ lại git/so giờ**: các bẫy đã trả giá —
+  fetch trước log (19/8: `log` suông không thấy commit vunbpp vừa push vào folder GW-779), soi đủ
+  `config.repos` chứ không riêng gt-promotion (13/8: `7f229442e` new-mainsite lọt), `--date=format-local`
+  (9/9: commit `+0000` hiện sớm 7 tiếng), cấm bọc `timeout` shell (20/8: macOS không có lệnh đó) — đã
+  khoá trong script + `tools/delta-scan.test.mjs`. Repo `stale: true` → 1 dòng board
+  "<repo> chưa fetch/pull được: <error>" rồi đi tiếp (không chặn).
+  (1) JQL `assignee = currentUser() AND updated >= "<window.jqlSince>"` (`lastRun` lùi 30 phút) —
+  `window.jqlFallback = "-4h"` chỉ khi state thiếu `lastRun`. ⚠ CẤM quay về `-4h` cứng: cửa sổ cố định hụt mọi thay đổi rơi vào khe
   giữa lúc JQL của lượt trước chạy và `lastRun` nếu 2 lượt cách nhau >4h — ca thật GW-805:
   COMPLETED 26/8 15:50, JQL lượt 26/8 chạy ~15:37 rồi ghi lastRun 15:56, lượt kế 27/8 14:56
   quét -4h chỉ với tới 10:56 ⇒ ticket done mà board vẫn `waiting-design`, user phải tự báo.
@@ -113,35 +122,18 @@ Token đầu của `$ARGUMENTS`:
   Đã đạp 17/9/2026 13:16: connector *still connecting* 4 lượt rồi *No matching deferred tools found*,
   `/mcp` xác nhận `CONNECT_TIMEOUT`; lượt đó giữ `lastRun` nên 13:26 quét bù bằng fallback vẫn bắt
   kịp GW-796 chuyển COMPLETED lúc 13:09 — nếu đã đóng dấu `lastRun` thì mất hẳn;
-  (2) `git -C <gt-promotion> pull` + `git log --since` xem commit mới có đụng folder task đang theo dõi;
-  **(2b) `git fetch --quiet` rồi `git log --since --all` (KHÔNG merge) cho MỌI repo còn lại trong
-  `config.repos`** — `cdn-source`, `new-mainsite`, `vportal2view`: task mainsite/landing sống ở đó
-  nên chỉ soi gt-promotion là mù đúng chỗ mình gõ code. ⚠ đã trả giá 13/8: commit `7f229442e` 18:02
-  trên new-mainsite (layout `boomzth/article-clean-black`) lọt qua delta lượt 10 lúc 21:08, chỉ lộ ở
-  lượt 22:5x nhờ soi thêm tay.
-  ⚠ **`fetch` là phần MỚI thêm 19/8, đừng bỏ về `log` suông**: `git log` chỉ thấy thứ đã có trong
-  repo local, nên commit người khác vừa push mà mình chưa pull là **vô hình**. Ca thật 19/8: lượt
-  delta 16:58 báo "cdn-source 0 commit mới sau `e00fab746` 15:46" — đúng với repo local nhưng trên
-  remote đã có `bda7e54f3` 16:27 + `e945b465b` 16:45 của vunbpp, sửa ĐÚNG folder của ticket GW-779
-  vừa assign cho mình lúc 16:55. Chỉ lộ khi user tự `git pull` lúc 17:03 (reflog). `fetch` là
-  read-only, không đụng working tree ⇒ an toàn cho mọi repo, kể cả repo có thay đổi chưa commit.
-  ⚠ **In giờ commit BẮT BUỘC `--date=format-local:` (hoặc `--date=local`), CẤM `--date=format:`**:
-  `--date=format:` render theo timezone CỦA COMMIT, nên commit ghi `+0000` (bot CMS new-mainsite,
-  merge commit GitLab) hiện sớm 7 tiếng so với giờ mình. Bản thân `--since` vẫn đúng (nó so mốc
-  tuyệt đối) — chỗ sai là khi so/lọc theo CHUỖI giờ vừa in ra. Ca thật 9/9: lượt delta 16:12 báo
-  "0 commit mới" trong khi new-mainsite `cb348d441` đã có lúc **16:06 local** (in ra `09:06`);
-  cùng lượt, merge `32e9e8b9e` 16:43 hiện `09:43`. Lần đó commit rơi vào `templates/vltk20/…`
-  không thuộc ticket nào nên vô hại — nhưng đúng cơ chế này che được commit vào folder của mình;
+  (2) `byTicket` → suy phase theo Bước 2b (git chỉ NÂNG phase) + dòng "📦 promotion vừa cập nhật <task>"
+  kèm file đổi cho commit repo gt-promotion; commit ngoài ticket chỉ là số `untracked`, không soi thêm;
   (3) bóc link sheet mới trong comment → `state.issues[key].bugSheets`;
-  (4) **refresh `history/months.json` khi `generatedAt` ≠ hôm nay** — 1 query snapshot theo
+  (4) **refresh `history/months.json` khi `monthsStale: true`** (`generatedAt` ≠ hôm nay) — 1 query snapshot theo
   `references/jql.md` mục "Snapshot theo tháng", ghi đè (backup sang `.backups/months/`);
-  (5) **xếp hàng quét lại design** — ticket phase chưa tới `wait-test` có `design.status =
-  đã-giao-đã-tải` + nguồn là FOLDER SharePoint (có manifest): `design.lastScanAt` (fallback
-  `downloadedAt`) quá 48h → set `design.scanDue = true` + 1 dòng board "design <KEY> chưa quét
+  (5) **xếp hàng quét lại design** — mỗi KEY trong `designScanDue` (script đã lọc: phase chưa tới
+  `wait-test`, `đã-giao-đã-tải`, có manifest = FOLDER SharePoint, `lastScanAt ?? downloadedAt` quá 48h,
+  chưa `scanDue`) → set `design.scanDue = true` + 1 dòng board "design <KEY> chưa quét
   lại N ngày — lượt /daily kế tự quét (muốn ngay: `/daily designwatch`)". KHÔNG quét trong delta: `sp-scan.js` cần tab Chrome cùng
   origin SharePoint, phiên nền không có toolset chrome (whitelist radar chỉ Atlassian + Google
   Drive — `tools/radar-tick.mjs`). Riêng design host **Google Drive** thì quét được ngay tại
-  đây: `get_file_metadata` so `modifiedTime` với `design.sourceModified` → mới hơn = designer
+  đây (danh sách sẵn trong `driveCheck`): `get_file_metadata` so `modifiedTime` với `design.sourceModified` → mới hơn = designer
   up bản mới → set `design.sourceChanged` + báo như bản mới (luồng SO CŨ↔MỚI).
   ⚠ **So theo TỪNG FILE con trong `design.files`, CẤM so `modifiedTime` của FOLDER.** Folder Drive
   chỉ đổi `modifiedTime` khi thêm/xoá con trực tiếp, sửa nội dung file con KHÔNG chạm nó — đo thật
@@ -212,7 +204,7 @@ trình `designwatch` cho các ticket đó ngay tại đây — radar chỉ xếp
 quét, user KHÔNG phải gõ lệnh riêng (mirror nếp `pendingSheetWrite`).
 Phiên nền không làm được 2 việc này (không có toolset chrome) nên đừng thử.
 
-**Pull gt-promotion đầu phiên** (mode mặc định/plan/delta): `git -C <root> pull --ff-only`
+**Pull gt-promotion đầu phiên** (mode mặc định/plan — `delta` để `delta-scan` pull, đừng pull lại): `git -C <root> pull --ff-only`
 — ⚠ **CẤM bọc lệnh git trong `timeout N`**: macOS không có `timeout` (thiếu coreutils), shell
 trả `command not found` và lệnh git **không chạy dòng nào** ⇒ `git log` sau đó chỉ đọc ref local,
 tái diễn đúng bẫy 19/8 "log local ≠ remote". Cần chặn treo thì dùng `timeout` của tool Bash

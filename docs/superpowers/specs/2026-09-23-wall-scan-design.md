@@ -38,7 +38,7 @@ node tools/wall-scan.mjs [--days 14] [--project <chuỗi>] [--skill <tên>] [--j
 ## Cấu trúc
 
 - `tools/wall-scan.mjs` theo khuôn `token-scan.mjs`: 1 file, không phụ thuộc ngoài.
-- Hàm thuần `sliceSession(lines, { skillOf })` trả các khoảng `{kind, skill, seconds, tool?, effort?, ctx?, cmd?}`; `summarize(slices)` gộp số. Phần đọc file/CLI tách riêng.
+- Hàm thuần `sliceTimeline(lines, { session, inheritedSkill, sub })` + `scanSession(...)` trả các khoảng `{kind, skill, seconds, tool?, effort?, ctx?, cmd?}`; `summarize(slices)` gộp số. Phần đọc file/CLI tách riêng.
 - `tools/wall-scan.test.mjs` (`node --test`) trên transcript giả dựng trong test, đủ: khoảng model, khoảng tool, AskUserQuestion vào chờ user, gián đoạn > 15 phút bị bỏ, subagent gắn đúng skill cha, chuỗi chạy skill tách đúng.
 
 ## Nghiệm thu

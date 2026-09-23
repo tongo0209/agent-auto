@@ -42,7 +42,9 @@ Các thư mục dữ liệu vẫn còn sau khi clone nhờ `.gitkeep`, chỉ là
 | `tools/state-doctor.mjs` | Validator CHỈ ĐỌC `state.json`: 11 luật ERROR (`E10` = cổng cài đặt, `E11` = thiếu `summary` làm console mất title) + 9 luật WARN | 31 ca |
 | `tools/fe-gate.mjs` | **Gate chất lượng**: bắt thứ được khai báo mà không tồn tại (font/ảnh 404, `dist/` cũ hơn source) | 18 ca |
 | `tools/bug-radar.mjs` | Phần thuần tính toán của radar buglist: bug nào mới, của ai, lượt này có đáng gọi `claude` không | 78 ca |
-| `tools/radar-tick.mjs` | Một lượt radar nền: gọi `/daily delta` trong phiên headless, ghép 1 lượt janitor/ngày | 28 ca |
+| `tools/radar-tick.mjs` | Một lượt radar nền: gọi `/daily delta` trong phiên headless, ghép 1 lượt janitor/ngày. Cổng đủ bước (`steps`: board · lastRun · months) báo ngay khi lượt "ok" mà bỏ bước; `radar.effort` → `--effort` | 52 ca |
+| `tools/delta-scan.mjs` | Phần cơ học của `/daily delta` chạy 1 lệnh (~2s): cửa sổ JQL, pull/fetch + log 4 repo, nối commit ↔ ticket qua `paths`, hàng quét design. Không ghi state | 8 ca |
+| `tools/wall-scan.mjs` | Đo **thời gian thật** theo skill từ transcript: model · tool · subagent tách khỏi chờ user, chia theo effort/cỡ context. Baseline `docs/notes/wall-baseline-2026-09-23.json` | 10 ca |
 | `tools/janitor.mjs` | Dọn rác nặng. Chỉ tự xoá thứ **tải lại được**; thứ mất là mất luôn thì chỉ BÁO. Sổ hoàn tác `.janitor-log.jsonl`, xem trước bằng `--dry` | 49 ca |
 | `tools/statusline.mjs` | Cảnh báo mốc + số bug chờ duyệt ngay trên thanh trạng thái. Hàm thuần, **không** gọi git/mạng | có |
 | `tools/build-dashboard.mjs` | Sinh khối `DATA` của `dashboard.html` **từ `state.json`** | có |

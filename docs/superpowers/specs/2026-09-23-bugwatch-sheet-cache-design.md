@@ -8,9 +8,9 @@ Ngày: 2026-09-23 · Dự án con 2 của đợt tăng tốc (sau `wall-scan`, `
 (23/9 11:3x): thao tác chậm nhất là **`Write /tmp/cfl-new.md` 75s** và **`Write .cache/bugsheets/…md` 24s** —
 model gõ lại nội dung `read_file_content` ra file cache, token output (đắt 5×, sinh chậm).
 
-Còn là lỗi chất lượng: SKILL bước 3 bảo "ghi nguyên văn khối bảng có cột BugID", sheet CFL có **2 khối**
-(ROUND 2 + ROUND 1) mà model chỉ chép ROUND 2 (23k/39k ký tự) — mất ROUND 1 là mất luôn đèn `shadowed`
-mà lessons 21–22/9 dựa vào.
+Không phải lỗi chất lượng (đã kiểm lại, đính chính nhận định ban đầu): cache model chép ngắn hơn (CFL 23k vs 35k ký tự)
+nhưng vẫn đủ cả ROUND 1 + ROUND 2 — `parseBugTable` trên bản model và bản script ra **0 trường lệch** trên 9 trường × 55 dòng,
+`shadowedBugIds` trùng khớp. Lợi ích là tốc độ + token output, không phải sửa sai.
 
 Nội dung Drive đã nằm nguyên văn trong transcript phiên (`tool_result` JSON `{fileContent}`); biến môi trường
 `CLAUDE_CODE_SESSION_ID` chỉ đúng file transcript của phiên đang chạy (cả phiên headless của radar).
@@ -32,7 +32,7 @@ Radar headless: `Bash(node:*)` đã có trong whitelist — không nới quyền
 ## Kế hoạch (TDD)
 
 - **Task 1** — `tools/sheet-cache.test.mjs` đỏ trước, transcript giả trong tmp: (a) 2 khối BugID + 1 bảng không BugID → cache có đúng 2 khối nguyên văn, đúng thứ tự; (b) đọc 2 lần → lấy lần sau; (c) sheet khác không lẫn; (d) không có lượt đọc → exit 1; (e) 0 khối BugID → exit 1, cache cũ giữ nguyên. Rồi code cho xanh, commit `[tools]`.
-- **Task 2** — chạy thật trên transcript `b2b0d9f6` cho 2 sheet (ghi ra thư mục tạm qua `--out`, không đè cache thật): CFL phải ra 2 khối, KHT 1 khối; `bug-radar.mjs scan` trên bản mới không lỗi.
+- **Task 2** — ✅ 23/9: CFL 2 khối / KHT 1 khối, 0,03s/sheet, 0 trường lệch so với cache model chép. Chạy thật trên transcript `b2b0d9f6` cho 2 sheet (ghi ra thư mục tạm qua `--out`, không đè cache thật): CFL phải ra 2 khối, KHT 1 khối; `bug-radar.mjs scan` trên bản mới không lỗi.
 - **Task 3** — sửa SKILL bước 3 (chỉ stage phần của mình, giữ nguyên thay đổi user), commit `[skills]`. Nghiệm thu thời gian ở lượt bugwatch thật kế tiếp của radar (`history/radar.jsonl` `ms` so trung vị 527s).
 
 ## Ngoài phạm vi

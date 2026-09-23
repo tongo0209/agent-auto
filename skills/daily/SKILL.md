@@ -511,9 +511,12 @@ Mỗi lượt `bugwatch`:
    `modifiedTime` với mtime cache. Đo thật 24/8/2026: lượt nền 09:45 `ok:false`, sheet CFL
    modifiedTime 21/8 mà cache còn 19/8 (mù 1.7 ngày), LightAndNight 23/8 vs cache 20/8 (mù 3.3 ngày)
    — lượt tay cùng ngày thấy 6/6 bug CFL đã sang `Done`, tin mà `changed:false` đã che.
-3. `mustRead` ⇒ `read_file_content(sheetId)` → ghi nguyên văn khối bảng có cột BugID vào
-   `.cache/bugsheets/<sheetId>.md`. Tối đa `bugRadar.maxSheetReadsPerTick` sheet MỚI mỗi lượt (mặc
-   định 3, ưu tiên `modifiedTime` mới nhất) — 1 lần đọc ~90s.
+3. `mustRead` ⇒ `read_file_content(sheetId)` → **`node <AGENT_AUTO>/tools/sheet-cache.mjs <sheetId>`**
+   ghi nguyên văn MỌI khối bảng có cột BugID vào `.cache/bugsheets/<sheetId>.md` (lấy từ transcript
+   phiên, 0,03s). **CẤM tự Write/cp nội dung sheet**: model gõ lại mất 75s + 24s cho 2 sheet (đo lượt
+   23/9 11:3x) mà parse ra y hệt script. Script exit 1 (chưa đọc / 0 khối BugID) → ghi board 1 dòng, GIỮ
+   cache cũ, sang sheet kế. Tối đa `bugRadar.maxSheetReadsPerTick` sheet MỚI mỗi lượt (mặc định 3, ưu
+   tiên `modifiedTime` mới nhất).
 4. `node tools/bug-radar.mjs scan <sheetId>` — **máy phán, không phải LLM**. Đọc `toSkill`.
 5. `toSkill > 0` → kiểm 4 cổng **VÀ** `config.bugRadar.autoFix !== false`; đủ hết → gọi
    `bug-fixer-lite` (`claude "/bug-fixer-lite <sheetUrl> <projectPath>"`); rớt bất kỳ điều kiện nào →

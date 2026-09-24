@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDLC AI Frontend</title>
+<meta name="description" content="Bản đồ tương tác quy trình làm việc với AI của team Frontend: nhận việc, bóc design, code, tự kiểm, duyệt, QC và bài học.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070a16; --bg2:#0d1230;
+  --text:#e8ecff; --muted:#9aa3c7; --faint:#5d668f;
+  --glass:rgba(255,255,255,.06); --glass-strong:rgba(20,26,58,.72);
+  --glass-border:rgba(255,255,255,.14); --glass-hi:rgba(255,255,255,.28);
+  --dot:rgba(255,255,255,.07); --shadow:rgba(0,0,0,.45);
+  --c-cmd:#a78bfa; --c-skill:#818cf8; --c-agent:#22d3ee; --c-file:#34d399;
+  --c-gate:#fbbf24; --c-board:#f472b6; --c-git:#fb923c; --c-step:#60a5fa; --c-end:#94a3b8; --c-check:#a3e635;
+  --m-fable:#f0abfc; --m-opus:#fdba74; --m-sonnet:#5eead4;
+  --blob1:#6d28d9; --blob2:#0891b2; --blob3:#db2777;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#eef1fb; --bg2:#e2e7fb; --text:#141a3a; --muted:#4f5880; --faint:#8a92b8;
+    --glass:rgba(255,255,255,.55); --glass-strong:rgba(255,255,255,.82);
+    --glass-border:rgba(20,26,58,.12); --glass-hi:rgba(20,26,58,.25);
+    --dot:rgba(20,26,58,.09); --shadow:rgba(40,50,110,.18);
+    --c-cmd:#7c3aed; --c-skill:#4f46e5; --c-agent:#0891b2; --c-file:#059669;
+    --c-gate:#d97706; --c-board:#db2777; --c-git:#ea580c; --c-step:#2563eb; --c-end:#64748b; --c-check:#65a30d;
+    --m-fable:#c026d3; --m-opus:#c2410c; --m-sonnet:#0f766e;
+    --blob1:#c4b5fd; --blob2:#a5f3fc; --blob3:#fbcfe8;
+    color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#eef1fb; --bg2:#e2e7fb; --text:#141a3a; --muted:#4f5880; --faint:#8a92b8;
+  --glass:rgba(255,255,255,.55); --glass-strong:rgba(255,255,255,.82);
+  --glass-border:rgba(20,26,58,.12); --glass-hi:rgba(20,26,58,.25);
+  --dot:rgba(20,26,58,.09); --shadow:rgba(40,50,110,.18);
+  --c-cmd:#7c3aed; --c-skill:#4f46e5; --c-agent:#0891b2; --c-file:#059669;
+  --c-gate:#d97706; --c-board:#db2777; --c-git:#ea580c; --c-step:#2563eb; --c-end:#64748b; --c-check:#65a30d;
+  --m-fable:#c026d3; --m-opus:#c2410c; --m-sonnet:#0f766e;
+  --blob1:#c4b5fd; --blob2:#a5f3fc; --blob3:#fbcfe8;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  font-family:Inter,system-ui,-apple-system,sans-serif; color:var(--text);
+  background:radial-gradient(1200px 700px at 10% -10%,var(--bg2),transparent 60%),var(--bg);
+  min-height:100vh; overflow-x:hidden; -webkit-font-smoothing:antialiased;
+}
+code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+
+/* ---------- ambient mesh ---------- */
+.mesh{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.mesh i{position:absolute;width:46vw;height:46vw;border-radius:50%;filter:blur(90px);opacity:.35;animation:drift 26s ease-in-out infinite alternate}
+.mesh i:nth-child(1){background:var(--blob1);left:-10vw;top:-12vw}
+.mesh i:nth-child(2){background:var(--blob2);right:-14vw;top:18vh;animation-duration:32s;animation-delay:-8s}
+.mesh i:nth-child(3){background:var(--blob3);left:30vw;bottom:-22vw;animation-duration:38s;animation-delay:-16s}
+@keyframes drift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(6vw,4vh) scale(1.12)}100%{transform:translate(-4vw,-3vh) scale(.94)}}
+
+.app{position:relative;z-index:1;max-width:1480px;margin:0 auto;padding:22px 24px 60px}
+.glass{background:var(--glass);border:1px solid var(--glass-border);backdrop-filter:blur(16px) saturate(150%);-webkit-backdrop-filter:blur(16px) saturate(150%);box-shadow:0 10px 40px -18px var(--shadow)}
+
+/* ---------- header ---------- */
+header.top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px;margin-right:auto}
+.logo{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-weight:800;font-size:15px;letter-spacing:-.02em;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.35);
+  background:conic-gradient(from 210deg,var(--c-cmd),var(--c-agent),var(--c-file),var(--c-gate),var(--c-board),var(--c-cmd));
+  box-shadow:0 6px 24px -6px var(--c-cmd)}
+.brand h1{font-size:19px;margin:0;letter-spacing:-.02em}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:12.5px}
+.iconbtn{border-radius:12px;padding:8px 12px;color:var(--text);cursor:pointer;font:600 12.5px Inter,sans-serif;display:inline-flex;gap:6px;align-items:center}
+.iconbtn:hover{border-color:var(--glass-hi)}
+
+/* ---------- tabs ---------- */
+.tabs-wrap{overflow-x:auto;margin:0 -24px 18px;padding:0 24px;scrollbar-width:none}
+.tabs-wrap::-webkit-scrollbar{display:none}
+nav.tabs{position:relative;display:inline-flex;gap:4px;padding:5px;border-radius:16px;white-space:nowrap}
+nav.tabs button{position:relative;z-index:1;border:0;background:none;color:var(--muted);font:600 13.5px Inter,sans-serif;padding:9px 16px;border-radius:12px;cursor:pointer;display:flex;gap:8px;align-items:center;transition:color .25s}
+nav.tabs button .dot{width:8px;height:8px;border-radius:50%;background:var(--tc);box-shadow:0 0 10px var(--tc)}
+nav.tabs button.active{color:var(--text)}
+nav.tabs .ind{position:absolute;top:5px;bottom:5px;border-radius:12px;background:var(--glass-strong);border:1px solid var(--glass-border);transition:left .35s cubic-bezier(.3,1.3,.5,1),width .35s cubic-bezier(.3,1.3,.5,1)}
+
+/* ---------- stage ---------- */
+.stage{animation:enter .45s cubic-bezier(.2,.9,.3,1)}
+@keyframes enter{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+.hero{display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;margin:4px 0 14px}
+.hero h2{margin:0;font-size:26px;letter-spacing:-.025em}
+.hero h2 span{background:linear-gradient(90deg,var(--h1),var(--h2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p b.ar{font-weight:900;color:var(--text);padding:0 1px}
+.hero p{margin:6px 0 0;color:var(--muted);max-width:1040px;font-size:14px;line-height:1.55}
+.hero .ctrl{margin-left:auto;display:flex;gap:8px}
+
+/* stack header */
+.stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px}
+.sgroup{border-radius:18px;padding:12px 14px}
+.sgroup h4{margin:0 0 9px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+.sgroup h4 b{color:var(--text);font-size:11px;background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:99px;padding:1px 8px;letter-spacing:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{--cc:var(--c-skill);font:500 12px "JetBrains Mono",monospace;padding:5px 9px;border-radius:9px;cursor:default;
+  background:color-mix(in srgb,var(--cc) 14%,transparent);border:1px solid color-mix(in srgb,var(--cc) 40%,transparent);color:var(--text);transition:transform .2s,box-shadow .2s}
+.chip small{font-family:Inter,sans-serif;color:var(--muted);font-size:10.5px;margin-left:4px}
+.chip.hl,.chip:hover{transform:translateY(-2px);box-shadow:0 6px 18px -6px var(--cc)}
+
+/* lanes */
+.lanes{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-radius:18px;padding:10px 12px;margin-bottom:14px}
+.lanes .lt{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-right:6px}
+.lane{padding:6px 10px;border-radius:10px;font-size:12.5px;font-weight:600;border:1px solid var(--glass-border);background:var(--glass-strong);transition:all .25s;display:flex;gap:6px;align-items:center}
+.lane em{font-style:normal;font-weight:500;font-size:10.5px;color:var(--muted);padding:1px 6px;border-radius:6px;background:var(--glass)}
+.lane.human em{color:var(--c-gate)}
+.lane.on{border-color:var(--c-board);box-shadow:0 0 0 3px color-mix(in srgb,var(--c-board) 25%,transparent),0 8px 22px -8px var(--c-board);transform:translateY(-2px)}
+.lanes .arr{color:var(--faint)}
+.lanes .reopen{flex-basis:100%;font-size:12px;color:var(--c-gate);padding:4px 2px 0}
+.band{position:absolute;top:0;border-left:1px dashed var(--glass-border);background:linear-gradient(180deg,color-mix(in srgb,var(--bc) 10%,transparent),color-mix(in srgb,var(--bc) 3%,transparent) 30%,transparent);transition:background .3s}
+.band{--bc:var(--c-board)}
+.band.alt{background:linear-gradient(180deg,color-mix(in srgb,var(--bc) 14%,transparent),color-mix(in srgb,var(--bc) 6%,transparent) 30%,color-mix(in srgb,var(--bc) 2%,transparent))}
+.band.k-pre{--bc:var(--c-end)} .band.k-human{--bc:var(--c-gate)} .band.k-wait{--bc:var(--c-step)} .band.k-main{--bc:var(--c-cmd)}
+.band .bh{position:absolute;top:12px;left:10px;right:10px;padding:8px 10px;border-radius:12px;background:var(--glass-strong);border:1px solid color-mix(in srgb,var(--bc) 45%,var(--glass-border));backdrop-filter:blur(8px)}
+.band.k-human .bh{border-style:dashed}
+.band .bh b{display:block;font-size:13.5px;letter-spacing:-.01em;color:var(--bc)}
+.band .bh span{display:block;font-size:11px;font-weight:600;color:var(--text);margin-top:2px}
+.band .bh small{display:block;font-size:10.5px;color:var(--muted);margin-top:1px}
+.band.on{background:color-mix(in srgb,var(--bc) 16%,transparent)}
+.band.on .bh{box-shadow:0 0 0 2px color-mix(in srgb,var(--bc) 40%,transparent),0 8px 24px -8px var(--bc)}
+
+/* canvas */
+.canvas-wrap{position:relative;border-radius:22px;overflow:auto;cursor:grab;
+  background-image:radial-gradient(var(--dot) 1.2px,transparent 1.3px);background-size:22px 22px}
+.canvas-wrap.drag{cursor:grabbing}
+.canvas-wrap::-webkit-scrollbar{height:8px}
+.canvas-wrap::-webkit-scrollbar-thumb{background:var(--glass-hi);border-radius:9px}
+.sizer{position:relative}
+.canvas{position:absolute;left:0;top:0;transform-origin:0 0}
+svg.edges{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.edge path.base{fill:none;stroke-width:2.2;opacity:.55;transition:opacity .3s,stroke-width .3s}
+.edge path.flow{fill:none;stroke-width:2.2;stroke-dasharray:4 14;animation:dash 1.1s linear infinite;opacity:.9}
+.edge.loop path.base{stroke-dasharray:6 6;opacity:.5}
+.edge.loop path.flow{animation-duration:1.8s}
+.edge.opt path.base{stroke-dasharray:2 6;opacity:.35}
+.edge.opt path.flow{display:none}
+.edge path.hop{fill:none;stroke-width:2.2;opacity:.95;stroke-linejoin:round}
+.canvas.focus .edge.on path.hop{opacity:1;stroke-width:3}
+.edge.opt path.hop{stroke-dasharray:2 3;opacity:.5}
+.edge .arrow{filter:drop-shadow(0 0 4px rgba(0,0,0,.35));transition:opacity .3s}
+.edge.opt .arrow{opacity:.5}
+@keyframes dash{to{stroke-dashoffset:-18}}
+.particle{transition:opacity .3s}
+.elabel.ok{color:var(--c-file);font-size:11.5px;font-weight:700;padding:4px 10px;border-color:color-mix(in srgb,var(--c-file) 55%,transparent);box-shadow:0 6px 18px -8px var(--c-file)}
+.elabel{position:absolute;transform:translate(-50%,-50%);font:600 10.5px Inter,sans-serif;padding:3px 8px;border-radius:8px;white-space:nowrap;pointer-events:none;
+  background:var(--glass-strong);border:1px solid var(--glass-border);color:var(--muted);backdrop-filter:blur(8px);transition:opacity .3s}
+
+.node{--nc:var(--c-agent);position:absolute;width:220px;border-radius:18px;padding:16px 12px 10px 11px;display:flex;flex-direction:column;gap:8px;cursor:pointer;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--nc) 16%,var(--glass)),var(--glass));
+  border:1px solid color-mix(in srgb,var(--nc) 38%,var(--glass-border));
+  backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);
+  box-shadow:0 10px 30px -14px var(--nc),inset 0 1px 0 rgba(255,255,255,.12);
+  transition:transform .25s cubic-bezier(.3,1.4,.5,1),box-shadow .25s,opacity .3s,filter .3s;animation:pop .5s backwards cubic-bezier(.3,1.4,.5,1)}
+@keyframes pop{from{opacity:0;transform:scale(.7)}}
+.node:hover,.node.on{transform:translateY(-4px) scale(1.04);box-shadow:0 18px 40px -12px var(--nc),0 0 0 1px var(--nc),inset 0 1px 0 rgba(255,255,255,.2);z-index:3}
+.node .ic{flex:none;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font-size:15px;color:#fff;
+  background:linear-gradient(135deg,var(--nc),color-mix(in srgb,var(--nc) 55%,#000));box-shadow:0 4px 14px -4px var(--nc)}
+.node .hd{display:flex;gap:9px;align-items:flex-start}
+.node .tx{min-width:0;flex:1}
+.node .ap{position:absolute;top:-10px;left:10px;font:800 9.5px Inter,sans-serif;letter-spacing:.08em;padding:3px 8px;border-radius:8px;color:#0b0f24;
+  background:var(--ac);box-shadow:0 4px 14px -4px var(--ac);white-space:nowrap}
+.node.act-both .ap{background:linear-gradient(90deg,var(--c-gate),var(--c-cmd))}
+.node.act-human,.node.act-both{border-style:dashed;border-width:1.6px}
+.node.act-human{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c-gate) 14%,var(--glass)) 0 10px,color-mix(in srgb,var(--c-gate) 8%,var(--glass)) 10px 20px)}
+.node.act-none{border-radius:10px 18px 18px 10px}
+.node.act-ext{border-style:dotted;border-width:1.6px}
+.io{display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px dashed var(--glass-border)}
+.ipo .k{display:inline-block;margin-bottom:3px}
+.ipo ul{margin:0;padding-left:14px}
+.ipo li{font:500 11px/1.4 "JetBrains Mono",monospace;color:var(--text);opacity:.92;overflow-wrap:break-word;margin:1px 0}
+.ipo.in li::marker{color:var(--c-step)} .ipo.pr li::marker{color:var(--c-gate)} .ipo.out li::marker{color:var(--c-file)}
+.ipo.pr li{font-family:Inter,sans-serif;font-size:11.3px}
+.k{font:800 8.5px Inter,sans-serif;letter-spacing:.08em;padding:2px 5px;border-radius:5px;text-align:center}
+.k.in{color:var(--c-step);background:color-mix(in srgb,var(--c-step) 16%,transparent)}
+.k.out{color:var(--c-file);background:color-mix(in srgb,var(--c-file) 16%,transparent)}
+.k.pr{color:var(--c-gate);background:color-mix(in srgb,var(--c-gate) 16%,transparent)}
+.grp{position:absolute;border-radius:24px;border:1.5px dashed color-mix(in srgb,var(--gc) 50%,transparent);background:color-mix(in srgb,var(--gc) 6%,transparent);pointer-events:none}
+.grp span{position:absolute;top:8px;left:14px;font:700 11px Inter,sans-serif;letter-spacing:.02em;color:var(--gc)}
+.actors{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-radius:18px;padding:10px 12px;margin-bottom:14px}
+.actors .lt{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.actor{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:11px;font-size:12.5px;font-weight:600;cursor:default;
+  border:1px solid color-mix(in srgb,var(--ac) 45%,transparent);background:color-mix(in srgb,var(--ac) 12%,transparent);transition:transform .2s,box-shadow .2s}
+.actor[data-actor="human"]{border-style:dashed}
+.actor em{font-style:normal;font-size:11px;padding:0 7px;border-radius:99px;background:var(--ac);color:#0b0f24}
+.actor small{font-weight:500;color:var(--muted);font-size:11px}
+.actor:hover,.actor.hl{transform:translateY(-2px);box-shadow:0 6px 18px -6px var(--ac)}
+.iohint{margin-left:auto;font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.pio{display:grid;grid-template-columns:1fr;gap:8px;margin:10px 0 2px}
+.pio>.ipo{padding:10px;border-radius:12px;border:1px solid var(--glass-border);background:var(--glass)}
+.pio .ipo li{font-size:12px}
+.node .t{font:700 13px/1.25 Inter,sans-serif;letter-spacing:-.01em;white-space:nowrap}
+.node .s{font-size:11.3px;color:var(--muted);margin-top:3px;line-height:1.3}
+.node .mb{position:absolute;top:-10px;right:10px;font:700 9.5px "JetBrains Mono",monospace;padding:2px 7px;border-radius:7px;color:#0b0f24;background:var(--mc)}
+.node .tb{position:absolute;bottom:-9px;left:12px;font:600 9.5px "JetBrains Mono",monospace;padding:2px 7px;border-radius:7px;color:var(--c-board);background:var(--glass-strong);border:1px solid color-mix(in srgb,var(--c-board) 45%,transparent)}
+.node.gate::after{content:"";position:absolute;inset:-5px;border-radius:21px;border:2px solid var(--c-gate);opacity:0;animation:ring 2.2s ease-out infinite}
+@keyframes ring{0%{opacity:.8;transform:scale(.96)}100%{opacity:0;transform:scale(1.12)}}
+.node.link .s::after{content:"  ↗ mở tab";color:var(--nc);font-weight:600}
+html[lang="en"] .node.link .s::after{content:"  ↗ open tab"}
+.langsw{display:inline-flex;padding:3px;border-radius:12px;gap:2px}
+.langsw button{border:0;background:none;color:var(--muted);font:700 12px Inter,sans-serif;padding:6px 10px;border-radius:9px;cursor:pointer;transition:all .2s}
+.langsw button.on{background:var(--glass-strong);color:var(--text);box-shadow:0 0 0 1px var(--glass-border)}
+.canvas.focus .node:not(.on){opacity:.28;filter:saturate(.4)}
+.canvas.focus .edge:not(.on){opacity:.12}
+.canvas.focus .elabel:not(.on){opacity:.15}
+.canvas.focus .band:not(.on),.canvas.playing .band:not(.on){opacity:.55}
+.canvas.focus .edge.on path.base{opacity:1;stroke-width:3}
+.canvas.playing .node:not(.lit){opacity:.3;filter:saturate(.3)}
+.canvas.playing .edge:not(.lit){opacity:.15}
+.node.lit{box-shadow:0 0 0 2px var(--nc),0 0 38px -4px var(--nc)}
+.node.current{transform:translateY(-4px) scale(1.07)}
+
+.toast{position:absolute;left:50%;top:14px;transform:translateX(-50%) translateY(-20px);opacity:0;pointer-events:none;z-index:5;
+  padding:9px 16px;border-radius:12px;font-weight:600;font-size:13px;border:1px solid var(--c-gate);color:var(--text);background:var(--glass-strong);backdrop-filter:blur(10px);
+  box-shadow:0 10px 30px -10px var(--c-gate);transition:all .35s cubic-bezier(.3,1.4,.5,1)}
+.toast.show{opacity:1;transform:translateX(-50%)}
+
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin:12px 4px 0;font-size:12px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:4px;background:var(--lc);box-shadow:0 0 8px var(--lc)}
+.legend .ln{width:22px;height:0;border-top:2px dashed var(--c-gate);border-radius:0;box-shadow:none;background:none}
+.legend .ln.o{border-top-style:dotted;border-color:var(--faint)}
+
+/* notes cards */
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:18px}
+.note{border-radius:18px;padding:14px 16px;position:relative;overflow:hidden}
+.note::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--nc2)}
+.note h5{margin:0 0 6px;font-size:13.5px;display:flex;gap:8px;align-items:center}
+.note p{margin:0;font-size:12.8px;color:var(--muted);line-height:1.55}
+
+/* detail panel */
+.panel{position:fixed;top:16px;right:16px;bottom:16px;width:min(400px,calc(100vw - 32px));z-index:20;border-radius:22px;padding:20px 20px 22px;overflow:auto;
+  background:var(--glass-strong);border:1px solid var(--glass-border);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);
+  box-shadow:0 30px 80px -20px var(--shadow);transform:translateX(calc(100% + 30px));transition:transform .45s cubic-bezier(.2,.9,.25,1)}
+.panel.open{transform:none}
+.panel .close{position:absolute;top:14px;right:14px}
+.panel .kind{display:inline-flex;gap:6px;align-items:center;font:700 10.5px Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--pc);padding:4px 9px;border-radius:8px;background:color-mix(in srgb,var(--pc) 16%,transparent)}
+.panel h3{margin:12px 0 4px;font-size:20px;letter-spacing:-.02em;padding-right:40px}
+.panel .sub{color:var(--muted);font-size:13px;margin:0 0 10px}
+.panel .badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.panel .badge{font:600 11px "JetBrains Mono",monospace;padding:3px 8px;border-radius:7px;border:1px solid var(--glass-border)}
+.panel h6{margin:16px 0 6px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.panel p,.panel li{font-size:13.3px;line-height:1.6;color:var(--text)}
+.panel ul{margin:0;padding-left:18px}
+.panel li{margin:3px 0}
+.panel pre{margin:0;padding:12px;border-radius:12px;background:rgba(0,0,0,.28);border:1px solid var(--glass-border);font-size:11.5px;line-height:1.55;overflow:auto;white-space:pre-wrap;color:var(--text)}
+:root[data-theme="light"] .panel pre{background:rgba(20,26,58,.05)}
+.panel code{font-size:12px;padding:1px 5px;border-radius:5px;background:var(--glass)}
+.scrim{position:fixed;inset:0;z-index:15;background:transparent;display:none}
+.scrim.show{display:block}
+
+@media (max-width:720px){
+  .app{padding:16px 16px 50px}
+  .tabs-wrap{margin:0 -16px 14px;padding:0 16px}
+  .hero h2{font-size:21px}
+  .hero .ctrl{margin-left:0}
+  .panel{top:auto;left:0;right:0;bottom:0;width:100%;max-height:78vh;border-radius:22px 22px 0 0;transform:translateY(105%)}
+  .panel.open{transform:none}
+  .stack{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion: reduce){
+  .mesh i,.edge path.flow,.node.gate::after{animation:none}
+  .particle{display:none}
+  .node,.stage{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="mesh"><i></i><i></i><i></i></div>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">AI</div>
+      <div>
+        <h1 data-i18n="SDLC làm việc với AI — Frontend">SDLC làm việc với AI — Frontend</h1>
+        <p data-i18n="Dev giữ 5 cổng quyết định · AI không tự đẩy code ra ngoài">Dev giữ 5 cổng quyết định · AI không tự đẩy code ra ngoài</p>
+      </div>
+    </div>
+    <div class="langsw glass" id="langSw" role="group" aria-label="Language"><button data-l="vi">VI</button><button data-l="en">EN</button></div>
+    <button class="iconbtn glass" id="fitBtn" data-i18n-title="Vừa khung / 100%" title="Vừa khung / 100%">⤢ <span data-i18n="Vừa khung">Vừa khung</span></button>
+    <button class="iconbtn glass" id="themeBtn" data-i18n-title="Đổi giao diện" title="Đổi giao diện" data-i18n="◐ Giao diện">◐ Giao diện</button>
+  </header>
+
+  <div class="tabs-wrap"><nav class="tabs glass" id="tabs"><div class="ind"></div></nav></div>
+
+  <main id="stage"></main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="panel" id="panel" aria-live="polite"></aside>
+
+<script>
+// node: c=cột r=hàng a=actor t/s=tiêu đề i/p/o=IN/PROCESS/OUT tr=mã luật · edge: [from,to,kind(main|loop|opt),label,arc,at]
+const TYPES = {
+  cmd:   {label:'Lệnh slash', ic:'⌘'},
+  skill: {label:'Skill',   ic:'✦'},
+  agent: {label:'Subagent', ic:'◉'},
+  file:  {label:'Artifact',ic:'▤'},
+  gate:  {label:'Cổng người', ic:'👤'},
+  check: {label:'Cổng kiểm cơ học', ic:'✔'},
+  board: {label:'Jira / Sheet', ic:'▦'},
+  git:   {label:'Git',     ic:'⎇'},
+  step:  {label:'Bước',    ic:'➜'},
+  end:   {label:'Rẽ nhánh / kết thúc', ic:'○'},
+};
+const ACTORS = {
+  human:{label:'DEV',ic:'👤',c:'--c-gate',name:'Dev'},
+  both: {label:'DEV + AI',ic:'👤🤖',c:'--c-gate',name:'Dev + AI'},
+  main: {label:'PHIÊN CLAUDE',ic:'🤖',c:'--c-cmd',name:'Phiên Claude'},
+  sub:  {label:'SUBAGENT',ic:'🤖',c:'--c-agent',name:'Subagent'},
+  bot:  {label:'SCRIPT / HOOK',ic:'⚙',c:'--c-check',name:'Script / hook'},
+  ext:  {label:'PM / QC',ic:'⏳',c:'--c-end',name:'PM / QC'},
+  none: {label:'ARTIFACT',ic:'▤',c:'--c-file',name:'Artifact'},
+};
+function actorOf(n){
+  const A={...ACTORS[n.a||'main']};
+  if(n.a==='none'){ if(n.type==='board'){A.label='JIRA / SHEET';A.ic='▦';A.c='--c-board'} else if(n.type==='end'){A.label='KẾT QUẢ';A.ic='○';A.c='--c-end'} }
+  return A;
+}
+const ALL_SKILLS = [['/daily'],['/check-design'],['/psd-cut'],['/figma-cut'],['/video-digest'],['/code-developer'],['/ui-check'],['/check-promotion'],['/code-audit'],['/clean-code'],['/commit'],['/bug-fixer-lite'],['/website-audit']];
+const ALL_HOOKS = [['guard-bash','check'],['guard-style','check'],['guard-pm','check'],['guard-state','check'],['token-watch','check']];
+
+const FLOWS = {
+overview:{
+  tab:'Tổng quan', color:'--c-cmd', h:['--c-cmd','--c-agent'],
+  title:'SDLC với AI', titleHi:'Frontend', padB:150,
+  desc:'AI = Claude Code chạy trong terminal, gắn bộ công cụ và bộ luật riêng của FE. AI làm từ nhận việc tới fix bug QC; dev giữ 5 cổng quyết định và AI không bao giờ tự đẩy code ra ngoài.',
+  lanesTitle:'7 giai đoạn · 5 cổng người',
+  lanes:[['Nhận việc','🤖 /daily'],['Cổng 1','👤 duyệt kế hoạch',1],['Design → asset','🤖 bóc design'],['Code','🤖 /code-developer'],['Tự kiểm','⚙ build + cổng máy'],['Cổng 2–4','👤 diff · push · merge',1],['QC & bug','🤖 /bug-fixer-lite'],['Chốt & học','🤖 /daily wrap'],['Cổng 5','👤 Done Jira',1]],
+  stack:{
+    'Skill':ALL_SKILLS,
+    'Agent':[['design-analyst','agent','opus'],['frontend-developer','agent','opus'],['design-checker','agent','opus'],['bug-lane','agent','sonnet'],['bug-analyst','agent','sonnet']],
+    'Script':[['fe-gate','check'],['pm-gate','check'],['layout-gate','check'],['landing-parity','check'],['project-note','check'],['bug-radar','check']],
+    'Hook':ALL_HOOKS,
+  },
+  nodes:[
+    {id:'src',c:0,r:0,type:'board',a:'ext',t:'Nguồn việc',s:'Jira · chat/mail · buglist QC',lane:'Nhận việc',i:['Ticket Jira (project GW)','Tin PM qua chat / mail'],p:['PM giao việc, QC ghi bug'],o:['Việc cần làm'],refs:[],d:{role:'Việc tới từ 3 cửa: ticket Jira project GW, PM nhắn chat/mail, và buglist QC trên Google Sheets sau khi bàn giao.'}},
+    {id:'daily',c:1,r:0,type:'cmd',a:'main',t:'/daily',s:'GĐ1 · Nhận việc',link:'intake',lane:'Nhận việc',i:['Ticket Jira','Commit git thật'],p:['Quét Jira, bóc brief, dò design','Suy tiến độ từ commit'],o:['Kế hoạch ngày chờ duyệt'],refs:['/daily'],d:{role:'Điều phối ngày: quét Jira, đọc sâu ticket mới / đổi, suy tiến độ từ commit thật (không tin trạng thái ticket), rồi trình kế hoạch để duyệt một lần.'}},
+    {id:'g1',c:2,r:0,type:'gate',a:'human',t:'Duyệt kế hoạch',s:'Cổng 1',lane:'Cổng 1',i:['Kế hoạch ngày'],p:['Dev sửa thứ tự / phạm vi'],o:['Kế hoạch đã duyệt'],refs:[],d:{role:'AI trình kế hoạch rồi DỪNG. Dev duyệt xong, /daily mới tự chạy từng việc theo kế hoạch.'}},
+    {id:'design',c:3,r:0,type:'skill',a:'main',t:'Design → asset',s:'GĐ2 · bóc design',link:'design',lane:'Design → asset',i:['Link DESIGN trong ticket'],p:['Soát đủ chưa, thiếu thì đòi PM','Bóc PSD / Figma / video'],o:['coords.json + assets/'],refs:['/check-design','/psd-cut','/figma-cut','/video-digest'],d:{role:'Tải design về kho ticket, bóc thành asset + toạ độ đã verify. Không cắt tay, không đoán toạ độ.'}},
+    {id:'code',c:4,r:0,type:'skill',a:'main',t:'/code-developer',s:'GĐ3 · Code',link:'code',lane:'Code',i:['Spec + asset đã bóc','Bộ luật rules/'],p:['Chọn làn theo quy mô','Code trong hàng rào hook'],o:['Code đã sửa'],refs:['/code-developer','design-analyst','frontend-developer','design-checker','guard-bash','guard-style','guard-pm','guard-state'],d:{role:'Nạp đúng luật của file sắp chạm, chọn làn sửa vặt / quick / mid / full / bug. Mọi lệnh đi qua hàng rào hook.'}},
+    {id:'verify',c:5,r:0,type:'check',a:'bot',t:'Tự kiểm',s:'GĐ4 · build + cổng máy',link:'verify',lane:'Tự kiểm',i:['Code đã sửa'],p:['Build thật, chặn asset thiếu','Đối chiếu UI trên browser thật'],o:['PASS, hoặc FAIL kèm file:dòng'],refs:['fe-gate','pm-gate','layout-gate','landing-parity','/ui-check','/check-promotion','/code-audit'],d:{role:'Cổng cơ học: phải có output lệnh thật mới qua, không nhận câu “chắc ổn rồi”.'}},
+    {id:'g2',c:6,r:0,type:'gate',a:'human',t:'Duyệt diff',s:'Cổng 2',lane:'Cổng 2–4',i:['git diff + báo cáo tự kiểm'],p:['Dev đọc diff'],o:['Diff đã duyệt','hoặc trả về sửa'],refs:[],d:{role:'Dev đọc diff và bằng chứng tự kiểm. Chưa đạt thì trả về GĐ3 kèm lý do.'}},
+    {id:'ship',c:7,r:0,type:'git',a:'both',t:'Commit · push · MR',s:'Cổng 3 push · Cổng 4 merge',link:'ship',lane:'Cổng 2–4',i:['Diff đã duyệt'],p:['AI commit, ghi AI đồng tác giả','Dev ra lệnh push, dev bấm Merge'],o:['MR đã merge','HTML bàn giao backend'],refs:['/commit'],d:{role:'AI tự commit đúng chuẩn. Push luôn hỏi dev từng lần. Merge do dev bấm. Sau đó bàn giao HTML sang repo backend.'}},
+    {id:'qc',c:8,r:0,type:'board',a:'main',t:'/bug-fixer-lite',s:'GĐ6 · QC & bug',link:'bug',lane:'QC & bug',i:['Buglist QC trên Google Sheets'],p:['Lọc bug của FE','Nhiều AI fix song song'],o:['Sheet ghi Done + routing'],refs:['/bug-fixer-lite','bug-lane','bug-radar'],d:{role:'Radar thấy bug mới → triage phút đầu, bug không thuộc FE thì ghi note chuyển đúng người, bug của FE thì fix song song theo cụm file.'}},
+    {id:'learn',c:9,r:0,type:'step',a:'main',t:'Chốt & học',s:'GĐ7 · /daily wrap',link:'bug',lane:'Chốt & học',i:['Kết quả trong ngày'],p:['Audit trước production','Chốt ngày, ghi bài học'],o:['Metrics từ commit','knowledge/lessons.md'],refs:['/website-audit','/daily'],d:{role:'Audit trước production, chốt ngày bằng metrics đo từ commit, ghi sổ bài học để task sau không lặp lỗi.'}},
+    {id:'g5',c:10,r:0,type:'gate',a:'human',t:'Đánh Done Jira',s:'Cổng 5',lane:'Cổng 5',i:['Bằng chứng bàn giao'],p:['Dev chuyển ticket'],o:['Ticket Done'],refs:[],d:{role:'AI không ghi ngược Jira. Chỉ dev đánh Done, khi đã có bằng chứng bàn giao.'}},
+    {id:'rules',c:3,r:1,type:'file',a:'none',t:'Bộ luật + hàng rào',s:'rules/ R-* · hooks/',i:['Bài học đã ghi sổ'],p:['MUST chặn, SHOULD cảnh báo','Hook chặn ngay ở tầng harness'],o:['Luật áp cho mọi task sau'],refs:['guard-bash','guard-style','guard-pm','guard-state','token-watch'],d:{role:'Luật có mã trong <code>rules/</code> (R-PM, R-CDN, R-JS, R-CS…). Luật quan trọng được nâng thành hook chặn cơ học, không phụ thuộc AI có nhớ hay không.'}},
+  ],
+  edges:[['src','daily'],['daily','g1'],['g1','design','main','✓ Duyệt'],['design','code'],['code','verify'],['verify','g2','main','✓ PASS'],['g2','ship','main','✓ Duyệt'],['ship','qc'],['qc','learn','main','hết bug'],['learn','g5'],
+    ['rules','code','opt','nạp trước khi sửa'],
+    ['g1','daily','loop','sửa','up'],['verify','code','loop','FAIL · file:dòng','up'],['g2','code','loop','chưa đạt','up'],['qc','code','loop','còn bug FE','up'],['learn','rules','loop','bài học → luật','down']],
+  notes:[
+    ['👤','Dev giữ 5 cổng','Duyệt kế hoạch · duyệt diff · ra lệnh push · bấm Merge · đánh Done Jira. Ngoài 5 cổng AI chạy một mạch, nhưng không bao giờ tự đẩy code ra ngoài.','--c-gate'],
+    ['✔','Cổng máy không nhận lời hứa','Mọi câu “xong / pass” phải kèm lệnh đã chạy thật và output. Chưa chạy thì báo “chưa verify”.','--c-check'],
+    ['§','Luật có mã','Chi tiết ở <code>rules/</code>: MUST chặn, SHOULD cảnh báo. Báo lỗi thì trích mã luật (<code>R-PM-3 MUST</code>) thay vì diễn giải lại.','--c-file'],
+    ['↻','Bài học thành luật','Lỗi lặp lại được ghi sổ → nâng thành luật → nâng tiếp thành hook chặn cơ học. Task sau tự hưởng.','--c-agent'],
+  ]
+},
+intake:{
+  tab:'Nhận việc', color:'--c-step', h:['--c-step','--c-board'],
+  title:'GĐ1', titleHi:'Nhận việc',
+  desc:'Mỗi sáng /daily quét Jira, đọc sâu ticket mới hoặc vừa đổi, suy tiến độ từ commit thật rồi trình kế hoạch ngày. Dev duyệt một lần, AI tự chạy tới cổng kế tiếp.',
+  stack:{
+    'Skill':[['/daily','skill','plan · prep · add · link · wrap']],
+    'Tool':[['Atlassian MCP','tool','chỉ đọc Jira'],['git log','tool','nối commit ↔ ticket']],
+    'Script':[['delta-scan','check'],['build-dashboard','check']],
+  },
+  nodes:[
+    {id:'jira',c:0,r:0,type:'board',a:'none',t:'Ticket Jira',s:'project GW',i:['Ticket được giao cho dev'],p:['AI chỉ đọc, không ghi ngược'],o:['Danh sách ticket'],refs:['Atlassian MCP'],d:{role:'Nguồn việc chính. /daily chỉ ĐỌC Jira qua Atlassian MCP, không bao giờ ghi ngược.'}},
+    {id:'chat',c:0,r:1,type:'file',a:'ext',t:'Chat / mail của PM',s:'việc ngoài Jira',i:['Tin nhắn PM'],p:['Dev thêm vào board'],o:['Việc thủ công'],refs:['/daily'],d:{role:'Việc không có ticket: dev thêm tay bằng <code>/daily add</code> hoặc nối vào ticket có sẵn bằng <code>/daily link</code>.'}},
+    {id:'bugs',c:0,r:2,type:'board',a:'ext',t:'Buglist QC',s:'Google Sheets',link:'bug',i:['Bug QC ghi sau bàn giao'],p:['Radar theo dõi thay đổi'],o:['Bug mới / đổi / reopen'],refs:['/daily'],d:{role:'Sau bàn giao, <code>/daily bugwatch</code> canh buglist. Luồng xử lý chi tiết ở tab QC & học.'}},
+    {id:'daily',c:1,r:1,fork:1,type:'cmd',a:'main',t:'/daily',s:'quét + điều phối ngày',i:['Jira + việc tay + buglist','state.json'],p:['Lọc ticket MỚI / ĐỔI / CÒN DỞ','Bỏ qua ticket không đổi'],o:['Danh sách cần đọc sâu'],refs:['/daily','delta-scan'],d:{role:'Chỉ đọc sâu ticket mới, vừa đổi hoặc còn dở. Phần cơ học (git, cửa sổ quét) do script <code>delta-scan</code> làm sẵn để tiết kiệm token.'}},
+    {id:'brief',c:2,r:0,type:'step',a:'main',t:'Đọc sâu ticket',s:'brief · docx · link DESIGN',i:['Mô tả ticket + file đính kèm'],p:['Bóc yêu cầu, loại promotion','Tìm link DESIGN trong ticket'],o:['Brief đã bóc','Trạng thái design'],refs:['/daily','Atlassian MCP'],d:{role:'Link DESIGN trong ticket là nguồn số 1 để biết design đã giao chưa.',notes:['Search SharePoint trả rỗng KHÔNG phải bằng chứng design chưa giao.']}},
+    {id:'phase',c:2,r:2,type:'step',a:'main',t:'Suy tiến độ từ commit',s:'không tin trạng thái ticket',i:['git log các repo','Commit có mã ticket'],p:['Nối commit ↔ ticket','Suy phase thật'],o:['Phase thật của từng task'],refs:['/daily','git log'],d:{role:'Trạng thái ticket hay bị trễ so với thực tế. Phase được suy từ commit đã có: chưa code, đang dựng, đã bàn giao…'}},
+    {id:'plan',c:3,r:1,type:'file',a:'main',t:'Kế hoạch ngày',s:'board + console',i:['Brief + phase thật'],p:['Xếp thứ tự, ước lượng','Cập nhật board + dashboard'],o:['Kế hoạch chờ duyệt','state.json + dashboard'],refs:['/daily','build-dashboard'],d:{role:'Kế hoạch trình dạng bảng. Board và dashboard được sinh từ <code>state.json</code> bằng script, không viết tay.'}},
+    {id:'g1',c:4,r:1,type:'gate',a:'human',t:'Duyệt kế hoạch',s:'Cổng 1',i:['Kế hoạch ngày'],p:['Dev sửa thứ tự / phạm vi','hoặc duyệt nguyên'],o:['Kế hoạch đã duyệt'],refs:[],d:{role:'Duyệt MỘT lần cho cả ngày. Sau đó AI tự chạy từng việc, chỉ dừng lại ở các cổng người phía sau.'}},
+    {id:'run',c:5,r:1,type:'step',a:'main',t:'Tự chạy theo kế hoạch',s:'prep design → code',link:'design',i:['Kế hoạch đã duyệt'],p:['/daily prep <KEY> từng ticket','Giao code qua /code-developer'],o:['Việc chạy tới cổng kế tiếp'],refs:['/daily','/code-developer'],d:{role:'<code>/daily prep &lt;KEY&gt;</code> tải và bóc design, rồi giao code qua <code>/code-developer</code>. /daily không commit, không push.'}},
+  ],
+  edges:[['jira','daily'],['chat','daily','main','add / link'],['bugs','daily','opt','bugwatch'],['daily','brief','main','MỚI / ĐỔI'],['daily','phase'],['brief','plan'],['phase','plan'],['plan','g1'],['g1','run','main','✓ Duyệt'],
+    ['g1','plan','loop','sửa','up']],
+  notes:[
+    ['👤','Dev ở đâu','Chỉ duyệt kế hoạch một lần. Việc ngoài Jira thì dev tự thêm bằng /daily add.','--c-gate'],
+    ['🔒','Chỉ đọc','/daily không ghi ngược Jira, không commit, không push. Đánh Done Jira là việc của dev (Cổng 5).','--c-step'],
+    ['▤','Design đã giao chưa?','Đọc link DESIGN trong ticket trước. Search SharePoint trả rỗng không có nghĩa là chưa giao.','--c-file'],
+    ['⎇','Tiến độ = commit','Phase suy từ commit thật, không từ trạng thái ticket, nên board không bị lệch với thực tế.','--c-git'],
+  ]
+},
+design:{
+  tab:'Design', color:'--c-file', h:['--c-file','--c-agent'],
+  title:'GĐ2', titleHi:'Design → asset', padB:130,
+  desc:'Tải design về kho ticket, soát đủ để dựng chưa (thiếu thì soạn sẵn nội dung đòi PM), rồi bóc theo đúng nguồn: PSD qua Photoshop, Figma qua API, video thành text/số. Kết quả là asset + toạ độ đã verify, không cắt tay.',
+  stack:{
+    'Skill':[['/check-design'],['/psd-cut'],['/figma-cut'],['/video-digest']],
+    'Tool':[['Photoshop','tool','bóc PSD / PSB'],['Figma REST API','tool','token riêng máy'],['Edge / Chrome','tool','tải file SharePoint']],
+  },
+  nodes:[
+    {id:'link',c:0,r:1,type:'board',a:'none',t:'Link DESIGN',s:'trong ticket Jira',i:['Ticket đã vào kế hoạch'],p:['Kiểm tra đã có link chưa'],o:['Link SharePoint / Figma'],refs:[],d:{role:'Link trong ticket là nguồn sự thật. Chưa có link → đi nhánh đòi PM.'}},
+    {id:'dl',c:1,r:1,type:'step',a:'main',t:'Tải design',s:'về kho của ticket',i:['Link SharePoint'],p:['Mở link tải qua trình duyệt','Giải nén vào kho ticket'],o:['File PSD / Figma / video / ảnh'],refs:['Edge / Chrome'],d:{role:'Tải bằng trình duyệt đã đăng nhập (đã verify với file 382MB), không cần extension.'}},
+    {id:'route',c:2,r:1,fork:1,type:'step',a:'main',t:'Nhận diện nguồn',s:'PSD · Figma · video · ảnh',i:['File design'],p:['Chọn đúng công cụ bóc'],o:['Chuyển sang nhánh tương ứng'],refs:[],d:{role:'Mỗi nguồn một công cụ. Cấm cắt tay bằng sips hay ước toạ độ bằng mắt.'}},
+    {id:'psd',c:3,r:0,type:'cmd',a:'main',t:'/psd-cut',s:'qua Photoshop',i:['.psd / .psb'],p:['survey → plan → export','gate + trim cùng lượt xanh'],o:['assets/ + coords.json'],refs:['/psd-cut','Photoshop'],d:{role:'Bóc PSD một lệnh. <code>coords.json</code> chỉ được ghi khi gate và trim cùng xanh trong một lượt.'}},
+    {id:'figma',c:3,r:1,type:'cmd',a:'main',t:'/figma-cut',s:'qua REST API',i:['Link figma.com'],p:['tree → plan → render','text vùng data-bind lấy textLive'],o:['assets/ + coords.json'],refs:['/figma-cut','Figma REST API'],d:{role:'Bóc Figma qua REST API (không phải MCP). Vùng chữ gắn dữ liệu lấy <code>textLive</code> thay vì ảnh.'}},
+    {id:'video',c:3,r:2,type:'cmd',a:'main',t:'/video-digest',s:'video → text / số',i:['Clip animation / QC / tutorial'],p:['Script bóc frame, đo chuyển động'],o:['Motion spec / buglist nháp'],refs:['/video-digest'],d:{role:'Không ném frame thô vào model: một clip 12 phút ≈ 34 triệu vision token. Script nghiền trước, AI đọc bản đã nghiền.'}},
+    {id:'img',c:3,r:3,type:'file',a:'none',t:'Ảnh PNG / JPG',s:'dùng trực tiếp',i:['Ảnh design phẳng'],p:['Không cần bóc'],o:['Ảnh tham chiếu'],refs:[],d:{role:'Ảnh phẳng dùng làm tham chiếu; design-analyst sẽ chuyển thành spec ở GĐ3.'}},
+    {id:'spec',c:4,r:1,type:'file',a:'none',t:'Spec đã bóc',s:'_auto-export/<slug>/',i:['Output các nhánh'],p:['Gom về một chỗ'],o:['assets/ + coords.json','motion spec'],refs:[],d:{role:'Mọi toạ độ về sau đều lấy từ <code>coords.json</code>, không đo lại trên ảnh.'}},
+    {id:'check',c:5,r:1,fork:1,type:'check',a:'main',t:'/check-design',s:'đủ để dựng chưa?',i:['Spec + brief / docx / Jira'],p:['Soát đủ màn, đủ trạng thái','Popup, state ô quà, mobile'],o:['Báo cáo đủ / thiếu'],refs:['/check-design'],d:{role:'Soát design có đủ màn, đủ trạng thái mà brief đòi không. Thiếu thì xuất sẵn block gửi PM.'}},
+    {id:'ask',c:0,r:3,type:'file',a:'main',t:'Soạn nội dung đòi PM',s:'block gửi PM',i:['Danh sách thiếu'],p:['Liệt kê màn / trạng thái thiếu'],o:['Tin nhắn sẵn để gửi'],refs:['/check-design'],d:{role:'AI soạn sẵn, dev gửi. Không tự đoán design còn thiếu.'}},
+    {id:'wait',c:1,r:3,type:'step',a:'ext',t:'Chờ PM / Designer',s:'giao bổ sung',i:['Tin nhắn đòi design'],p:['PM / designer bổ sung'],o:['Link design mới'],refs:[],d:{role:'Giai đoạn chờ bên ngoài. /daily designwatch canh khi nào design mới được giao.'}},
+    {id:'next',c:6,r:1,type:'step',a:'main',t:'Sang GĐ3 Code',s:'spec + asset sẵn sàng',link:'code',i:['Spec đã đủ'],p:['Giao /code-developer'],o:['Bắt đầu code'],refs:[],d:{role:'Mở tab Code.'}},
+  ],
+  edges:[['link','dl','main','đã có link'],['dl','route'],['route','psd','main','PSD'],['route','figma','main','Figma'],['route','video','main','video'],['route','img','main','ảnh'],
+    ['psd','spec'],['figma','spec'],['video','spec'],['img','spec'],['spec','check'],['check','next','main','✓ Đủ'],['link','ask','main','chưa giao'],['ask','wait'],
+    ['wait','dl','main','PM giao bổ sung'],['check','ask','loop','thiếu','down']],
+  notes:[
+    ['✂','Không cắt tay','Có PSD / Figma chưa bóc thì chạy /psd-cut hoặc /figma-cut TRƯỚC khi code. Toạ độ luôn lấy từ coords.json.','--c-file'],
+    ['🎞','Video phải nghiền trước','Video QC, animation, tutorial đi qua /video-digest. Cấm ném frame thô vào model.','--c-agent'],
+    ['⏳','Thiếu thì đòi, không đoán','/check-design soạn sẵn nội dung đòi PM. Design thiếu trạng thái ô quà thì suy ra và BÁO dev.','--c-end'],
+  ]
+},
+code:{
+  tab:'Code', color:'--c-agent', h:['--c-agent','--c-cmd'],
+  title:'GĐ3', titleHi:'Code',
+  desc:'Nạp đúng luật của file sắp chạm, rồi chọn làn theo quy mô: sửa vặt làm thẳng, việc nhỏ một mình phiên Claude, việc vừa thêm một dev AI, việc lớn đủ 3 AI phân tích · code · đối chiếu. Bug thì truy nguyên nhân gốc trước. Mọi lệnh đi qua hàng rào hook.',
+  stack:{
+    'Skill':[['/code-developer','skill','quick · mid · full · fix'],['systematic-debugging']],
+    'Agent':[['design-analyst','agent','opus'],['frontend-developer','agent','opus'],['design-checker','agent','opus']],
+    'Script':[['project-note','check','khoá gameplay'],['layout-gate','check']],
+    'Hook':ALL_HOOKS,
+  },
+  groups:[{c0:4,c1:6,r0:3,r1:3,label:'làn full · 3 subagent',a:'sub'}],
+  nodes:[
+    {id:'in',c:0,r:2,type:'file',a:'none',t:'Spec + asset',s:'từ GĐ2',link:'design',i:['coords.json + assets/','brief đã bóc'],p:['Đầu vào của GĐ3'],o:['Việc cần code'],refs:[],d:{role:'Mở tab Design để xem cách bóc.'}},
+    {id:'rules',c:1,r:2,type:'step',a:'main',t:'Nạp luật trước khi sửa',s:'rules/ theo file chạm tới',tr:'R-PM-11',i:['Đường dẫn file sắp sửa'],p:['pm__ → file dự án + khoá gameplay','cdn-source → R-CDN · R-JS · R-STR'],o:['Bộ luật áp cho task'],refs:['project-note'],d:{role:'Chỉ nạp luật của vùng sắp chạm, không nạp sẵn cho chắc.',notes:['Landing có <code>pm__</code>: <code>project-note path</code> → đọc file dự án → khoá gameplay TRƯỚC dòng code đầu tiên (R-PM-11).','cdn-source: R-CDN / R-SPR (SCSS, sprite), R-JS (JS landing), R-STR (section, clone).','Dựng list → R-LAY; ô nhận thưởng → đủ 3 trạng thái .off / .active / .received (R-ST).']}},
+    {id:'size',c:2,r:2,fork:1,type:'step',a:'main',t:'Chọn làn theo quy mô',s:'gate tín hiệu của task',i:['Mô tả việc + 1 lần grep'],p:['Đếm file, soát tín hiệu đỏ'],o:['Một trong 5 làn'],refs:['/code-developer'],d:{role:'Tự chọn làn và báo một dòng, không chờ xác nhận. Dev gõ mode tường minh thì theo dev.',notes:['Đang làm mà lộ tín hiệu đỏ → dừng, hỏi nâng làn. Không âm thầm gánh tiếp.']}},
+    {id:'tiny',c:3,r:0,type:'step',a:'main',t:'Sửa vặt',s:'≤2 file, chỗ sửa đã rõ',i:['Chỗ sửa đã rõ'],p:['Làm thẳng trong phiên'],o:['Code + build thật'],refs:[],d:{role:'Không qua skill, không subagent, nhưng vẫn build thật để verify.'}},
+    {id:'quick',c:3,r:1,type:'skill',a:'main',t:'Làn quick',s:'≤4 file · 0 subagent',i:['Việc nhỏ, rõ'],p:['Phiên Claude tự sửa'],o:['Code + build PASS'],refs:['/code-developer'],d:{role:'0 subagent, 0 spec, 0 report. Verify = build một lần PASS.'}},
+    {id:'mid',c:3,r:2,type:'skill',a:'main',t:'Làn mid',s:'1 AI code + phiên soát',i:['Việc vừa, không tín hiệu đỏ'],p:['1 frontend-developer code','Phiên Claude verify'],o:['Code đã soát'],refs:['/code-developer','frontend-developer'],d:{role:'Một dev AI code, phiên chính tự verify, không cần checker.'}},
+    {id:'full',c:3,r:3,type:'skill',a:'main',t:'Làn full',s:'dựng UI từ design',i:['Ảnh design + coords.json'],p:['Điều phối 3 subagent'],o:['Code khớp design'],refs:['/code-developer','design-analyst','frontend-developer','design-checker'],d:{role:'Dựng UI mới từ design, hoặc việc có tín hiệu đỏ.'}},
+    {id:'bug',c:3,r:4,type:'skill',a:'main',t:'Bug',s:'truy nguyên nhân gốc trước',i:['Mô tả bug / log'],p:['Tái hiện → khoanh vùng → nguyên nhân','Rồi mới đề xuất fix'],o:['Fix đúng gốc'],refs:['systematic-debugging'],d:{role:'Cấm vá triệu chứng. Chưa tìm ra nguyên nhân gốc thì chưa sửa.'}},
+    {id:'da',c:4,r:3,type:'agent',a:'sub',m:'opus',t:'design-analyst',s:'ảnh → Design Spec',i:['Ảnh design đã cắt','coords.json'],p:['Bóc layout, màu, font, trạng thái'],o:['Design Spec'],refs:['design-analyst'],d:{role:'Chuyển ảnh thành spec có cấu trúc — hợp đồng chung cho dev code theo và checker kiểm theo. Không viết code.'}},
+    {id:'fd',c:5,r:3,type:'agent',a:'sub',m:'opus',t:'frontend-developer',s:'spec → code',i:['Design Spec','Luật của repo'],p:['Code theo convention','Tự build / lint'],o:['Code + Dev Report'],refs:['frontend-developer'],d:{role:'Code theo spec, đọc knowledge để tránh lặp lỗi cũ. Dev Report phải có mục “Rules đã áp”.'}},
+    {id:'dc',c:6,r:3,type:'agent',a:'sub',m:'opus',t:'design-checker',s:'code vs spec',i:['Code + Design Spec'],p:['Soát lệch trên browser thật'],o:['Danh sách lệch kèm file:dòng'],refs:['design-checker'],d:{role:'Chỉ báo lệch có dẫn chứng, không sửa code.'}},
+    {id:'guard',c:7,r:2,type:'check',a:'bot',t:'Hàng rào hook',s:'chặn ở tầng harness',i:['Mọi lệnh / file AI vừa ghi'],p:['Chặn lệnh huỷ hoại, đọc credential','Soát pm__, comment thừa'],o:['Cho qua / chặn kèm mã G-*'],refs:['guard-bash','guard-style','guard-pm','guard-state','token-watch'],d:{role:'Hook chạy trên mọi lệnh, không phải lời khuyên. Bị chặn thì đọc mã G-* rồi đổi cách làm — không tìm đường lách.',notes:['guard-bash: deny lệnh huỷ hoại + đọc credential; hỏi trước git / deploy / rm.','guard-pm: file pm__ vừa ghi → chạy pm-gate, 🔴 là chặn.','guard-style: đếm comment đoạn vừa ghi (hook im ≠ đạt R-CS-1).','token-watch: context vượt ngưỡng → nhắc /clear.']}},
+    {id:'next',c:8,r:2,type:'step',a:'main',t:'Sang GĐ4 Tự kiểm',s:'code đã sửa',link:'verify',i:['Code đã sửa'],p:['Chạy cổng máy'],o:['Báo cáo tự kiểm'],refs:[],d:{role:'Mở tab Tự kiểm.'}},
+  ],
+  edges:[['in','rules'],['rules','size'],['size','tiny','main','vặt'],['size','quick','main','nhỏ'],['size','mid','main','vừa'],['size','full','main','lớn'],['size','bug','main','bug'],
+    ['full','da'],['da','fd','main','spec'],['fd','dc'],
+    ['tiny','guard'],['quick','guard'],['mid','guard'],['dc','guard'],['bug','guard'],['guard','next'],
+    ['dc','fd','loop','lệch → sửa','down']],
+  notes:[
+    ['§','Luật trước, code sau','Chạm file pm__ phải khoá gameplay trước dòng code đầu (R-PM-11). pm__ / id / data-* là hợp đồng với JS platform: cấm đổi tên, cấm xoá lẻ.','--c-file'],
+    ['⇅','Làn chỉ nâng, không hạ','Đang quick / mid mà lộ tín hiệu đỏ → dừng và hỏi nâng làn. Không tự hạ từ full xuống giữa chừng.','--c-agent'],
+    ['✎','Code intern đọc được','Comment tối giản, không phòng thủ thừa, tên thay comment. Cổng cuối: intern đọc một lượt có hiểu không (R-CS-7).','--c-cmd'],
+    ['⛨','Hook im ≠ đạt','Hook chỉ chặn lỗi đã biết. Không bị chặn không có nghĩa là đúng luật — vẫn phải qua GĐ4.','--c-check'],
+  ]
+},
+verify:{
+  tab:'Tự kiểm', color:'--c-check', h:['--c-check','--c-file'],
+  title:'GĐ4', titleHi:'Tự kiểm',
+  desc:'Trước khi đưa dev xem diff, AI phải qua một chuỗi cổng máy: build thật, chặn asset thiếu, đối chiếu UI trên browser thật với toạ độ design, soát popup theo loại chiến dịch, soát chất lượng code. FAIL thì quay lại sửa kèm file:dòng.',
+  stack:{
+    'Skill':[['/ui-check','skill','--autofix'],['/check-promotion'],['/code-audit'],['/clean-code']],
+    'Script':[['fe-gate','check'],['pm-gate','check','--page sau build'],['landing-parity','check'],['layout-gate','check']],
+  },
+  nodes:[
+    {id:'in',c:0,r:1,type:'step',a:'main',t:'Code xong',s:'từ GĐ3',link:'code',i:['Code đã sửa'],p:['Đầu vào của GĐ4'],o:['Chạy chuỗi cổng'],refs:[],d:{role:'Mở tab Code.'}},
+    {id:'build',c:1,r:1,type:'check',a:'main',t:'Build thật',s:'đọc log, không chỉ exit code',i:['Lệnh build của repo'],p:['Chạy build','Lọc error / warn trong log'],o:['dist/ mới'],refs:[],d:{role:'Build thật, đọc log. Không có output build thì không được nói “xong”.'}},
+    {id:'fe',c:2,r:1,type:'check',a:'bot',t:'fe-gate',s:'font · ảnh 404 · dist cũ',i:['dist/'],p:['Soát lỗi thiếu-vắng trên output'],o:['PASS / danh sách thiếu'],refs:['fe-gate'],d:{role:'Lưới chặn lỗi “thiếu-vắng”: font thiếu, ảnh 404, dist cũ chưa build lại, asset trắng trơn.'}},
+    {id:'ui',c:3,r:1,type:'check',a:'main',t:'/ui-check',s:'browser thật vs coords.json',i:['dist/ + coords.json'],p:['Mở PC 1920×1080, mobile 768×1024','Đo lệch vị trí, chữ cắt, tràn ngang'],o:['Báo cáo lệch','--autofix sửa SCSS'],refs:['/ui-check'],d:{role:'Kiểm trên output build qua browser thật, không đọc source chay. <code>--autofix</code> tự sửa vị trí asset lệch rồi build + đo lại.'}},
+    {id:'promo',c:4,r:0,type:'check',a:'bot',t:'pm-gate + /check-promotion',s:'landing có pm__',tr:'R-PM-6',i:['HTML landing + campaign'],p:['pm-gate soát hook pm__','/check-promotion soát đủ popup'],o:['Mã PG-* / bảng Pass-Fail'],refs:['pm-gate','/check-promotion'],d:{role:'Hai cổng bổ sung nhau: <code>pm-gate</code> soát hook pm__, <code>/check-promotion</code> soát đủ popup theo loại chiến dịch (không soát pm__).'}},
+    {id:'parity',c:4,r:2,type:'check',a:'bot',t:'landing-parity',s:'campaign mới / clone',i:['Campaign mới + landing cũ'],p:['So landing cũ có mà mới thiếu'],o:['Danh sách phải xử kèm file:dòng'],refs:['landing-parity','layout-gate'],d:{role:'Campaign mới hoặc clone-reskin phải chạy trước khi báo xong. Class MS__ / MJ__ lạ là phải sửa.'}},
+    {id:'audit',c:5,r:1,type:'skill',a:'main',t:'/code-audit',s:'chất lượng code R-CS',i:['Diff chưa commit'],p:['Soát hợp đồng, trùng lặp, style','Landing mới: dọn bằng /clean-code'],o:['Báo cáo 2 tầng'],refs:['/code-audit','/clean-code'],d:{role:'Soi 5 trục: hợp đồng platform, trùng lặp, đúng-sai khi chạy thật, dễ bảo trì, code-style R-CS.'}},
+    {id:'pass',c:6,r:1,fork:1,type:'end',a:'main',t:'PASS?',s:'đủ bằng chứng chưa',i:['Output các cổng'],p:['Gom bằng chứng vào báo cáo'],o:['PASS → Cổng 2','FAIL → quay lại sửa'],refs:[],d:{role:'Báo cáo phải có mục <code>Bằng chứng:</code> — lệnh đã chạy + output.'}},
+    {id:'next',c:7,r:1,type:'step',a:'main',t:'Sang Cổng 2',s:'dev duyệt diff',link:'ship',i:['Báo cáo tự kiểm'],p:['Trình diff cho dev'],o:['Chờ dev duyệt'],refs:[],d:{role:'Mở tab Duyệt & bàn giao.'}},
+  ],
+  edges:[['in','build'],['build','fe'],['fe','ui'],['ui','promo','opt','có pm__'],['ui','parity','opt','campaign mới'],['ui','audit'],['promo','audit'],['parity','audit'],['audit','pass'],['pass','next','main','✓ PASS'],
+    ['pass','in','loop','FAIL · file:dòng → sửa','up']],
+  notes:[
+    ['✔','Chưa chạy = chưa verify','Cấm nói “xong / pass” cho thứ chưa chạy. Báo cáo luôn có lệnh + output thật.','--c-check'],
+    ['🖥','Quy ước màn hình','PC 1920×1080, mobile 768×1024, PC → mobile reload đúng 1 lần. H5 chỉ kiểm ngang 1920×1080.','--c-step'],
+    ['🎯','Cổng theo loại việc','Landing pm__ thêm pm-gate + /check-promotion; campaign mới thêm landing-parity; list thêm layout-gate.','--c-file'],
+  ]
+},
+ship:{
+  tab:'Duyệt & bàn giao', color:'--c-git', h:['--c-git','--c-gate'],
+  title:'GĐ5', titleHi:'Duyệt & bàn giao',
+  desc:'Ba cổng người liền nhau: dev duyệt diff, dev ra lệnh push, dev bấm Merge. AI tự commit đúng chuẩn nhưng không bao giờ tự push hay tự merge. Cuối cùng bàn giao HTML sang repo backend.',
+  stack:{
+    'Skill':[['/commit','skill','Conventional Commits']],
+    'Tool':[['git','tool','pull --autostash trước commit'],['git mr','tool','cdn-source: dừng ở tạo MR']],
+  },
+  nodes:[
+    {id:'in',c:0,r:1,type:'step',a:'main',t:'PASS từ GĐ4',s:'kèm bằng chứng',link:'verify',i:['Báo cáo tự kiểm'],p:['Trình diff + bằng chứng'],o:['Chờ dev'],refs:[],d:{role:'Mở tab Tự kiểm.'}},
+    {id:'g2',c:1,r:1,fork:1,type:'gate',a:'human',t:'Duyệt diff',s:'Cổng 2',i:['git diff','Báo cáo tự kiểm'],p:['Dev đọc diff'],o:['Duyệt / trả về'],refs:[],d:{role:'Dev đọc diff và bằng chứng. Chưa đạt thì trả về GĐ3 kèm lý do.'}},
+    {id:'back',c:2,r:2,type:'end',a:'none',t:'Quay lại sửa',s:'về GĐ3 Code',link:'code',i:['Lý do chưa đạt'],p:['Sửa rồi qua lại GĐ4'],o:['Diff mới'],refs:[],d:{role:'Mở tab Code.'}},
+    {id:'commit',c:2,r:1,type:'git',a:'main',t:'/commit',s:'AI tự làm, báo lại',i:['Diff đã duyệt'],p:['cdn-source: pull --autostash trước','Message đúng chuẩn repo'],o:['Commit có AI đồng tác giả'],refs:['/commit','git'],d:{role:'Commit AI được tự làm, không hỏi — nhưng gom đúng phạm vi project và báo lại đã commit gì.',notes:['Repo git VNG: Conventional Commits. Repo nội bộ: <code>[&lt;leaf-folder&gt;] English subject</code>.','Luôn có dòng Co-Authored-By của AI.']}},
+    {id:'g3',c:3,r:1,type:'gate',a:'human',t:'Lệnh push',s:'Cổng 3 · hỏi từng lần',i:['Commit sẵn sàng'],p:['Dev gõ “push”'],o:['Được phép push'],refs:[],d:{role:'AI KHÔNG BAO GIỜ tự push. Mỗi lần push đều phải hỏi dev, duyệt lần trước không áp cho lần sau.'}},
+    {id:'mr',c:4,r:1,type:'git',a:'main',t:'Push + tạo MR',s:'nhánh riêng',i:['Lệnh push của dev'],p:['cdn-source: chạy git mr','Dừng ở bước tạo MR'],o:['Link MR'],refs:['git mr','git'],d:{role:'Push nhánh riêng và tạo MR. Không tự merge.'}},
+    {id:'g4',c:5,r:1,type:'gate',a:'human',t:'Bấm Merge',s:'Cổng 4',i:['Link MR'],p:['Dev / reviewer review MR'],o:['MR đã merge'],refs:[],d:{role:'Merge luôn là quyền của người.'}},
+    {id:'ho',c:6,r:1,type:'git',a:'both',t:'Bàn giao HTML',s:'sang repo backend',tr:'R-HO',i:['Bản build đã merge'],p:['Chép HTML, URL CDN tuyệt đối','Soát cả Promotion/ lẫn mainsite/'],o:['git diff --stat cho dev'],refs:[],d:{role:'Đưa HTML sang gt-promotion-template / new-mainsite. AI chỉ chép và đưa <code>git diff --stat</code>, dev tự commit ở hai repo này.',notes:['Giữ nguyên <code>&lt;% MODULE_CONTENT %&gt;</code>.','new-mainsite không chạy được ở local → cấm nói “đã verify runtime” cho Twig.']}},
+    {id:'next',c:7,r:1,type:'board',a:'ext',t:'Chờ QC',s:'sang GĐ6',link:'bug',i:['Bản đã bàn giao'],p:['QC test, ghi buglist'],o:['Buglist trên Sheets'],refs:[],d:{role:'Mở tab QC & học.'}},
+  ],
+  edges:[['in','g2'],['g2','commit','main','✓ Duyệt'],['g2','back','main','chưa đạt'],['commit','g3'],['g3','mr','main','✓ push'],['mr','g4'],['g4','ho','main','✓ Merge'],['ho','next']],
+  notes:[
+    ['👤','3 cổng liền nhau','Duyệt diff → ra lệnh push → bấm Merge. Cả ba đều do dev, AI dừng hẳn ở mỗi cổng.','--c-gate'],
+    ['⎇','Commit tự làm, push thì hỏi','Commit không cần hỏi nhưng phải báo lại. Push hỏi dev từng lần, kể cả khi vừa được phép ở lần trước.','--c-git'],
+    ['⇄','Bàn giao không commit hộ','Ở gt-promotion-template / new-mainsite AI chỉ đưa git diff --stat, dev tự commit và push.','--c-file'],
+  ]
+},
+bug:{
+  tab:'QC & học', color:'--c-board', h:['--c-board','--c-gate'],
+  title:'GĐ6–7', titleHi:'QC, bug và bài học',
+  desc:'QC ghi buglist lên Google Sheets. Radar lọc bug của FE, /bug-fixer-lite triage ngay phút đầu: bug không thuộc FE thì ghi note chuyển đúng người, bug của FE thì nhiều AI fix song song theo cụm file rồi ghi ngược Done lên sheet. Hết bug thì audit, chốt ngày và ghi bài học.',
+  stack:{
+    'Skill':[['/bug-fixer-lite'],['/website-audit'],['/daily','skill','bugwatch · wrap']],
+    'Agent':[['bug-lane','agent','sonnet'],['design-checker','agent','opus']],
+    'Script':[['bug-radar','check'],['radar-tick','check']],
+    'Tool':[['Claude in Chrome','tool','ghi sheet đứng tên dev']],
+  },
+  nodes:[
+    {id:'sheet',c:0,r:1,type:'board',a:'ext',t:'QC ghi buglist',s:'Google Sheets',i:['Bản đã bàn giao'],p:['QC test, ghi bug'],o:['Dòng bug trên sheet'],refs:[],d:{role:'QC ghi bug lên Google Sheets. Bug có thể thuộc FE, backend, studio hoặc SDK.'}},
+    {id:'radar',c:1,r:1,type:'check',a:'bot',t:'Radar buglist',s:'bug mới / đổi / reopen',i:['Sheet buglist'],p:['Quét định kỳ ở nền','Lọc bug của FE'],o:['Hàng đợi bug cần xử'],refs:['bug-radar','radar-tick','/daily'],d:{role:'Radar nền gọi <code>/daily delta</code> trong phiên headless, phần tính toán thuần do <code>bug-radar</code> làm.'}},
+    {id:'bfl',c:2,r:1,fork:1,type:'cmd',a:'main',t:'/bug-fixer-lite',s:'triage phút đầu',i:['Hàng đợi bug'],p:['Phân loại theo vùng × loại bug','Chia cụm file không giao nhau'],o:['Rổ FIX / rổ chuyển người'],refs:['/bug-fixer-lite'],d:{role:'Như một thành viên AI của team FE: chạy một lệnh là xong trọn trong phạm vi team, không cần dev trông.',notes:['Sổ ranh giới nhớ vùng nào đã bàn giao backend (FE chỉ còn quyền CSS/JS + text).']}},
+    {id:'route',c:3,r:0,type:'board',a:'main',t:'Note routing',s:'bug không thuộc FE',i:['Bug của backend / studio / SDK'],p:['Ghi note chuyển đúng người'],o:['Note trên sheet'],refs:['/bug-fixer-lite','Claude in Chrome'],d:{role:'Ghi sớm ngay sau khi triage để không mất khi rớt kết nối giữa phiên.'}},
+    {id:'lane',c:3,r:1,type:'agent',a:'sub',m:'sonnet',t:'bug-lane × N',s:'fix song song theo cụm file',i:['Một cụm bug + ranh giới sở hữu'],p:['Điều tra có bằng chứng','Fix mọi nơi matching'],o:['Partial bug-board','Dòng “Nơi đã sửa”'],refs:['bug-lane'],d:{role:'Mỗi lane một cụm file không giao nhau, làm trọn trong 1 context. Fix đáp xuống mọi nơi: source local, HTML gt-promotion, Twig new-mainsite.'}},
+    {id:'ver',c:4,r:1,type:'check',a:'main',t:'1 build + verify',s:'design-checker cả list',i:['Code của mọi lane'],p:['Build một lần chung','Verify cả danh sách một lượt'],o:['Bug đã verify'],refs:['design-checker'],d:{role:'Một build duy nhất, một lượt verify cho cả list để tiết kiệm thời gian và token.'}},
+    {id:'write',c:5,r:1,type:'board',a:'main',t:'Ghi ngược sheet',s:'DEV Check Status = Done',i:['Bug đã verify'],p:['Ghi qua trình duyệt đã đăng nhập'],o:['Sheet cập nhật'],refs:['Claude in Chrome','/bug-fixer-lite'],d:{role:'Ghi qua extension Claude in Chrome trên trình duyệt mặc định của dev, edit đứng tên dev. Không webhook, không Apps Script.'}},
+    {id:'more',c:6,r:1,fork:1,type:'end',a:'main',t:'Còn bug FE?',s:'QC test lại',i:['Sheet sau khi ghi'],p:['Chờ QC test lại / reopen'],o:['Còn → vòng mới','Hết → chốt'],refs:[],d:{role:'Lần chạy sau chỉ xử lý phần mới, đổi hoặc reopen.'}},
+    {id:'audit',c:7,r:1,type:'skill',a:'main',t:'/website-audit',s:'trước production',i:['Bản build cuối'],p:['SEO, meta, font, ảnh, Lighthouse'],o:['Danh sách tối ưu'],refs:['/website-audit'],d:{role:'Kiểm canonical, OG, robots, sitemap, preload font, Core Web Vitals trước khi lên production.'}},
+    {id:'wrap',c:8,r:1,fork:1,type:'cmd',a:'main',t:'/daily wrap',s:'chốt ngày',i:['Commit + board trong ngày'],p:['Đo metrics từ commit'],o:['Báo cáo ngày'],refs:['/daily'],d:{role:'Metrics đo từ commit thật, không từ cảm giác.'}},
+    {id:'lesson',c:9,r:0,type:'file',a:'main',t:'Ghi sổ bài học',s:'knowledge/lessons.md',i:['Lỗi / quyết định trong ngày'],p:['Ghi điều không suy ra được từ code'],o:['Bài học mới'],refs:[],d:{role:'Chỉ ghi điều không đọc được từ code hay git log.'}},
+    {id:'rule',c:10,r:0,type:'file',a:'none',t:'Bài học → luật → hook',s:'áp cho mọi task sau',i:['Bài học lặp lại'],p:['Nâng thành luật có mã','Nâng tiếp thành hook chặn'],o:['rules/ R-* · hooks/'],refs:[],d:{role:'Lỗi lặp lại lần hai thì thành luật; luật quan trọng thành hook chặn cơ học.'}},
+    {id:'g5',c:9,r:2,type:'gate',a:'human',t:'Đánh Done Jira',s:'Cổng 5',i:['Bằng chứng bàn giao'],p:['Dev chuyển ticket Done'],o:['Ticket Done'],refs:[],d:{role:'Bằng chứng bàn giao = đã push gt-promotion. AI không ghi ngược Jira.'}},
+  ],
+  edges:[['sheet','radar'],['radar','bfl'],['bfl','route','main','không thuộc FE'],['bfl','lane','main','bug FE'],['lane','ver'],['ver','write'],['route','more'],['write','more'],['more','audit','main','hết'],['audit','wrap'],['wrap','lesson'],['lesson','rule'],['wrap','g5'],
+    ['more','sheet','loop','còn · QC test lại','down']],
+  notes:[
+    ['⚡','Triage phút đầu','Bug không thuộc FE được ghi note chuyển người ngay, không đợi fix xong mới báo.','--c-board'],
+    ['∥','Song song theo cụm file','Mỗi bug-lane một cụm file không giao nhau → không đè code nhau, chỉ cần 1 build chung.','--c-agent'],
+    ['🧭','Sổ ranh giới','Vùng đã bàn giao backend chỉ sửa CSS/JS + text qua gt-promotion. Hỏi dev một lần, nhớ cho các lần sau.','--c-gate'],
+    ['↻','Vòng học','Bài học → luật → hook. Lần sau AI không cần “nhớ” — máy chặn luôn.','--c-cmd'],
+  ]
+},
+};
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+const NW_MIN=220, PAD_X=44, PAD_B=84;
+let NW=NW_MIN, COL_W=NW+76; // NW nới theo tiêu đề dài nhất (tiêu đề không xuống hàng)
+let PAD_T=132;
+let NH=150, ROW_H=196; // NH đo theo node cao nhất của flow
+const $=s=>document.querySelector(s);
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let current=null, particles=[], fitMode=true, play=null;
+/* ---------- i18n: VI gốc, EN tra bảng theo đúng chuỗi VI ---------- */
+const EN={"tuỳ chọn": "optional", "Workflow cho MVAS và GameAPIs": "Workflow for MVAS and GameAPIs", "Quy trình phát triển với AI Agent: làm rõ yêu cầu → lập plan → duyệt → build → review": "Development workflow with AI Agents: clarify requirements → plan → approve → build → review", "Vừa khung": "Fit", "Vừa khung / 100%": "Fit / 100%", "◐ Giao diện": "◐ Theme", "Đổi giao diện": "Toggle theme", "▶ Chạy luồng": "▶ Run flow", "▶ Tiếp tục": "▶ Resume", "❚❚ Tạm dừng": "❚❚ Pause", "▶ Chạy lại": "▶ Replay", "▶ Duyệt & tiếp tục": "▶ Approve & continue", "✓ Hết luồng — AI Agent dừng ở Review, Done do người": "✓ End of flow — AI Agent stops at Review, Done is up to the human", " — AI Agent dừng, chờ người": " — AI Agent stops, waiting for the human", "Trạng thái ticket · ai chuyển vào cột": "Ticket status · who moves it into the column", "duyệt · quyết định · thao tác board": "approve · decide · operate the board", "skill/command điều phối, gọi MCP/git": "skills/commands orchestrate, call MCP/git", "agent chuyên trách, trả JSON": "specialist agents, return JSON", "file / trạng thái board": "files / board state", "Ai làm bước này?": "Who does this step?", "đầu vào": "input", "bước này làm gì": "what this step does", "đầu ra": "output", "vòng lặp / auto-fix": "loop / auto-fix", "tuỳ chọn / resume": "optional / resume", "Nét đứt vàng = bước của người · hover để lần theo · click node xem chi tiết · kéo để cuộn": "Yellow dashed = human step · hover to trace · click a node for details · drag to scroll", "Đóng": "Close", "Vai trò": "Role", "Input chi tiết": "Input details", "Output chi tiết": "Output details", "Ghi chú": "Notes", "Liên quan": "Related", "↗ Mở tab": "↗ Open tab", "cột": "column", "luật": "rule", "✓ Hết luồng — AI không tự push / merge, Done do dev": "✓ End of flow — AI never pushes or merges on its own; Done is the dev’s call", " — AI dừng, chờ dev": " — AI stops, waiting for the dev", "duyệt · quyết · push · merge": "approve · decide · push · merge", "điều phối, sửa code, gọi tool": "orchestrates, edits code, calls tools", "agent chuyên trách, trả báo cáo": "specialist agent, returns a report", "chạy cơ học — không có output thật thì không qua": "mechanical — no real output, no pass", "giao design, ghi buglist": "delivers design, logs bugs", "file / ticket / sheet": "file / ticket / sheet", "SDLC làm việc với AI — Frontend": "SDLC with AI — Frontend", "Dev giữ 5 cổng quyết định · AI không tự đẩy code ra ngoài": "Devs own 5 decision gates · AI never ships code on its own", "Lệnh slash": "Slash command", "Cổng người": "Human gate", "Cổng kiểm cơ học": "Mechanical check", "Bước": "Step", "Rẽ nhánh / kết thúc": "Branch / end", "PHIÊN CLAUDE": "CLAUDE SESSION", "Phiên Claude": "Claude session", "KẾT QUẢ": "RESULT", "Tổng quan": "Overview", "SDLC với AI": "SDLC with AI", "AI = Claude Code chạy trong terminal, gắn bộ công cụ và bộ luật riêng của FE. AI làm từ nhận việc tới fix bug QC; dev giữ 5 cổng quyết định và AI không bao giờ tự đẩy code ra ngoài.": "AI = Claude Code running in the terminal, wired with FE's own tools and rules. AI handles everything from picking up work to fixing QC bugs; dev holds 5 decision gates and AI never pushes code out on its own.", "7 giai đoạn · 5 cổng người": "7 phases · 5 human gates", "Nhận việc": "Pick up work", "🤖 /daily": "🤖 /daily", "Cổng 1": "Gate 1", "👤 duyệt kế hoạch": "👤 approve plan", "Design → asset": "Design → asset", "🤖 bóc design": "🤖 extract design", "🤖 /code-developer": "🤖 /code-developer", "Tự kiểm": "Self-check", "⚙ build + cổng máy": "⚙ build + machine gate", "Cổng 2–4": "Gate 2–4", "👤 diff · push · merge": "👤 diff · push · merge", "🤖 /bug-fixer-lite": "🤖 /bug-fixer-lite", "Chốt & học": "Wrap & learn", "🤖 /daily wrap": "🤖 /daily wrap", "Cổng 5": "Gate 5", "👤 Done Jira": "👤 Done in Jira", "Nguồn việc": "Work sources", "Jira · chat/mail · buglist QC": "Jira · chat/mail · QC buglist", "PM giao việc, QC ghi bug": "PM assigns work, QC logs bugs", "Việc cần làm": "Work to do", "Việc tới từ 3 cửa: ticket Jira project GW, PM nhắn chat/mail, và buglist QC trên Google Sheets sau khi bàn giao.": "Work comes through 3 doors: Jira tickets in project GW, PM messages via chat/mail, and the QC buglist on Google Sheets after handoff.", "GĐ1 · Nhận việc": "Phase 1 · Pick up work", "Commit git thật": "Real git commits", "Quét Jira, bóc brief, dò design": "Scan Jira, extract brief, check design", "Suy tiến độ từ commit": "Infer progress from commits", "Kế hoạch ngày chờ duyệt": "Daily plan awaiting approval", "Điều phối ngày: quét Jira, đọc sâu ticket mới / đổi, suy tiến độ từ commit thật (không tin trạng thái ticket), rồi trình kế hoạch để duyệt một lần.": "Runs the day: scans Jira, reads new/changed tickets in depth, infers real progress from actual commits (not ticket status), then presents a plan for approval once.", "Duyệt kế hoạch": "Approve plan", "Kế hoạch ngày": "Daily plan", "Dev sửa thứ tự / phạm vi": "Dev adjusts order / scope", "Kế hoạch đã duyệt": "Approved plan", "AI trình kế hoạch rồi DỪNG. Dev duyệt xong, /daily mới tự chạy từng việc theo kế hoạch.": "AI presents the plan then STOPS. Once dev approves, /daily runs each task in the plan automatically.", "GĐ2 · bóc design": "Phase 2 · extract design", "Soát đủ chưa, thiếu thì đòi PM": "Check if complete, request PM if missing", "Bóc PSD / Figma / video": "Extract PSD / Figma / video", "Tải design về kho ticket, bóc thành asset + toạ độ đã verify. Không cắt tay, không đoán toạ độ.": "Download design into the ticket's folder, extract into assets + verified coordinates. No manual cutting, no guessed coordinates.", "GĐ3 · Code": "Phase 3 · Code", "Spec + asset đã bóc": "Spec + extracted assets", "Bộ luật rules/": "Rules in rules/", "Chọn làn theo quy mô": "Pick a lane by scope", "Code trong hàng rào hook": "Code inside the hook guardrail", "Code đã sửa": "Code changed", "Nạp đúng luật của file sắp chạm, chọn làn sửa vặt / quick / mid / full / bug. Mọi lệnh đi qua hàng rào hook.": "Load the right rules for the file about to be touched, pick a lane: tiny fix / quick / mid / full / bug. Every command passes through the hook guardrail.", "GĐ4 · build + cổng máy": "Phase 4 · build + machine gate", "Build thật, chặn asset thiếu": "Real build, blocks missing assets", "Đối chiếu UI trên browser thật": "Compare UI on a real browser", "PASS, hoặc FAIL kèm file:dòng": "PASS, or FAIL with file:line", "Cổng cơ học: phải có output lệnh thật mới qua, không nhận câu “chắc ổn rồi”.": "Mechanical gate: only real command output can pass — “probably fine” doesn't count.", "Duyệt diff": "Approve diff", "Cổng 2": "Gate 2", "git diff + báo cáo tự kiểm": "git diff + self-check report", "Dev đọc diff": "Dev reads the diff", "Diff đã duyệt": "Diff approved", "hoặc trả về sửa": "or sent back for fixes", "Dev đọc diff và bằng chứng tự kiểm. Chưa đạt thì trả về GĐ3 kèm lý do.": "Dev reads the diff and the self-check evidence. If not good enough, it goes back to Phase 3 with a reason.", "Commit · push · MR": "Commit · push · MR", "Cổng 3 push · Cổng 4 merge": "Gate 3 push · Gate 4 merge", "AI commit, ghi AI đồng tác giả": "AI commits, credits itself as co-author", "Dev ra lệnh push, dev bấm Merge": "Dev orders the push, dev clicks Merge", "MR đã merge": "MR merged", "HTML bàn giao backend": "HTML handed off to backend", "AI tự commit đúng chuẩn. Push luôn hỏi dev từng lần. Merge do dev bấm. Sau đó bàn giao HTML sang repo backend.": "AI commits by the convention itself. Push always asks dev each time. Merge is done by dev. Then HTML is handed off to the backend repo.", "GĐ6 · QC & bug": "Phase 6 · QC & bugs", "Buglist QC trên Google Sheets": "QC buglist on Google Sheets", "Lọc bug của FE": "Filter bugs that belong to FE", "Nhiều AI fix song song": "Multiple AIs fix in parallel", "Radar thấy bug mới → triage phút đầu, bug không thuộc FE thì ghi note chuyển đúng người, bug của FE thì fix song song theo cụm file.": "Radar spots a new bug → triage in the first minute, bugs not owned by FE get a note routing them to the right person, FE bugs get fixed in parallel by file cluster.", "GĐ7 · /daily wrap": "Phase 7 · /daily wrap", "Kết quả trong ngày": "Results for the day", "Audit trước production": "Audit before production", "Chốt ngày, ghi bài học": "Wrap the day, log lessons", "Metrics từ commit": "Metrics from commits", "Audit trước production, chốt ngày bằng metrics đo từ commit, ghi sổ bài học để task sau không lặp lỗi.": "Audit before production, wrap the day with metrics measured from commits, log lessons so later tasks don't repeat the same mistake.", "Đánh Done Jira": "Mark Done in Jira", "Bằng chứng bàn giao": "Handoff evidence", "Dev chuyển ticket": "Dev moves the ticket", "AI không ghi ngược Jira. Chỉ dev đánh Done, khi đã có bằng chứng bàn giao.": "AI never writes back to Jira. Only dev marks Done, once there's handoff evidence.", "Bộ luật + hàng rào": "Rules + guardrail", "rules/ R-* · hooks/": "rules/ R-* · hooks/", "Bài học đã ghi sổ": "Lessons already logged", "MUST chặn, SHOULD cảnh báo": "MUST blocks, SHOULD warns", "Hook chặn ngay ở tầng harness": "Hooks block right at the harness layer", "Luật áp cho mọi task sau": "Rules apply to every task after", "Luật có mã trong <code>rules/</code> (R-PM, R-CDN, R-JS, R-CS…). Luật quan trọng được nâng thành hook chặn cơ học, không phụ thuộc AI có nhớ hay không.": "Coded rules live in <code>rules/</code> (R-PM, R-CDN, R-JS, R-CS…). Important rules get promoted to mechanical blocking hooks, independent of whether AI remembers.", "✓ Duyệt": "✓ OK", "✓ PASS": "✓ PASS", "hết bug": "no more bugs", "nạp trước khi sửa": "load before editing", "sửa": "fix", "FAIL · file:dòng": "FAIL · file:line", "chưa đạt": "not good enough", "còn bug FE": "FE bugs remain", "bài học → luật": "lesson → rule", "Dev giữ 5 cổng": "Dev holds 5 gates", "Duyệt kế hoạch · duyệt diff · ra lệnh push · bấm Merge · đánh Done Jira. Ngoài 5 cổng AI chạy một mạch, nhưng không bao giờ tự đẩy code ra ngoài.": "Approve plan · approve diff · order the push · click Merge · mark Jira Done. Outside these 5 gates AI runs straight through, but never pushes code out on its own.", "Cổng máy không nhận lời hứa": "Machine gates don't take promises", "Mọi câu “xong / pass” phải kèm lệnh đã chạy thật và output. Chưa chạy thì báo “chưa verify”.": "Every “done / pass” claim needs a real command run and its output. Not run yet → say “not verified”.", "Luật có mã": "Coded rules", "Chi tiết ở <code>rules/</code>: MUST chặn, SHOULD cảnh báo. Báo lỗi thì trích mã luật (<code>R-PM-3 MUST</code>) thay vì diễn giải lại.": "Details in <code>rules/</code>: MUST blocks, SHOULD warns. When reporting an error, cite the rule code (<code>R-PM-3 MUST</code>) instead of restating it.", "Bài học thành luật": "Lessons become rules", "Lỗi lặp lại được ghi sổ → nâng thành luật → nâng tiếp thành hook chặn cơ học. Task sau tự hưởng.": "A repeated mistake gets logged → promoted to a rule → promoted further to a mechanical blocking hook. Later tasks inherit it for free.", "GĐ1": "Phase 1", "Mỗi sáng /daily quét Jira, đọc sâu ticket mới hoặc vừa đổi, suy tiến độ từ commit thật rồi trình kế hoạch ngày. Dev duyệt một lần, AI tự chạy tới cổng kế tiếp.": "Every morning /daily scans Jira, reads new or just-changed tickets in depth, infers progress from real commits, then presents the day's plan. Dev approves once, AI runs on to the next gate.", "plan · prep · add · link · wrap": "plan · prep · add · link · wrap", "chỉ đọc Jira": "Jira read-only", "nối commit ↔ ticket": "link commit ↔ ticket", "Ticket được giao cho dev": "Tickets assigned to dev", "AI chỉ đọc, không ghi ngược": "AI only reads, never writes back", "Danh sách ticket": "Ticket list", "Nguồn việc chính. /daily chỉ ĐỌC Jira qua Atlassian MCP, không bao giờ ghi ngược.": "Main work source. /daily only READS Jira via Atlassian MCP, never writes back.", "Chat / mail của PM": "PM's chat / mail", "việc ngoài Jira": "work outside Jira", "Tin nhắn PM": "PM message", "Dev thêm vào board": "Dev adds it to the board", "Việc thủ công": "Manual work item", "Việc không có ticket: dev thêm tay bằng <code>/daily add</code> hoặc nối vào ticket có sẵn bằng <code>/daily link</code>.": "Work with no ticket: dev adds it by hand with <code>/daily add</code>, or links it to an existing ticket with <code>/daily link</code>.", "Bug QC ghi sau bàn giao": "Bugs QC logs after handoff", "Radar theo dõi thay đổi": "Radar watches for changes", "Bug mới / đổi / reopen": "New / changed / reopened bugs", "Sau bàn giao, <code>/daily bugwatch</code> canh buglist. Luồng xử lý chi tiết ở tab QC & học.": "After handoff, <code>/daily bugwatch</code> watches the buglist. Full handling flow is in the QC & learn tab.", "quét + điều phối ngày": "scan + run the day", "Jira + việc tay + buglist": "Jira + manual work + buglist", "Lọc ticket MỚI / ĐỔI / CÒN DỞ": "Filter NEW / CHANGED / IN-PROGRESS tickets", "Bỏ qua ticket không đổi": "Skip unchanged tickets", "Danh sách cần đọc sâu": "List to read in depth", "Chỉ đọc sâu ticket mới, vừa đổi hoặc còn dở. Phần cơ học (git, cửa sổ quét) do script <code>delta-scan</code> làm sẵn để tiết kiệm token.": "Only reads deeply into tickets that are new, just changed, or still in progress. The mechanical part (git, scan window) is pre-done by the <code>delta-scan</code> script to save tokens.", "Đọc sâu ticket": "Read ticket in depth", "brief · docx · link DESIGN": "brief · docx · DESIGN link", "Mô tả ticket + file đính kèm": "Ticket description + attachments", "Bóc yêu cầu, loại promotion": "Extract requirements, promotion type", "Tìm link DESIGN trong ticket": "Find the DESIGN link in the ticket", "Brief đã bóc": "Extracted brief", "Trạng thái design": "Design status", "Link DESIGN trong ticket là nguồn số 1 để biết design đã giao chưa.": "The DESIGN link in the ticket is the #1 source for whether design has been delivered.", "Search SharePoint trả rỗng KHÔNG phải bằng chứng design chưa giao.": "An empty SharePoint search is NOT proof that design hasn't been delivered.", "không tin trạng thái ticket": "don't trust ticket status", "git log các repo": "git log across repos", "Commit có mã ticket": "Commits with the ticket code", "Nối commit ↔ ticket": "Link commit ↔ ticket", "Suy phase thật": "Infer the real phase", "Phase thật của từng task": "Real phase of each task", "Trạng thái ticket hay bị trễ so với thực tế. Phase được suy từ commit đã có: chưa code, đang dựng, đã bàn giao…": "Ticket status is often behind reality. Phase is inferred from existing commits: not coded yet, in progress, already handed off…", "Brief + phase thật": "Brief + real phase", "Xếp thứ tự, ước lượng": "Order tasks, estimate", "Cập nhật board + dashboard": "Update board + dashboard", "Kế hoạch chờ duyệt": "Plan awaiting approval", "Kế hoạch trình dạng bảng. Board và dashboard được sinh từ <code>state.json</code> bằng script, không viết tay.": "Plan presented as a table. Board and dashboard are generated from <code>state.json</code> by script, never hand-written.", "hoặc duyệt nguyên": "or approve as-is", "Duyệt MỘT lần cho cả ngày. Sau đó AI tự chạy từng việc, chỉ dừng lại ở các cổng người phía sau.": "Approve ONCE for the whole day. After that AI runs each task on its own, only stopping at the human gates further down.", "Tự chạy theo kế hoạch": "Runs the plan automatically", "prep design → code": "prep design → code", "/daily prep <KEY> từng ticket": "/daily prep <KEY> per ticket", "Việc chạy tới cổng kế tiếp": "Task runs to the next gate", "<code>/daily prep &lt;KEY&gt;</code> tải và bóc design, rồi giao code qua <code>/code-developer</code>. /daily không commit, không push.": "<code>/daily prep &lt;KEY&gt;</code> downloads and extracts design, then hands off code via <code>/code-developer</code>. /daily doesn't commit, doesn't push.", "MỚI / ĐỔI": "NEW / CHANGED", "Dev ở đâu": "Where's dev", "Chỉ duyệt kế hoạch một lần. Việc ngoài Jira thì dev tự thêm bằng /daily add.": "Only approves the plan once. Work outside Jira gets added by dev with /daily add.", "Chỉ đọc": "Read-only", "/daily không ghi ngược Jira, không commit, không push. Đánh Done Jira là việc của dev (Cổng 5).": "/daily never writes back to Jira, never commits, never pushes. Marking Jira Done is dev's job (Gate 5).", "Design đã giao chưa?": "Has design been delivered?", "Đọc link DESIGN trong ticket trước. Search SharePoint trả rỗng không có nghĩa là chưa giao.": "Read the DESIGN link in the ticket first. An empty SharePoint search doesn't mean it hasn't been delivered.", "Tiến độ = commit": "Progress = commits", "Phase suy từ commit thật, không từ trạng thái ticket, nên board không bị lệch với thực tế.": "Phase is inferred from real commits, not ticket status, so the board never drifts from reality.", "GĐ2": "Phase 2", "Tải design về kho ticket, soát đủ để dựng chưa (thiếu thì soạn sẵn nội dung đòi PM), rồi bóc theo đúng nguồn: PSD qua Photoshop, Figma qua API, video thành text/số. Kết quả là asset + toạ độ đã verify, không cắt tay.": "Download design into the ticket's folder, check whether it's enough to build (if not, draft a message to request more from PM), then extract by source: PSD via Photoshop, Figma via API, video into text/numbers. Result is assets + verified coordinates, no manual cutting.", "bóc PSD / PSB": "extract PSD / PSB", "token riêng máy": "machine-local token", "tải file SharePoint": "download SharePoint file", "Ticket đã vào kế hoạch": "Ticket already in the plan", "Kiểm tra đã có link chưa": "Check whether a link exists", "Link trong ticket là nguồn sự thật. Chưa có link → đi nhánh đòi PM.": "The link in the ticket is the source of truth. No link yet → go down the request-PM branch.", "Tải design": "Download design", "về kho của ticket": "into the ticket's folder", "Mở link tải qua trình duyệt": "Open the download link in a browser", "Giải nén vào kho ticket": "Unzip into the ticket's folder", "File PSD / Figma / video / ảnh": "PSD / Figma / video / image file", "Tải bằng trình duyệt đã đăng nhập (đã verify với file 382MB), không cần extension.": "Downloaded via a logged-in browser (verified with a 382MB file), no extension needed.", "Nhận diện nguồn": "Identify the source", "PSD · Figma · video · ảnh": "PSD · Figma · video · image", "Chọn đúng công cụ bóc": "Pick the right extraction tool", "Chuyển sang nhánh tương ứng": "Move to the matching branch", "Mỗi nguồn một công cụ. Cấm cắt tay bằng sips hay ước toạ độ bằng mắt.": "One tool per source. Cutting by hand with sips or eyeballing coordinates is forbidden.", "survey → plan → export": "survey → plan → export", "gate + trim cùng lượt xanh": "gate + trim green in the same run", "Bóc PSD một lệnh. <code>coords.json</code> chỉ được ghi khi gate và trim cùng xanh trong một lượt.": "Extracts PSD with one command. <code>coords.json</code> is only written when gate and trim are both green in the same run.", "tree → plan → render": "tree → plan → render", "text vùng data-bind lấy textLive": "data-bind text areas use textLive", "Bóc Figma qua REST API (không phải MCP). Vùng chữ gắn dữ liệu lấy <code>textLive</code> thay vì ảnh.": "Extracts Figma via REST API (not MCP). Data-bound text areas use <code>textLive</code> instead of an image.", "video → text / số": "video → text / numbers", "Script bóc frame, đo chuyển động": "Script extracts frames, measures motion", "Motion spec / buglist nháp": "Motion spec / draft buglist", "Không ném frame thô vào model: một clip 12 phút ≈ 34 triệu vision token. Script nghiền trước, AI đọc bản đã nghiền.": "Don't throw raw frames at the model: a 12-minute clip ≈ 34 million vision tokens. Script digests it first, AI reads the digest.", "Ảnh PNG / JPG": "PNG / JPG image", "dùng trực tiếp": "used directly", "Ảnh design phẳng": "Flat design image", "Không cần bóc": "No extraction needed", "Ảnh tham chiếu": "Reference image", "Ảnh phẳng dùng làm tham chiếu; design-analyst sẽ chuyển thành spec ở GĐ3.": "A flat image used as reference; design-analyst turns it into a spec in Phase 3.", "Spec đã bóc": "Extracted spec", "Output các nhánh": "Output of all branches", "Gom về một chỗ": "Gathered in one place", "Mọi toạ độ về sau đều lấy từ <code>coords.json</code>, không đo lại trên ảnh.": "Every coordinate from here on comes from <code>coords.json</code>, never re-measured on an image.", "đủ để dựng chưa?": "enough to build yet?", "Soát đủ màn, đủ trạng thái": "Check enough screens, enough states", "Popup, state ô quà, mobile": "Popups, reward-box states, mobile", "Báo cáo đủ / thiếu": "Report complete / missing", "Soát design có đủ màn, đủ trạng thái mà brief đòi không. Thiếu thì xuất sẵn block gửi PM.": "Checks whether design has all the screens and states the brief calls for. If missing, drafts a block to send PM.", "Soạn nội dung đòi PM": "Draft a request to PM", "block gửi PM": "message block for PM", "Danh sách thiếu": "List of what's missing", "Liệt kê màn / trạng thái thiếu": "List missing screens / states", "Tin nhắn sẵn để gửi": "Ready-to-send message", "AI soạn sẵn, dev gửi. Không tự đoán design còn thiếu.": "AI drafts it, dev sends it. Never guesses what design is still missing.", "Chờ PM / Designer": "Waiting on PM / Designer", "giao bổ sung": "delivers the rest", "Tin nhắn đòi design": "Design request message", "PM / designer bổ sung": "PM / designer adds the rest", "Link design mới": "New design link", "Giai đoạn chờ bên ngoài. /daily designwatch canh khi nào design mới được giao.": "An external waiting stage. <code>/daily designwatch</code> watches for when new design gets delivered.", "Sang GĐ3 Code": "On to Phase 3 Code", "spec + asset sẵn sàng": "spec + assets ready", "Spec đã đủ": "Spec is complete", "Bắt đầu code": "Start coding", "Mở tab Code.": "Open the Code tab.", "đã có link": "link exists", "ảnh": "image", "✓ Đủ": "✓ Ready", "chưa giao": "not delivered yet", "thiếu": "missing", "PM giao bổ sung": "PM delivers the rest", "Không cắt tay": "No manual cutting", "Có PSD / Figma chưa bóc thì chạy /psd-cut hoặc /figma-cut TRƯỚC khi code. Toạ độ luôn lấy từ coords.json.": "Have a PSD / Figma not yet extracted? Run /psd-cut or /figma-cut FIRST before coding. Coordinates always come from coords.json.", "Video phải nghiền trước": "Video must be digested first", "Video QC, animation, tutorial đi qua /video-digest. Cấm ném frame thô vào model.": "QC video, animation, tutorial go through /video-digest. Throwing raw frames at the model is forbidden.", "Thiếu thì đòi, không đoán": "Request what's missing, don't guess", "/check-design soạn sẵn nội dung đòi PM. Design thiếu trạng thái ô quà thì suy ra và BÁO dev.": "/check-design drafts the request to PM. If reward-box states are missing from design, infer them and REPORT to dev.", "GĐ3": "Phase 3", "Nạp đúng luật của file sắp chạm, rồi chọn làn theo quy mô: sửa vặt làm thẳng, việc nhỏ một mình phiên Claude, việc vừa thêm một dev AI, việc lớn đủ 3 AI phân tích · code · đối chiếu. Bug thì truy nguyên nhân gốc trước. Mọi lệnh đi qua hàng rào hook.": "Load the rules for the file about to be touched, then pick a lane by scope: tiny fix done straight, small work solo in the Claude session, medium work adds one AI dev, large work gets all 3 AIs — analyze · code · compare. For bugs, trace the root cause first. Every command passes through the hook guardrail.", "quick · mid · full · fix": "quick · mid · full · fix", "khoá gameplay": "lock gameplay", "làn full · 3 subagent": "full lane · 3 subagents", "từ GĐ2": "from Phase 2", "brief đã bóc": "extracted brief", "Đầu vào của GĐ3": "Input to Phase 3", "Việc cần code": "Work to code", "Mở tab Design để xem cách bóc.": "Open the Design tab to see how extraction works.", "Nạp luật trước khi sửa": "Load rules before editing", "rules/ theo file chạm tới": "rules/ matching the file touched", "Đường dẫn file sắp sửa": "Path of the file about to change", "pm__ → file dự án + khoá gameplay": "pm__ → project file + lock gameplay", "cdn-source → R-CDN · R-JS · R-STR": "cdn-source → R-CDN · R-JS · R-STR", "Bộ luật áp cho task": "Rules that apply to the task", "Chỉ nạp luật của vùng sắp chạm, không nạp sẵn cho chắc.": "Only load the rules for the area about to be touched, never preload everything just in case.", "Landing có <code>pm__</code>: <code>project-note path</code> → đọc file dự án → khoá gameplay TRƯỚC dòng code đầu tiên (R-PM-11).": "Landing with <code>pm__</code>: <code>project-note path</code> → read the project file → lock gameplay BEFORE the first line of code (R-PM-11).", "Dựng list → R-LAY; ô nhận thưởng → đủ 3 trạng thái .off / .active / .received (R-ST).": "Building a list → R-LAY; reward box → all 3 states .off / .active / .received (R-ST).", "gate tín hiệu của task": "gate on the task's signals", "Mô tả việc + 1 lần grep": "Task description + one grep pass", "Đếm file, soát tín hiệu đỏ": "Count files, check for red flags", "Một trong 5 làn": "One of 5 lanes", "Tự chọn làn và báo một dòng, không chờ xác nhận. Dev gõ mode tường minh thì theo dev.": "Picks a lane on its own and reports it in one line, no waiting for confirmation. If dev names a mode explicitly, follow dev.", "Đang làm mà lộ tín hiệu đỏ → dừng, hỏi nâng làn. Không âm thầm gánh tiếp.": "Mid-task red flag appears → stop, ask to escalate the lane. Never quietly push through.", "Sửa vặt": "Tiny fix", "≤2 file, chỗ sửa đã rõ": "≤2 files, fix location already clear", "Chỗ sửa đã rõ": "Fix location already clear", "Làm thẳng trong phiên": "Done straight in the session", "Code + build thật": "Code + real build", "Không qua skill, không subagent, nhưng vẫn build thật để verify.": "No skill, no subagent, but still a real build to verify.", "Làn quick": "Quick lane", "≤4 file · 0 subagent": "≤4 files · 0 subagents", "Việc nhỏ, rõ": "Small, clear task", "Phiên Claude tự sửa": "Claude session fixes it itself", "0 subagent, 0 spec, 0 report. Verify = build một lần PASS.": "0 subagents, 0 spec, 0 report. Verify = one build PASS.", "Làn mid": "Mid lane", "1 AI code + phiên soát": "1 AI codes + session reviews", "Việc vừa, không tín hiệu đỏ": "Medium task, no red flags", "Phiên Claude verify": "Claude session verifies", "Code đã soát": "Code reviewed", "Một dev AI code, phiên chính tự verify, không cần checker.": "One AI dev codes, the main session verifies itself, no checker needed.", "Làn full": "Full lane", "dựng UI từ design": "build UI from design", "Ảnh design + coords.json": "Design image + coords.json", "Điều phối 3 subagent": "Coordinates 3 subagents", "Code khớp design": "Code matches design", "Dựng UI mới từ design, hoặc việc có tín hiệu đỏ.": "Building new UI from design, or a task with red flags.", "truy nguyên nhân gốc trước": "trace root cause first", "Mô tả bug / log": "Bug description / log", "Tái hiện → khoanh vùng → nguyên nhân": "Reproduce → narrow down → root cause", "Rồi mới đề xuất fix": "Only then propose a fix", "Fix đúng gốc": "Fix at the root", "Cấm vá triệu chứng. Chưa tìm ra nguyên nhân gốc thì chưa sửa.": "No patching symptoms. Root cause not found yet → not fixed yet.", "ảnh → Design Spec": "image → Design Spec", "Ảnh design đã cắt": "Cut design image", "Bóc layout, màu, font, trạng thái": "Extract layout, color, font, states", "Chuyển ảnh thành spec có cấu trúc — hợp đồng chung cho dev code theo và checker kiểm theo. Không viết code.": "Turns an image into a structured spec — a shared contract for dev to code against and checker to check against. Doesn't write code.", "spec → code": "spec → code", "Luật của repo": "Repo rules", "Tự build / lint": "Self build / lint", "Code theo spec, đọc knowledge để tránh lặp lỗi cũ. Dev Report phải có mục “Rules đã áp”.": "Codes to spec, reads knowledge to avoid repeating old mistakes. Dev Report must have a “Rules applied” section.", "Soát lệch trên browser thật": "Check drift on a real browser", "Danh sách lệch kèm file:dòng": "List of drift with file:line", "Chỉ báo lệch có dẫn chứng, không sửa code.": "Only reports drift with evidence, doesn't fix code.", "Hàng rào hook": "Hook guardrail", "chặn ở tầng harness": "blocks at the harness layer", "Mọi lệnh / file AI vừa ghi": "Every command / file AI just wrote", "Chặn lệnh huỷ hoại, đọc credential": "Blocks destructive commands, reading credentials", "Soát pm__, comment thừa": "Checks pm__, excess comments", "Cho qua / chặn kèm mã G-*": "Pass / block with a G-* code", "Hook chạy trên mọi lệnh, không phải lời khuyên. Bị chặn thì đọc mã G-* rồi đổi cách làm — không tìm đường lách.": "Hooks run on every command, not advice. Blocked → read the G-* code and change approach — don't look for a way around it.", "guard-bash: deny lệnh huỷ hoại + đọc credential; hỏi trước git / deploy / rm.": "guard-bash: deny destructive commands + reading credentials; asks before git / deploy / rm.", "guard-pm: file pm__ vừa ghi → chạy pm-gate, 🔴 là chặn.": "guard-pm: file pm__ just written → runs pm-gate, 🔴 blocks.", "guard-style: đếm comment đoạn vừa ghi (hook im ≠ đạt R-CS-1).": "guard-style: counts comments in the just-written block (hook silent ≠ passes R-CS-1).", "token-watch: context vượt ngưỡng → nhắc /clear.": "token-watch: context over threshold → nudges /clear.", "Sang GĐ4 Tự kiểm": "On to Phase 4 Self-check", "code đã sửa": "code changed", "Chạy cổng máy": "Run the machine gate", "Báo cáo tự kiểm": "Self-check report", "Mở tab Tự kiểm.": "Open the Self-check tab.", "vặt": "tiny", "nhỏ": "small", "vừa": "medium", "lớn": "large", "lệch → sửa": "drift → fix", "Luật trước, code sau": "Rules first, code second", "Chạm file pm__ phải khoá gameplay trước dòng code đầu (R-PM-11). pm__ / id / data-* là hợp đồng với JS platform: cấm đổi tên, cấm xoá lẻ.": "Touching a pm__ file requires locking gameplay before the first line of code (R-PM-11). pm__ / id / data-* are a contract with the JS platform: no renaming, no deleting individually.", "Làn chỉ nâng, không hạ": "Lanes only go up, never down", "Đang quick / mid mà lộ tín hiệu đỏ → dừng và hỏi nâng làn. Không tự hạ từ full xuống giữa chừng.": "In quick / mid and a red flag shows up → stop and ask to escalate the lane. Never downgrade from full partway through.", "Code intern đọc được": "Code an intern can read", "Comment tối giản, không phòng thủ thừa, tên thay comment. Cổng cuối: intern đọc một lượt có hiểu không (R-CS-7).": "Minimal comments, no excess defensiveness, names instead of comments. Final gate: can an intern read it in one pass and understand it (R-CS-7).", "Hook im ≠ đạt": "Hook silent ≠ passing", "Hook chỉ chặn lỗi đã biết. Không bị chặn không có nghĩa là đúng luật — vẫn phải qua GĐ4.": "Hooks only block known issues. Not blocked doesn't mean it follows the rules — still has to pass Phase 4.", "GĐ4": "Phase 4", "Trước khi đưa dev xem diff, AI phải qua một chuỗi cổng máy: build thật, chặn asset thiếu, đối chiếu UI trên browser thật với toạ độ design, soát popup theo loại chiến dịch, soát chất lượng code. FAIL thì quay lại sửa kèm file:dòng.": "Before showing dev the diff, AI must pass a chain of machine gates: real build, blocking missing assets, comparing UI on a real browser, checking popups by campaign type, checking code quality. FAIL sends it back to fix with file:line.", "từ GĐ3": "from Phase 3", "Đầu vào của GĐ4": "Input to Phase 4", "Chạy chuỗi cổng": "Run the gate chain", "Build thật": "Real build", "đọc log, không chỉ exit code": "read the log, not just exit code", "Lệnh build của repo": "Repo's build command", "Chạy build": "Run build", "Lọc error / warn trong log": "Filter error / warn in the log", "dist/ mới": "fresh dist/", "Build thật, đọc log. Không có output build thì không được nói “xong”.": "Real build, read the log. No build output means it can't be called “done”.", "font · ảnh 404 · dist cũ": "font · 404 image · stale dist", "Soát lỗi thiếu-vắng trên output": "Checks the output for missing-thing errors", "PASS / danh sách thiếu": "PASS / list of what's missing", "Lưới chặn lỗi “thiếu-vắng”: font thiếu, ảnh 404, dist cũ chưa build lại, asset trắng trơn.": "A net for “missing” errors: missing fonts, 404 images, stale dist not rebuilt, blank assets.", "browser thật vs coords.json": "real browser vs coords.json", "Mở PC 1920×1080, mobile 768×1024": "Opens PC 1920×1080, mobile 768×1024", "Đo lệch vị trí, chữ cắt, tràn ngang": "Measures position drift, cut-off text, horizontal overflow", "Báo cáo lệch": "Drift report", "--autofix sửa SCSS": "--autofix fixes SCSS", "Kiểm trên output build qua browser thật, không đọc source chay. <code>--autofix</code> tự sửa vị trí asset lệch rồi build + đo lại.": "Checks the built output through a real browser, not reading source cold. <code>--autofix</code> auto-fixes drifted asset positions then rebuilds + re-measures.", "landing có pm__": "landing with pm__", "pm-gate soát hook pm__": "pm-gate checks pm__ hooks", "/check-promotion soát đủ popup": "/check-promotion checks popup completeness", "Mã PG-* / bảng Pass-Fail": "PG-* code / Pass-Fail table", "Hai cổng bổ sung nhau: <code>pm-gate</code> soát hook pm__, <code>/check-promotion</code> soát đủ popup theo loại chiến dịch (không soát pm__).": "Two gates that complement each other: <code>pm-gate</code> checks pm__ hooks, <code>/check-promotion</code> checks popup completeness by campaign type (doesn't check pm__).", "campaign mới / clone": "new campaign / clone", "Campaign mới + landing cũ": "New campaign + old landing", "So landing cũ có mà mới thiếu": "Compares what the old landing has that the new one lacks", "Danh sách phải xử kèm file:dòng": "Must-fix list with file:line", "Campaign mới hoặc clone-reskin phải chạy trước khi báo xong. Class MS__ / MJ__ lạ là phải sửa.": "A new campaign or clone-reskin must run this before reporting done. Unfamiliar MS__ / MJ__ classes must be fixed.", "chất lượng code R-CS": "code quality R-CS", "Diff chưa commit": "Uncommitted diff", "Soát hợp đồng, trùng lặp, style": "Checks contract, duplication, style", "Landing mới: dọn bằng /clean-code": "New landing: clean up with /clean-code", "Báo cáo 2 tầng": "Two-tier report", "Soi 5 trục: hợp đồng platform, trùng lặp, đúng-sai khi chạy thật, dễ bảo trì, code-style R-CS.": "Checks 5 axes: platform contract, duplication, correctness at runtime, maintainability, code-style R-CS.", "đủ bằng chứng chưa": "enough evidence yet?", "Output các cổng": "Output of all gates", "Gom bằng chứng vào báo cáo": "Gather evidence into the report", "PASS → Cổng 2": "PASS → Gate 2", "FAIL → quay lại sửa": "FAIL → back to fix", "Báo cáo phải có mục <code>Bằng chứng:</code> — lệnh đã chạy + output.": "The report must have an <code>Evidence:</code> section — commands run + output.", "Sang Cổng 2": "On to Gate 2", "dev duyệt diff": "dev approves diff", "Trình diff cho dev": "Present the diff to dev", "Chờ dev duyệt": "Wait for dev approval", "Mở tab Duyệt & bàn giao.": "Open the Approve & handoff tab.", "có pm__": "has pm__", "campaign mới": "new campaign", "FAIL · file:dòng → sửa": "FAIL · file:line → fix", "Chưa chạy = chưa verify": "Not run = not verified", "Cấm nói “xong / pass” cho thứ chưa chạy. Báo cáo luôn có lệnh + output thật.": "Never say “done / pass” for anything not run. The report always has the command + real output.", "Quy ước màn hình": "Screen conventions", "PC 1920×1080, mobile 768×1024, PC → mobile reload đúng 1 lần. H5 chỉ kiểm ngang 1920×1080.": "PC 1920×1080, mobile 768×1024, PC → mobile reload exactly once. H5 only checks landscape 1920×1080.", "Cổng theo loại việc": "Gates by task type", "Landing pm__ thêm pm-gate + /check-promotion; campaign mới thêm landing-parity; list thêm layout-gate.": "pm__ landing adds pm-gate + /check-promotion; new campaign adds landing-parity; lists add layout-gate.", "Duyệt & bàn giao": "Approve & handoff", "GĐ5": "Phase 5", "Ba cổng người liền nhau: dev duyệt diff, dev ra lệnh push, dev bấm Merge. AI tự commit đúng chuẩn nhưng không bao giờ tự push hay tự merge. Cuối cùng bàn giao HTML sang repo backend.": "Three human gates in a row: dev approves diff, dev orders the push, dev clicks Merge. AI commits by convention but never pushes or merges on its own. Finally HTML is handed off to the backend repo.", "pull --autostash trước commit": "pull --autostash before commit", "cdn-source: dừng ở tạo MR": "cdn-source: stops at creating the MR", "PASS từ GĐ4": "PASS from Phase 4", "kèm bằng chứng": "with evidence", "Trình diff + bằng chứng": "Present diff + evidence", "Chờ dev": "Wait for dev", "Duyệt / trả về": "Approve / send back", "Dev đọc diff và bằng chứng. Chưa đạt thì trả về GĐ3 kèm lý do.": "Dev reads the diff and the evidence. If not good enough, sends it back to Phase 3 with a reason.", "Quay lại sửa": "Back to fix", "về GĐ3 Code": "back to Phase 3 Code", "Lý do chưa đạt": "Reason it's not good enough", "Sửa rồi qua lại GĐ4": "Fix then go through Phase 4 again", "Diff mới": "New diff", "AI tự làm, báo lại": "AI does it itself, reports back", "cdn-source: pull --autostash trước": "cdn-source: pull --autostash first", "Message đúng chuẩn repo": "Message follows repo convention", "Commit có AI đồng tác giả": "Commit with AI as co-author", "Commit AI được tự làm, không hỏi — nhưng gom đúng phạm vi project và báo lại đã commit gì.": "AI commits are self-run, no need to ask — but must stay scoped to the right project and report what got committed.", "Repo git VNG: Conventional Commits. Repo nội bộ: <code>[&lt;leaf-folder&gt;] English subject</code>.": "VNG git repos: Conventional Commits. Internal repos: <code>[&lt;leaf-folder&gt;] English subject</code>.", "Luôn có dòng Co-Authored-By của AI.": "Always has AI's Co-Authored-By line.", "Lệnh push": "Push command", "Cổng 3 · hỏi từng lần": "Gate 3 · asks every time", "Commit sẵn sàng": "Commit ready", "Dev gõ “push”": "Dev types “push”", "Được phép push": "Push allowed", "AI KHÔNG BAO GIỜ tự push. Mỗi lần push đều phải hỏi dev, duyệt lần trước không áp cho lần sau.": "AI NEVER pushes on its own. Every push has to ask dev, approval from last time doesn't carry over.", "Push + tạo MR": "Push + create MR", "nhánh riêng": "own branch", "Lệnh push của dev": "Dev's push order", "cdn-source: chạy git mr": "cdn-source: runs git mr", "Dừng ở bước tạo MR": "Stops at creating the MR", "Push nhánh riêng và tạo MR. Không tự merge.": "Pushes its own branch and creates an MR. Never merges.", "Bấm Merge": "Click Merge", "Cổng 4": "Gate 4", "Merge luôn là quyền của người.": "Merge is always the human's call.", "Bàn giao HTML": "Hand off HTML", "Bản build đã merge": "Merged build", "Chép HTML, URL CDN tuyệt đối": "Copy HTML, absolute CDN URLs", "Soát cả Promotion/ lẫn mainsite/": "Checks both Promotion/ and mainsite/", "Đưa HTML sang gt-promotion-template / new-mainsite. AI chỉ chép và đưa <code>git diff --stat</code>, dev tự commit ở hai repo này.": "Hands HTML off to gt-promotion-template / new-mainsite. AI only copies and gives <code>git diff --stat</code>, dev commits in these two repos themselves.", "Giữ nguyên <code>&lt;% MODULE_CONTENT %&gt;</code>.": "Keeps <code>&lt;% MODULE_CONTENT %&gt;</code> unchanged.", "new-mainsite không chạy được ở local → cấm nói “đã verify runtime” cho Twig.": "new-mainsite can't run locally → forbidden to say “runtime verified” for Twig.", "Chờ QC": "Wait for QC", "sang GĐ6": "on to Phase 6", "Bản đã bàn giao": "Handed-off build", "Buglist trên Sheets": "Buglist on Sheets", "Mở tab QC & học.": "Open the QC & learn tab.", "✓ push": "✓ push", "✓ Merge": "✓ Merge", "3 cổng liền nhau": "3 gates in a row", "Duyệt diff → ra lệnh push → bấm Merge. Cả ba đều do dev, AI dừng hẳn ở mỗi cổng.": "Approve diff → order the push → click Merge. All three are dev's; AI stops fully at each gate.", "Commit tự làm, push thì hỏi": "Commits itself, asks for push", "Commit không cần hỏi nhưng phải báo lại. Push hỏi dev từng lần, kể cả khi vừa được phép ở lần trước.": "Commit doesn't need to ask but must report back. Push asks dev every time, even right after being allowed last time.", "Bàn giao không commit hộ": "Handoff doesn't commit for dev", "Ở gt-promotion-template / new-mainsite AI chỉ đưa git diff --stat, dev tự commit và push.": "At gt-promotion-template / new-mainsite, AI only gives git diff --stat, dev commits and pushes themselves.", "QC & học": "QC & learn", "GĐ6–7": "Phase 6–7", "QC, bug và bài học": "QC, bugs and lessons", "QC ghi buglist lên Google Sheets. Radar lọc bug của FE, /bug-fixer-lite triage ngay phút đầu: bug không thuộc FE thì ghi note chuyển đúng người, bug của FE thì nhiều AI fix song song theo cụm file rồi ghi ngược Done lên sheet. Hết bug thì audit, chốt ngày và ghi bài học.": "QC logs the buglist on Google Sheets. Radar filters FE's bugs, /bug-fixer-lite triages in the first minute: bugs not owned by FE get a note routing them to the right person, FE bugs get fixed in parallel by multiple AIs by file cluster then written back as Done on the sheet. Once bugs run out, audit, wrap the day and log lessons.", "bugwatch · wrap": "bugwatch · wrap", "ghi sheet đứng tên dev": "writes to sheet under dev's name", "Dòng bug trên sheet": "Bug row on the sheet", "QC ghi bug lên Google Sheets. Bug có thể thuộc FE, backend, studio hoặc SDK.": "QC logs bugs on Google Sheets. Bugs can belong to FE, backend, studio or SDK.", "bug mới / đổi / reopen": "new / changed / reopened bug", "Quét định kỳ ở nền": "Scans periodically in the background", "Hàng đợi bug cần xử": "Queue of bugs to handle", "Radar nền gọi <code>/daily delta</code> trong phiên headless, phần tính toán thuần do <code>bug-radar</code> làm.": "Background radar calls <code>/daily delta</code> in a headless session, the pure computation is done by <code>bug-radar</code>.", "triage phút đầu": "triage in the first minute", "Hàng đợi bug": "Bug queue", "Phân loại theo vùng × loại bug": "Classify by area × bug type", "Chia cụm file không giao nhau": "Split into non-overlapping file clusters", "Rổ FIX / rổ chuyển người": "FIX basket / route-to-others basket", "Như một thành viên AI của team FE: chạy một lệnh là xong trọn trong phạm vi team, không cần dev trông.": "Like an AI member of the FE team: run one command and it's handled end-to-end within the team's scope, no dev needed to watch.", "Sổ ranh giới nhớ vùng nào đã bàn giao backend (FE chỉ còn quyền CSS/JS + text).": "A boundary log remembers which areas have already been handed off to backend (FE only keeps CSS/JS + text rights).", "bug không thuộc FE": "bug not owned by FE", "Bug của backend / studio / SDK": "Bug belongs to backend / studio / SDK", "Ghi note chuyển đúng người": "Note routing it to the right person", "Note trên sheet": "Note on the sheet", "Ghi sớm ngay sau khi triage để không mất khi rớt kết nối giữa phiên.": "Written early right after triage, so it isn't lost if the connection drops mid-session.", "bug-lane × N": "bug-lane × N", "fix song song theo cụm file": "fix in parallel by file cluster", "Một cụm bug + ranh giới sở hữu": "One bug cluster + ownership boundary", "Điều tra có bằng chứng": "Investigate with evidence", "Fix mọi nơi matching": "Fix everywhere it matches", "Dòng “Nơi đã sửa”": "“Where fixed” line", "Mỗi lane một cụm file không giao nhau, làm trọn trong 1 context. Fix đáp xuống mọi nơi: source local, HTML gt-promotion, Twig new-mainsite.": "Each lane owns one non-overlapping file cluster, done fully in 1 context. Fixes land everywhere matching: local source, gt-promotion HTML, new-mainsite Twig.", "design-checker cả list": "design-checker for the whole list", "Code của mọi lane": "Code from every lane", "Build một lần chung": "One shared build", "Verify cả danh sách một lượt": "Verify the whole list in one pass", "Bug đã verify": "Bugs verified", "Một build duy nhất, một lượt verify cho cả list để tiết kiệm thời gian và token.": "One build only, one verify pass for the whole list, to save time and tokens.", "Ghi ngược sheet": "Write back to sheet", "Ghi qua trình duyệt đã đăng nhập": "Written via a logged-in browser", "Sheet cập nhật": "Sheet updated", "Ghi qua extension Claude in Chrome trên trình duyệt mặc định của dev, edit đứng tên dev. Không webhook, không Apps Script.": "Writes via the Claude in Chrome extension on dev's default browser, edit lands under dev's name. No webhook, no Apps Script.", "Còn bug FE?": "FE bugs left?", "QC test lại": "QC re-tests", "Chờ QC test lại / reopen": "Wait for QC re-test / reopen", "Còn → vòng mới": "Remaining → new round", "Hết → chốt": "Done → wrap", "Lần chạy sau chỉ xử lý phần mới, đổi hoặc reopen.": "Next run only handles what's new, changed, or reopened.", "trước production": "before production", "Bản build cuối": "Final build", "SEO, meta, font, ảnh, Lighthouse": "SEO, meta, font, image, Lighthouse", "Danh sách tối ưu": "Optimization list", "Kiểm canonical, OG, robots, sitemap, preload font, Core Web Vitals trước khi lên production.": "Checks canonical, OG, robots, sitemap, preload font, Core Web Vitals before going to production.", "chốt ngày": "wrap the day", "Commit + board trong ngày": "Commits + board for the day", "Đo metrics từ commit": "Measure metrics from commits", "Báo cáo ngày": "Daily report", "Metrics đo từ commit thật, không từ cảm giác.": "Metrics measured from real commits, not by feel.", "Ghi sổ bài học": "Log lessons", "Lỗi / quyết định trong ngày": "Errors / decisions during the day", "Ghi điều không suy ra được từ code": "Log what can't be inferred from code", "Bài học mới": "New lesson", "Chỉ ghi điều không đọc được từ code hay git log.": "Only logs what can't be read from code or git log.", "Bài học → luật → hook": "Lesson → rule → hook", "áp cho mọi task sau": "applies to every task after", "Bài học lặp lại": "Repeated lesson", "Nâng thành luật có mã": "Promoted into a coded rule", "Nâng tiếp thành hook chặn": "Promoted further into a blocking hook", "Lỗi lặp lại lần hai thì thành luật; luật quan trọng thành hook chặn cơ học.": "A repeated mistake becomes a rule; an important rule becomes a mechanical blocking hook.", "Dev chuyển ticket Done": "Dev moves ticket to Done", "Bằng chứng bàn giao = đã push gt-promotion. AI không ghi ngược Jira.": "Handoff evidence = already pushed to gt-promotion. AI doesn't write back to Jira.", "không thuộc FE": "not owned by FE", "hết": "done", "còn · QC test lại": "remaining · QC re-test", "Triage phút đầu": "Triage in the first minute", "Bug không thuộc FE được ghi note chuyển người ngay, không đợi fix xong mới báo.": "Bugs not owned by FE get a routing note immediately, not after fixes are done.", "Song song theo cụm file": "Parallel by file cluster", "Mỗi bug-lane một cụm file không giao nhau → không đè code nhau, chỉ cần 1 build chung.": "Each bug-lane owns one non-overlapping file cluster → no code collisions, just one shared build.", "Sổ ranh giới": "Boundary log", "Vùng đã bàn giao backend chỉ sửa CSS/JS + text qua gt-promotion. Hỏi dev một lần, nhớ cho các lần sau.": "Areas already handed off to backend only get CSS/JS + text fixes via gt-promotion. Ask dev once, remember for next time.", "Vòng học": "Learning loop", "Bài học → luật → hook. Lần sau AI không cần “nhớ” — máy chặn luôn.": "Lesson → rule → hook. Next time AI doesn't need to “remember” — the machine blocks it automatically."};
+let LANG='vi'; try{ LANG=localStorage.getItem('fe-sdlc-lang')||'vi' }catch(e){}
+const tr=x=>(LANG==='en'&&typeof x==='string'&&EN[x]!=null)?EN[x]:x;
+
+
+const tabsEl=$('#tabs'), ind=tabsEl.querySelector('.ind');
+Object.entries(FLOWS).forEach(([k,f])=>{
+  const b=document.createElement('button');
+  b.dataset.k=k; b.style.setProperty('--tc',`var(${f.color})`);
+  b.innerHTML=`<span class="dot"></span><span class="tl">${tr(f.tab)}</span>`;
+  b.onclick=()=>go(k);
+  tabsEl.appendChild(b);
+});
+function moveInd(){const a=tabsEl.querySelector('button.active'); if(!a)return; ind.style.left=a.offsetLeft+'px'; ind.style.width=a.offsetWidth+'px';}
+
+function ipo(label,cls,arr){ if(!arr||!arr.length) return ''; return `<div class="ipo ${cls}"><span class="k ${cls}">${label}</span><ul>${arr.map(x=>`<li>${wb(tr(x))}</li>`).join('')}</ul></div>`; }
+function wb(s){return esc(s).replace(/([\/_.])(?=\S)/g,'$1<wbr>')}
+function esc(s){return String(s).replace(/&(?![a-z#0-9]+;)/gi,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function go(k){
+  if(!FLOWS[k]) k='overview';
+  stopPlay(); closePanel();
+  tabsEl.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.k===k));
+  moveInd();
+  try{history.replaceState(null,'','#'+k)}catch(e){}
+  render(k);
+}
+
+function chipColor(type){return {cmd:'--c-cmd',skill:'--c-skill',agent:'--c-agent',tool:'--c-step',check:'--c-check',end:'--c-end'}[type]||'--c-skill'}
+
+function render(k){
+  const f=FLOWS[k]; current={k,f}; PAD_T=f.padT||132;
+  const st=$('#stage'); st.innerHTML=''; st.className='stage'; void st.offsetWidth; st.className='stage';
+  st.style.setProperty('--h1',`var(${f.h[0]})`); st.style.setProperty('--h2',`var(${f.h[1]})`);
+
+  // hero
+  st.insertAdjacentHTML('beforeend',`<section class="hero"><div><h2>${tr(f.title)}${f.sep!=null?f.sep:' · '}<span>${tr(f.titleHi)}</span></h2><p>${tr(f.desc)}</p></div>
+    <div class="ctrl"><button class="iconbtn glass" id="playBtn">${tr('▶ Chạy luồng')}</button><button class="iconbtn glass" id="resetBtn">↺</button></div></section>`);
+
+  // stack header
+  const groups={Command:'⌘',Skill:'✦',Agent:'◉',Tool:'⚒',Script:'⚙',Hook:'⛨'};
+  let sh='<section class="stack">';
+  for(const [g,items] of Object.entries(f.stack)){
+    sh+=`<div class="sgroup glass"><h4>${groups[g]||''} ${g} <b>${items.filter(i=>i[1]!=='end').length}</b></h4><div class="chips">`;
+    for(const it of items){
+      const [name,type=(g==='Command'?'cmd':g==='Agent'?'agent':g==='Tool'?'tool':'skill'),extra]=it;
+      const small = extra ? (['fable','opus','sonnet'].includes(extra) ? `<small style="color:var(--m-${extra})">${extra}</small>` : `<small>${esc(tr(extra))}</small>`) : '';
+      sh+=`<span class="chip" data-ref="${esc(name)}" style="--cc:var(${type==='agent'?'--c-agent':chipColor(type)})">${esc(name)}${small}</span>`;
+    }
+    sh+='</div></div>';
+  }
+  st.insertAdjacentHTML('beforeend',sh+'</section>');
+
+  // lanes
+  if(f.lanes){
+    let lh='<section class="lanes glass"><span class="lt">'+tr(f.lanesTitle||'Trạng thái ticket · ai chuyển vào cột')+'</span>';
+    f.lanes.forEach(([n,who,h],i)=>{lh+=(i?'<span class="arr">→</span>':'')+`<span class="lane${h?' human':''}" data-lane="${n}">${tr(n)}<em>${tr(who)}</em></span>`});
+    if(f.reopen) lh+=`<span class="reopen">↩ ${tr(f.reopen)}</span>`;
+    st.insertAdjacentHTML('beforeend',lh+'</section>');
+  }
+
+  // actor bar
+  const cnt=k=>f.nodes.filter(n=>(n.a||'main')===k).length;
+  const acts=[['human',cnt('human')+cnt('both'),'duyệt · quyết · push · merge'],['main',cnt('main')+cnt('both'),'điều phối, sửa code, gọi tool'],['sub',cnt('sub'),'agent chuyên trách, trả báo cáo'],['bot',cnt('bot'),'chạy cơ học — không có output thật thì không qua'],['ext',cnt('ext'),'giao design, ghi buglist'],['none',cnt('none'),'file / ticket / sheet']];
+  st.insertAdjacentHTML('beforeend',`<section class="actors glass"><span class="lt">${tr('Ai làm bước này?')}</span>${acts.filter(a=>a[1]).map(([k,c,h])=>`<span class="actor" data-actor="${k}" style="--ac:var(${ACTORS[k].c})"><b>${ACTORS[k].ic}</b> ${tr(ACTORS[k].name)} <em>${c}</em><small>${tr(h)}</small></span>`).join('')}<span class="iohint"><span class="k in">IN</span> ${tr('đầu vào')} · <span class="k pr">PROCESS</span> ${tr('bước này làm gì')} · <span class="k out">OUT</span> ${tr('đầu ra')}</span></section>`);
+  st.querySelectorAll('.actor').forEach(ch=>{
+    const k=ch.dataset.actor;
+    ch.onmouseenter=()=>{focusSet(f.nodes.filter(n=>(n.a||'main')===k||(n.a==='both'&&(k==='human'||k==='main'))).map(n=>n.id)); ch.classList.add('hl')};
+    ch.onmouseleave=()=>{unfocus(); ch.classList.remove('hl')};
+  });
+
+  // canvas — dựng node trước, đo chiều cao thật, rồi mới xếp vị trí + vẽ cạnh
+  const maxC=Math.max(...f.nodes.map(n=>n.c)), maxR=Math.max(...f.nodes.map(n=>n.r));
+  const wrap=document.createElement('section'); wrap.className='canvas-wrap glass';
+  wrap.innerHTML=`<div class="toast" id="toast"></div><div class="sizer"><div class="canvas"><svg class="edges"><defs></defs></svg></div></div>`;
+  st.appendChild(wrap);
+  const canvas=wrap.querySelector('.canvas'), svg=wrap.querySelector('svg'), defs=svg.querySelector('defs');
+
+  const gapBefore=c=>Object.entries(f.gap||{}).reduce((t,[k,v])=>t+(+k<c?v:0),0);
+  const colX=c=>PAD_X+c*COL_W+gapBefore(c);
+  const pos={}; const byId={};
+  f.nodes.forEach((n,i)=>{
+    byId[n.id]=n;
+    const el=document.createElement('div');
+    const A=actorOf(n);
+    const io=['IN','OUT'];
+    el.className=`node ${n.type} act-${n.a||'main'}${n.link?' link':''}`; el.dataset.id=n.id; el.dataset.actor=n.a||'main';
+    el.style.cssText=`left:0;top:0;--nc:var(${n.a==='human'?'--c-gate':'--c-'+n.type});--ac:var(${A.c});animation-delay:${n.c*55+n.r*25}ms`;
+    el.innerHTML=`<span class="ap">${A.ic} ${tr(A.label)}</span><div class="hd"><div class="ic">${n.a==='human'?'👤':TYPES[n.type].ic}</div><div class="tx"><div class="t">${esc(tr(n.t))}</div>${n.s?`<div class="s">${esc(tr(n.s))}</div>`:''}</div></div>`+
+      `<div class="io">${ipo(io[0],'in',n.i)}${ipo('PROCESS','pr',n.p)}${ipo(io[1],'out',n.o)}</div>`+
+      (n.m?`<span class="mb" style="--mc:var(--m-${n.m})">${n.m}</span>`:'')+
+      (n.tr?`<span class="tb">§ ${esc(n.tr)}</span>`:'');
+    el.onmouseenter=()=>focusNode(n.id); el.onmouseleave=unfocus;
+    el.onclick=(ev)=>{ev.stopPropagation(); openPanel(n)};
+    n.el=el; canvas.appendChild(el);
+  });
+  NW=Math.ceil(Math.max(NW_MIN,...f.nodes.map(n=>n.el.querySelector('.t').scrollWidth+66))); COL_W=NW+76;
+  f.nodes.forEach(n=>n.el.style.width=NW+'px');
+  NH=Math.max(120,...f.nodes.map(n=>n.el.offsetHeight)); ROW_H=NH+50;
+  f.nodes.forEach(n=>{
+    const x=colX(n.c), y=PAD_T+n.r*ROW_H; pos[n.id]={x,y,n};
+    n.el.style.left=x+'px'; n.el.style.top=y+'px'; n.el.style.height=NH+'px';
+  });
+  const W=PAD_X*2+maxC*COL_W+NW+gapBefore(maxC+1), H=PAD_T+maxR*ROW_H+NH+(f.padB||PAD_B);
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  svg.setAttribute('width',W); svg.setAttribute('height',H); svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  current.wrap=wrap; current.canvas=canvas; current.W=W; current.H=H;
+
+  (f.bands||[]).forEach((b,i)=>{
+    const x=colX(b.c0)-(COL_W-NW)/2, w=colX(b.c1)-colX(b.c0)+COL_W;
+    canvas.insertAdjacentHTML('afterbegin',`<div class="band k-${b.k}${i%2?' alt':''}" data-lane="${esc(b.n)}" style="left:${x}px;width:${w}px;height:${H}px"><div class="bh"><b>${esc(tr(b.n))}</b><span>${esc(tr(b.who))}</span><small>${esc(tr(b.desc))}</small></div></div>`);
+  });
+  (f.groups||[]).forEach(g=>{
+    const x=colX(g.c0)-18, y=PAD_T+g.r0*ROW_H-40, w=colX(g.c1)-colX(g.c0)+NW+36, h=(g.r1-g.r0)*ROW_H+NH+58;
+    canvas.insertAdjacentHTML('afterbegin',`<div class="grp" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;--gc:var(${ACTORS[g.a].c})"><span>🤖 ${esc(tr(g.label))}</span></div>`);
+  });
+
+  canvas.insertBefore(svg,canvas.querySelector('.node'));
+  // edges
+  particles=[];
+  // Làn dọc cho cạnh đi tới: mỗi khe giữa 2 cột có nhiều làn; cạnh chung nguồn hoặc chung đích dùng chung làn
+  // (gộp thành bus), cạnh khác nhau tách làn → không có đoạn đường nào chồng lên nhau.
+  const laneX={}, portOut={}, portIn={};
+  {
+    const fw=f.edges.map((e,i)=>({e,i,A:pos[e[0]],B:pos[e[1]],kind:e[2]||'main'}))
+      .filter(o=>o.kind!=='loop' && o.B.n.c>o.A.n.c && o.A.n.r!==o.B.n.r);
+    const par={}; const find=x=>par[x]===x?x:(par[x]=find(par[x])); const uni=(x,y)=>{par[find(x)]=find(y)};
+    const occ=new Set(f.nodes.map(n=>n.c+','+n.r)), clear=(r,c0,c1)=>{for(let c=c0;c<=c1;c++) if(occ.has(c+','+r)) return false; return true};
+    // cạnh vượt nhiều cột: chọn khe sao cho đoạn ngang không xuyên qua node nằm giữa
+    fw.forEach(o=>{ const a=o.A.n, b=o.B.n; o.gap = b.c-a.c<=1 ? a.c : (clear(a.r,a.c+1,b.c-1) ? b.c-1 : (clear(b.r,a.c+1,b.c-1) ? a.c : b.c-1)); });
+    fw.forEach(o=>{par[o.i]=o.i; const dn=o.B.y>o.A.y;
+      o.oy=o.A.y+NH/2+(o.A.n.fork?0:(dn?10:-10)); o.iy=o.B.y+NH/2+(dn?-20:20); portOut[o.i]=o.oy; portIn[o.i]=o.iy; });
+    fw.forEach(o=>fw.forEach(q=>{ if(q.i<o.i && q.gap===o.gap && (q.e[0]===o.e[0]||q.e[1]===o.e[1])) uni(o.i,q.i) }));
+    const byGap={};
+    fw.forEach(o=>{ const r=find(o.i); (byGap[o.gap]=byGap[o.gap]||{}); (byGap[o.gap][r]=byGap[o.gap][r]||[]).push(o) });
+    Object.entries(byGap).forEach(([g,groups])=>{
+      // Thứ tự làn: nhóm có đoạn RA ở cùng độ cao với đoạn VÀO của nhóm khác phải nằm bên trái nhóm đó
+      // (đoạn ra ngắn, đoạn vào ngắn → hai đoạn ngang không đè nhau, chỉ còn giao cắt vuông góc).
+      const G=Object.values(groups), outY=u=>new Set(u.map(o=>o.oy)), inY=u=>new Set(u.map(o=>o.iy));
+      const before=(u,v)=>[...outY(u)].some(y=>inY(v).has(y));
+      const gs=[]; const left=[...G].sort((u,v)=>Math.min(...u.map(o=>o.A.y))-Math.min(...v.map(o=>o.A.y)));
+      while(left.length){ const k=left.findIndex(u=>!left.some(v=>v!==u&&before(v,u))); gs.push(...left.splice(k<0?0:k,1)); }
+      const x0=colX(+g)+NW+14, x1=colX(+g+1)-22, n=gs.length;
+      gs.forEach((grp,k)=>{
+        const fork=grp.some(o=>o.A.n.fork);
+        const x=fork? x1-10 : (n===1? (x0+x1)/2 : x0+(x1-x0)*k/(n-1));
+        grp.forEach(o=>laneX[o.i]=x);
+      });
+    });
+  }
+  // cạnh vòng lặp cùng đích / cùng nguồn: lệch nhau 12px để không trùng đoạn đứng
+  const loopRank={}, loopSrc={};
+  { const L=f.edges.map((e,i)=>({e,i})).filter(o=>(o.e[2]==='loop')||pos[o.e[1]].n.c<pos[o.e[0]].n.c);
+    const byT={}; L.forEach(o=>(byT[o.e[1]+'|'+(o.e[4]||'')]=byT[o.e[1]+'|'+(o.e[4]||'')]||[]).push(o));
+    const byT2={}; L.forEach(o=>{ const side=(o.e[4]==='right'?'up':(o.e[4]||'')); (byT2[o.e[1]+'|'+side]=byT2[o.e[1]+'|'+side]||[]).push(o) });
+    Object.values(byT2).forEach(arr=>{ const keys=[...new Set(arr.map(o=>pos[o.e[0]].n.c))].sort((x,y)=>y-x); arr.forEach(o=>loopRank[o.i]=keys.indexOf(pos[o.e[0]].n.c)); }); }
+  const edges=f.edges.map((e,i)=>{
+    const [a,b,kind='main',label,arc,at]=e; const A=pos[a], B=pos[b];
+    let d, lp;
+    const ca=`var(--c-${A.n.type})`, cb=`var(--c-${B.n.type})`;
+    if(kind==='loop' || B.n.c<A.n.c){
+      // vòng lặp: đường vuông góc bo góc, đi phía trên hàng 0 (up) hoặc dưới node (down)
+      if(arc==='right'){ // đi lên theo khe bên PHẢI node nguồn rồi nhập vào vòng lặp phía trên (bus chung tới cùng đích)
+        const rb=loopRank[i]||0, R=12, span=Math.abs(A.n.c-B.n.c)||1;
+        const x0=A.x+NW, y0=A.y+NH/2+38, xr=A.x+NW+16, x2=B.x+NW/2+14+rb*14;
+        const pk=Math.max(f.bands?92:12,PAD_T-20-span*16);
+        d=`M${x0},${y0} H${xr-R} Q${xr},${y0} ${xr},${y0-R} V${pk+R} Q${xr},${pk} ${xr-R},${pk} H${x2+R} Q${x2},${pk} ${x2},${pk+R} V${B.y}`;
+      } else {
+      const up=(arc||(A.n.r===0?'up':'down'))==='up';
+      const ka=loopSrc[a]=(loopSrc[a]||0)+1, rb=loopRank[i]||0;
+      const x1=A.x+NW/2-14-(ka-1)*14, x2=B.x+NW/2+14+rb*14, sg=Math.sign(x2-x1)||-1, R=12;
+      const span=Math.abs(A.n.c-B.n.c)||1;
+      const y1=up?A.y:A.y+NH, y2=up?B.y:B.y+NH;
+      const pk=up?Math.max(f.bands?92:12,PAD_T-20-span*16):Math.max(y1,y2)+20+span*16, v=up?1:-1;
+      d=`M${x1},${y1} V${pk+R*v} Q${x1},${pk} ${x1+R*sg},${pk} H${x2-R*sg} Q${x2},${pk} ${x2},${pk+R*v} V${y2}`;
+      }
+    } else if(B.n.c===A.n.c){
+      const down=B.n.r>A.n.r, x=A.x+NW/2;
+      const y1=down?A.y+NH:A.y, y2=down?B.y:B.y+NH; d=`M${x},${y1} V${y2}`;
+    } else {
+      const x1=A.x+NW, x2=B.x-2, y1=portOut[i]!=null?portOut[i]:A.y+NH/2, y2=portIn[i]!=null?portIn[i]:B.y+NH/2;
+      if(Math.abs(y2-y1)<1) d=`M${x1},${y1} H${x2}`;
+      else { // vuông góc bo góc: ngang → làn dọc → ngang vào node (đoạn cuối thẳng → mũi tên thẳng hàng)
+        const xm=laneX[i]!=null?laneX[i]:(x1+x2)/2, R=Math.min(12,Math.abs(y2-y1)/2), v=Math.sign(y2-y1);
+        d=`M${x1},${y1} H${xm-R} Q${xm},${y1} ${xm},${y1+R*v} V${y2-R*v} Q${xm},${y2} ${xm+R},${y2} H${x2}`; // bo tròn góc
+        if(A.n.fork) e.forkLab={x:xm-6,y:y2};
+      }
+    }
+    const gid=`g${k}${i}`, mid=`m${k}${i}`;
+    defs.insertAdjacentHTML('beforeend',`<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="${A.x+NW/2}" y1="${A.y}" x2="${B.x+NW/2}" y2="${B.y}"><stop offset="0" stop-color="${css('--c-'+A.n.type)}"/><stop offset="1" stop-color="${css('--c-'+B.n.type)}"/></linearGradient>
+      <marker id="${mid}" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="${css(kind==='loop'?'--c-gate':'--c-'+B.n.type)}"/></marker>`);
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class',`edge ${kind}`); g.dataset.a=a; g.dataset.b=b;
+    const stroke = kind==='loop'?css('--c-gate'):`url(#${gid})`;
+    g.innerHTML=`<path class="base" d="${d}" stroke="${stroke}"/><path class="flow" d="${d}" stroke="${stroke}"/>`;
+    svg.appendChild(g);
+    const p=g.querySelector('path.base'), len=p.getTotalLength();
+    // mũi tên ở cuối đường (kiểu ->), mũi nhọn chạm cạnh node, thẳng hàng với hướng đường
+    {
+      const end=p.getPointAtLength(len), q=p.getPointAtLength(Math.max(0,len-4));
+      const ang=Math.atan2(end.y-q.y,end.x-q.x)*180/Math.PI;
+      const ar=document.createElementNS('http://www.w3.org/2000/svg','path');
+      ar.setAttribute('d','M-11,-5.5 L0,0 L-11,5.5 z'); ar.setAttribute('class','arrow');
+      ar.setAttribute('transform',`translate(${end.x},${end.y}) rotate(${ang})`);
+      ar.setAttribute('fill',css(kind==='loop'?'--c-gate':'--c-'+B.n.type));
+      g.appendChild(ar);
+    }
+    let lab=null;
+    // cạnh ngắn cùng hàng (2 cột kề nhau): khe hẹp, nhãn sẽ đè lên node → bỏ nhãn
+    const straightAdj=kind!=="loop" && B.n.c-A.n.c===1 && A.n.r===B.n.r;
+    if(label && (!straightAdj || label.startsWith('✓'))){
+      const pt=p.getPointAtLength(len*(at!=null?at:.5));
+      lab=document.createElement('div'); lab.className='elabel'; lab.textContent=tr(label);
+      if(e.forkLab){ pt.x=e.forkLab.x; pt.y=e.forkLab.y; lab.style.transform='translate(-100%,-50%)'; }
+      else if(straightAdj){ pt.y-=20; }
+      lab.style.left=pt.x+'px'; lab.style.top=pt.y+'px';
+      if(kind==='loop') lab.style.color='var(--c-gate)';
+      if(label.startsWith('✓')) lab.classList.add('ok');
+      canvas.appendChild(lab);
+    }
+    if(kind!=='opt' && !reduce){
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('r',kind==='loop'?3:3.6); c.setAttribute('class','particle');
+      c.setAttribute('fill',css(kind==='loop'?'--c-gate':'--c-'+B.n.type));
+      c.style.filter=`drop-shadow(0 0 5px ${css(kind==='loop'?'--c-gate':'--c-'+B.n.type)})`;
+      g.appendChild(c);
+      particles.push({c,p,len,off:Math.random(),dur:(kind==='loop'?3400:1900)+len*2.2});
+    }
+    return {a,b,g,lab,kind};
+  });
+  // Giao cắt: đường vẽ sau "đi trên" — đường dưới bị cắt khe, đường trên có cầu vồng nhỏ (line jump)
+  {
+    const poly=edges.map(e=>{ const p=e.g.querySelector('path.base'), L=p.getTotalLength(), pts=[];
+      for(let t=0;t<=L;t+=3){ const q=p.getPointAtLength(t); pts.push([q.x,q.y]) } return pts; });
+    const X=(a,b,c,d)=>{ const r=[b[0]-a[0],b[1]-a[1]], q=[d[0]-c[0],d[1]-c[1]], den=r[0]*q[1]-r[1]*q[0]; if(Math.abs(den)<1e-6) return null;
+      const t=((c[0]-a[0])*q[1]-(c[1]-a[1])*q[0])/den, u=((c[0]-a[0])*r[1]-(c[1]-a[1])*r[0])/den;
+      return (t>=0&&t<=1&&u>=0&&u<=1)?{x:a[0]+t*r[0],y:a[1]+t*r[1],dx:r[0],dy:r[1],ex:q[0],ey:q[1]}:null; };
+    const cuts=edges.map(()=>[]), hops=edges.map(()=>[]);
+    for(let j=0;j<edges.length;j++) for(let i=0;i<j;i++){
+      const E=edges[i], F=edges[j];
+      if(E.a===F.a||E.b===F.b) continue; // chung nguồn / chung đích = bus gộp có chủ đích, không phải giao cắt
+      const P=poly[i], Q=poly[j], found=[];
+      const ends=[P[0],P[P.length-1],Q[0],Q[Q.length-1]], nearEnd=h=>ends.some(q=>Math.hypot(q[0]-h.x,q[1]-h.y)<10); // sát điểm nối node → không tính
+      for(let m=1;m<Q.length;m++) for(let n=1;n<P.length;n++){
+        const h=X(Q[m-1],Q[m],P[n-1],P[n]); if(!h) continue;
+        if(Math.abs(h.dx*h.ey-h.dy*h.ex)<0.5) continue; // gần song song
+        if(nearEnd(h)) continue;
+        if(found.some(o=>Math.hypot(o.x-h.x,o.y-h.y)<14)) continue;
+        found.push(h);
+      }
+      found.forEach(h=>{ cuts[i].push(h); hops[j].push(h) });
+    }
+    const NS='http://www.w3.org/2000/svg';
+    edges.forEach((e,i)=>{
+      const holes=cuts[i].map(h=>({...h,r:8}));
+      if(!holes.length) return;
+      const mid=`x${k}${i}`, m=document.createElementNS(NS,'mask');
+      m.setAttribute('id',mid); m.setAttribute('maskUnits','userSpaceOnUse');
+      m.setAttribute('x',0); m.setAttribute('y',0); m.setAttribute('width',current.W); m.setAttribute('height',current.H);
+      m.innerHTML=`<rect width="${current.W}" height="${current.H}" fill="white"/>`+holes.map(h=>`<circle cx="${h.x}" cy="${h.y}" r="${h.r}" fill="black"/>`).join('');
+      defs.appendChild(m);
+      e.g.querySelectorAll('path.base,path.flow').forEach(pp=>pp.setAttribute('mask',`url(#${mid})`));
+    });
+  }
+  current.edges=edges; current.byId=byId;
+
+  // chip interactions
+  st.querySelectorAll('.chip').forEach(ch=>{
+    const ref=ch.dataset.ref;
+    ch.onmouseenter=()=>{const ids=f.nodes.filter(n=>(n.refs||[]).includes(ref)).map(n=>n.id); if(ids.length) focusSet(ids); ch.classList.add('hl')};
+    ch.onmouseleave=()=>{unfocus(); ch.classList.remove('hl')};
+  });
+
+  // legend + notes
+  st.insertAdjacentHTML('beforeend',`<div class="legend">${['cmd','skill','agent','file','gate','check','board','git','step','end'].filter(t=>f.nodes.some(n=>n.type===t)).map(t=>`<span><i style="--lc:var(--c-${t})"></i>${tr(TYPES[t].label)}</span>`).join('')}
+    ${f.edges.some(e=>e[2]==='loop')?`<span><i class="ln"></i>${tr('vòng lặp / auto-fix')}</span>`:''}${f.edges.some(e=>e[2]==='opt')?`<span><i class="ln o"></i>${tr('tuỳ chọn / resume')}</span>`:''}
+    <span style="margin-left:auto">${tr('Nét đứt vàng = bước của người · hover để lần theo · click node xem chi tiết · kéo để cuộn')}</span></div>`);
+  st.insertAdjacentHTML('beforeend',`<section class="notes">${f.notes.map(([ic,h,p,c])=>`<div class="note glass" style="--nc2:var(${c})"><h5>${ic} ${tr(h)}</h5><p>${tr(p)}</p></div>`).join('')}</section>`);
+
+  $('#playBtn').onclick=togglePlay; $('#resetBtn').onclick=()=>{stopPlay()};
+  setupDrag(wrap); fit();
+}
+
+/* ---------- focus ---------- */
+function focusSet(ids){
+  const c=current.canvas; c.classList.add('focus'); const set=new Set(ids);
+  c.querySelectorAll('.node').forEach(el=>el.classList.toggle('on',set.has(el.dataset.id)));
+  current.edges.forEach(e=>{const on=set.has(e.a)&&set.has(e.b); e.g.classList.toggle('on',on); e.lab&&e.lab.classList.toggle('on',on)});
+  lanesFor(ids);
+}
+function focusNode(id){
+  if(play) return;
+  const rel=new Set([id]);
+  current.edges.forEach(e=>{if(e.a===id)rel.add(e.b); if(e.b===id)rel.add(e.a)});
+  const c=current.canvas; c.classList.add('focus');
+  c.querySelectorAll('.node').forEach(el=>el.classList.toggle('on',rel.has(el.dataset.id)));
+  current.edges.forEach(e=>{const on=e.a===id||e.b===id; e.g.classList.toggle('on',on); e.lab&&e.lab.classList.toggle('on',on)});
+  const n=current.byId[id]; const refs=new Set(n.refs||[]);
+  document.querySelectorAll('.chip').forEach(ch=>ch.classList.toggle('hl',refs.has(ch.dataset.ref)));
+  lanesFor([id]);
+}
+function unfocus(){
+  if(!current) return;
+  current.canvas.classList.remove('focus');
+  current.canvas.querySelectorAll('.on').forEach(el=>el.classList.remove('on'));
+  current.edges.forEach(e=>{e.g.classList.remove('on'); e.lab&&e.lab.classList.remove('on')});
+  document.querySelectorAll('.chip.hl').forEach(ch=>ch.classList.remove('hl'));
+  if(!play) lanesFor([]);
+}
+function lanesFor(ids){
+  const lanes=new Set(ids.map(i=>current.byId[i]&&current.byId[i].lane).filter(Boolean));
+  document.querySelectorAll('.lane,.band').forEach(l=>l.classList.toggle('on',lanes.has(l.dataset.lane)));
+}
+
+/* ---------- particles ---------- */
+function tick(now){
+  for(const p of particles){
+    if(!p.c.isConnected) continue;
+    const t=((now/p.dur)+p.off)%1, pt=p.p.getPointAtLength(t*p.len);
+    p.c.setAttribute('cx',pt.x); p.c.setAttribute('cy',pt.y);
+    p.c.style.opacity = t<.08? t/.08 : t>.92 ? (1-t)/.08 : 1;
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+/* ---------- play ---------- */
+function togglePlay(){
+  const btn=$('#playBtn');
+  if(play && !play.paused){ play.paused=true; clearTimeout(play.to); btn.textContent=tr('▶ Tiếp tục'); return; }
+  if(!play){
+    const cols=[...new Set(current.f.nodes.map(n=>n.c))].sort((a,b)=>a-b);
+    play={cols,i:0,paused:false,lit:new Set()};
+    unfocus(); current.canvas.classList.add('playing');
+  }
+  play.paused=false; btn.textContent=tr('❚❚ Tạm dừng'); hideToast(); step();
+}
+function step(){
+  if(!play||play.paused) return;
+  if(play.i>=play.cols.length){ showToast(tr('✓ Hết luồng — AI không tự push / merge, Done do dev')); $('#playBtn').textContent=tr('▶ Chạy lại'); play=null; setTimeout(()=>{if(!play){current.canvas.classList.remove('playing'); clearLit()}},2600); return; }
+  const col=play.cols[play.i++];
+  const ns=current.f.nodes.filter(n=>n.c===col);
+  current.canvas.querySelectorAll('.node.current').forEach(e=>e.classList.remove('current'));
+  ns.forEach(n=>{play.lit.add(n.id); n.el.classList.add('lit','current')});
+  current.edges.forEach(e=>{if(e.kind!=='loop' && play.lit.has(e.a)&&play.lit.has(e.b)) e.g.classList.add('lit')});
+  lanesFor(ns.map(n=>n.id));
+  const gate=ns.find(n=>n.type==='gate' && play.i<play.cols.length);
+  if(gate){ play.paused=true; $('#playBtn').textContent=tr('▶ Duyệt & tiếp tục'); showToast(`⏸ ${tr(gate.t)}${tr(' — AI dừng, chờ dev')}`); return; }
+  play.to=setTimeout(step, reduce?300:950);
+}
+function clearLit(){ current.canvas.querySelectorAll('.lit,.current').forEach(e=>e.classList.remove('lit','current')); current.edges.forEach(e=>e.g.classList.remove('lit')); lanesFor([]); }
+function stopPlay(){
+  if(play){clearTimeout(play.to); play=null}
+  if(current&&current.canvas){current.canvas.classList.remove('playing'); clearLit(); hideToast(); const b=$('#playBtn'); if(b) b.textContent=tr('▶ Chạy luồng');}
+}
+function showToast(t){const el=$('#toast'); if(!el)return; el.textContent=t; el.classList.add('show')}
+function hideToast(){const el=$('#toast'); el&&el.classList.remove('show')}
+
+/* ---------- panel ---------- */
+const panel=$('#panel'), scrim=$('#scrim');
+function openPanel(n){
+  const T=TYPES[n.type], d=n.d||{};
+  const list=(h,a)=>a&&a.length?`<h6>${h}</h6><ul>${a.map(x=>{x=tr(x); return `<li>${x.includes('<')?x:`<code>${esc(x)}</code>`}</li>`}).join('')}</ul>`:'';
+  const refs=(n.refs||[]).filter(r=>!['Agent tool','Skill tool'].includes(r));
+  panel.style.setProperty('--pc',`var(--c-${n.type})`);
+  panel.innerHTML=`<button class="iconbtn glass close" aria-label="${tr('Đóng')}">✕</button>
+    <span class="kind">${T.ic} ${tr(T.label)}</span> <span class="kind" style="--pc:var(${actorOf(n).c})">${actorOf(n).ic} ${tr(actorOf(n).label)}</span>
+    <h3>${esc(tr(n.t))}</h3>${n.s?`<p class="sub">${esc(tr(n.s))}</p>`:''}
+    <div class="badges">${n.m?`<span class="badge" style="color:var(--m-${n.m})">model: ${n.m}</span>`:''}${n.tr?`<span class="badge" style="color:var(--c-board)">${tr('luật')}: ${esc(n.tr)}</span>`:''}${n.lane?`<span class="badge">${tr('cột')}: ${tr(n.lane)}</span>`:''}</div>
+    <div class="pio">${ipo('INPUT','in',n.i)}${ipo('PROCESS','pr',n.p)}${ipo('OUTPUT','out',n.o)}</div>
+    ${d.role?`<h6>${tr('Vai trò')}</h6><p>${tr(d.role)}</p>`:''}
+    ${list(tr('Input chi tiết'),d.in)}${list(tr('Output chi tiết'),d.out)}
+    ${d.contract?`<h6>JSON contract</h6><pre>${esc(d.contract)}</pre>`:''}
+    ${d.notes&&d.notes.length?`<h6>${tr('Ghi chú')}</h6><ul>${d.notes.map(x=>`<li>${tr(x)}</li>`).join('')}</ul>`:''}
+    ${refs.length?`<h6>${tr('Liên quan')}</h6><div class="chips">${refs.map(r=>`<span class="chip" style="--cc:var(--c-skill)">${esc(r)}</span>`).join('')}</div>`:''}
+    ${n.link?`<h6>&nbsp;</h6><button class="iconbtn glass" id="jump">${tr('↗ Mở tab')} ${tr(FLOWS[n.link].tab)}</button>`:''}`;
+  panel.querySelector('.close').onclick=closePanel;
+  const j=panel.querySelector('#jump'); if(j) j.onclick=()=>go(n.link);
+  panel.classList.add('open'); scrim.classList.add('show');
+}
+function closePanel(){panel.classList.remove('open'); scrim.classList.remove('show')}
+scrim.onclick=closePanel;
+addEventListener('keydown',e=>{if(e.key==='Escape')closePanel()});
+
+/* ---------- fit / drag ---------- */
+function fit(){
+  if(!current||!current.wrap) return;
+  const ww=current.wrap.clientWidth, s=fitMode?Math.max(.86,Math.min(1,ww/current.W)):1;
+  current.canvas.style.transform=`scale(${s})`;
+  const sz=current.wrap.querySelector('.sizer'); sz.style.width=current.W*s+'px'; sz.style.height=current.H*s+'px';
+}
+$('#fitBtn').onclick=()=>{fitMode=!fitMode; $('#fitBtn span').textContent=fitMode?tr('Vừa khung'):'100%'; fit()};
+addEventListener('resize',()=>{fit(); moveInd()});
+function setupDrag(w){
+  let sx=0,sl=0,down=false,moved=false;
+  w.addEventListener('pointerdown',e=>{if(e.target.closest('.node'))return; down=true;moved=false;sx=e.clientX;sl=w.scrollLeft;w.classList.add('drag')});
+  addEventListener('pointermove',e=>{if(!down)return; const dx=e.clientX-sx; if(Math.abs(dx)>3)moved=true; w.scrollLeft=sl-dx});
+  addEventListener('pointerup',()=>{down=false;w.classList.remove('drag')});
+}
+
+/* ---------- theme ---------- */
+function applyTheme(t){ if(t) document.documentElement.dataset.theme=t; else delete document.documentElement.dataset.theme; }
+try{applyTheme(localStorage.getItem('fe-sdlc-theme'))}catch(e){}
+$('#themeBtn').onclick=()=>{
+  const cur=document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');
+  const nt=cur==='dark'?'light':'dark'; applyTheme(nt);
+  try{localStorage.setItem('fe-sdlc-theme',nt)}catch(e){}
+  go(current.k); // re-render để gradient/marker lấy màu mới
+};
+
+function applyLang(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ const k=el.dataset.i18n; if(el.id==='fitBtn') return; el.textContent=tr(k) });
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>el.title=tr(el.dataset.i18nTitle));
+  document.title='SDLC AI Frontend';
+  tabsEl.querySelectorAll('button').forEach(b=>{ const t=b.querySelector('.tl'); if(t) t.textContent=tr(FLOWS[b.dataset.k].tab) });
+  document.querySelectorAll('#langSw button').forEach(b=>b.classList.toggle('on',b.dataset.l===LANG));
+  moveInd();
+}
+document.querySelectorAll('#langSw button').forEach(b=>b.onclick=()=>{
+  if(LANG===b.dataset.l) return; LANG=b.dataset.l; try{localStorage.setItem('fe-sdlc-lang',LANG)}catch(e){}
+  applyLang(); if(current) go(current.k);
+});
+applyLang();
+go((location.hash||'#overview').slice(1));
+if(document.fonts&&document.fonts.status!=='loaded') document.fonts.ready.then(()=>{if(current&&!play) render(current.k)});
+</script>
+</body>
+</html>

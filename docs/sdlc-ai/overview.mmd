@@ -1,0 +1,29 @@
+---
+config:
+  theme: base
+  fontFamily: "Arial, Helvetica, sans-serif"
+  themeVariables:
+    fontSize: 16px
+  flowchart:
+    htmlLabels: true
+    wrappingWidth: 380
+---
+flowchart LR
+  A["GĐ 1 · NHẬN VIỆC<br/>Jira · chat · buglist QC"]
+  B["GĐ 2 · DESIGN → ASSET<br/>bóc PSD/Figma → file toạ độ"]
+  C["GĐ 3 · CODE<br/>4 làn theo quy mô · nạp luật"]
+  D["GĐ 4 · TỰ KIỂM<br/>build · asset · UI vs design"]
+  E["GĐ 5 · NGƯỜI DUYỆT<br/>diff · commit · push · merge"]
+  F["GĐ 6 · QC và BUG<br/>radar · fix song song"]
+  G["GĐ 7 · CHỐT và HỌC<br/>metrics · luật · hàng rào"]
+  A --> B --> C --> D --> E --> F --> G
+  D -. "FAIL" .-> C
+  F -. "còn bug FE" .-> C
+  G -. "áp cho task sau" .-> C
+  classDef ai fill:#d5f5e3,stroke:#27ae60,stroke-width:2px,color:#1b4332
+  classDef human fill:#fdebd0,stroke:#e67e22,stroke-width:3px,color:#7e3f00
+  classDef gate fill:#d6eaf8,stroke:#2e86c1,stroke-width:2px,color:#12435e
+  class A,B,C ai
+  class D,F gate
+  class E human
+  class G ai

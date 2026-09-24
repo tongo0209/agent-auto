@@ -1,0 +1,29 @@
+---
+config:
+  theme: base
+  fontFamily: "Arial, Helvetica, sans-serif"
+  themeVariables:
+    fontSize: 16px
+  flowchart:
+    htmlLabels: true
+    wrappingWidth: 380
+---
+flowchart LR
+  A["1 · INTAKE<br/>Jira · chat · QC buglist"]
+  B["2 · DESIGN → ASSETS<br/>PSD / Figma extraction → coords"]
+  C["3 · IMPLEMENTATION<br/>4 lanes by scope · rules loaded"]
+  D["4 · SELF-VERIFICATION<br/>build · assets · UI vs design"]
+  E["5 · HUMAN REVIEW<br/>diff · commit · push · merge"]
+  F["6 · QC & BUG LOOP<br/>radar · parallel fixes"]
+  G["7 · CLOSE & LEARN<br/>metrics · rules · guardrails"]
+  A --> B --> C --> D --> E --> F --> G
+  D -. "FAIL" .-> C
+  F -. "FE bugs left" .-> C
+  G -. "applies to future tasks" .-> C
+  classDef ai fill:#d5f5e3,stroke:#27ae60,stroke-width:2px,color:#1b4332
+  classDef human fill:#fdebd0,stroke:#e67e22,stroke-width:3px,color:#7e3f00
+  classDef gate fill:#d6eaf8,stroke:#2e86c1,stroke-width:2px,color:#12435e
+  class A,B,C ai
+  class D,F gate
+  class E human
+  class G ai

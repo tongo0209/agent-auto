@@ -25,7 +25,7 @@ bè nhận quà, mẫu `zsm`; khung clone `products/gno/landing/2026-request-lan
 ## 3. Cách ly
 
 - Worktree riêng của cdn-source: `~/VNG/git-vng/cdn-source-gw745-rerun`, nhánh cục bộ `exp/gw745-rerun`
-  tách từ `master`. Commit trong nhánh được, **không merge master, không push**. Xong thì user quyết giữ/xoá.
+  tách từ `tont` HEAD `6234e8fa8` (= master + 28 commit chưa merge; master không có gì tont thiếu). Commit trong nhánh được, **không merge master, không push**. Xong thì user quyết giữ/xoá.
 - 3 campaign bomber trong worktree bị **xoá rồi dựng lại** từ khung gno như lần đầu.
 - HTML bàn giao bản mới ghi vào `tasks/GW-745/rerun/handoff/` (gitignore theo `tasks/`), **không** ghi vào
   `gt-promotion-template`.

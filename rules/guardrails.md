@@ -57,3 +57,9 @@ Vì sao cần — đo thật 22/9/2026 trên 1.792 phiên / 95.943 lượt:
 
 Ngưỡng đổi bằng biến môi trường `CLAUDE_CTX_WARN`. Self-test: `bash ~/.claude/hooks/token-watch.test.sh`.
 Đo lịch sử: `node ~/VNG/agent-auto/tools/token-scan.mjs` (token) · `node ~/VNG/agent-auto/tools/wall-scan.mjs [--skill <tên>]` (thời gian thật theo skill).
+
+## `limit-failover.sh` (StopFailure `rate_limit|billing_error`)
+
+Không phải guard: chỉ có tác dụng khi phiên chạy qua lệnh `ca` (`tools/claude-failover.sh`). Team đang dùng hết limit ⇒ hook ghi cờ `~/.cache/claude-failover/pending.<pid wrapper>` + mốc `<team>.last`, báo notification, tắt phiên (`pkill -TERM -a` — thiếu `-a` thì macOS bỏ qua tiến trình tổ tiên, phiên không chết). Wrapper thấy cờ ⇒ `--resume <session>` bằng team kia kèm lời nhắn làm tiếp. Team kia cũng vừa hết limit trong 5 giờ ⇒ dừng, in lệnh mở lại tay.
+
+Team A = `~/.claude` (chạy KHÔNG set `CLAUDE_CONFIG_DIR`, kẻo mất login), team B = `~/.claude-teamB` (symlink chung luật/skill/hook/`projects`). Statusline hiện `⚡A`/`⚡B` + % limit 5h/7d, ≥ 90% đổi 🔴. `claude` trần ⇒ hook im. Self-test: `bash ~/.claude/hooks/limit-failover.test.sh` · `bash ~/VNG/agent-auto/tools/claude-failover.test.sh`.

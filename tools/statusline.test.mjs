@@ -61,3 +61,27 @@ test('state hỏng không được làm vỡ statusline', () => {
   assert.doesNotThrow(() => statusLine({ state: null, today: TODAY, session: {} }));
   assert.ok(statusLine({}).length > 0);
 });
+
+const withLimits = (five, seven) => ({
+  ...SESSION,
+  rate_limits: { five_hour: { used_percentage: five, resets_at: 0 }, seven_day: { used_percentage: seven, resets_at: 0 } },
+});
+
+test('không có rate_limits và không chạy qua ca ⇒ không thêm mục limit', () => {
+  assert.doesNotMatch(statusLine({ state: { issues: {} }, today: TODAY, session: SESSION }), /⚡|🔴/);
+});
+
+test('hiện % limit 5h và 7d, làm tròn; vắng cửa sổ nào thì bỏ cửa sổ đó', () => {
+  assert.match(statusLine({ state: { issues: {} }, today: TODAY, session: withLimits(72.4, 40) }), /⚡ 5h 72% · 7d 40%$/);
+  const onlyFive = { ...SESSION, rate_limits: { five_hour: { used_percentage: 10 } } };
+  assert.match(statusLine({ state: { issues: {} }, today: TODAY, session: onlyFive }), /⚡ 5h 10%$/);
+});
+
+test('cửa sổ limit nào ≥ 90% ⇒ đổi sang 🔴', () => {
+  assert.match(statusLine({ state: { issues: {} }, today: TODAY, session: withLimits(20, 93) }), /🔴 5h 20% · 7d 93%$/);
+});
+
+test('chạy qua ca ⇒ ghi team đang dùng', () => {
+  assert.match(statusLine({ state: { issues: {} }, today: TODAY, session: withLimits(5, 1), team: 'B' }), /⚡B 5h 5% · 7d 1%$/);
+  assert.match(statusLine({ state: { issues: {} }, today: TODAY, session: SESSION, team: 'A' }), /⚡A$/);
+});

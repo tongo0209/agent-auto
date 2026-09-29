@@ -10,8 +10,20 @@ import { countPending, isWatched } from './bug-radar.mjs';
 import alerts from '../console/server/lib/alerts.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
+const HOT_LIMIT_PERCENT = 90;
 
-export function statusLine({ state, today, session = {} } = {}) {
+// team = A/B khi phiên chạy qua lệnh `ca` (tools/claude-failover.sh), để biết đang tiêu quota team nào.
+function limitPart(rateLimits = {}, team = '') {
+  const windows = [['5h', rateLimits.five_hour], ['7d', rateLimits.seven_day]].filter(
+    ([, w]) => typeof w?.used_percentage === 'number',
+  );
+  if (!windows.length && !team) return '';
+  const icon = windows.some(([, w]) => w.used_percentage >= HOT_LIMIT_PERCENT) ? '🔴' : '⚡';
+  const usage = windows.map(([label, w]) => `${label} ${Math.round(w.used_percentage)}%`).join(' · ');
+  return [icon + team, usage].filter(Boolean).join(' ');
+}
+
+export function statusLine({ state, today, session = {}, team } = {}) {
   const safe = state && typeof state === 'object' ? state : { issues: {} };
   const dir = session.workspace?.current_dir || session.cwd || ROOT;
   const parts = [path.basename(dir)];
@@ -27,6 +39,9 @@ export function statusLine({ state, today, session = {} } = {}) {
     const rest = crits.length > 1 ? ` +${crits.length - 1}` : '';
     parts.push(`⏰ ${crits[0].key} ${crits[0].text}${rest}`);
   }
+
+  const limit = limitPart(session.rate_limits, team);
+  if (limit) parts.push(limit);
   return parts.join('  ·  ');
 }
 
@@ -45,5 +60,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.met
   };
   const session = parse(await readAll(), {});
   const state = parse(fs.readFileSync(path.join(ROOT, 'state.json'), 'utf8'), null);
-  process.stdout.write(statusLine({ state, today: new Date().toISOString().slice(0, 10), session }));
+  process.stdout.write(statusLine({ state, today: new Date().toISOString().slice(0, 10), session, team: process.env.CLAUDE_FAILOVER_TEAM }));
 }

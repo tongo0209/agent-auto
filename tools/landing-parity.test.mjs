@@ -110,6 +110,26 @@ const BASE = w(path.join(ROOT, 'base-structure.md'), `| # | Project | Đường 
   check('libraryMainsite 1.3.1 không báo', !/index\.html\.twig:1/.test(out), out);
   check('--strict + sai bản lib → exit 1', code === 1, String(code));
 }
+{
+  const lib = 'https://cdn-mainsite-aka.vnggames.com/products/libraryMainsite/prod-source/1.3.1/dist/libraryMainsite-1.3.1';
+  w(path.join(NEW, 'assets/index.html.twig'), `<link href="${lib}.css">\n`);
+  const popup = path.join(NEW, 'assets/libraryMainsite-t-popup/libraryMainsite-t-popup.js');
+  w(popup, `import html2canvas from 'html2canvas';\nwindow.saveDom = html2canvas;\nfunction resizeCanvas(c) {\n  return c;\n}\nwindow.getScreenshotDiv = function () {\n  html2canvas(document.body).then(resizeCanvas);\n};\n`);
+  const dead = run([NEW, '--ref', REF, '--strict']);
+  check('html2canvas import mà không ai gọi hàm chụp → 🔴 R-CDN-25 kèm file:line', /🔴 R-CDN-25.*libraryMainsite-t-popup\.js:1/.test(dead.out), dead.out);
+  check('--strict + html2canvas chết → exit 1', dead.code === 1, String(dead.code));
+  w(path.join(NEW, 'assets/main/main.js'), `const h5 = varMS.H5;\n$('.btn-save').on('click', getScreenshotDiv);\n`);
+  const used = run([NEW, '--ref', REF, '--strict']);
+  check('hàm chụp được gọi ở file khác (kể cả truyền callback) → không báo', !/R-CDN-25/.test(used.out), used.out);
+  w(path.join(NEW, 'assets/main/main.js'), `const h5 = varMS.H5;\n`);
+  w(popup, `import html2canvas from 'html2canvas';\nasync function downloadWish() {\n  await html2canvas(document.body);\n}\nbtn.addEventListener('click', downloadWish);\n`);
+  const sameFile = run([NEW, '--ref', REF, '--strict']);
+  check('hàm chụp được gắn sự kiện ngay trong cùng file → không báo', !/R-CDN-25/.test(sameFile.out), sameFile.out);
+  w(popup, `import html2canvas from 'html2canvas';\n// window.getScreenshotDiv = function () {\n//   html2canvas(node);\n// };\n// getScreenshotDiv();\n`);
+  const commented = run([NEW, '--ref', REF, '--strict']);
+  check('lời gọi đã comment hết, còn mỗi import → 🔴 R-CDN-25', /🔴 R-CDN-25/.test(commented.out), commented.out);
+  fs.rmSync(popup);
+}
 
 console.log(`\nlanding-parity.test: ${pass} pass, ${fail} fail`);
 fs.rmSync(ROOT, { recursive: true, force: true });

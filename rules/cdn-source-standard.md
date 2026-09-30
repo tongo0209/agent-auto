@@ -66,6 +66,7 @@ Quét 16 campaign 2026 (23/9/2026): cùng một việc viết nhiều kiểu. Ki
 | **R-CDN-22** | SHOULD | UI bám màn hình bên trong vùng đã scale: `var(--sr-device-height)` của lib, không `100vh` |
 | **R-CDN-23** | SHOULD | N phần tử cùng hiệu ứng CSS: 1 `@keyframes`, tham số từng phần tử qua CSS var hoặc `animation-delay` âm |
 | **R-CDN-24** | MUST | Code mới chỉ trỏ `https://cdn-mainsite-aka.vnggames.com/` (`global-mainsite.mto.zing.vn` đã ngưng) và nạp đúng `libraryMainsite` **1.3.1** |
+| **R-CDN-25** | MUST | Không import thư viện nặng mà không gọi (`html2canvas` ~195KB): trang không chụp ảnh thì bỏ cả import lẫn hàm chụp |
 
 ### R-CDN-15 · MUST · Breakpoint chỉ từ `additionalData`
 `webpack.config.js` bơm `$maxWidthMB`/`$minWidthPC` + `@mixin mobile|pc` vào đầu mọi file SCSS (R-CDN-5). File
@@ -226,6 +227,17 @@ asset, ảnh) dùng `https://cdn-mainsite-aka.vnggames.com/`. Clone từ landing
 .dot--b { --pulse-dur: 2.5s; --pulse-shift: -1s; }
 ```
 Dẫn chứng: `ddtank/2026-chengdu-tournament/assets/Frame2/Frame2.scss:193,227` · `lan/2026-trung-thu/assets/Frame1/Frame1.scss:62,73` · `lan/2026-trung-thu/assets/Frame7/Frame7.scss:174-175` (tham số từ SCSS list).
+
+### R-CDN-25 · MUST · Không chở thư viện nặng không dùng
+`libraryMainsite-t-popup.js` chép từ campaign cũ hay kèm `import html2canvas` + `window.getScreenshotDiv` /
+`window.saveDom` — ~195KB vào bundle dù trang không có nút chụp. Đo 30/9/2026: 24 campaign 2026 có import sống,
+**15 không nơi nào gọi hàm chụp** (soát cả `gt-promotion-template`, `new-mainsite`, `vportal2view`); 7 dùng thật
+(`downloadWishScreenshot` ở các `request-landing-convert`, `ghoststory/2026-2nd-anniverary`, `renderShareCard` ở
+`lan/2026-h5-hallween`). Trang cần chụp thì giữ, và hàm chụp phải được gọi/gắn sự kiện.
+
+- Áp cho campaign MỚI / clone mới. Campaign đang chạy: không sửa (user chốt 30/9) — cổng chỉ cảnh báo.
+- Cổng: `landing-parity.mjs <campaign>` in `🔴 R-CDN-25 … file:line` khi import sống mà hàm bao lời gọi `html2canvas(`
+  (và alias `window.x = html2canvas`) không được nhắc lại ở đâu; dòng comment không tính. `--strict` exit 1.
 
 ## Sprite (webpack-spritesmith) — R-SPR-*
 

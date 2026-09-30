@@ -12,6 +12,10 @@ const RETIRED_CDN = /global-mainsite\.mto\.zing\.vn/g;
 const LIBRARY_LINK = /libraryMainsite-(\d+\.\d+\.\d+)\.(?:js|css)/g;
 const LIBRARY_VERSION = '1.3.1';
 const CDN_CHECK_EXT = new Set(['.twig', '.html', '.js', '.json', '.scss']);
+const HTML2CANVAS_IMPORT = /^\s*import\s+\w+\s+from\s+["']html2canvas["']/m;
+// Định nghĩa hàm trên 1 dòng: `window.x = function`, `async function x`, `const x = (`; alias `window.x = html2canvas`
+const FN_DEF = /window\.(\w+)\s*=\s*(?:async\s*)?(?:function|\()|function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:function|\()/;
+const HTML2CANVAS_ALIAS = /window\.(\w+)\s*=\s*html2canvas\b/g;
 
 const FEATURES = {
   config: { files: ['config.js'], re: /(?:^|[{,])\s*["']?([A-Za-z_]\w*)["']?\s*:/gm },
@@ -72,8 +76,40 @@ for (const e of [...reds, ...(opts.all ? greys : [])]) console.log(`  ${e.severi
 if (reds.length) console.log(`\n🔴 hook MS__/MJ__ của libraryMainsite không tự có — kiểm lại documentsClass.txt trước khi giữ.`);
 const cdnViolations = cdnViolationsIn(campaign);
 for (const v of cdnViolations) console.log(`🔴 R-CDN-24 ${v.problem}  ${v.loc}`);
-if (opts.json) fs.writeFileSync(opts.json, JSON.stringify({ campaign, refs, missing, extra, cdnViolations }, null, 2));
-process.exit(opts.strict && (reds.length || cdnViolations.length) ? 1 : 0);
+const deadImports = deadHtml2canvasIn(campaign);
+for (const loc of deadImports) console.log(`🔴 R-CDN-25 import html2canvas (~195KB) mà không nơi nào gọi hàm chụp — gỡ import + hàm chụp  ${loc}`);
+if (opts.json) fs.writeFileSync(opts.json, JSON.stringify({ campaign, refs, missing, extra, cdnViolations, deadImports }, null, 2));
+process.exit(opts.strict && (reds.length || cdnViolations.length || deadImports.length) ? 1 : 0);
+
+function deadHtml2canvasIn(dir) {
+  const texts = listFiles(dir)
+    .filter((file) => ['.js', '.twig', '.html'].includes(path.extname(file)))
+    .map((file) => ({ file, text: withoutLineComments(fs.readFileSync(file, 'utf8')) }));
+  const importers = texts.filter(({ file, text }) => path.extname(file) === '.js' && HTML2CANVAS_IMPORT.test(text));
+  return importers
+    .filter((importer) => {
+      const lines = importer.text.split('\n');
+      // Tên hàm = định nghĩa gần nhất phía trên mỗi lời gọi html2canvas( — hàm phụ như resizeCanvas không tính
+      const enclosing = lines.flatMap((line, i) => {
+        if (!/html2canvas\s*\(/.test(line)) return [];
+        for (let j = i; j >= 0; j--) {
+          const m = lines[j].match(FN_DEF);
+          if (m) return [m[1] || m[2] || m[3]];
+        }
+        return [];
+      });
+      const captureNames = [...enclosing, ...[...importer.text.matchAll(HTML2CANVAS_ALIAS)].map((m) => m[1])];
+      const isCalled = (name) =>
+        texts.reduce((n, { text }) => n + (text.match(new RegExp(`\\b${name}\\b`, 'g')) || []).length, 0) > 1;
+      return !captureNames.some(isCalled);
+    })
+    .map(({ file, text }) => `${path.relative(dir, file)}:${lineAt(text, text.search(HTML2CANVAS_IMPORT))}`);
+}
+
+// Giữ nguyên số dòng để file:line vẫn đúng
+function withoutLineComments(text) {
+  return text.replace(/^\s*\/\/.*$/gm, '');
+}
 
 function cdnViolationsIn(dir) {
   return listFiles(dir)

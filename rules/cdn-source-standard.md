@@ -205,6 +205,9 @@ asset, ảnh) dùng `https://cdn-mainsite-aka.vnggames.com/`. Clone từ landing
 - Phiên bản: task mới nạp **đúng `libraryMainsite-1.3.0.css` + `.js`** (user chốt 30/9/2026 — bản mới và ổn nhất).
   KHÔNG lấy 1.3.1 — đo 30/9: bản 1.3.1 trên CDN còn tải vendor từ `global-mainsite` (7 chỗ), chỉ 3 campaign dùng
   (1 là `test-library`); 1.3.0 có 169 campaign + 183 file đã bàn giao, vendor trỏ `cdn-mainsite` (7/7 link 200).
+  1.3.1 tách từ 19/3 nên THIẾU fix sau đó của 1.3.0: `scrollFrame.init()` chạy cả mobile (`82e27ecdc`, 13/5 —
+  1.3.1 vẫn bỏ trống nhánh mobile, `1.3.1/assets/main/js/scrollFrame.2.js:222`) và vendor sang `cdn-mainsite`
+  (`e7e7d84f3`, 23/9). Muốn lên 1.3.1 thì phải bê 2 fix này sang + build lại trước.
   KHÔNG giữ bản cũ đi theo landing clone. Clone từ landing 1.1.x ⇒ đổi cả domain lẫn bản, build rồi
   chạy thử (API lib khác giữa 1.1.x và 1.3.0). Bẫy đã đo: `cdn-mainsite` KHÔNG có 1.1.2 (404) ⇒ đổi domain mà giữ
   1.1.2 là vỡ trang. Thư mục nguồn `libraryMainsite/prod-source/1.3.1/` vẫn là chỗ tra template popup (R-POP) — đó

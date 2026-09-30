@@ -24,7 +24,7 @@ run() { # <tên ca> <FAKE_LIMIT_ON> [args claude...]
   CASE="$TMP/$1"; mkdir -p "$CASE/state"; LOG="$CASE/log"; : > "$LOG"
   local limits="$2"; shift 2
   CLAUDE_CONFIG_DIR=/khong/duoc/lot/vao CLAUDE_BIN="$TMP/claude" CLAUDE_FAILOVER_DIR="$CASE/state" \
-    CLAUDE_FAILOVER_B_DIR=/team-b LOG="$LOG" FAKE_LIMIT_ON="$limits" \
+    CLAUDE_FAILOVER_B_DIR=/team-b CLAUDE_FAILOVER_START="${START:-}" LOG="$LOG" FAKE_LIMIT_ON="$limits" \
     bash "$WRAPPER" "$@" > "$CASE/out" 2>&1
   RC=$?
 }
@@ -50,6 +50,19 @@ expect "cả 2 team vừa hết limit ⇒ dừng sau lần 2" "$(wc -l < "$LOG" 
 expect "cả 2 team hết limit ⇒ mã thoát 1" "$RC" "1"
 grep -q "ca --resume sess-2" "$CASE/out" && { pass=$((pass+1)); echo "  ✓ in lệnh mở lại tay"; } \
   || { fail=$((fail+1)); echo "  ✗ thiếu lệnh mở lại tay: $(cat "$CASE/out")"; }
+
+START=B run startOnB ""
+expect "cB (CLAUDE_FAILOVER_START=B) ⇒ chạy team B bằng config dir B" "$(cat "$LOG")" "team=B dir=/team-b args="
+
+START=B run fromBtoA "1"
+expect "bắt đầu team B, B hết limit ⇒ lần 2 chạy team A, bỏ config dir" "$(line 2 | cut -d' ' -f1-2)" "team=A dir=none"
+expect "lần 2 (từ B sang A) resume đúng session bị cắt" "$(line 2 | cut -d' ' -f3-4)" "args=--resume sess-1"
+
+CASE="$TMP/startBwhenBhit"; mkdir -p "$CASE/state"; date +%s > "$CASE/state/B.last"
+LOG="$CASE/log"; : > "$LOG"
+CLAUDE_FAILOVER_START=B CLAUDE_BIN="$TMP/claude" CLAUDE_FAILOVER_DIR="$CASE/state" CLAUDE_FAILOVER_B_DIR=/team-b \
+  LOG="$LOG" FAKE_LIMIT_ON="" bash "$WRAPPER" > /dev/null 2>&1
+expect "bắt đầu team B nhưng B vừa hết limit ⇒ mở thẳng team A" "$(line 1 | cut -d' ' -f1)" "team=A"
 
 CASE="$TMP/startB"; mkdir -p "$CASE/state"; date +%s > "$CASE/state/A.last"
 LOG="$CASE/log"; : > "$LOG"

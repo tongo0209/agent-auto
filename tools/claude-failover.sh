@@ -1,6 +1,7 @@
 #!/bin/bash
-# Lệnh `ca`: chạy Claude Code, team đang dùng hết limit thì hook limit-failover.sh tắt phiên và wrapper
-# mở lại đúng phiên đó bằng team kia, nhắn nó làm tiếp. Team A = ~/.claude, team B = ~/.claude-teamB.
+# Lệnh `ca` (bắt đầu team A) và `cB` (CLAUDE_FAILOVER_START=B): chạy Claude Code, team đang dùng hết limit thì
+# hook limit-failover.sh tắt phiên và wrapper mở lại đúng phiên đó bằng team kia, nhắn nó làm tiếp.
+# Team A = ~/.claude, team B = ~/.claude-teamB.
 set -uo pipefail
 
 CLAUDE_BIN="${CLAUDE_BIN:-claude}"
@@ -24,8 +25,8 @@ run_as() { # <team> <args claude...>
 
 mkdir -p "$STATE"
 rm -f "$PENDING"
-team=A
-hit_recently A && ! hit_recently B && team=B
+team="${CLAUDE_FAILOVER_START:-A}"
+hit_recently "$team" && ! hit_recently "$(other_team "$team")" && team="$(other_team "$team")"
 run_as "$team" "$@"; rc=$?
 
 while [ -f "$PENDING" ]; do

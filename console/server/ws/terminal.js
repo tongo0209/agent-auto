@@ -16,13 +16,26 @@ const SESSION_TTL_MS = 6 * 3600 * 1000;
 const SWEEP_EVERY_MS = 10 * 60 * 1000;
 
 /**
+ * WebSocket không bị CORS chặn: thiếu kiểm này thì trang web bất kỳ đang mở trên trình duyệt
+ * cũng nối được vào /term và gõ lệnh trên máy. Không có Origin = client không phải trình duyệt.
+ */
+function isAllowedOrigin(origin, port) {
+  if (origin === undefined) return true;
+  return origin === `http://127.0.0.1:${port}` || origin === `http://localhost:${port}`;
+}
+
+/**
  * Mỗi WebSocket = một ĐƯỜNG DÂY nối vào phiên pty (zsh login), không phải chủ sở hữu phiên.
  * Spawn zsh chứ không spawn thẳng `claude` để user tự chủ: claude thoát thì shell còn sống.
  * Phiên neo theo `?id=` do client giữ trong localStorage nên reload trang không giết claude —
  * xem lib/ptyStore.js.
  */
 function attachTerminal(server, wsPath = '/term') {
-  const wss = new WebSocketServer({ server, path: wsPath });
+  const wss = new WebSocketServer({
+    server,
+    path: wsPath,
+    verifyClient: ({ origin }, done) => done(isAllowedOrigin(origin, server.address().port), 403),
+  });
 
   const store = createPtyStore({
     spawn: ({ cols, rows }) =>
@@ -85,4 +98,4 @@ function attachTerminal(server, wsPath = '/term') {
   return wss;
 }
 
-module.exports = { attachTerminal };
+module.exports = { attachTerminal, isAllowedOrigin };

@@ -1,5 +1,5 @@
 #!/bin/bash
-# G-CTX-1: context phiên vượt ngưỡng thì nhắc cắt phiên. Chi phí tăng theo bình phương độ dài phiên
+# G-CTX-1: context phiên vượt ngưỡng thì nhắc chốt việc ra file trước khi auto-compact. Chi phí tăng theo bình phương độ dài phiên
 # vì toàn bộ context được gửi lại mỗi lượt. Hook UserPromptSubmit, không chặn — chỉ chèn nhắc.
 set -uo pipefail
 
@@ -22,5 +22,5 @@ case "$ctx" in ''|*[!0-9]*) exit 0 ;; esac
 [ "$ctx" -gt "$WARN" ] || exit 0
 
 k=$((ctx / 1000))
-printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"[G-CTX-1] Context phiên đang ~%sk token (ngưỡng %sk). Mỗi lượt từ đây gửi lại toàn bộ chỗ đó. Xong pha hiện tại thì nhắc user /clear trước khi sang việc mới — trừ khi việc đang làm cần đúng ngữ cảnh này."}}\n' "$k" "$((WARN / 1000))"
+printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"[G-CTX-1] Context phiên đang ~%sk token (ngưỡng %sk). Phiên sẽ tự compact khi chạm autoCompactWindow (300k) — KHÔNG nhắc user /clear. Việc nhiều pha đang dở: ghi kết quả trung gian (board, file:line, lệnh verify) ra file trước để bản tóm tắt compact không làm rơi."}}\n' "$k" "$((WARN / 1000))"
 exit 0

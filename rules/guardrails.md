@@ -47,7 +47,7 @@ Self-test: `bash ~/.claude/hooks/guard-pm.test.sh` (dùng `HOME` + `GUARD_LOG` t
 
 ## `token-watch.sh` (UserPromptSubmit)
 
-Đọc `transcript_path` từ stdin, tính context của lượt gần nhất. Vượt ngưỡng (mặc định 200.000 token) thì chèn nhắc cắt phiên bằng `/clear`.
+Đọc `transcript_path` từ stdin, tính context của lượt gần nhất. Vượt ngưỡng (mặc định 200.000 token) thì chèn nhắc chốt việc dở ra file — phiên tự compact ở `autoCompactWindow: 300000` (`~/.claude/settings.json`, đặt 30/9/2026 thay cho nhắc `/clear`). Model opus[1m] không đặt window thì chỉ compact gần 1M, nên phiên leo 500–700k.
 
 Vì sao cần — đo thật 22/9/2026 trên 1.792 phiên / 95.943 lượt:
 

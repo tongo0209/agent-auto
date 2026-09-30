@@ -124,4 +124,4 @@ for (const s of sessions.sort((a, b) => weighted(b) - weighted(a)).slice(0, top)
   const proj = s.project.replace(/^-Users-lap17727-/, '').slice(-34);
   console.log(`  ${M(weighted(s))}M  ${String(s.turns).padStart(5)}  ${K(s.peak)}k  ${proj}`);
 }
-console.log('\n  Phiên càng dài càng đắt theo bình phương — cắt bằng /clear giữa các pha.\n');
+console.log('\n  Phiên càng dài càng đắt theo bình phương — đặt autoCompactWindow cho phiên tự compact.\n');

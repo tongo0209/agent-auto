@@ -33,7 +33,7 @@ Tham số: `$ARGUMENTS`.
 
 0. **Cổng phiên dài — việc ĐẦU TIÊN, trước cả đọc sheet:** lượt gọi skill có dòng `[G-CTX-1] Context phiên
    đang ~<n>k` (hook `token-watch`, ngưỡng 200k) ⇒ DỪNG, in đúng 1 dòng: `Phiên đã ~<n>k token — đợt fix
-   ~120 lượt sẽ gửi lại chỗ đó mỗi lượt, chạy chậm ~2×. Gõ /clear rồi dán lại đúng lệnh này.` Args có
+   ~120 lượt sẽ gửi lại chỗ đó mỗi lượt, chạy chậm ~2× và có thể tự compact giữa đợt. Gõ /compact rồi dán lại đúng lệnh này.` Args có
    `--keep-context` ⇒ bỏ qua cổng và gỡ token đó khỏi args trước bước 1. Đo 14 ngày tới 23/9/2026: manager
    chạy ở context TB 265k (có lần vào skill đã 424k); lượt 150–300k mất 23,8s so với 10,2s ở 50–150k.
 

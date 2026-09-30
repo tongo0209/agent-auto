@@ -8,6 +8,8 @@ const SIBLING_REFS = 2;
 const DEFAULT_BASE_STRUCTURE = path.join(os.homedir(), '.claude/knowledge/code-developer/base-structure.md');
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'html-pro', 'optimized', '.git', '.claude']);
 const MIN_REFS_WHEN_MANY = 2;
+const RETIRED_CDN = /global-mainsite\.mto\.zing\.vn/g;
+const RETIRED_CDN_EXT = new Set(['.twig', '.html', '.js', '.json', '.scss']);
 
 const FEATURES = {
   config: { files: ['config.js'], re: /(?:^|[{,])\s*["']?([A-Za-z_]\w*)["']?\s*:/gm },
@@ -66,8 +68,19 @@ for (const m of shown) console.log(`  ${m.feature.padEnd(12)} ${m.value.padEnd(3
 console.log(`\nMỚI có · REF không: ${reds.length ? `🔴 ${reds.length} class MS__/MJ__ lạ` : 'không có class lạ'}${greys.length ? ` (⚪ ${greys.length} mục khác${opts.all ? '' : ', --all để xem'})` : ''}`);
 for (const e of [...reds, ...(opts.all ? greys : [])]) console.log(`  ${e.severity === 'red' ? '🔴' : '⚪'} ${e.feature.padEnd(12)} ${e.value.padEnd(36)} ${e.loc}`);
 if (reds.length) console.log(`\n🔴 hook MS__/MJ__ của libraryMainsite không tự có — kiểm lại documentsClass.txt trước khi giữ.`);
-if (opts.json) fs.writeFileSync(opts.json, JSON.stringify({ campaign, refs, missing, extra }, null, 2));
-process.exit(opts.strict && reds.length ? 1 : 0);
+const retiredCdn = retiredCdnUses(campaign);
+for (const loc of retiredCdn) console.log(`🔴 R-CDN-24 domain global-mainsite đã ngưng → https://cdn-mainsite-aka.vnggames.com/  ${loc}`);
+if (opts.json) fs.writeFileSync(opts.json, JSON.stringify({ campaign, refs, missing, extra, retiredCdn }, null, 2));
+process.exit(opts.strict && (reds.length || retiredCdn.length) ? 1 : 0);
+
+function retiredCdnUses(dir) {
+  return listFiles(dir)
+    .filter((file) => RETIRED_CDN_EXT.has(path.extname(file)))
+    .flatMap((file) => {
+      const text = fs.readFileSync(file, 'utf8');
+      return [...text.matchAll(RETIRED_CDN)].map((m) => `${path.relative(dir, file)}:${lineAt(text, m.index)}`);
+    });
+}
 
 function features(dir) {
   const out = {};

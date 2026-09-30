@@ -65,6 +65,7 @@ Quét 16 campaign 2026 (23/9/2026): cùng một việc viết nhiều kiểu. Ki
 | **R-CDN-21** | SHOULD | Ảnh đục lưu `.jpg`/`.webp` ngay tại nguồn; PNG chỉ cho ảnh có alpha thật |
 | **R-CDN-22** | SHOULD | UI bám màn hình bên trong vùng đã scale: `var(--sr-device-height)` của lib, không `100vh` |
 | **R-CDN-23** | SHOULD | N phần tử cùng hiệu ứng CSS: 1 `@keyframes`, tham số từng phần tử qua CSS var hoặc `animation-delay` âm |
+| **R-CDN-24** | MUST | Code mới chỉ trỏ `https://cdn-mainsite-aka.vnggames.com/` — `global-mainsite.mto.zing.vn` đã ngưng |
 
 ### R-CDN-15 · MUST · Breakpoint chỉ từ `additionalData`
 `webpack.config.js` bơm `$maxWidthMB`/`$minWidthPC` + `@mixin mobile|pc` vào đầu mọi file SCSS (R-CDN-5). File
@@ -195,6 +196,18 @@ Dẫn chứng: `ddtank/2026-chengdu-tournament/assets/navigation/navigation.scss
 N phần tử cùng hiệu ứng: **1** `@keyframes`, tham số từng phần tử truyền qua CSS var (`--dur`, `--delay`) hoặc
 `animation-delay` âm để lệch pha ngay khung đầu; dữ liệu phần tử để trong SCSS list + `@each` (R-LAY-8). Vẫn chỉ
 animate `transform`/`opacity` (R-ANIM-2) và có `prefers-reduced-motion` (R-ANIM-5).
+
+### R-CDN-24 · MUST · Domain CDN: chỉ `cdn-mainsite`
+User chốt 30/9/2026: `global-mainsite.mto.zing.vn` không dùng nữa. Campaign mới, section mới, clone-reskin: mọi URL
+tuyệt đối (link `libraryMainsite` trong `index.html.twig`, `url:` trong `main/html/configProduction.html.twig`,
+asset, ảnh) dùng `https://cdn-mainsite-aka.vnggames.com/`. Clone từ landing cũ mang theo domain cũ ⇒ đổi ngay sau clone.
+
+- Bẫy phiên bản (đo 30/9/2026): `cdn-mainsite` có `libraryMainsite` 1.1.0 · 1.1.1 · 1.3.0 · 1.3.1, **KHÔNG có 1.1.2**
+  (404). Clone từ landing dùng 1.1.2 thì đổi domain thôi là vỡ trang — nâng lên bản pin trong `base-structure.md`
+  (hiện 1.3.0) rồi build + chạy thử, đừng giữ 1.1.2.
+- Landing cũ đang chạy: không quét đổi hàng loạt. Đụng file nào thì đổi file đó; phần còn lại ghi mục 7 Nợ.
+- Cổng: `node ~/VNG/agent-auto/tools/landing-parity.mjs <campaign>` in `🔴 R-CDN-24 … file:line` (không soát `dist/`),
+  `--strict` trả exit 1.
 ```scss
 // ❌ mỗi chấm sáng 1 bản keyframes giống hệt, chỉ khác thời lượng
 @keyframes pulse-a { 50% { opacity: 0.4; } }

@@ -91,6 +91,15 @@ const BASE = w(path.join(ROOT, 'base-structure.md'), `| # | Project | Đường 
   w(path.join(NEW, 'package.json'), JSON.stringify({ scripts: { 'build-dev': 'webpack', 'build-pro': 'x' } }));
   const { code, out } = run([NEW, '--ref', REF, '--strict']);
   check('campaign đủ → sạch, --strict exit 0', code === 0 && /không thiếu gì/.test(out) && /không có class lạ/.test(out), out);
+  check('không có domain CDN cũ thì không báo R-CDN-24', !/R-CDN-24/.test(out), out);
+}
+{
+  w(path.join(NEW, 'assets/main/html/configProduction.html.twig'), `{\n  url: "https://global-mainsite.mto.zing.vn/",\n}\n`);
+  w(path.join(NEW, 'dist/index.html'), '<script src="https://global-mainsite.mto.zing.vn/x.js"></script>');
+  const { code, out } = run([NEW, '--ref', REF, '--strict']);
+  check('domain CDN cũ → 🔴 R-CDN-24 kèm file:line', /🔴 R-CDN-24.*assets\/main\/html\/configProduction\.html\.twig:2/.test(out), out);
+  check('không soát dist/ (bản build)', !/dist\/index\.html/.test(out), out);
+  check('--strict + domain cũ → exit 1', code === 1, String(code));
 }
 
 console.log(`\nlanding-parity.test: ${pass} pass, ${fail} fail`);

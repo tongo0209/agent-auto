@@ -75,7 +75,7 @@ Validate file HTML landing page VNG theo loại promotion. Output bảng Pass/Fa
 ### Bước 0 — Parse arguments
 
 Từ prompt user, extract:
-1. **Loại promotion** (BẮT BUỘC — user tự nhập): match theo thứ tự ưu tiên — (a) STT 1-39, (b) tên trên platform (không phân biệt hoa/thường, chấp nhận thiếu phần "PROMOTIONTYPES."), (c) slug/alias từ bảng trên, (d) checklist phụ: `milestone`/`moc-thuong` → `reference/milestone.md`, `event`/`su-kien` → `reference/event.md` (không tra bảng 39 loại, sang thẳng Bước 2 với file đó). Tên match trùng nhiều STT (VD "RÚT THĂM MAY MẮN & ĐỔI QUÀ V2" khớp cả 24 và 31) → lấy STT nhỏ nhất.
+1. **Loại promotion** (BẮT BUỘC — user tự nhập): match theo thứ tự ưu tiên — (a) STT 1-39, (b) tên trên platform (không phân biệt hoa/thường, chấp nhận thiếu phần "PROMOTIONTYPES." — nhưng xét SAU alias, nên `affiliate` trần ra STT 22), (c) slug/alias từ bảng trên, (d) checklist phụ: `milestone`/`moc-thuong` → `reference/milestone.md`, `event`/`su-kien` → `reference/event.md` (không tra bảng 39 loại, sang thẳng Bước 2 với file đó). Tên match trùng nhiều STT (VD "RÚT THĂM MAY MẮN & ĐỔI QUÀ V2" khớp cả 24 và 31) → lấy STT nhỏ nhất.
 2. **File path** (tuỳ chọn): nếu user cung cấp path hoặc tên file.
 
 **Nếu KHÔNG có loại trong prompt (hoặc gõ không match)**: KHÔNG tự đoán loại từ file, KHÔNG dùng AskUserQuestion để chọn loại. In NGUYÊN VĂN bảng dưới đây ra chat (đủ 39 dòng, không rút gọn) rồi DỪNG chờ user trả lời; câu trả lời của user parse lại theo rule (a)-(d) ở trên:
@@ -162,10 +162,26 @@ Extract path từ tag.
 
 #### 1.3. Verification
 
-Print dòng confirm: `🎯 Target: <path>`
-Đọc file bằng Read tool. Nếu fail → báo lỗi + chuyển Case C.
+KHÔNG Read file HTML — script ở Bước 2 tự đọc. Path không tồn tại → script trả `THIEU_FILE` → chuyển Case C.
 
-### Bước 2 — Load checklist
+### Bước 2 — Chạy script (thay cho soát tay)
+
+```bash
+node ~/VNG/agent-auto/tools/check-promotion.mjs <loại user gõ> <path>
+```
+
+In NGUYÊN VĂN stdout ra chat — đó đã là report đúng format Spec ③. Script đọc bảng 39 loại ở trên + `reference/*.md` + `pm-kit-overrides.tsv` lúc chạy, gameplay payment lấy từ file dự án ⇒ sửa checklist là sửa ở `reference/`, KHÔNG sửa script. Các mục "Spec script ①-③" bên dưới là **spec script thực thi**, model KHÔNG soát tay lại.
+
+| Kết quả | Làm gì |
+|---|---|
+| exit 0 / 1 | in stdout (1 = có Fail) rồi sang Bước 3 |
+| `LOAI_KHONG_KHOP` | in bảng 39 loại ở Bước 0, chờ user |
+| `KHONG_CO_CHECKLIST` | báo lỗi, dừng (Skip rule) |
+| `THIEU_FILE` | Bước 1 Case C |
+
+Script chỉ nhận nút submit của thẻ `a` qua class/id (`submit`, `btn`, `confirm`, `xacnhan`, `dangky`, `nhan`…) — không đọc chữ trên nút. Form bị báo thiếu submit mà dev nói có nút `<a>` chữ "Xác nhận" → mở đúng dòng đó kiểm tay, sai thì sửa regex `SUBMIT_LIKE` kèm test.
+
+### Spec script ① — Load checklist
 
 Tra cột **Checklist** trong bảng ở section "39 promotion type" phía trên để biết file cần load từ `reference/`. Ví dụ: STT 13 (`nap-tien`) → load `reference/13-khuyen-mai-nap.md`; STT 27 → load `reference/27-diem-danh-rut-tham.md` + `reference/02-rut-tham-may-man.md`. Checklist phụ (đã chốt ở Bước 0d): load thẳng `reference/milestone.md` hoặc `reference/event.md`, không tra bảng.
 
@@ -182,11 +198,11 @@ Extract từ (các) file:
 - **KHÔNG** mượn `required_popups` của loại khác (đo 22/9/2026: 4.181 template, không nhóm popup nào ≥60% xuyên loại ⇒ không tồn tại bộ chung để mượn).
 - **KHÔNG** chạy Layer 1 lẫn Layer 2 (không có danh sách để so ⇒ không có cơ sở nói thiếu hay thừa) — chỉ chạy Layer 3.
 - Mở đầu report ghi rõ: "⚠️ Loại `<tên>` (STT X) chưa có checklist riêng — chỉ kiểm CẤU TRÚC popup đang có. Muốn kiểm đủ popup bắt buộc thì cần ≥3 template production của loại này để rút checklist."
-- Icon tổng kết tối đa ◐ (xem Bước 4) — loại này KHÔNG BAO GIỜ ra ✅.
+- Icon tổng kết tối đa ◐ (xem Spec ③) — loại này KHÔNG BAO GIỜ ra ✅.
 
 **Skip rule**: cột Checklist là **—** (STT 35 banner tĩnh) hoặc file map không tồn tại → báo lỗi và dừng, KHÔNG tự dùng checklist loại khác.
 
-### Bước 3 — Parse & validate HTML
+### Spec script ② — Parse & validate HTML
 
 Đọc toàn bộ file HTML target. Thực hiện 3 layer check:
 
@@ -228,7 +244,7 @@ Chỉ check cho popup **đã tồn tại** trong file (trừ item optional). Chu
 
 **QUAN TRỌNG**: Khi check "bên trong popup", giới hạn scope từ tag mở của element popup (`<section id="popup_xxx">` hoặc `<div id="popup_xxx">`) đến tag đóng tương ứng của nó. Không check toàn bộ file.
 
-### Bước 4 — Output kết quả
+### Spec script ③ — Output kết quả
 
 Print output theo format sau:
 
@@ -278,7 +294,7 @@ Print output theo format sau:
 - Tất cả Pass + có warning → ⚠️
 - Tất cả Pass + không warning → ✅
 
-### Bước 5 — Kết thúc
+### Bước 3 — Kết thúc
 
 Sau khi output, KHÔNG tự sửa file. Skill này chỉ báo cáo (read-only).
 

@@ -101,6 +101,15 @@ const BASE = w(path.join(ROOT, 'base-structure.md'), `| # | Project | Đường 
   check('không soát dist/ (bản build)', !/dist\/index\.html/.test(out), out);
   check('--strict + domain cũ → exit 1', code === 1, String(code));
 }
+{
+  fs.rmSync(path.join(NEW, 'assets/main/html/configProduction.html.twig'));
+  const lib = (v) => `https://cdn-mainsite-aka.vnggames.com/products/libraryMainsite/prod-source/${v}/dist/libraryMainsite-${v}`;
+  w(path.join(NEW, 'assets/index.html.twig'), `<link href="${lib('1.3.0')}.css">\n<script src="${lib('1.3.1')}.js"></script>\n`);
+  const { code, out } = run([NEW, '--ref', REF, '--strict']);
+  check('libraryMainsite khác 1.3.0 → 🔴 R-CDN-24 kèm file:line', /🔴 R-CDN-24 libraryMainsite 1\.3\.1.*assets\/index\.html\.twig:2/.test(out), out);
+  check('libraryMainsite 1.3.0 không báo', !/index\.html\.twig:1/.test(out), out);
+  check('--strict + sai bản lib → exit 1', code === 1, String(code));
+}
 
 console.log(`\nlanding-parity.test: ${pass} pass, ${fail} fail`);
 fs.rmSync(ROOT, { recursive: true, force: true });

@@ -10,7 +10,7 @@ const SKIP_DIRS = new Set(['node_modules', 'dist', 'html-pro', 'optimized', '.gi
 const MIN_REFS_WHEN_MANY = 2;
 const RETIRED_CDN = /global-mainsite\.mto\.zing\.vn/g;
 const LIBRARY_LINK = /libraryMainsite-(\d+\.\d+\.\d+)\.(?:js|css)/g;
-const LIBRARY_VERSION = '1.3.0';
+const LIBRARY_VERSION = '1.3.1';
 const CDN_CHECK_EXT = new Set(['.twig', '.html', '.js', '.json', '.scss']);
 
 const FEATURES = {

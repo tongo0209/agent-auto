@@ -16,7 +16,7 @@ chúng nói về *cách cư xử trong repo đó* — không nói **HTML phải 
 | File trong 1 request | `Promotion/index.html`, `Promotion/prod-template-pc.html`, `Promotion/prod-template-mobile.html`, `mainsite/index.html`, `mainsite/index-2.html` (số lượng khác nhau theo request) |
 | Placeholder platform | `<% MODULE_CONTENT %>` nằm ngay sau `<body>` **chỉ ở bản `Promotion/`** — `mainsite/index.html` không có (kiểm `Promotion/index.html:18` vs `mainsite/index.html`) |
 | Đường dẫn asset | **URL CDN tuyệt đối**: `https://cdn-mainsite-aka.vnggames.com/products/<game>/landing/<campaign>/dist/optimized/<section>/images/…` — không có path tương đối |
-| Thư viện | `libraryMainsite-1.3.1.css` + `preload` + `<script>` `libraryMainsite-1.3.1.js` từ cùng CDN |
+| Thư viện | `libraryMainsite-1.3.2.css` + `preload` + `<script>` `libraryMainsite-1.3.2.js` từ cùng CDN |
 | Khung bắt buộc còn lại | `<body class="<locale>">`, `<div class="MS__layer-loading">`, `<div class="layer-rotate">`, `<div id="MS__wrapper" data-audio="">` |
 | Sinh file bàn giao | `cdn-source` không có script. **Dùng `tools/mk-handoff-html.py`** (viết 10/9/2026): `--src dist/index.html --cdn <prefix> --out <file>` sinh + soát, `--check <file...>` soát bản đã có. Nó chặn ghi nếu bản mới làm **mất** hook so với bản cũ |
 

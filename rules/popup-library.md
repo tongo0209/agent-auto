@@ -14,7 +14,7 @@ campaign lại một kiểu. Popup là **design system**, không phải chỗ s�
 | Định dạng | Twig + SCSS + JS | HTML thuần (skeleton) |
 | Ngôn ngữ hợp đồng | `MS__*` (layout lib) + `MJ__*` (hook JS lib) | `pm__*` / `id` / `data-*` (hook JS platform) |
 | Khung | `html/base.html.twig` → `{% extends %}` | `MASTER-<gameplay>.html` → copy khối |
-| Nguồn template mới nhất trong repo | `products/libraryMainsite/prod-source/1.3.1/assets/libraryMainsite-t-popup/` (14 module) | `ai-template-kit/AI-GUIDE.md` → `gameplays/<gameplay>/{AI-RULES,MASTER}-*` (hiện có `luckydraw-gift-exchange`, `payment`) + `components/common/popups/` (login, profile, selectrole, history, inform) |
+| Nguồn template mới nhất trong repo | `products/libraryMainsite/prod-source/1.3.2/assets/libraryMainsite-t-popup/` (14 module) | `ai-template-kit/AI-GUIDE.md` → `gameplays/<gameplay>/{AI-RULES,MASTER}-*` (hiện có `luckydraw-gift-exchange`, `payment`) + `components/common/popups/` (login, profile, selectrole, history, inform) |
 | Campaign tham chiếu sạch | `products/cfl/landing/2026-hanh-trinh-cua-fox/assets/libraryMainsite-t-popup/` (TRỪ `libraryMainsite-t-popup.js`: còn `import html2canvas` chết — R-CDN-25; lấy file JS từ lib 1.3.1) | các request trong `gt-promotion-template/<mã-game>/` |
 
 **Quan hệ hai hệ (user chốt 19/8/2026):** popup **dựng trong cdn-source bằng hệ A**; khi bàn giao thì HTML đã

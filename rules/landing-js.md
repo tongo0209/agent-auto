@@ -26,6 +26,19 @@ chạy). Kiểu tốt thành luật; kiểu chưa tốt ghi ❌ cũ / ✅ chuẩ
 | Config runtime | `varMS` (`H5`, `scaleWidthPC/MB`) khai trong `main/html/configProduction.html.twig` | điều kiện theo loại trang đọc từ `varMS` |
 | Ngôn ngữ | tên quà `names[$("body").attr("class")][indexWord]` và câu hết lượt `notEnoughCp[$("body").attr("class")]` (khoá `en` `vn` `id` `cn` `th`) — tra theo **nguyên chuỗi class của `<body>`**; lib không dùng `<html lang>` để chọn ngôn ngữ | JS đọc ngôn ngữ cùng nguồn đó (R-JS-13); body chỉ mang 1 mã (R-STR-9) |
 
+## API dùng chung từ 1.3.2 (dự án mới — R-CDN-24; `cdn-source` `780e066b7`)
+Có sẵn thì DÙNG, không tự viết lại (đo 30/9/2026: mỗi thứ dưới đây đang bị chép tay ở 20–52 campaign).
+
+| Cần | Gọi | Thay cho |
+|---|---|---|
+| Nối engine promotion | `window.libraryMainsite.promotion` — `url/debug/directory/items/names` tự lấy từ `window.prodTemplate` nếu không truyền; option `offClass` (mặc định `MS__off`), `messages: { notEnoughCp, network, missingType }` | chép `promotion3.js` · chép tay `url: prodTemplate.url, …` |
+| Quay ô sáng dần tới ô đích | `libraryMainsite.gridSpin($items, targetIndex, { activeClass='active', loops=2, stepMs=80, finalStepMs=210, holdMs=300, randomSteps=0 })` → Promise ra `targetIndex`; `.duration` gán `timeWait` (R-JS-2). `targetIndex` đếm từ 0 | `LOOP_DELAY` / `animationRandom` / `calculateAnimationTime` |
+| Chờ | `await libraryMainsite.wait(ms)` | class `Core.wait` tự viết |
+| Chờ vendor sẵn | `await libraryMainsite.ready('swiper'\|'fancybox'\|'lodash')` — vendor chưa bật trong `varMS.bundles` thì reject kèm hướng dẫn | vòng `typeof Swiper === 'undefined'` + `setTimeout` |
+| Lớp phủ "xoay ngang máy" (trang KHÔNG H5) | `varMS.rotateOverlay: true` — mặc định tắt; lib tự chèn `.rotate-phone` nếu trang chưa có | `checkRotateScreen` + `.layer-rotate` tự viết |
+
+Lưu ý: không truyền `url` mà `prodTemplate.url` có giá trị ⇒ engine POST tới đó (1.3.1 để `""`). `prodTemplate.textNotEnough` có giá trị thì vẫn thắng `messages.notEnoughCp`.
+
 ## Luật
 
 | ID | Sev | Luật (chi tiết + ví dụ ở mục dưới) |

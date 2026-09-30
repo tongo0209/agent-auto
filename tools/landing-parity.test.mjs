@@ -104,14 +104,14 @@ const BASE = w(path.join(ROOT, 'base-structure.md'), `| # | Project | Đường 
 {
   fs.rmSync(path.join(NEW, 'assets/main/html/configProduction.html.twig'));
   const lib = (v) => `https://cdn-mainsite-aka.vnggames.com/products/libraryMainsite/prod-source/${v}/dist/libraryMainsite-${v}`;
-  w(path.join(NEW, 'assets/index.html.twig'), `<link href="${lib('1.3.1')}.css">\n<script src="${lib('1.3.0')}.js"></script>\n`);
+  w(path.join(NEW, 'assets/index.html.twig'), `<link href="${lib('1.3.2')}.css">\n<script src="${lib('1.3.1')}.js"></script>\n`);
   const { code, out } = run([NEW, '--ref', REF, '--strict']);
-  check('libraryMainsite khác 1.3.1 → 🔴 R-CDN-24 kèm file:line', /🔴 R-CDN-24 libraryMainsite 1\.3\.0.*assets\/index\.html\.twig:2/.test(out), out);
-  check('libraryMainsite 1.3.1 không báo', !/index\.html\.twig:1/.test(out), out);
+  check('libraryMainsite khác 1.3.2 → 🔴 R-CDN-24 kèm file:line', /🔴 R-CDN-24 libraryMainsite 1\.3\.1.*assets\/index\.html\.twig:2/.test(out), out);
+  check('libraryMainsite 1.3.2 không báo', !/index\.html\.twig:1/.test(out), out);
   check('--strict + sai bản lib → exit 1', code === 1, String(code));
 }
 {
-  const lib = 'https://cdn-mainsite-aka.vnggames.com/products/libraryMainsite/prod-source/1.3.1/dist/libraryMainsite-1.3.1';
+  const lib = 'https://cdn-mainsite-aka.vnggames.com/products/libraryMainsite/prod-source/1.3.2/dist/libraryMainsite-1.3.2';
   w(path.join(NEW, 'assets/index.html.twig'), `<link href="${lib}.css">\n`);
   const popup = path.join(NEW, 'assets/libraryMainsite-t-popup/libraryMainsite-t-popup.js');
   w(popup, `import html2canvas from 'html2canvas';\nwindow.saveDom = html2canvas;\nfunction resizeCanvas(c) {\n  return c;\n}\nwindow.getScreenshotDiv = function () {\n  html2canvas(document.body).then(resizeCanvas);\n};\n`);

@@ -65,7 +65,7 @@ Quét 16 campaign 2026 (23/9/2026): cùng một việc viết nhiều kiểu. Ki
 | **R-CDN-21** | SHOULD | Ảnh đục lưu `.jpg`/`.webp` ngay tại nguồn; PNG chỉ cho ảnh có alpha thật |
 | **R-CDN-22** | SHOULD | UI bám màn hình bên trong vùng đã scale: `var(--sr-device-height)` của lib, không `100vh` |
 | **R-CDN-23** | SHOULD | N phần tử cùng hiệu ứng CSS: 1 `@keyframes`, tham số từng phần tử qua CSS var hoặc `animation-delay` âm |
-| **R-CDN-24** | MUST | Code mới chỉ trỏ `https://cdn-mainsite-aka.vnggames.com/` (`global-mainsite.mto.zing.vn` đã ngưng) và nạp đúng `libraryMainsite` **1.3.1** |
+| **R-CDN-24** | MUST | Code mới chỉ trỏ `https://cdn-mainsite-aka.vnggames.com/` (`global-mainsite.mto.zing.vn` đã ngưng) và nạp đúng `libraryMainsite` **1.3.2** |
 | **R-CDN-25** | MUST | Không import thư viện nặng mà không gọi (`html2canvas` ~195KB): trang không chụp ảnh thì bỏ cả import lẫn hàm chụp |
 
 ### R-CDN-15 · MUST · Breakpoint chỉ từ `additionalData`
@@ -198,21 +198,23 @@ N phần tử cùng hiệu ứng: **1** `@keyframes`, tham số từng phần t�
 `animation-delay` âm để lệch pha ngay khung đầu; dữ liệu phần tử để trong SCSS list + `@each` (R-LAY-8). Vẫn chỉ
 animate `transform`/`opacity` (R-ANIM-2) và có `prefers-reduced-motion` (R-ANIM-5).
 
-### R-CDN-24 · MUST · Domain CDN: chỉ `cdn-mainsite` · `libraryMainsite` 1.3.1
+### R-CDN-24 · MUST · Domain CDN: chỉ `cdn-mainsite` · `libraryMainsite` 1.3.2
 User chốt 30/9/2026: `global-mainsite.mto.zing.vn` không dùng nữa. Campaign mới, section mới, clone-reskin: mọi URL
 tuyệt đối (link `libraryMainsite` trong `index.html.twig`, `url:` trong `main/html/configProduction.html.twig`,
 asset, ảnh) dùng `https://cdn-mainsite-aka.vnggames.com/`. Clone từ landing cũ mang theo domain cũ ⇒ đổi ngay sau clone.
 
-- Phiên bản: task mới nạp **đúng `libraryMainsite-1.3.1.css` + `.js`** (user chốt 30/9/2026, thay pin 1.3.0 cùng ngày).
+- Phiên bản: task mới nạp **đúng `libraryMainsite-1.3.2.css` + `.js`** (user chốt 30/9/2026: tính năng mới vào BẢN MỚI,
+  không sửa bản trang đang chạy dùng). 1.3.2 = 1.3.1 dưới đây + API dùng chung (xem `landing-js.md` "Facts về lib").
+  Lịch sử cùng ngày: pin 1.3.0 → 1.3.1 → 1.3.2.
   1.3.1 = 1.3.0 + tối ưu `OPTIMIZATION_REPORT.md` (debounce resize, orientationchange, tách đọc/ghi DOM, bỏ log). Nó
   tách từ 19/3 nên từng THIẾU 2 fix của 1.3.0 — đã bê sang ở `cdn-source` `cf88065a4`: vendor từ `cdn-mainsite`
   (`e7e7d84f3`) + `scrollFrame.init()` chạy cả mobile (`82e27ecdc`, file giờ trùng byte với 1.3.0). Đo sau khi bê:
   dist js chỉ khác đúng fix scrollFrame; tqht 1.3.0 ↔ 1.3.1 chụp PC 10 lượt lệch 0 px; jxm/tqht PC+MB số scale,
   `MS__pc/mb`, vendor trùng. **Bản vá chỉ lên CDN sau khi push `cdn-source`** — trước đó CDN 1.3.1 còn gọi
   `global-mainsite`. Clone từ landing 1.1.x/1.3.0 ⇒ đổi cả domain lẫn bản, build rồi chạy thử. Bẫy: `cdn-mainsite`
-  KHÔNG có 1.1.2 (404). Thư mục `prod-source/1.3.1/assets/libraryMainsite-t-popup/` vẫn là nguồn template popup (R-POP).
+  KHÔNG có 1.1.2 (404). Nguồn template popup: `prod-source/1.3.2/assets/libraryMainsite-t-popup/` (R-POP).
 - Landing cũ đang chạy: không quét đổi hàng loạt. Đụng file nào thì đổi file đó; phần còn lại ghi mục 7 Nợ.
-- Cổng: `node ~/VNG/agent-auto/tools/landing-parity.mjs <campaign>` in `🔴 R-CDN-24 … file:line` cho domain cũ và cho link `libraryMainsite-<bản ≠ 1.3.1>` (không soát `dist/`),
+- Cổng: `node ~/VNG/agent-auto/tools/landing-parity.mjs <campaign>` in `🔴 R-CDN-24 … file:line` cho domain cũ và cho link `libraryMainsite-<bản ≠ 1.3.2>` (không soát `dist/`),
   `--strict` trả exit 1.
 ```scss
 // ❌ mỗi chấm sáng 1 bản keyframes giống hệt, chỉ khác thời lượng

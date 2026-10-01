@@ -30,8 +30,8 @@
     <div id="radar-bar"></div>
 
     <div class="tabs" role="tablist">
-      <button type="button" class="tab active" data-tab="today" role="tab">Hôm nay <span class="count" id="today-count"></span></button>
-      <button type="button" class="tab" data-tab="overview" role="tab">Tổng quan</button>
+      <button type="button" class="tab active" data-tab="overview" role="tab">Tổng quan</button>
+      <button type="button" class="tab" data-tab="today" role="tab">Hôm nay <span class="count" id="today-count"></span></button>
       <button type="button" class="tab" data-tab="review" role="tab">Review <span class="count" id="review-count"></span></button>
       <button type="button" class="tab" data-tab="bugs" role="tab">Bug <span class="count" id="bug-count"></span></button>
       <button type="button" class="tab" data-tab="months" role="tab">Theo tháng</button>
@@ -39,7 +39,7 @@
     </div>
 
     <!-- Tab: Hôm nay — hàng đợi "Làm gì tiếp" (server gom ở /api/queue) -->
-    <section class="pane active" id="pane-today">
+    <section class="pane" id="pane-today">
       <div class="rowline">
         <h2>Làm ngay <span class="count" id="queue-now-count"></span>
           <span class="srcnote">cảnh báo · Cần bạn · review · bug — gấp nhất lên đầu</span></h2>
@@ -78,7 +78,7 @@
     </section>
 
     <!-- Tab: Tổng quan — mốc 14 ngày · timeline · bảng task · log board -->
-    <section class="pane" id="pane-overview">
+    <section class="pane active" id="pane-overview">
       <h2>Mốc 14 ngày tới</h2>
       <div class="week" id="week"><span class="empty-note">Đang đọc mốc…</span></div>
       <div id="weekwarn"></div>

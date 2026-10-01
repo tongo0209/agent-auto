@@ -151,6 +151,23 @@ const byRankThenDue = (a, b) =>
   (a.due || '9999').localeCompare(b.due || '9999') ||
   a.key.localeCompare(b.key);
 
+/** Cùng ticket nhiều lý do (mốc gấp · file chưa commit · đứng yên) gộp một dòng; dòng "Cần bạn" là checkbox nên đứng riêng */
+function groupByTicket(sorted) {
+  const out = [];
+  const byKey = new Map();
+  for (const item of sorted) {
+    const head = item.key && item.source !== 'need' && byKey.get(item.key);
+    if (!head) {
+      out.push(item);
+      if (item.key && item.source !== 'need') byKey.set(item.key, item);
+      continue;
+    }
+    if (!head.reasons) head.reasons = [{ id: head.id, text: head.text, level: head.level }];
+    head.reasons.push({ id: item.id, text: item.text, level: item.level });
+  }
+  return out.map((i) => (i.reasons ? { ...i, ids: i.reasons.map((r) => r.id) } : i));
+}
+
 function buildQueue({ today, issues, alerts, doctor, board, debt, review, bugs, snoozes }) {
   const all = [
     ...doctorItems(doctor),
@@ -168,7 +185,7 @@ function buildQueue({ today, issues, alerts, doctor, board, debt, review, bugs, 
     if (snooze) out.snoozed.push({ ...item, snoozedUntil: snooze.until });
     else out[item.group].push(item);
   }
-  out.now.sort(byRankThenDue);
+  out.now = groupByTicket(out.now.sort(byRankThenDue));
   out.waiting.sort(byRankThenDue);
   return out;
 }

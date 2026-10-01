@@ -65,9 +65,8 @@ button {
   line-height: 1.5;
 }
 
-/* Scrollbar mảnh — dải tuần / list commit / cột trái */
+/* Scrollbar mảnh — list commit / cột trái */
 .left,
-.week,
 .ttabs,
 .commits,
 #modal-body {
@@ -75,7 +74,6 @@ button {
   scrollbar-color: var(--line) transparent;
 }
 .left::-webkit-scrollbar,
-.week::-webkit-scrollbar,
 .ttabs::-webkit-scrollbar,
 .commits::-webkit-scrollbar,
 #modal-body::-webkit-scrollbar {
@@ -83,7 +81,6 @@ button {
   height: 7px;
 }
 .left::-webkit-scrollbar-thumb,
-.week::-webkit-scrollbar-thumb,
 .ttabs::-webkit-scrollbar-thumb,
 .commits::-webkit-scrollbar-thumb,
 #modal-body::-webkit-scrollbar-thumb {
@@ -91,7 +88,6 @@ button {
   border-radius: 4px;
 }
 .left::-webkit-scrollbar-track,
-.week::-webkit-scrollbar-track,
 .commits::-webkit-scrollbar-track {
   background: transparent;
 }

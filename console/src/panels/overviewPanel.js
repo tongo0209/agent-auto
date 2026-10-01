@@ -20,6 +20,7 @@ import { openTicket } from '@panels/ticketPanel';
 import { ganttTimeline } from '@components/gantt';
 import { effortCell, activityDetail } from '@components/activityLine';
 import { bindBoardAppend } from '@components/boardAppend';
+import { toast } from '@components/toast';
 
 const ACTIVITY_REFRESH_MS = 30000;
 /** Log board thiếu giờ thật: skill phải lấy `date +%H:%M`, không được ghi placeholder */
@@ -144,7 +145,7 @@ export function renderOverview(data) {
   $('#jira-link').attr('href', site + '/issues/?jql=' + encodeURIComponent(data.config?.jql || 'assignee = currentUser()'));
   if (data.config?.dashboardUrl) $('#dash-link').attr('href', data.config.dashboardUrl);
 
-  renderWeek(data.week || []);
+  renderDeadlineWarning(data.week || []);
   // Timeline: ticket ĐÃ XONG phần mình vẫn có hàng (vẽ mờ) chừng nào còn mốc tương lai — FE xong
   // không phải hết việc, Test/Release của BE/QC mới là lúc bug quay lại và cần canh. Hết mốc
   // tương lai thì bỏ hẳn hàng. Ticket ĐÃ CHUYỂN NGƯỜI thì không vẽ: việc không còn bên mình.
@@ -176,18 +177,7 @@ export function renderOverview(data) {
   $('#metrics-foot').text('metrics: ' + (data.metricsCount || 0) + ' bản ghi');
 }
 
-function renderWeek(week) {
-  $('#week').html(
-    week
-      .map(
-        (w) => `<div class="wk" style="--sev:var(--${severityByDays(w.days)})">
-          <div class="d">${shortDate(w.date)} · còn ${w.days}d</div>
-          <div class="t">${escapeHtml(MILESTONE_LABEL[w.name] || w.name)}</div>
-          <div class="m">${escapeHtml(w.key)}</div></div>`
-      )
-      .join('') || '<span class="empty-note">Không có mốc nào trong 14 ngày tới.</span>'
-  );
-
+function renderDeadlineWarning(week) {
   const htmlMilestones = week.filter((w) => w.name === 'html');
   let warning = '';
   for (let i = 1; i < htmlMilestones.length; i++) {
@@ -386,8 +376,8 @@ function rerenderTasks() {
     `<table class="ttable" style="--actw:${actW}px"><thead><tr>
       <th class="c-key">Ticket</th><th class="c-title">Việc <span class="thhint">· icon = design</span></th>
       <th class="c-phase">Phase</th><th class="c-due">Mốc kế</th>
-      <th class="c-gate">Gate</th><th class="c-push">Push</th><th class="c-effort">Effort</th>
-      <th class="c-act"><span class="sr">Hành động</span></th>
+      <th class="c-gate">Gate</th><th class="c-push">Push</th><th class="c-effort" title="Số commit · số dòng code đã thêm — bấm ô để xem từng commit">Commit</th>
+      <th class="c-act">Mở</th>
     </tr></thead><tbody>${body}</tbody></table>`
   );
 }
@@ -414,12 +404,12 @@ function renderLog(log) {
 
 async function openPath(app, root, sub) {
   if (!root) {
-    window.alert('Chưa cấu hình đường dẫn cho hành động này (kiểm tra config.json).');
+    toast('Chưa cấu hình đường dẫn cho hành động này (kiểm tra config.json).');
     return;
   }
   try {
     await api.open(app, sub ? root + '/' + sub : root);
   } catch (err) {
-    window.alert('Không mở được: ' + (err.responseJSON?.error || err.statusText || 'lỗi không rõ'));
+    toast('Không mở được: ' + (err.responseJSON?.error || err.statusText || 'lỗi không rõ'));
   }
 }

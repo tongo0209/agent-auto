@@ -9,6 +9,8 @@
   background: var(--panel);
   border-bottom: 1px solid var(--line);
   margin-bottom: 4px;
+  /* .left là flex dọc: thiếu dòng này thì tab có nội dung dài (Review ~4000px) bóp dãy tab lùn đi ~9px */
+  flex-shrink: 0;
 }
 .tab {
   background: none;

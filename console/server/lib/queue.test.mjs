@@ -22,7 +22,7 @@ const base = (over = {}) => ({
   snoozes: {},
   ...over,
 });
-const ids = (list) => list.map((i) => i.id);
+const ids = (list) => list.flatMap((i) => i.ids || [i.id]);
 
 test('alert crit lên now hạng 0, warn xuống hạng 3, sort theo hạng rồi mốc kế', () => {
   const q = buildQueue(
@@ -120,9 +120,9 @@ test('review chỉ lên khi có việc thật; bug chờ duyệt gom 1 dòng/she
     })
   );
   assert.deepStrictEqual(ids(q.now), ['bugs:s1', 'review:GW-1', 'review:GW-3']);
-  assert.match(q.now[0].text, /2 bug/);
-  assert.match(q.now[1].text, /4 file chưa commit/);
-  assert.match(q.now[2].text, /2 commit chưa push/);
+  assert.match(q.now[0].reasons[0].text, /2 bug/);
+  assert.match(q.now[0].reasons[1].text, /4 file chưa commit/);
+  assert.match(q.now[1].text, /2 commit chưa push/);
 });
 
 test('nợ: mỗi mục 1 dòng, cũ nhất lên đầu, tick ghi về board gốc', () => {
@@ -200,4 +200,29 @@ test('applySnooze ghi/bỏ hoãn; pruneSnoozes dọn mục hết hạn', () => {
   assert.deepStrictEqual(pruneSnoozes({ a: { until: '2026-10-01' }, b: { until: '2026-10-05' } }, '2026-10-01'), {
     b: { until: '2026-10-05' },
   });
+});
+
+test('nhiều lý do cùng ticket gộp MỘT dòng: lý do gấp nhất đứng đầu và giữ nút của nó — ca thật GW-856 1/10', () => {
+  const q = buildQueue(
+    base({
+      alerts: [
+        { key: 'GW-1', code: 'stale', level: 'warn', text: 'đứng yên 2 ngày' },
+        { key: 'GW-1', code: 'html-urgent', level: 'crit', text: 'còn 1 ngày' },
+        { key: 'GW-2', code: 'stale', level: 'warn', text: 'đứng yên' },
+      ],
+      review: [{ key: 'GW-1', dirty: 4, unpushed: 0 }],
+      board: { boardDate: TODAY, needYou: ['GW-1: hỏi PM'] },
+    })
+  );
+  const gw1 = q.now.filter((i) => i.key === 'GW-1' && i.source !== 'need');
+  assert.strictEqual(gw1.length, 1);
+  assert.strictEqual(gw1[0].level, 'crit');
+  assert.deepStrictEqual(gw1[0].action, { kind: 'ticket', key: 'GW-1' });
+  assert.deepStrictEqual(
+    gw1[0].reasons.map((r) => r.text),
+    ['còn 1 ngày', '4 file chưa commit', 'đứng yên 2 ngày']
+  );
+  assert.deepStrictEqual(gw1[0].ids, ['alert:html-urgent:GW-1', 'review:GW-1', 'alert:stale:GW-1']);
+  assert.ok(q.now.some((i) => i.source === 'need'), 'dòng "Cần bạn" là checkbox riêng, không gộp');
+  assert.strictEqual(q.now.find((i) => i.key === 'GW-2').reasons, undefined);
 });

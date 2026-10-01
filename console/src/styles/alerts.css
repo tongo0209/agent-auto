@@ -5,8 +5,8 @@
   align-items: center;
   gap: 7px;
   cursor: pointer;
-  padding: 6px 10px;
-  margin-bottom: 8px;
+  padding: 3px 9px;
+  white-space: nowrap;
   border-radius: var(--r-sm);
   background: var(--raise);
   border: 1px solid var(--line);
@@ -22,20 +22,17 @@
 .radarbar {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 4px 2px;
-  margin-bottom: 8px;
+  gap: 6px;
+  white-space: nowrap;
   color: var(--muted);
   font-size: var(--fs-xs);
-}
-.radarbar .btn {
-  margin-left: auto;
 }
 .radarbar.dead {
   color: var(--crit);
   font-weight: 600;
 }
 .deltalist {
+  margin-top: 8px;
   padding: 8px 10px;
   margin-bottom: 8px;
   border-radius: var(--r-sm);
@@ -76,4 +73,37 @@
   color: var(--ok);
   border: 1px solid var(--line);
   font-size: var(--fs);
+}
+
+/* ---- Thông báo nổi góc dưới (components/toast.js) ---- */
+.toast {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 50;
+  max-width: 520px;
+  padding: 9px 13px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--raise);
+  color: var(--ink);
+  font-size: var(--fs);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+}
+.toast.show {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.toast.crit {
+  border-color: var(--crit);
+  color: var(--crit);
+}
+.toast.ok {
+  border-color: var(--ok);
+  color: var(--ok);
 }

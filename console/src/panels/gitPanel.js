@@ -33,6 +33,12 @@ export async function loadGit() {
     return;
   }
 
+  // Đầu tháng (1/10) tháng hiện tại còn trống — lần mở đầu tiên lùi về tháng trước thay vì vẽ biểu đồ rỗng
+  if (month === null && !data.commits.length && data.months[1]) {
+    month = data.months[1];
+    loading = false;
+    return loadGit();
+  }
   month = data.month;
   $('#git-author').text(data.author);
   $('#git-count').text(`(${data.commits.length})`);

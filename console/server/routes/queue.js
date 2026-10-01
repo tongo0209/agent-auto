@@ -3,11 +3,10 @@ const { file } = require('../lib/paths');
 const { readJSON, todayStr } = require('../lib/fsutil');
 const { writeAtomic } = require('../lib/backup');
 const { through } = require('../lib/cache');
-const { readBoard, readAllNeedYou } = require('../lib/board');
-const { buildDebt } = require('../lib/debt');
+const { readBoard } = require('../lib/board');
 const { buildBugs } = require('../lib/bugs');
 const { reviewForIssues } = require('../lib/review');
-const { currentAlerts, currentDoctor } = require('../lib/sources');
+const { currentAlerts, currentDoctor, currentDebt } = require('../lib/sources');
 const { buildQueue, applySnooze, pruneSnoozes } = require('../lib/queue');
 
 const router = Router();
@@ -33,7 +32,7 @@ router.get('/queue', async (_req, res) => {
       alerts: alerts.items,
       doctor,
       board: readBoard(),
-      debt: buildDebt({ boards: readAllNeedYou(), today, state }),
+      debt: currentDebt(state, today),
       review: review.value,
       bugs: [...pending.verified, ...pending.unverified],
       snoozes: readJSON(file.snooze, {}),

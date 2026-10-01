@@ -29,9 +29,10 @@ const ownerKey = (text) => (String(text ?? '').match(/\bGW-\d+/) || [null])[0];
  * @param boards [{ date, items }] — `items` từ lib/needyou.js::parseNeedYou
  * @param today  'YYYY-MM-DD'
  * @param state  state.json — đọc phase + loại ticket đã ra khỏi tay (vocab::isOffMyPlate)
+ * @param archived lastSeenIssues(history/issues.jsonl) — ticket đã rời state.json (GW-654 reassigned còn 11 mục nợ 1/10)
  * @returns { groups, counts }
  */
-function buildDebt({ boards = [], today = '', state = {} } = {}) {
+function buildDebt({ boards = [], today = '', state = {}, archived = {} } = {}) {
   /**
    * "Board hiện tại" phải hiểu ĐÚNG NHƯ `lib/board.js::readBoard`: board hôm nay nếu có, không
    * thì board MỚI NHẤT. Đó chính là board đang hiện ở khối "Cần bạn" của tab Hôm nay.
@@ -81,7 +82,7 @@ function buildDebt({ boards = [], today = '', state = {} } = {}) {
       }
       // Ticket đã đóng / đã chuyển người thì việc cũ của nó không còn là nợ của mình (189/254
       // mục đo ngày 21/9 nằm ở đây). Việc KHÔNG gắn ticket vẫn giữ: không suy ra được là đã đóng.
-      if (key && isOffMyPlate(state.issues?.[key])) continue;
+      if (key && isOffMyPlate(state.issues?.[key] || archived[key])) continue;
       dropped++;
       if (!byKey.has(key)) byKey.set(key, []);
       byKey.get(key).push({ date: b.date, index: item.index, text: item.text, staleDays });
@@ -105,4 +106,6 @@ function buildDebt({ boards = [], today = '', state = {} } = {}) {
   return { groups, radarDate, counts: { dropped, tickets: groups.length, inRadar } };
 }
 
-module.exports = { ownerKey, buildDebt };
+const lastSeenIssues = (rows) => Object.fromEntries(rows.map((r) => [r.key, r]));
+
+module.exports = { ownerKey, buildDebt, lastSeenIssues };

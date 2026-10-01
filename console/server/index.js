@@ -11,8 +11,7 @@ const { readJSON, readJSONL, todayStr } = require('./lib/fsutil');
 const { appendJSONL } = require('./lib/backup');
 const { buildAlerts } = require('./lib/alerts');
 const { notifyNewCrits, sendNotification } = require('./lib/notify');
-const { readAllNeedYou } = require('./lib/board');
-const { buildDebt } = require('./lib/debt');
+const { currentDebt } = require('./lib/sources');
 
 // Credential Jira (JIRA_EMAIL/JIRA_TOKEN) cho nút đánh Done. Không có file cũng chạy bình thường
 // — chỉ mỗi nút Done báo thiếu token. File nằm trong .gitignore.
@@ -102,7 +101,7 @@ async function notifyTick() {
     const today = todayStr();
     // Nợ đọng dựng tại đây (đọc board, rẻ) để nó cũng được nhắc RA NGOÀI trang — đúng lý do
     // vòng soi này tồn tại: việc rơi khỏi radar thì không ai mở tab để thấy nó.
-    const debt = buildDebt({ boards: readAllNeedYou(), today, state });
+    const debt = currentDebt(state, today);
     const alerts = buildAlerts(state, today, {}, debt);
     const log = readJSONL(file.notified);
     const config = readJSON(file.config, {});

@@ -1,12 +1,16 @@
 const path = require('path');
 const { AGENT_AUTO, file } = require('./paths');
-const { readJSON, todayStr } = require('./fsutil');
+const { readJSON, readJSONL, todayStr } = require('./fsutil');
 const { through } = require('./cache');
 const { activityForIssue } = require('./activity');
 const { buildAlerts } = require('./alerts');
 const { readAllNeedYou } = require('./board');
-const { buildDebt } = require('./debt');
+const { buildDebt, lastSeenIssues } = require('./debt');
 const { isOffMyPlate } = require('./vocab');
+
+/** Nợ đọng — kèm dòng quét cuối của ticket đã rời state.json để không đòi nợ ticket đã chuyển người */
+const currentDebt = (state, today, boards = readAllNeedYou()) =>
+  buildDebt({ boards, today, state, archived: lastSeenIssues(readJSONL(file.issues)) });
 
 const ACTIVITY_TTL = 60000; // git log per-path nặng; "đứng yên" đổi theo ngày, không theo giây
 
@@ -24,7 +28,7 @@ async function currentAlerts() {
     return map;
   });
 
-  const debt = buildDebt({ boards: readAllNeedYou(), today, state });
+  const debt = currentDebt(state, today);
   return { items: buildAlerts(state, today, activity, debt), today };
 }
 
@@ -48,4 +52,4 @@ async function currentDoctor() {
   }
 }
 
-module.exports = { currentAlerts, currentDoctor };
+module.exports = { currentAlerts, currentDoctor, currentDebt };

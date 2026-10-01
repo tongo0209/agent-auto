@@ -303,3 +303,28 @@ test('board hôm nay có mục CÒN MỞ của ticket thì vẫn là radan bình
   ]);
   assert.deepEqual(out.groups, []);
 });
+
+test('ticket đã rời state.json nhưng lượt quét cuối ghi reassigned ⇒ không còn là nợ — ca thật GW-654/GW-592 1/10', () => {
+  const out = buildDebt({
+    boards: [
+      { date: '2026-08-10', items: [it('GW-654: còn nợ bàn giao'), it('GW-999: ticket lạ')].map((x, i) => ({ ...x, index: i })) },
+      { date: '2026-08-12', items: [] },
+    ],
+    today: '2026-08-12',
+    state: { issues: {} },
+    archived: { 'GW-654': { phase: 'reassigned' } },
+  });
+  assert.deepEqual(
+    out.groups.map((g) => g.key),
+    ['GW-999']
+  );
+});
+
+test('lastSeenIssues giữ dòng MỚI NHẤT của mỗi ticket', () => {
+  const rows = [
+    { key: 'GW-1', phase: 'coding' },
+    { key: 'GW-2', phase: 'coding' },
+    { key: 'GW-1', phase: 'reassigned' },
+  ];
+  assert.deepEqual(debt.lastSeenIssues(rows), { 'GW-1': rows[2], 'GW-2': rows[1] });
+});

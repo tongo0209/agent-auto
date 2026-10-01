@@ -43,9 +43,11 @@ body.dragging .terms {
 }
 .head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 10px;
 }
 .brand {
   display: flex;
@@ -75,11 +77,16 @@ h1 {
 .conn.bad {
   color: var(--crit);
 }
+.headside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
 .links {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  text-align: right;
+  gap: 10px;
 }
 .links a {
   color: var(--accent);

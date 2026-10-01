@@ -12,11 +12,17 @@ import { showDiff } from '@components/modal';
  */
 const CO_AUTHOR = 'Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>';
 let ctx = { terminals: null, items: [], gates: {} };
+/** Nhóm "task sạch" đang mở — giữ ngoài DOM vì tab vẽ lại mỗi lượt poll */
+let cleanOpen = false;
 
 export function initReviewPanel({ terminals }) {
   ctx.terminals = terminals;
 
   $('#review')
+    // 'toggle' của <details> không nổi bọt nên không uỷ quyền được — bắt click summary (chạy TRƯỚC khi đổi open)
+    .on('click', '#review-clean > summary', () => {
+      cleanOpen = !$('#review-clean').prop('open');
+    })
     .on('click', '[data-diff-repo]', function () {
       const repo = $(this).data('diff-repo');
       const file = $(this).data('diff-file');
@@ -89,7 +95,14 @@ export async function loadReview() {
     );
     return;
   }
-  $('#review').html(ctx.items.map(card).join(''));
+  const clean = ctx.items.filter((i) => !i.dirty && !i.unpushed);
+  const cleanBox = clean.length
+    ? `<details class="foldbox" id="review-clean"${cleanOpen ? ' open' : ''}>
+        <summary>${clean.length} task sạch · đã đẩy <span class="srcnote">không còn gì để commit/push</span></summary>
+        ${clean.map(card).join('')}</details>`
+    : '';
+  const empty = withWork.length ? '' : '<span class="empty-note">Không còn file chưa commit hay commit chưa push.</span>';
+  $('#review').html(empty + withWork.map(card).join('') + cleanBox);
 }
 
 function card(item) {

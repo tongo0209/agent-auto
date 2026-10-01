@@ -97,3 +97,58 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* Lý do phụ của dòng đã gộp theo ticket */
+.qmore {
+  color: var(--muted);
+}
+
+/* ---- Dải "N việc làm ngay" đầu tab Tổng quan ---- */
+.nowstrip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 10px 0 2px;
+  padding: 7px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs);
+  text-align: left;
+}
+button.nowstrip {
+  cursor: pointer;
+}
+.nowstrip.crit {
+  background: var(--crit-bg);
+  border-color: color-mix(in srgb, var(--crit) 40%, transparent);
+}
+.nowstrip.crit > .ic {
+  color: var(--crit);
+}
+.nowstrip.warn {
+  background: var(--warn-bg);
+}
+.nowstrip.warn > .ic {
+  color: var(--warn);
+}
+.nowstrip.calm {
+  color: var(--ok);
+}
+.nowtop {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink2);
+}
+.nowgo {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+button.nowstrip:hover .nowgo {
+  text-decoration: underline;
+}

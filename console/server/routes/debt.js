@@ -2,7 +2,7 @@ const { Router } = require('express');
 const { file } = require('../lib/paths');
 const { readJSON, todayStr } = require('../lib/fsutil');
 const { readAllNeedYou } = require('../lib/board');
-const { buildDebt } = require('../lib/debt');
+const { currentDebt } = require('../lib/sources');
 
 const router = Router();
 
@@ -19,7 +19,7 @@ router.get('/debt', (_req, res) => {
   const boards = readAllNeedYou();
   res.json({
     today,
-    ...buildDebt({ boards, today, state }),
+    ...currentDebt(state, today, boards),
     // Board viết lệch section (dòng Log lọt vào "Cần bạn") — phơi ra thay vì bỏ trong im lặng.
     stray: boards.filter((b) => b.stray).map((b) => ({ date: b.date, count: b.stray })),
   });

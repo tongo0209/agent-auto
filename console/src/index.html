@@ -18,16 +18,17 @@
           <p class="sub"><span id="today" class="mono"></span> · <span id="conn" class="conn">đang nối…</span></p>
         </div>
       </div>
-      <nav class="links">
-        <a id="dash-link" href="#" target="_blank" rel="noopener">Dashboard</a>
-        <a id="jira-link" href="#" target="_blank" rel="noopener">Jira</a>
-      </nav>
+      <div class="headside">
+        <!-- "Có gì mới từ lần bạn xem" — tin tức (history/issues.jsonl + phases.jsonl), không phải việc phải làm -->
+        <div id="delta-bar"></div>
+        <div id="radar-bar"></div>
+        <nav class="links">
+          <a id="dash-link" href="#" target="_blank" rel="noopener">Dashboard</a>
+          <a id="jira-link" href="#" target="_blank" rel="noopener">Jira</a>
+        </nav>
+      </div>
     </header>
-
-    <!-- "Có gì mới từ lần bạn xem" (Task 8) — đọc history/issues.jsonl + phases.jsonl,
-         KHÔNG trộn vào hàng đợi việc: đây là tin tức, không phải việc phải làm -->
-    <div id="delta-bar"></div>
-    <div id="radar-bar"></div>
+    <div id="delta-list"></div>
 
     <div class="tabs" role="tablist">
       <button type="button" class="tab active" data-tab="overview" role="tab">Tổng quan</button>
@@ -77,13 +78,12 @@
       </details>
     </section>
 
-    <!-- Tab: Tổng quan — mốc 14 ngày · timeline · bảng task · log board -->
+    <!-- Tab: Tổng quan — việc gấp (tóm từ hàng đợi) · timeline · bảng task · log board -->
     <section class="pane active" id="pane-overview">
-      <h2>Mốc 14 ngày tới</h2>
-      <div class="week" id="week"><span class="empty-note">Đang đọc mốc…</span></div>
-      <div id="weekwarn"></div>
+      <div id="now-strip"></div>
 
-      <h2>Timeline mốc <span class="srcnote">4 tuần · vạch xanh = hôm nay · mốc HTML tô đậm</span></h2>
+      <h2>Timeline mốc <span class="srcnote">4 tuần · vạch xanh = hôm nay · mốc HTML tô đậm · rê chuột vào mốc xem còn bao nhiêu ngày</span></h2>
+      <div id="weekwarn"></div>
       <div class="chartbox" id="gantt-box"><span class="empty-note">Đang đọc timeline…</span></div>
 
       <div class="rowline">
@@ -120,8 +120,10 @@
     <section class="pane" id="pane-bugs">
       <h2>Bug đang mở <span class="srcnote" id="bug-opennote"></span></h2>
       <div id="bug-open"></div>
-      <h2>Bug chờ bạn duyệt <span class="srcnote" id="bug-src">radar nền ghi · console chỉ đọc · ghi sheet bằng /daily bugwrite</span></h2>
-      <div id="bug-pending"></div>
+      <div id="bug-pending-box">
+        <h2>Bug chờ bạn duyệt <span class="srcnote" id="bug-src">radar nền ghi · console chỉ đọc · ghi sheet bằng /daily bugwrite</span></h2>
+        <div id="bug-pending"></div>
+      </div>
       <h2>Buglist đang theo dõi <span class="srcnote" id="bug-watchnote"></span></h2>
       <div id="bug-sheets"></div>
     </section>

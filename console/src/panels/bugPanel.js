@@ -207,7 +207,13 @@ export async function loadBugs() {
 
   const { counts, pending, sheets, watching, oldestHeldHours, open } = data;
   const todo = open.counts.total + counts.total;
-  $('#bug-count').text(todo ? `(${todo})` : '');
+  $('#bug-count')
+    .text(todo ? `(${todo})` : '')
+    .attr(
+      'title',
+      `${open.counts.chuaFix} chưa fix · ${open.counts.daFix} đã fix chưa ghi sheet · ${counts.total} chờ bạn duyệt`
+    );
+  $('#bug-pending-box').toggle(counts.total > 0);
   $('#bug-opennote').text(
     open.counts.total
       ? `${open.counts.chuaFix} chưa fix · ${open.counts.daFix} đã fix chưa ghi sheet · ${open.counts.choConfirm} chờ QC confirm` +

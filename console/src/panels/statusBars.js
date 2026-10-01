@@ -12,12 +12,11 @@ const DELTA_LABEL = { status: 'status Jira', phase: 'phase', milestone: 'mốc',
 export function initStatusBars() {
   // Dòng "có gì mới": bấm mở/thu danh sách; bấm "đánh dấu đã xem" mới ghi lại mốc localStorage.
   // Bind 1 lần ở đây (không bind lại mỗi lần loadDelta() vẽ lại #delta-bar).
-  $('#delta-bar')
-    .on('click', '[data-delta-open]', () => $('.deltalist').attr('hidden', (i, v) => (v ? null : 'hidden')))
-    .on('click', '[data-delta-seen]', () => {
-      localStorage.setItem(SEEN_KEY, new Date().toISOString());
-      loadDelta();
-    });
+  $('#delta-bar').on('click', '[data-delta-open]', () => $('.deltalist').attr('hidden', (i, v) => (v ? null : 'hidden')));
+  $('#delta-list').on('click', '[data-delta-seen]', () => {
+    localStorage.setItem(SEEN_KEY, new Date().toISOString());
+    loadDelta();
+  });
 
   // Công tắc radar nền: ghi config.radar.enabled qua server (không đụng launchctl từ web).
   // Bind 1 lần, không bind lại mỗi lần loadRadar() vẽ lại #radar-bar.
@@ -49,7 +48,10 @@ async function loadDelta() {
     return;
   }
   const n = items.reduce((s, i) => s + i.changes.length, 0);
-  if (!n) return void $('#delta-bar').empty();
+  if (!n) {
+    $('#delta-bar, #delta-list').empty();
+    return;
+  }
   // Giờ ĐỊA PHƯƠNG, không phải cắt chuỗi ISO: `since` là ISO UTC, `slice(11,16)` in ra giờ UTC
   // nên ở +07:00 nó lệch 7 tiếng — đã thấy thật trên màn hình ("từ 19:21" trong khi máy 14:21,
   // đọc thành 7 giờ tối). Mốc "đã xem" sai giờ thì cả dòng delta mất nghĩa.
@@ -67,9 +69,14 @@ async function loadDelta() {
           .join(' · ')}`
     )
     .join('<br>');
+  const wasOpen = $('.deltalist').length && !$('.deltalist').attr('hidden');
   $('#delta-bar').html(
-    `<div class="deltabar" data-delta-open>${icon('radar')}<span><b>${n} thay đổi</b> từ ${escapeHtml(time)} · xem</span></div>
-     <div class="deltalist" hidden>${detail}
+    `<button type="button" class="deltabar" data-delta-open title="Thay đổi Jira/phase từ lần bạn đánh dấu đã xem">${icon(
+      'radar'
+    )}<span><b>${n} thay đổi</b> từ ${escapeHtml(time)}</span></button>`
+  );
+  $('#delta-list').html(
+    `<div class="deltalist"${wasOpen ? '' : ' hidden'}>${detail}
        <button type="button" class="btn ghost small" data-delta-seen>đánh dấu đã xem</button></div>`
   );
 }

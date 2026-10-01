@@ -4,6 +4,7 @@ import { icon } from '@core/icons';
 import { escapeHtml, inlineMd, shortDate, daysUntil } from '@core/format.mjs';
 import { openTicket } from '@panels/ticketPanel';
 import { bindBoardAppend } from '@components/boardAppend';
+import { toast } from '@components/toast';
 
 const QUEUE_REFRESH_MS = 15000;
 const ACTION_LABEL = {
@@ -29,6 +30,7 @@ export function initQueuePanel({ terminals, notify }) {
   ctx.terminals = terminals;
   onNotify = notify;
   bindBoardAppend('#need-add', 'Cần bạn', () => ctx.boardDate || ctx.today);
+  $('#now-strip').on('click', '[data-goto-today]', () => $('.tab[data-tab="today"]').trigger('click'));
 
   $('#pane-today')
     .on('click', '[data-qtext]', function () {
@@ -112,7 +114,7 @@ async function checkBoardLine(item, $btn) {
     $btn.closest('li').addClass('done');
   } catch (err) {
     const msg = err.responseJSON?.error || 'không ghi được board ' + date;
-    window.alert(msg + (err.status === 409 ? '\n\nBoard vừa bị sửa — hàng đợi sẽ tự nạp lại.' : ''));
+    toast(msg + (err.status === 409 ? ' — board vừa bị sửa, hàng đợi tự nạp lại.' : ''));
   } finally {
     $btn.prop('disabled', false);
     loadQueue();
@@ -121,10 +123,11 @@ async function checkBoardLine(item, $btn) {
 
 async function snooze(item, choice) {
   const until = choice === null ? null : choice === 'due' ? item.due : addDays(ctx.today, Number(choice));
+  const reasons = item.reasons || [item];
   try {
-    await api.queueSnooze({ id: item.id, until, level: item.level, text: item.text });
+    await Promise.all(reasons.map((r) => api.queueSnooze({ id: r.id, until, level: r.level, text: r.text })));
   } catch (err) {
-    window.alert('Không lưu được hoãn: ' + (err.responseJSON?.error || 'lỗi không rõ'));
+    toast('Không lưu được hoãn: ' + (err.responseJSON?.error || 'lỗi không rõ'));
   }
   $(document.activeElement).trigger('blur');
   loadQueue();
@@ -153,7 +156,9 @@ function row(item, { snoozed = false } = {}) {
       ? `<button type="button" class="qkey" data-qticket="${escapeHtml(item.key)}" title="Mở ticket">${escapeHtml(item.key)}</button>`
       : '';
   const age = item.source === 'debt' ? `<span class="debtage">${shortDate(item.date)} · ${item.staleDays}d</span>` : '';
-  const text = isCheck ? inlineMd(item.text) : escapeHtml(item.text);
+  const text = isCheck
+    ? inlineMd(item.text)
+    : (item.reasons || [item]).map((r, i) => (i ? `<span class="qmore">· ${escapeHtml(r.text)}</span>` : escapeHtml(r.text))).join(' ');
   const actionIcon = item.action.kind === 'copy' ? icon('copy') + ' ' : '';
   const actionButton = isCheck
     ? ''
@@ -176,6 +181,19 @@ function debtRows(debt) {
   return [...withTicket, toggle, ...(showLooseDebt ? loose.map((i) => row(i)) : [])].join('');
 }
 
+/** Dải đầu tab Tổng quan: tab mở mặc định nhưng việc gấp nằm ở tab Hôm nay — không có dải này là phải bấm sang mới biết */
+function renderNowStrip(now) {
+  if (!now.length) return void $('#now-strip').html(`<div class="nowstrip calm">${icon('goal')}<span>Không có việc phải làm ngay.</span></div>`);
+  const top = now[0];
+  const crit = now.some((i) => i.level === 'crit');
+  $('#now-strip').html(
+    `<button type="button" class="nowstrip ${crit ? 'crit' : 'warn'}" data-goto-today title="Sang tab Hôm nay">
+      ${icon(crit ? 'warn' : 'wait')}<b>${now.length} việc làm ngay</b>
+      <span class="nowtop">${top.key ? escapeHtml(top.key) + ' · ' : ''}${escapeHtml(top.text)}</span>
+      <span class="nowgo">xem ›</span></button>`
+  );
+}
+
 function renderQueue(q) {
   lastQueue = q;
   itemsById = new Map([...q.now, ...q.waiting, ...q.debt, ...q.snoozed].map((i) => [i.id, i]));
@@ -187,6 +205,7 @@ function renderQueue(q) {
   );
   $('#queue-now-count').text(q.now.length ? `(${q.now.length})` : '');
   $('#today-count').text(q.now.length ? `(${q.now.length})` : '');
+  renderNowStrip(q.now);
 
   const fill = (name, list, html) => {
     $(`#queue-${name}-box`).toggle(list.length > 0);
@@ -195,6 +214,11 @@ function renderQueue(q) {
   };
   fill('waiting', q.waiting, q.waiting.map((i) => row(i)).join(''));
   fill('debt', q.debt, debtRows(q.debt));
+  const looseCount = q.debt.filter((i) => i.loose).length;
+  const ticketDebt = q.debt.length - looseCount;
+  $('#queue-debt-count').html(
+    (ticketDebt ? `(${ticketDebt})` : '') + (looseCount ? ` <span class="srcnote">+${looseCount} không gắn ticket</span>` : '')
+  );
   fill('snoozed', q.snoozed, q.snoozed.map((i) => row(i, { snoozed: true })).join(''));
 
   const crit = q.now.filter((i) => i.level === 'crit');

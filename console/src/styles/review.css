@@ -222,44 +222,6 @@
   outline: none;
   border-color: var(--accent);
 }
-
-/* ---- "Cần bạn": ô tick thật + 1 DÒNG mỗi mục ----
-   9 mục dạng card wrap 2-4 dòng chiếm gần hết màn hình, đọc thành "việc tồn nhiều hơn việc làm".
-   Nay mỗi mục 1 dòng có ellipsis; bấm vào chữ mới mở hết (class .open). */
-.need li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 9px;
-  line-height: 1.35;
-}
-.need li::before {
-  display: none;
-}
-.need .needtext {
-  flex: 1 1 auto;
-  min-width: 0;
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.need li.open {
-  align-items: flex-start;
-}
-.need li.open .needtext {
-  white-space: normal;
-  overflow: visible;
-}
-.need li.open .needbox {
-  margin-top: 2px;
-}
-.need .needtext:hover {
-  color: var(--accent);
-}
-.need li.done .needtext {
-  cursor: pointer;
-}
 .needbox {
   flex: 0 0 auto;
   background: none;
@@ -280,37 +242,12 @@
   opacity: 0.5;
   cursor: progress;
 }
-
-/* ---- Nợ đọng từ board cũ ----
-   Dùng lại nguyên hàng `.need` (needbox + needtext) để mắt đọc cùng một kiểu; chỉ thêm nhãn
-   ngày nguồn + tuổi. Nhãn phải `flex: 0 0 auto` + nowrap, không thì tuổi bị chữ việc đẩy xuống. */
-.debtgroup {
-  margin-bottom: 10px;
-}
-.debtgroup:last-child {
-  margin-bottom: 0;
-}
-.debthead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 0 5px;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-}
-.debthead .mono {
-  font-weight: 400;
-  color: var(--muted);
-}
 .debtage {
   flex: 0 0 auto;
   font-size: var(--fs-xs);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-.debthead .debtage {
-  margin-left: auto;
 }
 
 /* ---- Ô ghi nhanh vào board (Cần bạn / Log) ---- */

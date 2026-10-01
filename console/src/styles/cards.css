@@ -44,57 +44,6 @@
   margin-top: 2px;
 }
 
-/* ---- Cần bạn ---- */
-.need {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.need li {
-  position: relative;
-  padding: 7px 10px 7px 28px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  font-size: var(--fs);
-  line-height: 1.45;
-}
-.need li::before {
-  content: '';
-  position: absolute;
-  left: 9px;
-  top: 9px;
-  width: 11px;
-  height: 11px;
-  border: 1.5px solid var(--muted);
-  border-radius: 3px;
-}
-/* Việc user đã gạch ngang trong board (~~…~~) = đã xong → mờ đi + tick ô vuông */
-.need li.done {
-  color: var(--muted);
-}
-.need li.done::before {
-  border-color: var(--ok);
-  background: var(--ok-bg);
-}
-.need del {
-  text-decoration-color: var(--muted);
-}
-.need .empty {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding-left: 10px;
-  color: var(--ok);
-  border-style: dashed;
-}
-.need .empty::before {
-  display: none;
-}
-
 /* ---- Hàng tháng / chip board ---- */
 .mrow {
   background: var(--surface);

@@ -13,7 +13,9 @@ user), trỏ `CONSOLE_STATE`/`CONSOLE_CONFIG` vào `console/fixtures/`, gọi `/
 `/`, bundle js, rồi tự kill tiến trình theo PID mình sinh ra. Đây là lệnh RIÊNG, KHÔNG nằm trong
 `npm run check` (nó bật server thật, chậm hơn).
 
-Đang kiểm: alert `bug-reopened` (crit + `sheetUrl`) · alert `qc-test-no-buglist` (warn) · phân nhóm
+Đang kiểm: alert `bug-reopened` (crit + `sheetUrl`) · alert `qc-test-no-buglist` (warn) · `/api/queue` (bug-reopened
+vào now hạng 0 + lệnh fixbug, qc-test vào nhóm chờ + tin nhắn chép, không còn dòng `debt-dropped`) · hoãn/bỏ hoãn qua
+`POST /api/queue/snooze` (ghi file tạm `CONSOLE_SNOOZE`, kiểm `history/snooze.json` thật không bị ghi) · phân nhóm
 buglist `following`/`off`/`closed` · trang `/` 200 + bundle js tải được · `state.json`,
 `config.json`, `knowledge/metrics.jsonl`, `history/notified.jsonl` THẬT không bị ghi (so size@mtime
 trước ↔ sau).

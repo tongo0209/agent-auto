@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -10,6 +11,8 @@ const AGENT_AUTO = path.join(CONSOLE_ROOT, '..');
 const USER_CONSOLE_PORT = 4747;
 const REAL_FILES = ['state.json', 'config.json', 'knowledge/metrics.jsonl', 'history/notified.jsonl'];
 const MIN_BUNDLE_BYTES = 1000;
+const REAL_SNOOZE = path.join(AGENT_AUTO, 'history', 'snooze.json');
+const SMOKE_SNOOZE = path.join(os.tmpdir(), `console-smoke-snooze-${process.pid}.json`);
 
 let failed = 0;
 
@@ -40,6 +43,7 @@ async function startConsole(fixture) {
       CONSOLE_STATE: stampFixture(fixture),
       CONSOLE_CONFIG: path.join(CONSOLE_ROOT, 'fixtures', 'config.json'),
       CONSOLE_PORT: String(await freePort()),
+      CONSOLE_SNOOZE: SMOKE_SNOOZE,
     },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
@@ -69,8 +73,12 @@ async function withConsole(fixture, body) {
 }
 
 const getJSON = async (base, api) => (await fetch(base + api)).json();
+const postJSON = (base, api, body) =>
+  fetch(base + api, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+const snoozeStamp = () => (fs.existsSync(REAL_SNOOZE) ? String(fs.statSync(REAL_SNOOZE).mtimeMs) : 'vắng');
 
 const before = fingerprint();
+const snoozeBefore = snoozeStamp();
 
 await withConsole('reopened', async (base) => {
   const { items } = await getJSON(base, '/api/alerts');
@@ -89,6 +97,12 @@ await withConsole('reopened', async (base) => {
   check('reopened: nhóm off', inGroup('off') === 'fixture-sheet-off', inGroup('off'));
   check('reopened: nhóm closed', inGroup('closed') === 'fixture-sheet-closed', inGroup('closed'));
   check('reopened: 3 bug đang mở', bugs.open.counts.total === 3, JSON.stringify(bugs.open.counts));
+
+  const queue = await getJSON(base, '/api/queue');
+  const reopenedRow = queue.now.find((i) => i.code === 'bug-reopened');
+  check('queue: bug-reopened nằm nhóm now hạng 0', reopenedRow?.rank === 0, JSON.stringify(reopenedRow?.action));
+  check('queue: dòng bug-reopened mang lệnh fixbug', reopenedRow?.action.kind === 'fixbug');
+  check('queue: không còn dòng gom debt-dropped', !queue.now.some((i) => i.code === 'debt-dropped'));
 
   const page = await fetch(base + '/');
   const html = await page.text();
@@ -116,9 +130,26 @@ await withConsole('qc-no-buglist', async (base) => {
     bugs.sheets.length === 0 && bugs.open.counts.total === 0,
     `sheets=${bugs.sheets.length} · open=${bugs.open.counts.total}`,
   );
+
+  const waiting = (await getJSON(base, '/api/queue')).waiting.find((i) => i.code === 'qc-test-no-buglist');
+  check('queue: qc-test-no-buglist vào nhóm chờ + có tin nhắn chép', waiting?.action.kind === 'copy', waiting?.action.message);
+
+  const bad = await postJSON(base, '/api/queue/snooze', { id: waiting.id, until: 'mai' });
+  check('snooze: until sai định dạng → 400', bad.status === 400, `status=${bad.status}`);
+  await postJSON(base, '/api/queue/snooze', { id: waiting.id, until: '2999-01-01', level: waiting.level, text: waiting.text });
+  const hidden = await getJSON(base, '/api/queue');
+  check(
+    'snooze: dòng đã hoãn rời nhóm chờ, sang snoozed',
+    !hidden.waiting.some((i) => i.id === waiting.id) && hidden.snoozed.some((i) => i.id === waiting.id),
+  );
+  await postJSON(base, '/api/queue/snooze', { id: waiting.id, until: null });
+  const back = await getJSON(base, '/api/queue');
+  check('snooze: bỏ hoãn → dòng quay lại', back.waiting.some((i) => i.id === waiting.id));
 });
 
 check('state/config/metrics/notified THẬT không bị ghi', fingerprint() === before, 'so size@mtime trước↔sau');
+check('history/snooze.json THẬT không bị ghi', snoozeStamp() === snoozeBefore, `trước=${snoozeBefore} · sau=${snoozeStamp()}`);
+fs.rmSync(SMOKE_SNOOZE, { force: true });
 
 console.log(failed ? `\n${failed} check FAIL` : '\nTất cả check PASS');
 process.exitCode = failed ? 1 : 0;

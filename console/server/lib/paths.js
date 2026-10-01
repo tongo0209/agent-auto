@@ -31,6 +31,7 @@ module.exports = {
     issues: path.join(AGENT_AUTO, 'history', 'issues.jsonl'),
     /** Log alert crit đã nhắc qua notification macOS — chống spam lặp trong 12h (lib/notify.js) */
     notified: path.join(AGENT_AUTO, 'history', 'notified.jsonl'),
+    snooze: overridable('CONSOLE_SNOOZE', path.join(AGENT_AUTO, 'history', 'snooze.json')),
     /** Sổ radar nền: 1 dòng mỗi lượt tick (tools/radar-tick.mjs ghi, console chỉ đọc) */
     radar: path.join(AGENT_AUTO, 'history', 'radar.jsonl'),
   },

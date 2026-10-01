@@ -1,63 +1,5 @@
-/* ---- Dải cảnh báo chủ động (mốc gấp · quá mốc · đứng yên · design chưa tải) ----
-   Đặt NGAY dưới KPI, ngoài mọi tab: cảnh báo phải thấy được kể cả khi đang ở tab khác.
-   Không có cảnh báo thì container rỗng và KHÔNG chiếm chỗ (không margin mồ côi). */
-.alerts {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.alerts:not(:empty) {
-  margin-bottom: 10px;
-}
-.alert {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  padding: 6px 10px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--line);
-  font-size: var(--fs);
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-.alert.crit {
-  background: var(--crit-bg);
-  color: var(--crit);
-}
-.alert.warn {
-  background: var(--warn-bg);
-  color: var(--warn);
-}
-.alert .ic {
-  margin-top: 2px;
-  flex: 0 0 auto;
-}
-.alert .akey {
-  font: 700 var(--fs) var(--font-mono);
-  flex: 0 0 auto;
-}
-.alert .atext {
-  color: var(--ink2);
-}
-.alert .abtn {
-  margin-left: auto;
-  flex: 0 0 auto;
-  padding: 2px 8px;
-  font-size: var(--fs-xs);
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-}
-.alert .abtn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 /* ---- Dòng "có gì mới" (Task 8) — thông tin, không phải báo động, nên dùng tone accent
-   chứ không đỏ/vàng như .alert. Đặt NGAY TRÊN #kpis (xem index.html), khối RIÊNG khỏi
-   #alerts — không trộn tin tức với báo động. ---- */
+   chứ không đỏ/vàng như hàng đợi việc. Khối RIÊNG ngoài mọi tab — tin tức, không phải việc. ---- */
 .deltabar {
   display: flex;
   align-items: center;
@@ -134,9 +76,4 @@
   color: var(--ok);
   border: 1px solid var(--line);
   font-size: var(--fs);
-}
-
-/* Trong khối gập của đỉnh trang, khoảng cách thuộc về khối — không để margin dưới mồ côi */
-.topfold .alerts:not(:empty) {
-  margin: 9px 0 0;
 }

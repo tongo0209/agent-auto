@@ -1,0 +1,99 @@
+/* ---- Hàng đợi "Làm gì tiếp" (tab Hôm nay): 1 dòng = 1 việc + 1 nút; bấm chữ để mở hết ---- */
+.queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.foldbox .queue {
+  margin-top: 7px;
+}
+.qrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: var(--fs);
+  line-height: 1.4;
+}
+.qrow > .ic {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+.qrow.crit {
+  background: var(--crit-bg);
+}
+.qrow.crit > .ic,
+.qrow.crit .qdue {
+  color: var(--crit);
+}
+.qrow.warn > .ic {
+  color: var(--warn);
+}
+.qrow.done {
+  opacity: 0.5;
+}
+.qrow.empty {
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+.qrow.open {
+  align-items: flex-start;
+}
+.qkey {
+  flex: 0 0 auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  font: 700 var(--fs) var(--font-mono);
+  color: var(--ink);
+  cursor: pointer;
+}
+.qkey:hover,
+.qtext:hover {
+  color: var(--accent);
+}
+.qtext {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--ink2);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qrow.open .qtext {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.qdue {
+  flex: 0 0 auto;
+  font: var(--fs-xs) var(--font-mono);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.qrow .abtn,
+.qsnooze {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: var(--fs-xs);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.qsnooze {
+  padding: 2px 4px;
+  color: var(--muted);
+}
+.qrow .abtn:hover,
+.qsnooze:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}

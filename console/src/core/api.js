@@ -35,8 +35,10 @@ export const api = {
   ticket: (key) => getJSON('/api/ticket/' + encodeURIComponent(key)),
   runGate: (key) => postJSON('/api/gate/run/' + encodeURIComponent(key), {}),
 
-  // Cảnh báo chủ động (hệ con ①)
-  alerts: () => getJSON('/api/alerts'),
+  /** Hàng đợi "Làm gì tiếp" của tab Hôm nay — server gom cảnh báo · Cần bạn · review · bug · nợ */
+  queue: () => getJSON('/api/queue'),
+  /** `until: null` = bỏ hoãn */
+  queueSnooze: ({ id, until, level, text }) => postJSON('/api/queue/snooze', { id, until, level, text }),
 
   // Radar nền (launchd → tools/radar-tick.mjs) — trạng thái + công tắc
   radar: () => getJSON('/api/radar'),
@@ -44,10 +46,6 @@ export const api = {
   /** Hàng bug chờ bạn duyệt + động tĩnh buglist (radar nền ghi state.bugWatch) */
   bugs: () => getJSON('/api/bugs'),
   bugWatch: (sheetId, watching) => postJSON('/api/bugs/watch', { sheetId, watching }),
-  /** Nợ "Cần bạn" ở board CŨ mà hôm nay không ai nhắc lại — tick bằng `boardCheck` với `date` gốc */
-  debt: () => getJSON('/api/debt'),
-  // Hợp đồng state.json vs schema/vocab.json (Task 5) — trộn vào dải cảnh báo
-  doctor: () => getJSON('/api/doctor'),
   // "Có gì mới từ lần bạn xem" (Task 8) — đọc history/issues.jsonl + phases.jsonl, KHÔNG
   // trộn vào dải cảnh báo trên: đây là tin tức, không phải báo động.
   delta: (since) => getJSON('/api/delta?since=' + encodeURIComponent(since)),

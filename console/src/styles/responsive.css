@@ -12,11 +12,6 @@
     gap: var(--gap);
     align-content: start;
   }
-  .need {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-  }
   .mrow {
     margin-bottom: 0;
   }
@@ -25,9 +20,6 @@
   }
   .gchart {
     height: 96px;
-  }
-  .kpi .n {
-    font-size: 23px;
   }
 }
 
@@ -78,9 +70,6 @@
 @container (min-width: 920px) {
   .commits,
   #month-list {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .need {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

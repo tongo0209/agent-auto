@@ -49,6 +49,8 @@ import panelHide from 'lucide-static/icons/panel-left-close.svg';
 import panelShow from 'lucide-static/icons/panel-left-open.svg';
 import more from 'lucide-static/icons/ellipsis.svg';
 import grid from 'lucide-static/icons/grid-2x2.svg';
+import snooze from 'lucide-static/icons/alarm-clock-off.svg';
+import copy from 'lucide-static/icons/copy.svg';
 
 const RAW = {
   wait,
@@ -89,6 +91,8 @@ const RAW = {
   'panel-show': panelShow,
   more,
   grid,
+  snooze,
+  copy,
 };
 
 const CLS_SLOT = '__ICON_CLASS__';
@@ -97,7 +101,7 @@ const CLS_SLOT = '__ICON_CLASS__';
 function normalize(svg) {
   const cleaned = String(svg)
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/\s+(?:width|height)="[^"]*"/g, '')
+    .replace(/<svg[^>]*>/, (tag) => tag.replace(/\s+(?:width|height)="[^"]*"/g, ''))
     .replace(/stroke-width="[^"]*"/, 'stroke-width="1.75"')
     .replace(/\s+/g, ' ')
     .trim();

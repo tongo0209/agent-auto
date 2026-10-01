@@ -39,6 +39,8 @@ console/
 │   │   ├── review.js        # git status/diff/commit-chưa-push theo ticket + chặn path ngoài repo
 │   │   ├── ticket.js        # gom MỌI thứ của 1 ticket + ảnh design cấp 1 + suy dist/ từ state.paths
 │   │   ├── alerts.js        # cảnh báo: mốc gấp · quá mốc · đứng yên · design chưa tải
+│   │   ├── sources.js       # gom alert (kèm cache activity) + doctor — /api/alerts, /api/doctor, /api/queue dùng chung
+│   │   ├── queue.js         # THUẦN: ghép hàng đợi now/waiting/debt/snoozed + luật hoãn (leo thang warn→crit)
 │   │   ├── learn.js         # vòng học: quan sát phase đổi · lead time · metrics đo từ git
 │   │   ├── backup.js        # snapshot quay vòng + ghi atomic + appendJSONL
 │   │   ├── git.js           # git log theo author + khoảng ngày, lastTouch theo subpath
@@ -60,8 +62,8 @@ console/
 │   │   ├── promoScan.js     # phần I/O của việc kiểm bàn giao: chạy git + liệt kê `<promoFolder>/mainsite/`
 │   │   └── jira.js          # client Jira REST v3 CHỈ đủ để đánh Done 1 ticket — cố ý KHÔNG có hàm ghi
 │   │                        #   description/comment (chốt 10/08: không đụng bài của PM)
-│   ├── routes/              # 19 file
-│   │   ├── state.js         # GET /api/state    → tab Hôm nay + KPI (+ cờ có designs/questions)
+│   ├── routes/              # 20 file
+│   │   ├── state.js         # GET /api/state    → tab Tổng quan (+ cờ có designs/questions)
 │   │   ├── git.js           # GET /api/git, /api/promotion
 │   │   ├── months.js        # GET /api/months   → gom history/months.json theo tháng
 │   │   ├── activity.js      # GET /api/activity, /api/activity/:key → hoạt động git per ticket
@@ -73,11 +75,12 @@ console/
 │   │   ├── alerts.js        # GET /api/alerts
 │   │   ├── learn.js         # GET /api/learn, /api/lessons
 │   │   ├── doctor.js        # GET /api/doctor   → chạy tools/state-doctor.mjs (dynamic import ESM từ CJS)
-│   │   ├── delta.js         # GET /api/delta?since=<ISO> → dòng "có gì mới từ HH:MM" tab Hôm nay
+│   │   ├── delta.js         # GET /api/delta?since=<ISO> → dòng "có gì mới từ HH:MM" đầu cột trái
 │   │   ├── debt.js          # GET /api/debt → nợ "Cần bạn" ở board cũ (cache 30s) + số dòng lệch section
 │   │   ├── handoff.js       # GET/POST /api/handoff/:key[, /check] → checklist bàn giao phase reassigned
 │   │   ├── radar.js         # GET /api/radar (trạng thái radar nền, CHỈ ĐỌC) · POST /radar/toggle
 │   │   ├── bugs.js          # GET /api/bugs (hàng bug chờ duyệt, CHỈ ĐỌC) · POST /bugs/watch (bật/tắt 1 buglist)
+│   │   ├── queue.js         # GET /api/queue → tab Hôm nay · POST /queue/snooze { id, until|null } → history/snooze.json
 │   │   ├── jira.js          # GET /api/jira/delivery/:key · POST /jira/done/:key → ĐÁNH DONE ticket khi đã
 │   │   │                    #   bàn giao qua gt-promotion (đường DUY NHẤT console ghi ra Jira)
 │   │   └── open.js          # POST /api/open    → Finder/VS Code (có whitelist)
@@ -97,16 +100,17 @@ console/
     ├── core/splitter.js     # thanh kéo đổi tỉ lệ 2 cột (nhớ trong localStorage)
     ├── components/          # modal.js (showText + showDiff) · charts.js · gantt.js · activityLine.js ·
     │                        #   flashbar.js (chớp 1 dòng thông báo trong .flashbar — Review + drawer dùng chung)
-    ├── panels/              # todayPanel, ticketPanel (drawer 1 ticket), reviewPanel, bugPanel, monthsPanel,
-    │                        #   gitPanel, historyPanel
-    └── styles/              # index.css import 16 file: tokens/base/layout/kpi/tabs/cards/table/alerts/drawer/review/bugs/gantt/charts/terminal/modal + responsive (CUỐI)
+    ├── panels/              # queuePanel (tab Hôm nay), overviewPanel (tab Tổng quan), statusBars (dải delta + radar),
+    │                        #   ticketPanel (drawer 1 ticket), reviewPanel, bugPanel, monthsPanel, gitPanel, historyPanel
+    └── styles/              # index.css import 16 file: tokens/base/layout/tabs/cards/table/alerts/queue/drawer/review/bugs/gantt/charts/terminal/modal + responsive (CUỐI)
 ```
 
 ## Tính năng cột trái
 
 | Tab | Có gì |
 |---|---|
-| Hôm nay | KPI 4 ô (chỉ ô cần chú ý mới lên màu) · **dải cảnh báo** (mốc gấp/quá mốc/đứng yên/design chưa tải/**nợ đọng rơi radar**) · dải mốc 14 ngày + cảnh báo dồn deadline · **timeline mốc 4 tuần** (Gantt) · **bảng task** nhóm theo phase (`Ticket · Việc · Phase · Mốc kế · Gate · Push · Effort · Actions`, header sticky) · **ô lọc** · **ô Effort** = hoạt động git per ticket · **Cần bạn tick được** (ghi vào board) · **Nợ đọng từ board cũ** (tick ghi vào board GỐC) · log board (tô vàng dòng còn `HH:MM`) |
+| Hôm nay | **Hàng đợi "Làm gì tiếp"** (`GET /api/queue`, server gom ở `lib/queue.js`): nhóm **Làm ngay** — lỗi state.json · cảnh báo crit · bug chờ duyệt · review (file chưa commit/commit chưa push) · "Cần bạn" chưa tick (tick ghi board) · cảnh báo warn — gấp nhất lên đầu, mỗi dòng 1 nút hành động · ô thêm việc "Cần bạn" · nhóm thu gọn **Chờ người khác** (QC chưa giao buglist, quá mốc design — nút chép tin nhắn đòi) · **Nợ cũ** (tick ghi về board GỐC; việc không gắn ticket ẩn sau 1 nút) · **Đang hoãn**. Dòng nào cũng hoãn được 1 ngày / 3 ngày / tới mốc kế (`history/snooze.json`); hoãn lúc `warn` mà lên `crit` thì tự hiện lại |
+| Tổng quan | Dải mốc 14 ngày + cảnh báo dồn deadline · **timeline mốc 4 tuần** (Gantt) · **bảng task** nhóm theo phase (`Ticket · Việc · Phase · Mốc kế · Gate · Push · Effort · Actions`, header sticky) · **ô lọc** · log board (tô vàng dòng còn `HH:MM`, ghi thêm được) |
 | Review | Việc chờ **bạn** đẩy lên, gom theo ticket: badge `n file chưa commit` / `n commit chưa push` / `sạch · đã đẩy` · badge fe-gate (`/api/gates`, chưa chạy thì bấm để gõ lệnh) · danh sách file kèm `+/-`, bấm xem diff · nút gõ hộ `git add && commit -m "[leaf] subject" -m <trailer>` và `git push`. Console **không** commit/push: chỉ gõ vào terminal, **không** gửi Enter — số trên tab đếm ticket có việc thật |
 | Bug | Bug do **bug-radar nền** fix, chờ bạn gật trước khi ghi Done lên sheet QC. Hai nhóm: *đã verify* và *chưa verify được* (kèm lý do + gợi ý cách verify), badge treo bao lâu + chip ticket + link sheet. Dưới là **buglist đang theo dõi**: động tĩnh lượt quét cuối (bug mới/đổi/QC mở lại/không của mình) + nút bật-tắt theo dõi từng sheet (`POST /api/bugs/watch` — tắt thì lượt bugwatch thôi đọc sheet đó, mỗi lượt ~90s + token). Console **chỉ đọc**, ghi ngược sheet bằng `/daily bugwrite` (có nút gõ hộ) |
 | Theo tháng | Task nhóm theo **tháng của due date**, mặc định 3 tháng gần nhất (bấm xem tất cả); dấu tick = đã chuyển Done. Nguồn: `history/months.json` (snapshot real từ Jira do `/daily` ghi). Cuối tab: **board các ngày trước · gt-promotion commit mới nhất theo task · metrics ước lượng vs thực tế** (trước là tab "Lịch sử" riêng, chỉ 3 dòng nội dung nên đứng riêng thành màn trống) |
@@ -124,13 +128,14 @@ bảng task tự bỏ 2 cột phụ (Design/Effort) thay vì cuộn ngang.
 | Muốn thêm | Sửa file |
 |---|---|
 | Nút lệnh mới trên toolbar | `src/core/constants.mjs` → `COMMANDS` |
+| Nguồn mới cho hàng đợi Hôm nay | `server/lib/queue.js` (hàm `<nguồn>Items` + nhóm/hạng) + truyền dữ liệu từ `server/routes/queue.js` + test trong `queue.test.mjs` |
 | Endpoint API mới | `server/routes/<tên>.js` + mount trong `server/index.js` + thêm hàm vào `src/core/api.js` |
 | Tab mới bên trái | `src/index.html` (nút + pane) → `src/panels/<tên>Panel.js` → khai báo trong `PANEL_LOADERS` (`src/index.js`) |
 | Đổi màu / khoảng cách / cỡ chữ | `src/styles/tokens.css` (chỉ ở đây — gồm `--fs`, `--fs-sm`, `--fs-xs`, `--row-h`) |
 | Chart mới | `src/components/charts.js` + style trong `src/styles/charts.css` |
 | Phase mới của vòng đời | `AGENT_AUTO/schema/vocab.json` — thêm entry vào `phases[]` (server + client đều đọc từ đây qua `lib/vocab.js`, không tự khai lại). Ngoại lệ: icon vẫn phải khai riêng trong `src/core/icons.js` — vocab chỉ ghi TÊN icon (`icon: "bug"`), không phải file SVG. `tools/state-doctor.mjs` (E7) báo lỗi nếu tên icon trong vocab không tồn tại trong `icons.js`. |
 | Icon mới / đổi hình icon | `src/core/icons.js`: 1 dòng `import … from 'lucide-static/icons/<tên>.svg'` + 1 entry `RAW` theo **tên nghiệp vụ**; panel chỉ gọi `icon('<tên nghiệp vụ>')` |
-| Cột mới trong bảng task | `src/panels/todayPanel.js` (`taskRow` + `<thead>`) + bề rộng cột trong `src/styles/table.css` |
+| Cột mới trong bảng task | `src/panels/overviewPanel.js` (`taskRow` + `<thead>`) + bề rộng cột trong `src/styles/table.css` |
 
 ## Ghi chú kỹ thuật
 

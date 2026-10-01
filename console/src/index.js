@@ -9,7 +9,9 @@ import { TerminalManager } from '@terminal/TerminalManager';
 import { GRID_MODES } from '@terminal/gridLayout.mjs';
 import { initSplitter } from '@core/splitter';
 import { initModal } from '@components/modal';
-import { initTodayPanel, renderToday } from '@panels/todayPanel';
+import { initQueuePanel, setQueueContext, loadQueue } from '@panels/queuePanel';
+import { initOverviewPanel, renderOverview } from '@panels/overviewPanel';
+import { initStatusBars } from '@panels/statusBars';
 import { initTicketPanel } from '@panels/ticketPanel';
 import { initReviewPanel, loadReview } from '@panels/reviewPanel';
 import { initMonthsPanel, loadMonths } from '@panels/monthsPanel';
@@ -20,6 +22,7 @@ import { initHistoryPanel, loadHistory } from '@panels/historyPanel';
 // Tab "Theo tháng" gánh luôn phần lịch sử (board cũ · gt-promotion · metrics · vòng học) —
 // trước đây là tab riêng nhưng chỉ có 3 dòng nội dung nên đứng riêng thành cả màn trống.
 const PANEL_LOADERS = {
+  today: loadQueue,
   review: loadReview,
   bugs: loadBugs,
   months: () => Promise.all([loadMonths(), loadHistory()]),
@@ -153,14 +156,16 @@ $(function boot() {
 
   initModal();
   initTicketPanel({ terminals });
-  initTodayPanel({ terminals, notify });
+  initStatusBars();
+  initQueuePanel({ terminals, notify });
+  initOverviewPanel({ terminals });
   initReviewPanel({ terminals });
   initMonthsPanel();
   initBugPanel({ terminals });
   initGitPanel();
   initHistoryPanel();
 
-  // --- Poll tab Hôm nay ---
+  // --- Poll state: tab Tổng quan + ngữ cảnh cho hàng đợi ---
   let lastOk = null;
   function paintFresh() {
     if (!lastOk) return;
@@ -169,7 +174,9 @@ $(function boot() {
   }
   async function poll() {
     try {
-      renderToday(await api.state());
+      const data = await api.state();
+      renderOverview(data);
+      setQueueContext(data);
       lastOk = Date.now();
     } catch {
       /* server tắt — giữ UI cũ, lần poll sau tự khôi phục */
@@ -190,7 +197,7 @@ $(function boot() {
     const $b = $(this).prop('disabled', true).text('Đang quét…');
     terminals.type('/daily delta');
     try {
-      await poll();
+      await Promise.all([poll(), loadQueue()]);
     } finally {
       $b.prop('disabled', false).text('Cập nhật');
     }

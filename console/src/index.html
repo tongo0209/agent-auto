@@ -25,27 +25,24 @@
     </header>
 
     <!-- "Có gì mới từ lần bạn xem" (Task 8) — đọc history/issues.jsonl + phases.jsonl,
-         KHÔNG trộn vào #alerts bên dưới: đây là tin tức, không phải báo động -->
+         KHÔNG trộn vào hàng đợi việc: đây là tin tức, không phải việc phải làm -->
     <div id="delta-bar"></div>
     <div id="radar-bar"></div>
 
-    <div class="kpis" id="kpis"></div>
-
-    <!-- Cảnh báo chủ động: mốc gấp · quá mốc · đứng yên · design chưa tải -->
-    <div class="alerts" id="alerts"></div>
-
     <div class="tabs" role="tablist">
-      <button type="button" class="tab active" data-tab="today" role="tab">Hôm nay</button>
+      <button type="button" class="tab active" data-tab="today" role="tab">Hôm nay <span class="count" id="today-count"></span></button>
+      <button type="button" class="tab" data-tab="overview" role="tab">Tổng quan</button>
       <button type="button" class="tab" data-tab="review" role="tab">Review <span class="count" id="review-count"></span></button>
       <button type="button" class="tab" data-tab="bugs" role="tab">Bug <span class="count" id="bug-count"></span></button>
       <button type="button" class="tab" data-tab="months" role="tab">Theo tháng</button>
       <button type="button" class="tab" data-tab="git" role="tab">Git của tôi</button>
     </div>
 
-    <!-- Tab: Hôm nay -->
+    <!-- Tab: Hôm nay — hàng đợi "Làm gì tiếp" (server gom ở /api/queue) -->
     <section class="pane active" id="pane-today">
       <div class="rowline">
-        <h2>Mốc 14 ngày tới</h2>
+        <h2>Làm ngay <span class="count" id="queue-now-count"></span>
+          <span class="srcnote">cảnh báo · Cần bạn · review · bug — gấp nhất lên đầu</span></h2>
         <div class="tools">
           <span class="srcnote" id="fresh"></span>
           <button type="button" class="btn" id="reload-now"
@@ -54,6 +51,35 @@
           </button>
         </div>
       </div>
+      <ul class="queue" id="queue-now"><li class="qrow empty"><span>Đang gom việc…</span></li></ul>
+      <form class="addline" id="need-add">
+        <input type="text" maxlength="500" placeholder="thêm việc vào &quot;Cần bạn&quot; của board hôm nay…" aria-label="Thêm việc Cần bạn">
+        <button type="submit" class="btn small">thêm</button>
+      </form>
+
+      <details class="foldbox" id="queue-waiting-box" style="display:none">
+        <summary>Chờ người khác <span class="count" id="queue-waiting-count"></span>
+          <span class="srcnote">việc bạn chỉ đòi được — chép tin nhắn gửi QC/designer</span></summary>
+        <ul class="queue" id="queue-waiting"></ul>
+      </details>
+
+      <!-- Nợ: việc chưa tick ở board CŨ mà hôm nay không ai nhắc lại. Tick ghi thẳng vào board GỐC. -->
+      <details class="foldbox" id="queue-debt-box" style="display:none">
+        <summary>Nợ cũ <span class="count" id="queue-debt-count"></span>
+          <span class="srcnote">chưa tick ở board cũ · cũ nhất lên đầu</span></summary>
+        <ul class="queue" id="queue-debt"></ul>
+      </details>
+
+      <details class="foldbox" id="queue-snoozed-box" style="display:none">
+        <summary>Đang hoãn <span class="count" id="queue-snoozed-count"></span>
+          <span class="srcnote">tự hiện lại khi tới hạn hoặc lên mức gấp</span></summary>
+        <ul class="queue" id="queue-snoozed"></ul>
+      </details>
+    </section>
+
+    <!-- Tab: Tổng quan — mốc 14 ngày · timeline · bảng task · log board -->
+    <section class="pane" id="pane-overview">
+      <h2>Mốc 14 ngày tới</h2>
       <div class="week" id="week"><span class="empty-note">Đang đọc mốc…</span></div>
       <div id="weekwarn"></div>
 
@@ -72,32 +98,12 @@
       </div>
       <div id="tasks"><span class="empty-note">Đang đọc dữ liệu… chưa lên thì server console chưa chạy, hoặc hôm nay chưa chạy <code>/daily</code>.</span></div>
 
-      <div class="rowline">
-        <h2>Cần bạn <span class="count" id="need-count"></span>
-          <span class="srcnote">việc chỉ bạn làm được · nguồn: mục "Cần bạn" của board</span></h2>
-        <button type="button" class="bchip" id="need-toggle" style="display:none"></button>
-      </div>
-      <ul class="need" id="need"></ul>
-      <form class="addline" id="need-add">
-        <input type="text" id="need-input" maxlength="500" placeholder="thêm việc vào &quot;Cần bạn&quot; của board hôm nay…" aria-label="Thêm việc Cần bạn">
-        <button type="submit" class="btn small">thêm</button>
-      </form>
-
-      <!-- Nợ đọng: việc chưa tick ở board CŨ mà hôm nay không ai nhắc lại. Board là sổ theo
-           ngày nên việc cũ rụng khỏi radar (ca 12/8: 5 việc GW-627 từ board 10/8 mất 2 ngày,
-           mà GW-627 release 15/8). Tick ở đây ghi thẳng vào board GỐC. -->
-      <details class="foldbox" id="debt-box" open style="display:none">
-        <summary>Nợ đọng từ board cũ <span class="count" id="debt-count"></span>
-          <span class="srcnote">chưa tick ở board cũ · hôm nay không ai nhắc lại</span></summary>
-        <div id="debt"></div>
-      </details>
-
       <details class="foldbox">
         <summary>Log board <span class="mono" id="board-date"></span></summary>
         <div id="log-warn"></div>
         <ul class="log" id="log"></ul>
         <form class="addline" id="log-add">
-          <input type="text" id="log-input" maxlength="500" placeholder="ghi 1 dòng log — giờ do server lấy, không gõ tay…" aria-label="Thêm dòng log">
+          <input type="text" maxlength="500" placeholder="ghi 1 dòng log — giờ do server lấy, không gõ tay…" aria-label="Thêm dòng log">
           <button type="submit" class="btn small">ghi log</button>
         </form>
       </details>

@@ -2,11 +2,11 @@
 @import './tokens.css';
 @import './base.css';
 @import './layout.css';
-@import './kpi.css';
 @import './tabs.css';
 @import './cards.css';
 @import './table.css';
 @import './alerts.css';
+@import './queue.css';
 @import './drawer.css';
 @import './review.css'; /* sau cards/table: ghi đè ô tick của .need + .ttable.small */
 @import './bugs.css';

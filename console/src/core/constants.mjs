@@ -36,6 +36,8 @@ export const ACTIVE_PHASES = idsWhere('active');
  * Ticket vẫn phải HIỆN trong bảng (còn việc bàn giao), chỉ không được tính mốc nữa.
  */
 export const OFF_MY_PLATE_PHASES = idsWhere('offMyPlate');
+/** Phase user được tự báo xong / đóng từ bảng task (server: lib/finish.js) */
+export const MANUAL_FINISH_PHASES = idsWhere('manualFinish');
 
 /**
  * `offMyPlate` gộp 2 tình huống KHÁC HẲN nhau, tách ra từ 6/8 vì timeline cần phân biệt:

@@ -6,6 +6,7 @@ import {
   OFF_MY_PLATE_PHASES,
   GONE_PHASES,
   DONE_PHASES,
+  MANUAL_FINISH_PHASES,
   MILESTONE_LABEL,
   DESIGN_STATUS,
   designDeliveredNotLocal,
@@ -40,8 +41,9 @@ let forecastMap = {}; // key → { date, samples } | null — dự báo ngày xo
 /** Số nút nhiều nhất trên 1 hàng của lượt render đang chạy → suy bề rộng cột Actions */
 let lastActionCount = 0;
 
-export function initOverviewPanel({ terminals }) {
+export function initOverviewPanel({ terminals, refresh }) {
   ctx.terminals = terminals;
+  ctx.refresh = refresh;
   bindBoardAppend('#log-add', 'Log', () => ctx.boardDate || ctx.today);
 
   $('#task-filter').on('input', function () {
@@ -56,8 +58,25 @@ export function initOverviewPanel({ terminals }) {
     rerenderTasks();
   });
 
+  $(document)
+    .on('click', (e) => {
+      if (!$(e.target).closest('#finish-menu, [data-finish]').length) closeFinishMenu();
+    })
+    .on('keydown', (e) => e.key === 'Escape' && closeFinishMenu())
+    .on('click', '#finish-menu [data-to]', function () {
+      const $menu = $('#finish-menu');
+      finishTicket(String($menu.data('key')), String($(this).data('to')), String($menu.data('phase')));
+    });
+  $('.left').on('scroll', closeFinishMenu);
+
   // Hành động trong bảng — bind 1 lần, không bind lại mỗi lần render
   $('#tasks')
+    .on('click', '[data-finish]', function () {
+      openFinishMenu(this);
+    })
+    .on('click', '[data-reopen]', function () {
+      reopenTicket(String($(this).data('reopen')));
+    })
     .on('click', '[data-fold]', function () {
       const label = String($(this).data('fold'));
       expandedGroups[label] = !expandedGroups[label];
@@ -233,6 +252,14 @@ function taskRow([key, issue], { today, site }) {
    * `c-act` là `nowrap` nên hụt 1 nút là nút đó bị cắt mất (đã dính 1/8).
    */
   const buttons = [
+    MANUAL_FINISH_PHASES.includes(issue.phase)
+      ? `<button type="button" class="iconbtn" data-finish="${escapeHtml(key)}" data-phase="${escapeHtml(issue.phase)}"
+           title="Báo ${escapeHtml(key)} đã xong / đã đóng — rời nhóm &quot;${escapeHtml(phase.label)}&quot;">${icon('done')}</button>`
+      : '',
+    issue.manualFinish
+      ? `<button type="button" class="iconbtn" data-reopen="${escapeHtml(key)}"
+           title="Hoàn tác: trả ${escapeHtml(key)} về &quot;${escapeHtml(PHASE[issue.manualFinish.from]?.label || issue.manualFinish.from)}&quot;">${icon('undo')}</button>`
+      : '',
     designLink
       ? `<a class="iconbtn abtn2" href="${escapeHtml(designLink)}" target="_blank" rel="noopener"
            title="Mở folder design trên OneDrive (chọn all → Download)">${icon('ext')}</a>`
@@ -400,6 +427,48 @@ function renderLog(log) {
       ? `<div class="warnbar small">${icon('warn')}<span>${missing} dòng log ghi <code>HH:MM</code> thay vì giờ thật → mất trục thời gian cho vòng học.</span></div>`
       : ''
   );
+}
+
+function closeFinishMenu() {
+  $('#finish-menu').remove();
+}
+
+function openFinishMenu(btn) {
+  const key = String($(btn).data('finish'));
+  closeFinishMenu();
+  const rect = btn.getBoundingClientRect();
+  $(`<div id="finish-menu" class="finishmenu" role="menu"></div>`)
+    .data({ key, phase: String($(btn).data('phase')) })
+    .html(
+      `<div class="fmhead">${escapeHtml(key)} — báo đã xong</div>
+       <button type="button" role="menuitem" data-to="done-fe">${icon('done')}<span><b>Xong FE</b>
+         <small>Rời nhóm chờ test / fix bug · vẫn hiện mờ trên timeline tới mốc release</small></span></button>
+       <button type="button" role="menuitem" data-to="closed">${icon('closed')}<span><b>Đóng hẳn</b>
+         <small>Ticket đã xong toàn bộ · thôi mọi cảnh báo và mốc</small></span></button>`
+    )
+    .css({ top: rect.bottom + 6, right: window.innerWidth - rect.right })
+    .appendTo('body');
+}
+
+async function finishTicket(key, to, expectPhase) {
+  closeFinishMenu();
+  try {
+    await api.finishTicket(key, to, expectPhase);
+    toast(`${key} → ${PHASE[to].label}`, 'ok', { label: 'hoàn tác', run: () => reopenTicket(key) });
+  } catch (err) {
+    toast('Không ghi được: ' + (err.responseJSON?.error || 'lỗi không rõ'));
+  }
+  ctx.refresh();
+}
+
+async function reopenTicket(key) {
+  try {
+    const out = await api.reopenTicket(key);
+    toast(`${key} đã trả về "${PHASE[out.to]?.label || out.to}"`, 'ok');
+  } catch (err) {
+    toast('Không hoàn tác được: ' + (err.responseJSON?.error || 'lỗi không rõ'));
+  }
+  ctx.refresh();
 }
 
 async function openPath(app, root, sub) {

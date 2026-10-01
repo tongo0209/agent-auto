@@ -158,7 +158,7 @@ $(function boot() {
   initTicketPanel({ terminals });
   initStatusBars();
   initQueuePanel({ terminals, notify });
-  initOverviewPanel({ terminals });
+  initOverviewPanel({ terminals, refresh: () => Promise.all([poll(), loadQueue()]) });
   initReviewPanel({ terminals });
   initMonthsPanel();
   initBugPanel({ terminals });

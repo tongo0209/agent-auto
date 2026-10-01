@@ -13,7 +13,7 @@ const browser = {
 const node = {
   require: 'readonly', module: 'writable', process: 'readonly', __dirname: 'readonly',
   Buffer: 'readonly', console: 'readonly', setTimeout: 'readonly', setInterval: 'readonly',
-  URL: 'readonly', fetch: 'readonly',
+  URL: 'readonly', fetch: 'readonly', structuredClone: 'readonly',
 };
 
 export default [

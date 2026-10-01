@@ -39,6 +39,8 @@ export const api = {
   queue: () => getJSON('/api/queue'),
   /** `until: null` = bỏ hoãn */
   queueSnooze: ({ id, until, level, text }) => postJSON('/api/queue/snooze', { id, until, level, text }),
+  finishTicket: (key, to, expectPhase) => postJSON(`/api/ticket/${encodeURIComponent(key)}/finish`, { to, expectPhase }),
+  reopenTicket: (key) => postJSON(`/api/ticket/${encodeURIComponent(key)}/reopen`, {}),
 
   // Radar nền (launchd → tools/radar-tick.mjs) — trạng thái + công tắc
   radar: () => getJSON('/api/radar'),

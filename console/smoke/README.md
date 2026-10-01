@@ -35,6 +35,8 @@ CONSOLE_STATE=$(node fixtures/stamp.mjs reopened) CONSOLE_CONFIG=fixtures/config
 # mở URL console in ra (KHÔNG phải 4747 nếu console thật đang chạy)
 ```
 
+Server phụ có bấm nút ghi (✓ báo xong, hoàn tác) thì trỏ thêm `CONSOLE_PHASES` + `CONSOLE_BACKUPS` sang thư mục tạm — thiếu là ghi vào `history/phases.jsonl` thật và xoay mất bản backup thật trong `.backups/` (giữ 30).
+
 ### 1. Nút "fix bug" trên dải cảnh báo
 1. Tab **Hôm nay** → dải cảnh báo trên cùng.
 2. ĐÚNG: có dòng đỏ `2 bug bị QC mở lại: #12, #34 — Buglist giả lập — đợt 1`, cuối dòng có nút

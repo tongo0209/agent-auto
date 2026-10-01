@@ -41,6 +41,8 @@ module.exports = {
   PHASE_BY_ID: Object.fromEntries(vocab.phases.map((p) => [p.id, p])),
   /** Mốc không còn là deadline của mình → loại khỏi dải mốc + cảnh báo */
   OFF_MY_PLATE_PHASES: idsWhere('offMyPlate'),
+  /** User được tự báo xong từ console (lib/finish.js) */
+  MANUAL_FINISH_PHASES: idsWhere('manualFinish'),
   /** Còn phải làm mới ra được HTML */
   HTML_TODO_PHASES: idsWhere('htmlTodo'),
   /** Miễn "trễ mốc HTML". CHÚ Ý: `deliver` KHÔNG miễn — đang giao mà quá mốc thì vẫn trễ. */

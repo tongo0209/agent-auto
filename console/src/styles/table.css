@@ -423,3 +423,49 @@ button.gt:hover {
   pointer-events: none;
   opacity: 0.6;
 }
+
+/* ---- Menu "báo đã xong" mở từ nút ✓ ở cột Mở (overviewPanel::openFinishMenu) ---- */
+.finishmenu {
+  position: fixed;
+  z-index: 40;
+  width: 300px;
+  padding: 6px;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: var(--raise);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+.fmhead {
+  padding: 4px 8px 6px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.finishmenu button {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--ink);
+  font-size: var(--fs);
+  text-align: left;
+  cursor: pointer;
+}
+.finishmenu button:hover,
+.finishmenu button:focus-visible {
+  background: var(--surface);
+}
+.finishmenu button .ic {
+  margin-top: 2px;
+  color: var(--accent);
+}
+.finishmenu small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}

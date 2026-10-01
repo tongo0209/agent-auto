@@ -51,6 +51,7 @@ import more from 'lucide-static/icons/ellipsis.svg';
 import grid from 'lucide-static/icons/grid-2x2.svg';
 import snooze from 'lucide-static/icons/alarm-clock-off.svg';
 import copy from 'lucide-static/icons/copy.svg';
+import undo from 'lucide-static/icons/undo-2.svg';
 
 const RAW = {
   wait,
@@ -93,6 +94,7 @@ const RAW = {
   grid,
   snooze,
   copy,
+  undo,
 };
 
 const CLS_SLOT = '__ICON_CLASS__';

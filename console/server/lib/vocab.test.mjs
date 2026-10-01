@@ -28,6 +28,8 @@ test('không còn cờ CHẾT trong vocab — mọi cờ phase phải có ngư�
     // `gone` / `doneMine` tách nhánh của `offMyPlate` cho timeline — consumer là
     // core/constants.mjs (GONE_PHASES · DONE_PHASES) → core/marks.mjs keepOnTimeline().
     'gone', 'doneMine',
+    // `manualFinish` — consumer là lib/finish.js (server) + nút báo xong ở bảng task (overviewPanel)
+    'manualFinish',
   ]);
   const unknown = [...new Set(vocabLib.vocab.phases.flatMap((p) => Object.keys(p)))].filter((k) => !used.has(k));
   assert.deepEqual(unknown, []);

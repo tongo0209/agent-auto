@@ -27,7 +27,7 @@ module.exports = {
     lessons: path.join(AGENT_AUTO, 'knowledge', 'lessons.md'),
     months: path.join(AGENT_AUTO, 'history', 'months.json'),
     /** Vòng học: 1 dòng mỗi lần phase của 1 ticket đổi (skill ghi + console tự quan sát) */
-    phases: path.join(AGENT_AUTO, 'history', 'phases.jsonl'),
+    phases: overridable('CONSOLE_PHASES', path.join(AGENT_AUTO, 'history', 'phases.jsonl')),
     issues: path.join(AGENT_AUTO, 'history', 'issues.jsonl'),
     /** Log alert crit đã nhắc qua notification macOS — chống spam lặp trong 12h (lib/notify.js) */
     notified: path.join(AGENT_AUTO, 'history', 'notified.jsonl'),
@@ -41,6 +41,6 @@ module.exports = {
     designs: path.join(AGENT_AUTO, 'designs'),
     /** Báo cáo fe-gate theo ticket (tools/fe-gate.mjs --json ghi vào đây) */
     gates: path.join(AGENT_AUTO, 'knowledge', 'gates'),
-    backups: path.join(AGENT_AUTO, '.backups'),
+    backups: overridable('CONSOLE_BACKUPS', path.join(AGENT_AUTO, '.backups')),
   },
 };

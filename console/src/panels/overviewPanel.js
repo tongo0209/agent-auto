@@ -62,7 +62,10 @@ export function initOverviewPanel({ terminals, refresh }) {
     .on('click', (e) => {
       if (!$(e.target).closest('#finish-menu, [data-finish]').length) closeFinishMenu();
     })
-    .on('keydown', (e) => e.key === 'Escape' && closeFinishMenu())
+    // Trả `false` cho jQuery = preventDefault ⇒ nuốt phím cách của terminal
+    .on('keydown', (e) => {
+      if (e.key === 'Escape') closeFinishMenu();
+    })
     .on('click', '#finish-menu [data-to]', function () {
       const $menu = $('#finish-menu');
       finishTicket(String($menu.data('key')), String($(this).data('to')), String($menu.data('phase')));

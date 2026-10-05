@@ -21,7 +21,10 @@ ABS = re.compile(r"^(https?:|//|#|data:|mailto:|javascript:)")
 PREFIX_ATTRS = re.compile(r'\b(src|href|poster)="([^"]+)"')
 SRCSET_ATTRS = re.compile(r'\b(srcset|imagesrcset)="([^"]+)"')
 CSS_URL = re.compile(r"url\(([^)]+)\)")
-KHUNG = ["MS__layer-loading", "layer-rotate", "MS__wrapper"]
+KHUNG = ["MS__layer-loading", "MS__wrapper"]
+# lib 1.3.2 không đọc .layer-rotate (lớp xoay của lib là .rotate-phone tự chèn) — khung này chỉ là nếp template H5
+KHUNG_H5 = ["layer-rotate"]
+NOT_H5 = re.compile(r"\bH5\s*:\s*false\b")
 HOOKS = {
     "pm__": r"pm__[a-zA-Z0-9_-]+",
     "MS__": r"MS__[a-zA-Z0-9_-]+",
@@ -76,7 +79,8 @@ def check(html, name):
     rel_css = [v for v in CSS_URL.findall(html) if not ABS.match(v.strip("'\""))]
     if rel_css:
         loi.append(f"R-HO-1 {len(rel_css)} url() tương đối, vd {rel_css[0]}")
-    for k in KHUNG:
+    khung = KHUNG if NOT_H5.search(html) else KHUNG + KHUNG_H5
+    for k in khung:
         if k not in html:
             loi.append(f"R-HO-3 thiếu khung {k}")
     lib = set(re.findall(r"libraryMainsite-(\d+\.\d+\.\d+)\.(?:css|js)", html))

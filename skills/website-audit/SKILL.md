@@ -44,7 +44,7 @@ Muốn validate HTML chuẩn sâu hơn: `npx html-validate '<dir>/**/*.html'`.
 - **Lệch chuẩn cdn-source / bàn giao** (chỉ khi target là landing VNGGames — luật: `~/VNG/agent-auto/rules/html-handoff.md`, `rules/popup-library.md`, `rules/cdn-source-standard.md`):
   path tương đối hoặc URL localhost trong HTML bàn giao (**R-HO-1** — 404 thật trên production, không phải góp ý);
   mất `<% MODULE_CONTENT %>` ở bản `Promotion/` (**R-HO-2** — trang trống);
-  thiếu `#MS__wrapper` / `MS__layer-loading` / `layer-rotate` (**R-HO-3**);
+  thiếu `#MS__wrapper` / `MS__layer-loading` / `layer-rotate` (chỉ landing H5) (**R-HO-3**);
   version `libraryMainsite` trong `<link>`/`preload`/`<script>` không khớp nhau (**R-HO-4**);
   popup thiếu `MJ__close-popup` (**R-POP-2** — nút đóng chết). Mỗi mục ghi mã luật + file:line.
 

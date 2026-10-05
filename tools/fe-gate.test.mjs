@@ -227,6 +227,27 @@ const flagged = (r) => r.findings.filter((x) => x.check === 'flagged-asset-used'
   expect('  và gate FAIL', r.pass === false);
 }
 
+/* ── ca 11c: cùng md5 với một bản cắt KHÔNG cờ FONT-SUBST ⇒ pixel đã được chứng minh sạch (GW-901 title-vn) ── */
+{
+  const dist = cleanFixture('flag-clean-twin');
+  const cut = path.join(ROOT, 'flag-clean-twin-src/assets');
+  w(path.join(cut, 'group-2.png'), png(80, 30, 'tieu-de'));
+  w(path.join(cut, 'f3-title-text.png'), png(80, 30, 'tieu-de'));
+  w(path.join(cut, 'bxh.png'), png(50, 50, 'bxh'));
+  w(path.join(cut, 'bxh-khung.png'), png(50, 50, 'bxh'));
+  writeCut(cut, { runId: 'r1', gateStatus: 'PASS', assets: [
+    row('group-2', 80, 30, ['BAKE', 'FONT-SUBST']), row('f3-title-text', 80, 30, ['BAKE']),
+    row('bxh', 50, 50, ['DATA-ZONE']), row('bxh-khung', 50, 50)] });
+  w(path.join(dist, 'images/title-vn.png'), png(80, 30, 'tieu-de'));
+  w(path.join(dist, 'images/bxh-copy.png'), png(50, 50, 'bxh'));
+  fs.appendFileSync(path.join(dist, 'index.html'), '\n<img src="images/title-vn.png"><img src="images/bxh-copy.png">');
+  const r = runGate(dist, ['--quiet', '--design', path.join(ROOT, 'flag-clean-twin-src')]);
+  const f = flagged(r);
+  expect('FONT-SUBST có bản sinh đôi sạch cùng md5 → không ERROR', !f.some((x) => x.message.includes('FONT-SUBST')), JSON.stringify(f));
+  expect('  DATA-ZONE vẫn ERROR dù có bản không cờ (vùng dữ liệu là nghĩa, không phải pixel)',
+    f.some((x) => x.message.includes('DATA-ZONE') && x.level === 'ERROR'), JSON.stringify(f));
+}
+
 /* ── ca 11b: trùng TÊN mà khác cỡ + khác nội dung là ảnh khác (đo GW-727: title.png popup library) ── */
 {
   const dist = cleanFixture('flag-same-name');

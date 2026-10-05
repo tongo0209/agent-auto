@@ -431,7 +431,7 @@ for (const img of shippedImgs) {
   const byName = (cutRowsByName.get(path.basename(img)) || []).filter((r) => sameDims(r.real, real));
   const byContent = (cutRowsBySize.get(size(img)) || []).filter((r) => md5(r.path) === md5(img));
   const rows = [...new Set([...byName, ...byContent])];
-  if (rows.length) copies.push({ img, rows });
+  if (rows.length) copies.push({ img, rows, byContent });
 }
 
 /* ── check 9: asset mang cờ plan mà vẫn dùng làm ảnh (img src / background / sprite) ── */
@@ -447,13 +447,15 @@ const codeFiles = flaggedCopies.length
   ? [...walk(DIST, CODE_EXT), ...srcDirs.flatMap((d) => walk(d, CODE_EXT))].map((f) => ({ f, lines: read(f).split('\n') }))
   : [];
 const seenFlagged = new Set();
-for (const { img, rows } of flaggedCopies) {
+for (const { img, rows, byContent } of flaggedCopies) {
+  // cùng md5 với bản cắt không FONT-SUBST ⇒ pixel chữ đã được chứng minh đúng (GW-901 title-vn)
+  const cleanPixels = byContent.some((r) => !r.flags.includes('FONT-SUBST'));
   const base = path.basename(img);
   const stem = path.basename(img, path.extname(img));
   const usedAt = new RegExp(`(?<![\\w-])${escRe(base)}|sprite\\(\\s*\\$${escRe(stem)}\\s*\\)|MS__sprite-${escRe(stem)}(?![\\w-])`);
   const wheres = codeFiles.flatMap(({ f, lines }) => lines.flatMap((l, i) => (usedAt.test(l) ? [`${rel(f)}:${i + 1}`] : [])));
   for (const row of rows) {
-    for (const flag of row.flags.filter((fl) => FLAG_RULES[fl])) {
+    for (const flag of row.flags.filter((fl) => FLAG_RULES[fl] && !(fl === 'FONT-SUBST' && cleanPixels))) {
       const [level, meaning] = FLAG_RULES[flag];
       // Không thấy dòng tham chiếu vẫn báo: sprite gộp nguyên thư mục, dist chép là đã ship
       for (const where of wheres.length ? wheres : [rel(img)]) {

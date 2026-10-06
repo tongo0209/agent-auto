@@ -67,6 +67,11 @@ Quét 16 campaign 2026 (23/9/2026): cùng một việc viết nhiều kiểu. Ki
 | **R-CDN-23** | SHOULD | N phần tử cùng hiệu ứng CSS: 1 `@keyframes`, tham số từng phần tử qua CSS var hoặc `animation-delay` âm |
 | **R-CDN-24** | MUST | Code mới chỉ trỏ `https://cdn-mainsite-aka.vnggames.com/` (`global-mainsite.mto.zing.vn` đã ngưng) và nạp đúng `libraryMainsite` **1.3.2** |
 | **R-CDN-25** | MUST | Không import thư viện nặng mà không gọi (`html2canvas` ~195KB): trang không chụp ảnh thì bỏ cả import lẫn hàm chụp |
+| **R-CDN-26** | MUST | Con trực tiếp của khung `display:flex` cỡ cố định chứa sprite/ảnh → `flex-shrink: 0` (không thì flex co lại, hình bị xén) |
+| **R-CDN-27** | MUST | `.x &` chỉ khi `.x` là tổ tiên NGOÀI section (class `<body>`); quan hệ trong section viết phẳng — build xong grep selector trong `dist/*.css` |
+| **R-CDN-28** | MUST | Tooltip/popover: đo tràn mép MỌI mục ở cả PC lẫn MB; mục sát mép lật hướng |
+| **R-CDN-29** | MUST | Đa locale: chữ VN không dấu ở EN/CN/TH = tự dịch theo thuật ngữ của landing; chữ mới phải có glyph trong font subset; chữ CJK/Thái đo vị trí theo bbox layer PSD từng locale |
+| **R-CDN-30** | MUST | Nút play / slide video nối fancybox ngay khi dựng: `fancybox: true`, `<a href data-fancybox="">`, link tạm đúng game |
 
 ### R-CDN-15 · MUST · Breakpoint chỉ từ `additionalData`
 `webpack.config.js` bơm `$maxWidthMB`/`$minWidthPC` + `@mixin mobile|pc` vào đầu mọi file SCSS (R-CDN-5). File
@@ -240,6 +245,61 @@ Dẫn chứng: `ddtank/2026-chengdu-tournament/assets/Frame2/Frame2.scss:193,227
 - Áp cho campaign MỚI / clone mới. Campaign đang chạy: không sửa (user chốt 30/9) — cổng chỉ cảnh báo.
 - Cổng: `landing-parity.mjs <campaign>` in `🔴 R-CDN-25 … file:line` khi import sống mà hàm bao lời gọi `html2canvas(`
   (và alias `window.x = html2canvas`) không được nhắc lại ở đâu; dòng comment không tính. `--strict` exit 1.
+
+### R-CDN-26 · MUST · Khung flex cố định: con không được co
+Icon 94px trong vòng tròn `display:flex` 80px ⇒ flex co span sprite về 80px (`min-width:auto` của span rỗng = 0),
+nền sprite bị xén 2 đầu. File PNG vẫn đủ nên dễ chẩn nhầm sang asset.
+```scss
+.gift-icon { display: flex; width: 80px; height: 80px;
+  > * { flex-shrink: 0; } }   // ✅ sprite rộng hơn khung vẫn hiện đủ, tràn ra ngoài như design
+```
+Dẫn chứng: `ghoststory/landing/2026-big-update-t10/assets/Frame3/Frame3.scss` (`.ms__gift-icon`, 6/10/2026) — lần
+đầu "sửa" bằng cách bỏ nền tròn cho riêng ô đó, QC báo lại. Hình mất mép thẳng mà PNG đủ ⇒ nghi CSS trước asset.
+
+### R-CDN-27 · MUST · `&` đứng sau chỉ cho tổ tiên ngoài section
+Mọi rule nằm trong `#<section> {}` (R-STR-1), nên `.ms:last-child & {}` biên dịch thành
+`.ms:last-child #Frame3 .ms__tip` — không khớp phần tử nào, build vẫn xanh.
+- ✅ `.cn & .news-title` — `.cn` ở `<body>`, đúng là tổ tiên của section.
+- ✅ quan hệ bên trong section viết phẳng: `.ms:last-child .ms__tip { … }`.
+- Build xong grep selector trong `dist/*.css` để chắc nó ra đúng chuỗi mong đợi.
+- Sửa CSS mà reload "không ăn": `http-server` mặc định cache 3600s — chạy `npx http-server dist -p <port> -s -c-1`
+  (hoặc CDP `Network.setCacheDisabled`) trước khi kết luận.
+
+### R-CDN-28 · MUST · Tooltip/popover không tràn mép
+Trang MB rộng 750px: tooltip mở sang phải của mục cuối tràn khỏi trang (GW-901: 791 > 750), PC rộng nên không
+lộ. Dựng xong đo từng mục ở PC 1920 và MB 768 (`rect.left >= 0 && rect.right <= innerWidth`, ép hiện bằng
+`:focus`/class). Mục sát mép lật hướng, chỉ trong `@include mobile` nếu PC không tràn:
+```scss
+.ms:last-child .ms__tip { @include mobile { left: auto; right: 87px; } }   // cùng offset, đối xứng
+```
+
+### R-CDN-29 · MUST · Đa locale: dịch, glyph, vị trí chữ
+1. **Placeholder VN không dấu** trong PSD EN/CN/TH ("Ve Quay Thuong 18,888 Ngoc") = designer quên dịch ⇒ **tự
+   dịch**, lấy thuật ngữ từ chính landing (vd "Ngọc Hồ Chi" đã là Jade / 玉 / หยก ⇒ "Ngọc" dịch theo), rồi báo user
+   danh sách đã tự dịch để PM duyệt. Quét khi dựng: giá trị en/cn/th là ASCII giống tiếng Việt không dấu.
+2. **Chữ mới phải có glyph trong font subset** (R-CDN-16): đọc cmap từng `*.woff2`
+   (`fontTools.ttLib.TTFont(f).getBestCmap()`). Thiếu ⇒ subset lại = cmap cũ + ký tự mới từ font gốc. Trình duyệt
+   fallback im lặng, gate không bắt.
+3. **CJK/Thái lệch dọc so PSD** (FZZYSK hộp chữ cao hơn nét ⇒ tụt 4–6px): đo bằng bbox layer chữ trong PSD
+   (`psd_tools`, `layer.bbox`) so mực chữ trên screenshot — cột x nằm trong bbox, cửa sổ ±6px để tránh viền
+   khung. Bù `margin-top` theo `.cn &`/`.th &`, PC và MB riêng.
+4. **Thẻ 2 dòng**: đẩy nhãn lên thì dòng trên dính mép ảnh. Kiểm profile dọc từng thẻ: mép ảnh → dòng 1 ≥2px,
+   giữa 2 dòng ≥2px, đáy ≥1px. Khoảng nới đặt lên phần tử chỉ thẻ 2 dòng có (`.sub`), không đặt lên title (áp
+   cả thẻ 1 dòng).
+
+Dẫn chứng: GW-901 Frame1/Frame3, 6/10/2026 — user bắt 4 lượt liên tiếp trên cùng dải thẻ tin CN.
+
+### R-CDN-30 · MUST · Nút video nối fancybox ngay khi dựng
+Design có nút play / thumbnail video / tab "Video" ⇒ nối trong cùng lượt dựng, không để `href="javascript:;"`:
+- `configProduction.html.twig`: `fancybox: true` — lib tự nạp, không thêm `<script>` tay.
+- `<a href="<youtube watch URL>" data-fancybox="">` — giá trị **rỗng**: mỗi link mở 1 video. Đặt tên nhóm thì
+  clone loop của Swiper gộp thành gallery.
+- Slide video trong Swiper: cho chính `.swiper-slide` là thẻ `<a>` (twig `{% if %}<a …>{% else %}<div …>`), CSS
+  slide giữ nguyên.
+- Verify: click → `.fancybox__iframe` xuất hiện (lib 1.3.2 dùng class `fancybox__*`, không phải
+  `.fancybox-container`), `.fancybox__slide` đếm = 1, PC + MB.
+- Link tạm phải là video của **đúng game** — mở xem tiêu đề trước khi dùng (GW-901 chép link landing T4, hoá ra
+  trailer Nghịch Thủy Hàn) — và báo user là link tạm chờ PM.
 
 ## Sprite (webpack-spritesmith) — R-SPR-*
 

@@ -91,7 +91,7 @@ $visible-days: 3;
   `/commit` — Conventional Commits `(<type>): <mô tả>` + footer `Co-Authored-By`. Đây là format CI/CD VNG bắt.
 - **Repo nội bộ** (`agent-auto`, `promptAgent`, tool cá nhân): giữ `[<leaf-folder>] <English subject>` + trailer Co-Authored-By.
 - `git push`: KHÔNG BAO GIỜ tự làm, hỏi user từng lần. `git commit`: tự làm được ở repo nội bộ và `cdn-source`;
-  **KHÔNG commit** ở `gt-promotion-template` / `new-mainsite` (R-GTP-2, R-TWIG-4).
+  repo bàn giao tự commit đúng path vừa giao, báo lại hash (R-GIT-4).
 
 ## Thực thi cơ học
 `~/.claude/hooks/guard-style.sh` (PostToolUse trên `Write|Edit`) đếm comment trong **đoạn vừa ghi**

@@ -970,3 +970,237 @@ Browser hết tài nguyên (`ERR_INSUFFICIENT_RESOURCES`) thì bắn `onerror` y
 **Lưới chặn.** Đếm ảnh vỡ thì đo từ ngoài browser (`curl`/`urllib` HEAD, ≤12 luồng, có retry). Dùng
 browser chỉ để **nhìn** ảnh vỡ trên một màn hình, không để đếm. Nếu buộc phải probe trong trang thì
 hạ xuống ≤6 luồng và đối chiếu lại một mẫu bằng curl trước khi báo số.
+
+## 2026-09-21 — `autoclose` nuốt phase `bugfix` của ticket Jira đã COMPLETED
+
+- **Bắt được gì:** lượt `/daily delta` 11:13 thấy commit fix buglist thật hôm nay cho GW-745 (`a5fe11698` 11:07, buglist bản 21/9, 8 bug) và GW-477 (`4ee30210` 11:09 + buglist QC 19/9), nhưng cả 2 vẫn nằm `closed` ⇒ mất khỏi radar, bug-radar không canh.
+- **Nguyên nhân:** hai luật đá nhau. Bug-radar bước 7 bảo "có bug thật ⇒ `phase = bugfix` (kèm `reopenedFrom`)". `shouldAutoClose` (`tools/autoclose.mjs:21`) chỉ tha `closed` và `reassigned`; ticket Jira COMPLETED + hết mốc tương lai bị đóng lại bất kể đang có bug mở. Đặt `bugfix` bây giờ = lượt radar kế (30') đóng lại, phase nhảy qua nhảy lại và nhiễu `phases.jsonl`.
+- **Lưới chặn đề xuất (CHƯA làm — `delta` không code, chờ user chốt):** thêm điều kiện tha ở `shouldAutoClose` — `phase === 'bugfix'`, hoặc tha khi ticket còn `openBugs`/`bugSheets` chưa settled. Cách sau chặt hơn vì máy suy được, không phụ thuộc phase do LLM ghi.
+- **Nguồn:** `boards/2026-09-21.md` mục "Log — lượt 11:20" + "Cần bạn"; `state.issues['GW-745'].lastAction` (đợt bugfix QC 21/9, MR !259).
+
+## 2026-09-21 — Opt-in làm bug-radar câm 28 ngày, và KÊNH 2 chết theo
+
+- **Bắt được gì:** lượt `/daily bugwatch` 14:43 phát hiện lượt `bugwatch` gần nhất trong
+  `history/radar.jsonl` là **24/8 09:34Z** — 28 ngày không lượt nào. Hệ quả nhìn thấy được: sheet
+  `BugList JXm: H5 Sinh Nhật 10 Tuổi` chia sẻ 14/9, sửa 17/9, mà **chưa từng vào sổ** `bugWatch`.
+- **Nguyên nhân:** `pickPrompt` (`tools/bug-radar.mjs`) lọc `watched = entries.filter(isWatched)`
+  **trước** khi xét `hot`/`stale`. Opt-in mặc định TẮT (chốt 18/8) nên `watched` rỗng ⇒ luôn
+  `skip: 'cold'`. KÊNH 2 — nhận sheet mới từ `list_recent_files` — lại nằm BÊN TRONG lượt
+  `bugwatch`, nên nó chết cùng: 0 sheet theo dõi ⇒ không lượt nào ⇒ không phát hiện sheet mới ⇒
+  mãi mãi 0 sheet theo dõi. Vòng khoá chính nó.
+- **Lưới chặn (CHƯA làm, chờ user duyệt):** tách KÊNH 2 khỏi cổng `watched` — `pickPrompt` trả
+  `bugwatch` khi quá N giờ chưa quét Drive, kể cả khi 0 sheet đang theo dõi. Đây là cùng họ với
+  bài học "cửa `stale` là cửa sống" (18/8): mọi cửa vào bugwatch mà phụ thuộc trạng thái do
+  chính lượt bugwatch đặt đều tự khoá.
+- **Nguồn:** `history/radar.jsonl` (đếm `bugwatch`, mốc cuối 24/8) · `boards/2026-09-21.md` lượt 14:43.
+
+## 2026-09-21 — `shouldRetire` + `checkGates` là code chết, y hệt `updateHeat` hồi 19/8
+
+- **Bắt được gì:** `SKILL.md` mô tả 2 hàm này như lưới chặn đang chạy ("`retired` là máy tự suy nên
+  THẮNG cả khi user đã bật", "chỉ tự fix khi PASS đủ 4 cổng"). Grep toàn repo: cả hai **chỉ xuất
+  hiện trong `tools/bug-radar.test.mjs` và `SKILL.md`**, không file chạy nào gọi. Đo cụ thể hôm nay:
+  `shouldRetire(GW-477)` = `true` (mốc cuối `release 2026-08-31` qua 21 ngày) trong khi QC vừa mở
+  ROUND 2 và user vừa bật theo dõi lúc 13:10 — tức nếu ai nối dây, nó tắt đúng thứ user vừa bật.
+- **Nguyên nhân:** hàm được viết + test đầy đủ rồi dừng ở đó; phần gọi để LLM làm bằng tay, nên
+  hành vi thật phụ thuộc việc skill có nhớ gọi hay không. Đúng vết `updateHeat` (export + 5 test,
+  0 chỗ gọi, cửa `hot` không nổ suốt 2 ngày — ghi 19/8).
+- **Lưới chặn:** với mọi hàm "máy phán" mới trong `tools/`, thêm 1 test khẳng định **có chỗ gọi**
+  (grep trong `tools/radar-tick.mjs` / CLI), hoặc gắn thẳng vào `radar-tick`. Luật viết trong
+  `SKILL.md` mà không có ai gọi thì không phải luật, chỉ là ý định.
+- **Nguồn:** grep `checkGates|shouldRetire` toàn repo (hit: test + SKILL.md) · lượt bugwatch 21/9 14:43.
+
+## 2026-09-21 — `bug-radar add` TỰ bật follow, không dùng được cho KÊNH 2
+
+- **Bắt được gì:** dùng `node tools/bug-radar.mjs add "<link>"` để ghi sheet mới do KÊNH 2 phát
+  hiện, kết quả trả `watched: true` — trái luật "sheet mới LUÔN vào sổ ở trạng thái CHƯA theo dõi,
+  TUYỆT ĐỐI không tự bật hộ".
+- **Nguyên nhân:** `addWatchFromLink` gọi `followSheet(...)` ngay sau `mergeWatch`. Đúng cho
+  `/daily add <link>` (user dán link = đã tỏ ý muốn theo dõi), sai cho KÊNH 2 (radar tự nhặt).
+- **Lưới chặn:** KÊNH 2 dùng `mergeWatch` (không follow), hoặc `add` rồi `unwatch` ngay kèm lý do —
+  cách đã làm hôm nay. Nhớ thêm: `add` không có `--key` thì tự đẻ `ADHOC-n` với `phase: 'bugfix'`,
+  làm console hiện một task không có thật và `state-doctor` báo W2 (thiếu `paths`).
+- **Nguồn:** `tools/bug-radar.mjs` `addWatchFromLink` · lượt bugwatch 21/9 14:48.
+
+## 2026-09-21 — `parseBugTable` dedupe BugID toàn file, sheet nhiều ROUND bị nuốt dòng
+
+- **Bắt được gì:** sheet `BugList CFM: Tournament` có 2 khối bảng: ROUND 2 (BugID 1–3, ở TRÊN) và
+  ROUND 1 (BugID 1–27). `parseBugTable` giữ một `seenIds` chung cho cả file nên BugID 1/2/3 của
+  ROUND 1 bị bỏ, `rowsTotal` ra 27 thay vì 30.
+- **Nguyên nhân:** dedupe thiết kế cho ca sheet lặp header/lặp bảng (cùng một dữ liệu), không lường
+  ca nhiều đợt test cùng đánh số lại từ 1.
+- **Lưới chặn (đã dựng 21/9 16:0x):** `scan` và `lastScan` nay có field `shadowed` — danh sách BugID
+  bị nuốt (`shadowedBugIds()` trong `tools/bug-radar.mjs`, 2 test). Hết im lặng: lệch bao nhiêu dòng
+  là đọc ra được, không phải tự nhẩm số dòng trên sheet.
+- **Chưa xử — cần user chốt:** mới là ĐÈN BÁO, chưa sửa gốc. Cách "reset `seenIds` theo từng khối
+  bảng" ghi ở trên KHÔNG dùng thẳng được: `diffRows` khoá `seenBugs[bugId]` và `pendingSheetWrite`
+  định vị dòng ghi ngược cũng bằng `bugId`, nên trả về 2 dòng cùng id sẽ hỏng cả diff lẫn ghi sheet.
+  Muốn sửa gốc phải đổi khoá thành `<đợt>#<bugId>` ở cả 3 chỗ. Rủi ro còn treo: ROUND 2 điền tới
+  dòng nào thì dòng ROUND 1 cùng số biến khỏi `openBugs` — hôm nay ROUND 1 còn 10 bug đang mở
+  (#8,10,11,13,16,19,21,22,23,27).
+- **Nguồn:** `.cache/bugsheets/1TyM5kGAdd_v….md` · `scan` ra `rowsTotal: 27` / `shadowed: [1,2,3]`
+  trong khi cache có 30 dòng bug.
+- **22/9 10:55 — rủi ro "còn treo" ở trên ĐÃ THÀNH SỰ THẬT, đo được bằng máy.** QC gõ ROUND 2 `#8`
+  lúc 10:32; ROUND 1 `#8` (*[User chưa login] phải render đủ nội dung từng tab*, đang mở, có tranh
+  luận `[DEV-ToNT]` chuyển BE vs `[DEV-TuCH]` *force login như V1*) biến khỏi `openBugs`. So
+  `.backups/state/state-20260922035127..json` ↔ `state.json`: tổng `openBugs` **23 → 23**, chỉ nội
+  dung `#8` bị thay. Tức **mất bug mà tổng không đổi** — không một con số nào trên console nhúc
+  nhích, `shadowed` là đèn báo DUY NHẤT (8 dòng: ROUND2 `3` + ROUND1 `1,2,3,4,6,7,8`).
+  ⇒ Đèn báo là đủ để BIẾT, không đủ để KHỎI MẤT. Ưu tiên sửa gốc (`<đợt>#<bugId>`) lên cao hơn:
+  mỗi lượt QC gõ thêm 1 dòng ROUND 2 là nuốt thêm đúng 1 bug ROUND 1 cùng số.
+
+## 2026-09-21 — KÊNH 2 mù vì `list_recent_files` mặc định `pageSize: 10`
+
+- **Bắt được gì:** lượt `bugwatch` 16:37 kết luận "6 sheet tiêu đề `BugList` Drive trả về **đều đã có
+  trong sổ**, không sheet mới". Lượt 17:49 gọi lại đúng API đó với `pageSize: 25` thì lòi ra
+  `BugList CFL: H5_Promotion Event Trial Card` (`1YIVYHl9…`, QC minhnq8, sửa 3/9) — **chưa từng vào sổ**.
+- **Nguyên nhân:** `SKILL.md` bước 1 của `bugwatch` chỉ ghi `list_recent_files(orderBy:lastModified)`,
+  không chốt `pageSize`; mặc định của tool là **10**. Drive sắp theo `lastModified` toàn tài khoản
+  (spreadsheet lương, slide brief, folder design…), nên 10 slot đầu hiếm khi đủ chỗ cho buglist cũ.
+  Sheet càng nguội càng tụt hạng — đúng loại sheet mà KÊNH 2 sinh ra để nhặt.
+- **Lưới chặn (chưa làm, chờ user duyệt):** ghi cứng `pageSize: 25` vào bước 1 `bugwatch` trong
+  `SKILL.md`, hoặc lặp `nextPageToken` cho tới khi hết sheet tiêu đề `BugList`. Cùng họ với bài học
+  "cửa `stale` là cửa sống": mọi bước quét mà cửa sổ nhìn hẹp hơn dữ liệu thật đều báo "không có gì"
+  một cách tự tin.
+- **Nguồn:** `boards/2026-09-21.md` lượt 16:37 (câu kết luận sai) vs lượt 17:49 (`pageSize: 25`).
+
+## 2026-09-21 — Sheet CFM: ROUND 2 chạm `#7`, ngưỡng nuốt bug đang mở còn đúng 1 số
+
+- **Bắt được gì:** 16:41 `shadowed: [3,1,2,3,4]`; 17:53 `shadowed: [3,1,2,3,4,6,7]`. ROUND 2 mọc thêm
+  `#6`, `#7` trong ~70 phút và vừa nuốt ROUND 1 `#6`/`#7`. Cả hai đã `Confirmed fix` nên chưa mất việc
+  — nhưng ROUND 1 `#8` **đang mở**, tức số kế tiếp QC gõ là mất một bug thật khỏi `openBugs`.
+- **Nguyên nhân:** vẫn là `parseBugTable` khoá theo `bugId` toàn file (bài học cùng ngày, mục trên).
+  Điểm mới: **tốc độ**. Dự báo 16:41 tưởng còn xa, thực tế ROUND 2 tiến 2 số/giờ.
+- **Lưới chặn:** `shadowed` mới chỉ là đèn báo. Muốn chặn thật phải đổi khoá thành `<đợt>#<bugId>` ở
+  cả 3 chỗ (`diffRows`, `openBugs`, `pendingSheetWrite`) — hoặc rẻ hơn: nhờ QC đánh ROUND 2 tiếp từ 28.
+  Ghi lại để lần sau đừng đánh giá "còn xa" theo số dòng, mà theo **tốc độ QC gõ**.
+- **Nguồn:** `state.issues['GW-477'].lastAction` + `state.bugWatch['1TyM5kGAdd…'].lastScan` (2 mốc 16:41 / 17:53).
+
+## 2026-09-22 — `writeMerged(p, base, {patch})` XOÁ sạch state: `mine` phải là state ĐẦY ĐỦ
+
+- **Bắt được gì:** lượt `/daily delta` 12:05 gọi
+  `writeMerged("state.json", base, { lastRun: now })` để đóng dấu `lastRun`. Kết quả: `state.json`
+  còn **44 byte / đúng 1 key** — mất `issues` (24 ticket), `bugWatch` (27 sheet), `driveSignals`,
+  `schemaVersion`. Hook `guard-state.sh` bắt ngay trong lượt (`E5 schemaVersion undefined`); phục hồi
+  từ `.backups/state/state-20260922-120532.json` (bản copy TRƯỚC khi ghi, đúng luật backup của Bước 6).
+- **Nguyên nhân:** `merge3(base, mine, theirs)` ở `tools/state-merge.mjs:17-20` coi `mine` là **ảnh
+  chụp TRỌN state của mình**, không phải patch — key nào có trong `base` mà **thiếu** trong `mine` thì
+  hiểu là "mình đã xoá nó" và `delete out[key]`. Đây là semantics CHỦ Ý (để xoá được `scanDue`,
+  `sourceChanged`…), không phải bug của tool. Bug nằm ở cách gọi.
+- **Lưới chặn:** `mine = { ...base, <field mình đổi> }`. Sau khi ghi, đọc ngược và **so field lệch với
+  bản backup** — chỉ được lệch đúng những field mình chủ ý đổi (lượt này: `lastRun`, và đúng 1 field
+  đó thật). Hai lưới đã cứu lượt này là backup-trước-khi-ghi + `guard-state.sh`; thiếu một trong hai
+  là mất 24 ticket không revert được (agent-auto chưa versioned state).
+- **Vì sao dễ tái phạm:** tên `writeMerged` + comment "chỉ ghi phần MÌNH đã đổi so với bản đã đọc"
+  đọc như API nhận patch. Câu đó nói về *so sánh với `base`*, không phải *hình dạng của `mine`*.
+  Mọi lệnh `bug-radar.mjs` gọi đúng vì chúng vốn giữ state đầy đủ trong tay; chỉ đường LLM gõ tay
+  mới rơi vào bẫy.
+- **Nguồn:** `boards/2026-09-22.md` log 12:05-12:06; `tools/state-merge.mjs:15-30`.
+
+## 2026-09-22 — BugID trùng giữa 2 đợt: `openBugs` nuốt bug mở mà tổng KHÔNG đổi
+
+**Bắt được gì.** Sheet `BugList CFM: Tournament` có 2 tab đánh số lại từ 1 (ROUND 2 đứng trước,
+ROUND 1 đứng sau). `parseBugTable` khử trùng theo `bugId` trên toàn file ⇒ mỗi lần QC gõ thêm 1 số
+ROUND 2 là dòng ROUND 1 cùng số biến khỏi `openBugs`. Đo 22/9: 10:32 mất ROUND 1 `#8`, 12:20 mất
+tiếp ROUND 1 `#10` (đang mở, chờ GS chốt) — cả 3 lần đo `openBugs` **đều bằng 23**.
+
+**Nguyên nhân.** Tổng số là đại lượng duy nhất người ta nhìn, mà mất-1-thêm-1 thì tổng đứng yên.
+`shadowed` mới là đại lượng lộ ra (8 → 10), nhưng nó không được đếm ở đâu ngoài `lastScan`.
+
+**Lưới chặn.** `shadowedBugIds` (đã có, chưa commit) chỉ BÁO. Cách bền là đổi khoá thành
+`<đợt>#<bugId>` ở `parseBugTable` + `diffRows` + `openBugs` + `pendingSheetWrite` — chờ user duyệt,
+xem `boards/2026-09-22.md` mục Cần bạn. Trong lúc chờ: đọc `shadowed` của `scan`, đừng tin `openBugs`
+tổng.
+
+**Kèm theo.** `.cache/bugsheets/<id>.md` bị ghi đè mỗi lượt, không có backup ⇒ không diff được cũ↔mới
+để biết QC sửa gì; lượt 12:38 phải suy từ `changed` và có 1 dòng (`#13`) không kết luận được.
+
+**Cập nhật 22/9 14:38 — lần nuốt thứ 4, và tốc độ đang tăng.** 13:44 nuốt `#11`, **14:31 nuốt `#13`**
+(*click "Tổ chức Sự Kiện"/"Đăng Ký Leader" → popup mở ra trang trắng*, QC đang chờ họp GS). ROUND 2
+mọc **3 số trong 47 phút** (`#11` → `#14`), không phải 2 số/giờ như ước 21/9. `shadowed` 8 → 10 → 11
+→ **14**; `openBugs` đứng **23** cả 5 lần đo. Cộng dồn **4 dòng đang mở** bị nuốt: `#8` `#10` `#11` `#13`.
+Cách đo lại được (dùng khi cần con số thật, vì `openBugs` không lộ): tách cache theo dòng trống thành
+2 khối rồi `parseBugTable` từng khối, lấy giao `bugId` và lọc `!isSettled` — ra 13 dòng ROUND 1 bị che,
+4 đang mở. Còn `#15`–`#21` trống ⇒ **7 lần nữa**; đây không còn là rủi ro xa mà là đồng hồ đang chạy.
+
+**Nguồn.** `/daily bugwatch` 22/9 10:50 và 12:38 · `tools/bug-radar.mjs` `parseBugTable`/`shadowedBugIds`.
+
+**Cập nhật 22/9 17:43 — đồng hồ đã chạy hết, ROUND 2 phủ TRỌN ROUND 1.** ROUND 2 đủ **23/23 dòng**
+⇒ `shadowed` = `[1..23]`, toàn bộ ROUND 1 `#1`–`#23` biến khỏi `parseBugTable`; chỉ `#24`–`#27` còn
+ra được radar. Cộng dồn **8 dòng ROUND 1 đang mở** bị che: `#8` `#10` `#11` `#13` `#16` `#19` `#21`
+`#23` (ước 14:38 là "còn 7 lần nữa" — thực tế hết sạch trong ~3 giờ). `shadowed` 8 → 10 → 11 → 14 →
+18 → **23**.
+
+**Điểm mới đáng ghi — cách "rẻ" (a) đã CHẾT, không phải vì QC quên mà vì QC làm đúng.** Phương án
+21/9 là *nhờ QC đánh ROUND 2 tiếp từ 28*. Hôm nay QC làm ngược lại: đánh lại ROUND 2 cho **sạch số
+1–23** (trước đó có 2 dòng cùng số `3` — ca trùng nội bộ ghi 21/9 nay đã hết). Việc dọn dẹp đó **đúng
+về phía sheet** và **tệ nhất có thể về phía radar**: số càng liền mạch thì phủ càng kín. Bài học:
+lưới chặn dựa vào quy ước con người tuân thủ thì không chỉ hỏng khi người ta quên — nó còn hỏng khi
+người ta dọn dẹp theo cách khác. Chỉ còn cách (b): đổi khoá `<đợt>#<bugId>` ở `parseBugTable` +
+`diffRows` + `openBugs` + `pendingSheetWrite`.
+
+**Và (b) nay là việc SỬA CHỮA, không còn là phòng ngừa.** 8 dòng đã bị che sẽ không tự quay lại khi
+đổi khoá xong — `seenBugs` đang giữ bản lai (khoá `1`–`23` mang nội dung ROUND 2, `24`–`27` mang nội
+dung ROUND 1). Đổi khoá phải kèm bước gieo lại `seenBugs` từ cache, nếu không lượt đầu sau khi sửa
+sẽ báo 23 bug "fresh" giả.
+
+**Quyết định lượt này (để lần sau khỏi phân vân):** rớt cổng G4 nên không fix, và **cố ý KHÔNG chạy
+`commit`** — commit sẽ đóng dấu "đã thấy" lên 23 dòng ROUND 2 chưa ai xử và ghi đè `openBugs` bằng
+bản lai. Luật "fix xong mới commit" ở đây bảo vệ đúng chỗ nó sinh ra để bảo vệ.
+
+**Nguồn.** `/daily bugwatch` 22/9 17:37–17:45 · `scan` ra `rowsTotal 27` / `shadowed [1..23]` /
+`toSkill 7` (`mine 0`) · `boards/2026-09-22.md` log 17:37–17:45.
+
+## gate-flagged-asset-used-2026-09-23
+- Bắt được: 4 ERROR (flagged-asset-used) trên dist — ảnh cờ FONT-SUBST (chữ nướng bằng font thay thế vì font PSD chưa cài — sai nét) đang dùng làm ảnh: btn-play.png ← bản cắt "btn-play"
+- Nguyên nhân: (điền — vì sao lọt tới đây)
+- Lưới chặn: fe-gate check flagged-asset-used (đã bắt được, giữ nguyên trong luồng code-developer)
+- Nguồn: 2026-pbm-t10 · 2026-09-23
+
+## psd-cut-lop-phu-lech-c5-2026-09-30
+- Bắt được: psd-cut GW-881 rớt C5/C2. Nguyên nhân là lớp phủ toàn canvas (`Color Fill 1`, nhóm `tooltips`) và layer clipping/adjustment (`Layer 28/29` clip vào title, `色相/饱和度 5`) bị so riêng lẻ với scope trang.
+- Nguyên nhân: màn phụ (tooltips) và lớp phủ modal nằm cùng cấp với nội dung trang. Layer clipping hoặc adjustment không đứng một mình được.
+- Lưới chặn: job có `_scope-page` (group cấp 1 trừ màn phụ) · `ignore` lớp phủ, kèm lý do · gộp clipping và adjustment vào CÙNG state với layer gốc. KHÔNG nới ngưỡng và KHÔNG sửa coords.json.
+- Nguồn: GW-881 2026-ngoi-sao-may-man · 2026-09-30
+
+## headless-virtual-time-rot-anh-2026-09-30
+- Bắt được: ảnh chụp headless `--virtual-time-budget` rớt ngẫu nhiên khoảng 1/3 ảnh (ô trống), làm design-diff ra số giả.
+- Lưới chặn: chụp bằng `--timeout=12000`. Ảnh chụp phải NHÌN trước khi tin số đo.
+- Nguồn: GW-881 · 2026-09-30
+
+## sp-coverage-file-an-2026-09-30
+- Bắt được: sp-coverage không bao giờ exit 0 vì manifest SharePoint có `.DS_Store` mà scan local luôn bỏ qua.
+- Lưới chặn: đã sửa sp-coverage.mjs để lọc file bắt đầu bằng `.`.
+- Nguồn: GW-881 · 2026-09-30
+
+## gate-flagged-asset-used-2026-09-30
+- Bắt được: 57 ERROR (flagged-asset-used) trên dist-snap — ảnh cờ FONT-SUBST (chữ nướng bằng font thay thế vì font PSD chưa cài — sai nét) đang dùng làm ảnh: navi.png ← bản cắt "navi"
+- Nguyên nhân: (điền — vì sao lọt tới đây)
+- Lưới chặn: fe-gate check flagged-asset-used (đã bắt được, giữ nguyên trong luồng code-developer)
+- Nguồn: scratchpad · 2026-09-30
+
+## psd-cut-job-con-scope-phai-khop-bo-cuc-2026-09-30
+- Bắt được: job con (hardlink tên mới) cắt nền đã `hidePath` 4 sao + ẩn nút login trong menu-mb → C5 đỏ 12.24 / 8.6 vì `_scope-*` tự sinh vẫn còn phần đã ẩn và còn chồng header/navi (cắt ở job khác); BLEND-OUT KHÔNG nhận override.
+- Lưới chặn: sửa chính `_scope-*` của job con cho đúng bố cục job (thêm hidePath giống state, bỏ nhóm đã cắt ở job khác) → C5 0.00; chỉ override C5 (overrides.json + measured) khi state không BLEND-OUT; sao/icon tách thì thêm ref phụ `supplementary` trỏ đúng nhóm.
+- Nguồn: GW-881 · 2026-09-30
+
+## popup-lib-scale-ms-outer-1-1-2026-09-30
+- Bắt được: popup dựng theo hệ số 2/3 (box 529 thay 744) — lib 1.3.2 đã scale `.MS__outer` theo window/2000 nên toạ độ popup phải lấy 1:1 từ coords.json (trừ gốc box), mobile thu bằng `scale()` trong `@include mobile`.
+- Lưới chặn: design-diff vùng popup trước/sau (70 → 3.3); đo box ở viewport 2000 phải ≈ bbox PSD.
+- Nguồn: GW-881 · 2026-09-30
+
+## font-psd-thieu-tim-trong-repo-cu-2026-09-30
+- Bắt được: fanpage FONT-SUBST do thiếu `UTMFacebookK&TBold` — font có sẵn trong vportal2public (tên file `UTM FacebookB K&T.ttf`), khớp theo PostScript name bằng fontTools.
+- Lưới chặn: trước khi báo "thiếu font, hỏi designer": `mdfind` tên họ font + so `name` id 6 với tên PSD báo thiếu.
+- Nguồn: GW-881 · 2026-09-30
+
+## lib-131-popup-pointer-none-2026-09-30
+- Bắt được: lib 1.3.1/1.3.2 có `.MS__popup.active { pointer-events: auto; …; pointer-events: none }` (dòng sau đè) ⇒ popup mở ra, X/Xác nhận chết click. 1.3.0 không dính. check-promotion vẫn 10/10 vì không bấm chuột thật.
+- Lưới chặn: dùng lib ≥1.3.1 thì popup base phải có `.base.active { pointer-events: auto }`. Verify popup bằng `page.click` (chuột thật) chứ không `el.click()` — `el.click()` lách qua pointer-events.
+- Kèm: markup đủ hook `pm__rut` mà không gọi `libraryMainsite.promotion()` thì nút Rút chết im, không lỗi. Debug chỉ có 1 url mẫu (`getdata.html` ×1, `getdatax5.html`/`getdatax10.html`); landing có cả ×1 và ×5 phải đổi url theo `totalTurn` (`$.ajaxPrefilter`) mới test được cả 2 nút.
+- Nguồn: GW-881 · 2026-09-30
+
+## gate-flagged-asset-used-2026-10-05
+- Bắt được: 25 ERROR (flagged-asset-used) trên dist — ảnh cờ FONT-SUBST (chữ nướng bằng font thay thế vì font PSD chưa cài — sai nét) đang dùng làm ảnh: frame-2.png ← bản cắt "frame-2"
+- Nguyên nhân: (điền — vì sao lọt tới đây)
+- Lưới chặn: fe-gate check flagged-asset-used (đã bắt được, giữ nguyên trong luồng code-developer)
+- Nguồn: 2026-big-update-t10 · 2026-10-05

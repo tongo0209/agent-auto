@@ -18,6 +18,7 @@ import {
   matchSheetToTicket,
   normalizeCell,
   parseBugTable,
+  shadowedBugIds,
   rowHash,
   diffRows,
   classifyBug,
@@ -106,6 +107,27 @@ test('map đúng cột theo TÊN header, không theo vị trí', () => {
 test('header lặp 2 lần không sinh bug trùng', () => {
   const ids = parseBugTable(REAL_SHEET).map((r) => r.bugId);
   assert.equal(new Set(ids).size, ids.length);
+});
+
+test('sheet 2 đợt đánh số lại từ 1 ⇒ báo BugID bị nuốt, không im lặng', () => {
+  const twoRounds = `| ROUND 2 | ROUND 2 | ROUND 2 |
+| :-: | :-: | :-: |
+| BugID | Description | DEV Check Status |
+| 1 | Dropdown chưa canh giữa | |
+
+| BugID | Description | DEV Check Status |
+| :-: | :-: | :-: |
+| 1 | Bấm X là văng về trang chủ | Done |
+| 2 | Filter sự kiện sai | |`;
+  assert.deepEqual(shadowedBugIds(twoRounds), ['1']);
+  assert.deepEqual(
+    parseBugTable(twoRounds).map((r) => r.desc),
+    ['Dropdown chưa canh giữa', 'Filter sự kiện sai'],
+  );
+});
+
+test('sheet 1 đợt ⇒ không báo BugID bị nuốt', () => {
+  assert.deepEqual(shadowedBugIds(REAL_SHEET), []);
 });
 
 test('bảng thứ hai (Accounts) không có cột BugID nên bị bỏ qua hoàn toàn', () => {

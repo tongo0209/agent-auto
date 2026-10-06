@@ -89,10 +89,28 @@ export function statusReadable(markdown = '') {
 }
 
 export function parseBugTable(markdown = '') {
+  const kept = new Map();
+  for (const row of collectBugRows(markdown)) {
+    if (!kept.has(row.bugId)) kept.set(row.bugId, row);
+  }
+  return [...kept.values()];
+}
+
+/** Sheet nhiều đợt (ROUND 1 / ROUND 2) đánh số lại từ 1 ⇒ BugID trùng, dòng sau bị nuốt im lặng. */
+export function shadowedBugIds(markdown = '') {
+  const seen = new Set();
+  const shadowed = [];
+  for (const row of collectBugRows(markdown)) {
+    if (seen.has(row.bugId)) shadowed.push(row.bugId);
+    else seen.add(row.bugId);
+  }
+  return shadowed;
+}
+
+function collectBugRows(markdown = '') {
   const lines = String(markdown).split('\n');
   const rows = [];
   let map = null;
-  const seenIds = new Set();
   for (const line of lines) {
     if (!line.trim().startsWith('|')) {
       map = null;
@@ -121,8 +139,6 @@ export function parseBugTable(markdown = '') {
       type: pick('type'),
     };
     if (!row.desc) continue;
-    if (seenIds.has(bugId)) continue;
-    seenIds.add(bugId);
     rows.push(row);
   }
   return rows;
@@ -419,6 +435,7 @@ export function summarize(seen, markdown) {
   return {
     isBugSheet: looksLikeBugSheet(markdown),
     rowsTotal: rows.length,
+    shadowed: shadowedBugIds(markdown),
     settled: actionable.length - open.length,
     toSkill: buckets.mine.length + buckets.unknown.length,
     open: readable ? openRows(rows) : [],
@@ -630,6 +647,7 @@ function cli(argv) {
     const lastScan = {
       at: new Date().toISOString(),
       rowsTotal: found.rowsTotal,
+      shadowed: found.shadowed,
       settled: found.settled,
       toSkill: found.toSkill,
       fresh: found.fresh.length,

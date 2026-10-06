@@ -34,6 +34,8 @@ node <skill-dir>/scripts/check-html.mjs <site-dir>    # HTML/SEO/validation + ab
 node <skill-dir>/scripts/scan-assets.mjs <site-dir>   # ảnh/font/JS/CSS nặng + lệnh fix sẵn
 ```
 Exit code 1 = có CRITICAL = **production blocker**. Thêm `--json` khi cần parse.
+CRITICAL ⇒ báo user NGAY 1 khối ngắn (blocker + `file:line`) rồi làm tiếp Bước 2–3 — không giữ tới báo
+cáo cuối (user chốt 6/10/2026: cảnh báo phải tới trước, đợi xong mới báo thì lâu).
 Muốn validate HTML chuẩn sâu hơn: `npx html-validate '<dir>/**/*.html'`.
 
 ## Bước 2 — Mắt đọc (những gì máy không bắt được)

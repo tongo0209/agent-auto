@@ -24,7 +24,7 @@ while IFS="$(printf '\t')" read -r here origin note; do
   else
     drift=$((drift+1))
     printf '  \033[33m≠\033[0m %s\n' "$here"
-    diff -rq --exclude=.DS_Store "$REPO/$here" "$src" 2>&1 | sed 's/^/      /' | head -5
+    diff -rq --exclude=.DS_Store "$REPO/$here" "$src" 2>&1 | sed 's/^/      /' | head -5 || true  # diff exit 1 + pipefail sẽ giết vòng lặp ở mục lệch đầu
   fi
 done < "$TSV"
 

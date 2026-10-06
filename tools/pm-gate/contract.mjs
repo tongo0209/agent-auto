@@ -218,7 +218,7 @@ function masterPairs(master, bareJs) {
     const classes = el.classes.filter((c) => (c.startsWith('pm__') || bareJs.includes(c)) && c !== MODULE_MARKER);
     const hooks = [...el.classes.filter((c) => c.startsWith('pm__') && c !== MODULE_MARKER), ...(el.id ? [el.id] : [])];
     for (const hook of hooks) {
-      const partners = hook.startsWith('pm__') ? [...classes, ...data].filter((p) => p !== hook) : data;
+      const partners = hook.startsWith('pm__') ? [...classes, ...data].filter((p) => p !== hook) : [...classes.filter((c) => bareJs.includes(c)), ...data];
       seen.set(hook, [...(seen.get(hook) || []), partners]);
     }
   }

@@ -5,7 +5,6 @@ gameplay	kit	production	kind	evidence	reported
 *	popup_nhanluot_signUp	popup_register	alias	cdn-source 113 campaign popup_register vs 0; gt-promotion 136 vs 0	no
 luckydraw-gift-exchange	popup_noti	-	fix	MASTER-luckydraw:499 getElementById('popup_noti') không có phần tử	no
 payment	pm__module@popup-condition	-	fix	components/popups/popup-condition.html:2 còn pm__module, MASTER đã bỏ	no
-*	mto-login-form	-	drop	gtp 0/29 request có id="mto-login-form"; 10 request có pm__btn-login đặt thẳng trong pm__login-module · rg -l 'id="mto-login-form"' gt-promotion-template -g '**/Promotion/*.html'	no
 *	pm__anchor	-	drop	gtp 7/29 request có pm__anchor · rg -l pm__anchor gt-promotion-template -g '**/Promotion/*.html'	no
 *	pm__anchor@pm__login	-	drop	gtp 1/13 request đặt pm__anchor cùng thẻ pm__login; cdn 10/12 campaign không kèm · rg -l -e 'pm__login [^"]*pm__anchor' -e 'pm__anchor [^"]*pm__login[ "]'	no
 *	pm__anchor@pm__logout	-	drop	gtp 2/11 request đặt pm__anchor cùng thẻ pm__logout; cdn 24/25 campaign không kèm	no
@@ -37,3 +36,4 @@ luckydraw-gift-exchange	popup_history	h5	drop	H5 Lucky không popup lịch sử:
 luckydraw-gift-exchange	pm__form-history	h5	drop	H5 Lucky không pm__form-history: gtp 1/7 (A49-CFL monthlycardt9), cdn 3/19 (cfl/2025-may-quay-chien-binh, cfl/2026-truy-tim-kho-bau, zsm/2026-dua-co-hoi-h5)	no
 *	pm__playnow	like:pm__zing	allow	provider đăng nhập Play Now cạnh pm__btn-login: cdn 4 campaign (boomzth/2025-anniversary-2, boomzth/2025-webshop, ddtank/2025-vote, gnmobinew/2026-trung-thu), gtp 2 request (622-Bomber-VNG/Request-landing-convert-(ZSM-GNO)-57041) · rg -l -e 'pm__playnow[ "]'	no
 luckydraw-gift-exchange	pm__title-form	in:pm__condition-module	allow	gtp 3 request đặt pm__title-form thẳng trong pm__condition-module, ngoài form: 496_GNOTH/ChengduTournamentWebEvent2026_55990, A78-LAN/H5-Halloween-56357, LAN/h5trungthu-53730 (AI-RULES Payment cũng cho "trực tiếp trong pm__condition-module")	no
+*	mto-login-form	h5	drop	H5: khối form đăng nhập đi theo popup_login (đã drop h5) · kit thắng trên web từ 6/10/2026 (user chốt check bàn giao theo kit)	no

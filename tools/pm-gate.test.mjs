@@ -329,10 +329,13 @@ const CASES = [
     ['H5', gate(L, once(withoutConditionAndHistory(base(L)), '</body>', H5_FLAG)), noRed],
     ['web', gate(L, withoutConditionAndHistory(base(L))), (r) => redOn('PG-REQ', 'popup_condition / popupCondition')(r) && redOn('PG-REQ', 'popup_history')(r)],
   ]],
-  ['35 bỏ khối mto-login-form (production) → không 🔴; pm__btn-login ra ngoài pm__login-module → PG-NEST', () => [
-    ['bỏ wrapper', gate(L, once(base(L), '<div id="mto-login-form">', '<div>')), noRed],
+  ['35 bỏ khối mto-login-form → PG-REQ (kit thắng từ 6/10); pm__btn-login ra ngoài pm__login-module → PG-NEST', () => [
+    ['bỏ wrapper', gate(L, once(base(L), '<div id="mto-login-form">', '<div>')), redOn('PG-REQ', 'mto-login-form')],
     ['ra ngoài', gate(L, once(once(base(L), '<div id="mto-login-form">', '<div>'), '<a href="#" class="pm__menu-selectrole"></a>',
       '<a href="#" class="pm__menu-selectrole"></a>\n  <a href="#" class="pm__btn-login pm__zing"></a>')), redOn('PG-NEST', 'pm__btn-login')],
+  ]],
+  ['35b #refresh-captcha thiếu class trần btn-refresh (JS kit bám) → PG-PAIR', () => [
+    ['thiếu', gate(L, once(base(L), 'class="btn-refresh"', 'class=""')), redOn('PG-PAIR', 'refresh-captcha')],
   ]],
   ['36 pm__login/pm__logout không kèm pm__anchor (production) → không 🔴; nút quiz vẫn phải kèm', () => [
     ['L', gate(L, once(once(once(base(L), 'class="pm__login pm__anchor"', 'class="pm__login"'), 'class="pm__logout pm__anchor"', 'class="pm__logout"'),
@@ -376,8 +379,8 @@ const CASES = [
     ['class', gate(L, once(base(L), '<div class="pm__role">', '<div class="pm__role form-profile">')), noRed],
     ['id', gate(L, once(base(L), '<div class="pm__role">', '<div class="pm__role" id="form-profile">')), redOn('PG-ONCE', 'form-profile')],
   ]],
-  ['47 MTO-login-form (biến thể của hook production đã bỏ) → không PG-TYPO', () => [
-    ['L', gate(L, once(base(L), 'id="mto-login-form"', 'id="MTO-login-form"')), noRed],
+  ['47 MTO-login-form (sai hoa/thường hook kit) → PG-TYPO', () => [
+    ['L', gate(L, once(base(L), 'id="mto-login-form"', 'id="MTO-login-form"')), redOn('PG-TYPO', 'MTO-login-form')],
   ]],
   ['48 --ref: popup riêng của ref (popup_chucmung) không phải hợp đồng → không PG-REF; popup platform vẫn bắt', () => [
     ['riêng', refCaseWith('<div id="popup_chucmung"></div><div id="popup_history" class="pm__history-module"></div>'), (r) => lacks(r, 'PG-REF', 'popup_chucmung')],

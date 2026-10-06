@@ -1,7 +1,7 @@
 // Luật của pm-gate: mỗi mã PG-* một hàm, soi phần tử đã quét theo hợp đồng từ contract.mjs.
 import { ancestorsOf, tokensOf, matcherFor, isPattern } from './scan.mjs';
 
-export const WARN_CODES = new Set(['PG-TEXT', 'PG-MODULE', 'PG-UNKNOWN']);
+export const WARN_CODES = new Set(['PG-TEXT', 'PG-MODULE', 'PG-UNKNOWN', 'PG-NAME']);
 export const MODULE_MARKER = 'pm__module';
 export const POPUP_ID = /^popup/;
 export const FIELD_TAGS = new Set(['input', 'select', 'textarea']);
@@ -93,8 +93,10 @@ function checkAny({ els, anyCount, add }) {
 }
 
 // Tên kit và tên production đều hợp lệ (NSTT 62633 dùng tên kit, user chốt 6/10): quy về tên production cho các check sau.
-function checkOverrides({ els, contract, explained }) {
+function checkOverrides({ els, contract, add, explained }) {
   for (const [kit, production] of contract.aliases) {
+    const legacy = elementsWith(els, production);
+    if (legacy.length) add('PG-NAME', production, `\`${production}\` vẫn chạy nhưng task mới dùng tên kit \`${kit}\` (mẫu NSTT 62633)`, legacy);
     const found = elementsWith(els, kit);
     if (!found.length) continue;
     for (const el of found.map((i) => els[i])) {
@@ -102,6 +104,15 @@ function checkOverrides({ els, contract, explained }) {
       el.classes = el.classes.map((c) => (c === kit ? production : c));
     }
     explained.add(kit);
+  }
+}
+
+// GW-901 (user chốt 6/10): nút đăng nhập để platform lo — không data-channel, pm__login không tự mở popup bằng data-target.
+function checkLoginButtons({ els, add }) {
+  const offenders = (hook, attr) => els.flatMap((el, i) => (el.classes.includes(hook) && el.attrs.has(attr) ? [i] : []));
+  for (const [hook, attr] of [['pm__btn-login', 'data-channel'], ['pm__login', 'data-target']]) {
+    const found = offenders(hook, attr);
+    if (found.length) add('PG-DONT', attr, `\`${hook}\` không mang \`${attr}\` — platform tự xử lý đăng nhập`, found);
   }
 }
 
@@ -290,5 +301,5 @@ function checkRef({ els, contract, fullDocument, h5, elsewhere, add }) {
 }
 
 // Thứ tự có nghĩa: lỗi gốc ghi explained trước để PG-REQ/PG-UNKNOWN không báo trùng.
-const CHECKS = [checkAny, checkOverrides, checkClaim, checkForeign, checkDont, checkFormIds, checkNames, checkRequired,
+const CHECKS = [checkAny, checkOverrides, checkLoginButtons, checkClaim, checkForeign, checkDont, checkFormIds, checkNames, checkRequired,
   checkOnce, checkNesting, checkOpen, checkInputs, checkPairs, checkTextLeaf, checkModuleWith, checkRef];

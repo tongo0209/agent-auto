@@ -203,8 +203,7 @@ const TWIG_PARTIAL = '{% if a %}<form id="sso-login-form"><input type="text" nam
 // Mỗi ca: danh sách [nhãn, kết quả chạy, điều kiện] — ca xanh khi mọi điều kiện đúng.
 const CASES = [
   ['0 base L/P sạch', () => [
-    ['L', gate(L, base(L)), clean],
-    ['P', gate(P, base(P)), clean],
+    ...[L, P].map((g) => [g, gate(g, base(g)), (r) => r.exit === 0 && noRed(r) && r.json.warns.every((w) => w.code === 'PG-NAME')]),
   ]],
   ['1 MASTER thô (tên kit popup_signIn/popup_nhanluot_signUp) → hợp lệ ngang tên production (NSTT 62633, user chốt 6/10)', () => [
     ...[L, P].map((g) => [g, gate(g, ALIASES.reduce((t, [kit, production]) => t.replaceAll(production, kit), base(g))), noRed]),
@@ -339,6 +338,11 @@ const CASES = [
   ]],
   ['35b #refresh-captcha thiếu class trần btn-refresh (JS kit bám) → PG-PAIR', () => [
     ['thiếu', gate(L, once(base(L), 'class="btn-refresh"', 'class=""')), redOn('PG-PAIR', 'refresh-captcha')],
+  ]],
+  ['35c nút đăng nhập mang data-channel / pm__login mang data-target → PG-DONT; dùng popup_login → 🟡 PG-NAME (GW-901, user chốt 6/10)', () => [
+    ['channel', gate(L, once(base(L), 'class="pm__btn-login pm__zing"', 'class="pm__btn-login pm__zing" data-channel="zing"')), redOn('PG-DONT', 'data-channel')],
+    ['target', gate(L, once(base(L), 'class="pm__login pm__anchor"', 'class="pm__login pm__anchor MJ__toogleActive" data-target="#popup_login"')), redOn('PG-DONT', 'data-target')],
+    ['tên', gate(L, base(L)), (r) => noRed(r) && r.json.warns.some((w) => w.code === 'PG-NAME' && w.token === 'popup_login')],
   ]],
   ['36 pm__login/pm__logout không kèm pm__anchor (production) → không 🔴; nút quiz vẫn phải kèm', () => [
     ['L', gate(L, once(once(once(base(L), 'class="pm__login pm__anchor"', 'class="pm__login"'), 'class="pm__logout pm__anchor"', 'class="pm__logout"'),

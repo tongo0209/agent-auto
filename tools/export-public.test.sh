@@ -65,5 +65,14 @@ mkdir -p "$R/publish/overrides/src"; printf 'ban da duoc thay\n' > "$R/publish/o
 run "$R" "$O" >/dev/null
 grep -q 'ban da duoc thay' "$O/src/a.txt" 2>/dev/null && ok || nope "ca5 override không được áp"
 
+# ── Ca 6: commit public mang danh tính trung tính, không lấy git config nào của máy tác giả ──
+R=$(fixture); O=$(mktemp -d)/out; G=$(mktemp)
+printf '[user]\n\tname = may\n\temail = may@corp-noi-bo.test\n' > "$G"
+git -C "$R" config user.name tac-gia; git -C "$R" config user.email tac-gia@users.noreply.test
+printf 'corp-noi-bo\ntac-gia\n' >> "$R/publish/denylist.txt"
+out=$(GIT_CONFIG_GLOBAL="$G" run "$R" "$O"); rc=$?
+[ "$rc" -eq 0 ] || nope "ca6 export phải thành công: $out"
+[ "$(git -C "$O" log -1 --format=%ae 2>/dev/null)" = agent-auto@users.noreply.github.com ] && ok || nope "ca6 tác giả commit phải là danh tính trung tính"
+
 printf '%d pass · %d fail\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

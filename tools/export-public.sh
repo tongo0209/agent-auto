@@ -174,12 +174,15 @@ if [ "$DRY" = 1 ]; then
 fi
 
 echo "── git init + commit ──"
+# Không để git tự lấy config của máy: email công ty lẫn handle GitHub đều nằm trong denylist.
+AUTHOR_NAME="${PUBLIC_AUTHOR_NAME:-agent-auto}"; AUTHOR_EMAIL="${PUBLIC_AUTHOR_EMAIL:-agent-auto@users.noreply.github.com}"
 [ -e "$OUT" ] && { echo "❌ $OUT đã tồn tại — xoá/đổi tên tay rồi chạy lại (script không tự xoá)"; exit 1; }
 ( cd "$STAGE/out" \
   && git init -q \
   && git add -A \
-  && git -c commit.gpgsign=false commit -q -m "Initial public release of agent-auto" )
-if ( cd "$STAGE/out" && git log -p -- . ":(exclude)console/package-lock.json" | grep -IEq -f "$PUB/denylist.txt" ); then
+  && git -c commit.gpgsign=false -c user.name="$AUTHOR_NAME" -c user.email="$AUTHOR_EMAIL" \
+       commit -q -m "Initial public release of agent-auto" )
+if ! bash "$(dirname "${BASH_SOURCE[0]}")/history-denylist.sh" "$STAGE/out" "$PUB/denylist.txt"; then
   echo "❌ history vẫn khớp denylist — không phát hành"; exit 1
 fi
 echo "   history sạch"

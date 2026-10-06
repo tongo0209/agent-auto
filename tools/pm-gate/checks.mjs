@@ -92,12 +92,16 @@ function checkAny({ els, anyCount, add }) {
   if (anyCount) add('PG-ANY', 'any', `còn ${anyCount} thẻ <any> chưa thay bằng tag thật`, els.flatMap((el, i) => (el.tag === 'any' ? [i] : [])));
 }
 
-function checkOverrides({ els, contract, add, explained }) {
+// Tên kit và tên production đều hợp lệ (NSTT 62633 dùng tên kit, user chốt 6/10): quy về tên production cho các check sau.
+function checkOverrides({ els, contract, explained }) {
   for (const [kit, production] of contract.aliases) {
     const found = elementsWith(els, kit);
     if (!found.length) continue;
-    add('PG-OVR', kit, `\`${kit}\` là tên trong kit — production dùng \`${production}\` (rules/pm-kit-overrides.tsv)`, found);
-    explained.add(kit).add(production);
+    for (const el of found.map((i) => els[i])) {
+      if (el.id === kit) el.id = production;
+      el.classes = el.classes.map((c) => (c === kit ? production : c));
+    }
+    explained.add(kit);
   }
 }
 

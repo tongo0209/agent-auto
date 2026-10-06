@@ -206,9 +206,12 @@ const CASES = [
     ['L', gate(L, base(L)), clean],
     ['P', gate(P, base(P)), clean],
   ]],
-  ['1 MASTER thô (chưa alias) → PG-OVR', () => [
-    ['L', gate(L, rawMaster(L)), red('PG-OVR')],
-    ['P', gate(P, rawMaster(P)), red('PG-OVR')],
+  ['1 MASTER thô (tên kit popup_signIn/popup_nhanluot_signUp) → hợp lệ ngang tên production (NSTT 62633, user chốt 6/10)', () => [
+    ...[L, P].map((g) => [g, gate(g, ALIASES.reduce((t, [kit, production]) => t.replaceAll(production, kit), base(g))), noRed]),
+  ]],
+  ['1b pm__btn-show-condition trong popup_getlist → không PG-NEST (NSTT 62633)', () => [
+    ['L', gate(L, once(base(L), '</body>', '<section id="popup_getlist" class="MS__popup"><a href="#" class="pm__btn-show-condition"></a></section>\n</body>')),
+      (r) => lacks(r, 'PG-NEST', 'pm__btn-show-condition')],
   ]],
   ['2 nhân đôi sso-login-form → PG-ONCE', () => [L, P].map((g) => [g,
     gate(g, once(base(g), '<div id="sso-login-form">', '<div id="sso-login-form"></div>\n<div id="sso-login-form">')), red('PG-ONCE')])],

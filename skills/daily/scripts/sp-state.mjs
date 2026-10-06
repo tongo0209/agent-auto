@@ -10,6 +10,7 @@
  */
 import { readFileSync, writeFileSync, copyFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, basename, dirname } from "node:path";
+import { loadManifest } from "./sp-manifest.mjs";
 
 const [, , KEY, manPath, designDir, statePath, ...rest] = process.argv;
 if (!KEY || !manPath || !designDir || !statePath) {
@@ -19,7 +20,7 @@ if (!KEY || !manPath || !designDir || !statePath) {
 const dIdx = rest.indexOf("--deferred");
 const deferredNote = dIdx > -1 ? rest[dIdx + 1] : null;
 
-const man = JSON.parse(readFileSync(manPath, "utf8"));
+const man = loadManifest(manPath);
 const local = new Map();
 (function scan(dir) {
   if (!existsSync(dir)) return;
@@ -54,6 +55,7 @@ d.coverage = {
   sourceFiles: man.count, sourceBytes: man.totalBytes,
   localFiles: have.length, localBytes: have.reduce((s, f) => s + f.length, 0),
   missingFiles: missing.length, missingBytes: missing.reduce((s, f) => s + f.length, 0),
+  emptyAtSource: man.emptyAtSource.map(f => f.rel),
 };
 if (missing.length) d.missing = missing.map(f => f.rel);
 else delete d.missing;
@@ -63,5 +65,5 @@ delete d.notDownloadedNote;
 if (full) d.downloadedAt = new Date().toISOString();
 
 writeFileSync(statePath, JSON.stringify(state, null, 2) + "\n");
-console.log(`${KEY}: ${d.status} — ${have.length}/${man.count} file (${(d.coverage.localBytes / 1048576).toFixed(1)}/${(man.totalBytes / 1048576).toFixed(1)} MB)`);
+console.log(`${KEY}: ${d.status} — ${have.length}/${man.files.length} file (${(d.coverage.localBytes / 1048576).toFixed(1)}/${(man.totalBytes / 1048576).toFixed(1)} MB)`);
 if (missing.length) console.log(`   còn thiếu ${missing.length} file — đã ghi state.issues.${KEY}.design.missing`);

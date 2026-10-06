@@ -393,6 +393,9 @@ Mode `plan`/`week` dừng tại đây.
 - Gọi `/code-developer <mode>` qua tool Skill, args = `tasks/<KEY>/brief.md` + design + repo đích.
   Args LUÔN kèm dòng: `Chuẩn: ~/VNG/agent-auto/rules/cdn-source-standard.md + popup-library.md
   (+ html-handoff.md nếu task có bàn giao)` — brief tự sinh không nhắc thì subagent không biết.
+- **Task landing `pm__` (R-PM-11, `~/VNG/agent-auto/rules/pm-contract.md`):** trước khi gọi, chạy
+  `node ~/VNG/agent-auto/tools/project-note.mjs path <campaign>` → args thêm dòng `Landing pm__: file dự án
+  <path | "chưa có — init"> · khoá <gameplay | CHƯA KHOÁ>`. Khoá do code-developer làm từ brief.md; daily KHÔNG tự khoá.
 - **Task có `Khung nguồn` đã duyệt:** args code-developer full thêm dòng
   `Scaffold: clone · nguồn <abs path campaign nguồn> · đích <repos.cdn-source>/products/<game>/landing/<slug>`.
   Scaffold xong (folder đích
@@ -407,13 +410,13 @@ Mode `plan`/`week` dừng tại đây.
   `pathsConfirmed: true` + `state.issues[KEY].scaffoldedAt`; **phase GIỮ `waiting-design`** —
   luật "`ready` chỉ khi có ảnh thật" không nới, khung sẵn ≠ design về. Design về → làn thường
   chạy tiếp, `/code-developer full` tự SKIP scaffold vì folder đã tồn tại.
-- **Phase deliver** (task có kênh promotion, code đã verify): chép output HTML/asset vào
-  `<gt-promotion>/<game>/<slug>-<nexusId>/mainsite/` — theo `~/VNG/agent-auto/rules/html-handoff.md`
-  (R-HO-1 URL CDN tuyệt đối · R-HO-2 giữ `<% MODULE_CONTENT %>` ở bản `Promotion/` · R-HO-5 soát cả
-  `Promotion/` lẫn `mainsite/` bằng `python3 ~/VNG/agent-auto/tools/check-handoff-sync.py --folder <game>/<slug>-<nexusId>`)
-  → liệt kê file đã chép + kết quả so 2 nửa vào board →
-  nhắc user review + TỰ push (KHÔNG tự commit/push). Trước khi chép: bản trên git MỚI HƠN
-  local (promotion vừa sửa) → báo diff, hỏi user hướng merge (đây là ca "kẹt thật" được phép hỏi).
+- **Phase deliver**: `/code-developer full` đã tự làm trọn (pha 5 audit/optimize → pha 6 bàn giao + commit,
+  `skills/code-developer/references/full-lifecycle.md`) — promotion chép HTML + `assets/` vào
+  `<gt-promotion>/<game>/<slug>-<nexusId>/mainsite/` (R-HO-1..12), mainsite thuần sang new-mainsite/vportal2view.
+  Gọi code-developer từ daily thì args thêm `Từ /daily: KHÔNG hỏi pha 7` — daily gom câu hỏi push/release của
+  MỌI task vào 1 câu cuối lượt (Bước 5). Board ghi: đích bàn giao + commit hash từng repo + kết quả
+  `check-handoff-sync`. Trước khi chép: bản trên git MỚI HƠN local (promotion vừa sửa) → báo diff, hỏi user
+  hướng merge (đây là ca "kẹt thật" được phép hỏi).
 - Buglist: soạn lệnh `claude "/bug-fixer-lite <sheet> <project>"` vào board + báo cáo.
   Phiên hiện tại là CLI có toolset chrome → được hỏi chạy luôn không (trong lượt duyệt).
 - Task fail → ⚠️ + lý do, chạy tiếp task khác. Verify thật mới được ✅.
@@ -613,17 +616,26 @@ mất 48/56 file. Bài học ở sai chỗ = chưa ghi.
    phần người dùng sở hữu (`bugWatch[].follow`, `unfollowReason`, `keys`, `title`). Việc bật/tắt
    theo dõi buglist thì **KHÔNG ghi tay**, gọi `node tools/bug-radar.mjs watch|unwatch <sheetId>`
    (nó đã hợp nhất lúc ghi qua `tools/state-merge.mjs`).
+   ⚠ **`writeMerged(path, base, mine)` — `mine` phải là state ĐẦY ĐỦ, KHÔNG phải patch.** `merge3`
+   coi key có trong `base` mà thiếu trong `mine` là "mình đã xoá" rồi `delete` thật (semantics chủ ý,
+   để xoá được `scanDue`/`sourceChanged`). Gõ `mine = { lastRun: now }` là **xoá sạch** `issues` +
+   `bugWatch` + `schemaVersion`. Luôn viết `mine = { ...base, <field mình đổi> }`. Đã trả giá
+   22/9/2026 12:05: `state.json` tụt còn 44 byte / 1 key, mất 24 ticket + 27 sheet; cứu được nhờ
+   backup-trước-khi-ghi + `guard-state.sh` bắt `E5` ngay trong lượt.
    **ĐỌC NGƯỢC SAU KHI GHI, TRƯỚC KHI BÁO SỐ** (R-EV-1, `~/VNG/agent-auto/rules/agent-evidence.md`):
    đọc lại `state.json` vừa ghi (không tin lệnh ghi đã chạy là đủ) rồi mới lấy số cho báo cáo Bước 6.2
-   — lệnh ghi có thể fail âm thầm hoặc ghi nhầm field, chỉ output đọc-lại mới là bằng chứng.
+   — lệnh ghi có thể fail âm thầm hoặc ghi nhầm field, chỉ output đọc-lại mới là bằng chứng. **So
+   field lệch với bản backup vừa copy**: chỉ được lệch đúng field mình chủ ý đổi — đây là lưới duy
+   nhất bắt được ca "ghi thành công nhưng mất field khác".
 2. Báo cáo TIẾNG VIỆT: ⏰ cảnh báo trễ mốc trước → ✅ xong (kèm verify) → ⚠️ kẹt →
-   📦 động tĩnh promotion → 📋 việc user (review diff, push tay, cập nhật Jira tay, lệnh
+   📦 động tĩnh promotion → 📋 việc user (commit chờ push/release — hỏi 1 câu gộp, cập nhật Jira tay, lệnh
    bug-fixer-lite chờ dán) → link dashboard + board → ⏱ máy chạy vs chờ user.
 
 ## Luật an toàn (không thương lượng)
 
-- KHÔNG `git commit`/`push` (kể cả gt-promotion — chép file xong để user push). KHÔNG ghi gì lên Jira.
+- `git commit`: tự làm qua `/code-developer full` (cdn-source + repo bàn giao, đúng path của task, báo hash — R-GIT-4).
+  `git push` + release CMS: KHÔNG tự làm — gom 1 câu hỏi cuối lượt cho mọi task đã commit. KHÔNG ghi gì lên Jira.
 - Claim "xong" phải có lệnh + output thật. Chưa verify → nói "chưa verify" (R-EV-1/2, `rules/agent-evidence.md`).
-- Tối đa 2 cổng hỏi: (a) duyệt kế hoạch, (b) first-run JQL. Ngoại lệ được hỏi: xung đột
+- Tối đa 3 cổng hỏi: (a) duyệt kế hoạch, (b) first-run JQL, (c) push/release cuối lượt (chỉ khi có commit chờ đẩy). Ngoại lệ được hỏi: xung đột
   merge gt-promotion, thiếu input không đoán được. Ca mập mờ khác → default an toàn + ghi board.
 - `delta`/`status`/`wrap` không bao giờ hỏi.

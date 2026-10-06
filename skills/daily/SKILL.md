@@ -1,6 +1,6 @@
 ---
 name: daily
-description: Điều phối ngày + vòng đời task của dev frontend VNG: quét Jira (project GW), bóc design đã giao, suy phase từ commit thật, trình kế hoạch duyệt 1 lần rồi tự chạy (code qua code-developer), canh buglist QC sau bàn giao, cập nhật board + console. KHÔNG ghi ngược Jira, KHÔNG commit/push. Modes: mặc định | plan | prep <KEY> | week | add | link | delta | bugwatch | bugwrite | designwatch | wrap | status | doctor. Dùng khi user gõ /daily hoặc nói "check task jira hôm nay", "hôm nay làm gì", "kế hoạch tuần", "chốt ngày".
+description: Điều phối ngày + vòng đời task của dev frontend VNG: quét Jira (project GW), bóc design đã giao, suy phase từ commit thật, trình kế hoạch duyệt 1 lần rồi tự chạy (code qua code-developer), canh buglist QC sau bàn giao, cập nhật board + console. KHÔNG ghi ngược Jira; commit qua code-developer full, push/release hỏi 1 lần cuối lượt. Modes: mặc định | plan | prep <KEY> | week | add | link | delta | bugwatch | bugwrite | designwatch | wrap | status | doctor. Dùng khi user gõ /daily hoặc nói "check task jira hôm nay", "hôm nay làm gì", "kế hoạch tuần", "chốt ngày".
 ---
 
 # /daily — điều phối ngày + vòng đời task: Jira → kế hoạch → chạy → giao HTML → bug → chốt

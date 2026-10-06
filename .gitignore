@@ -5,8 +5,8 @@ console/dist/
 # Backup quay vòng do console/skill ghi (state, board) — lưới an toàn, không phải lịch sử
 .backups/
 
-# Ảnh chụp tạm của browserpilot
-.browserpilot/shots/
+# Runtime browserpilot (ảnh chụp tạm) — ở mọi cấp thư mục, không chỉ gốc repo
+**/.browserpilot/
 
 # Design KHÔNG vào git: 5.1GB kể cả _raw, 112MB ảnh đã cắt (đo 1/8).
 # Đây là bản tải về, nguồn thật nằm trên SharePoint của designer — tải lại được.

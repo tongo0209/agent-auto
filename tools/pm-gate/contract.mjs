@@ -21,8 +21,11 @@ export function loadContract(gameplay, { kitDir, overridesPath, refDir }) {
   const overrides = readOverrides(overridesPath, gameplay);
   const aliases = overrides.alias;
   const read = (path) => applyAliases(readFileSync(path, 'utf8'), aliases);
-  const rules = gameplay === 'none' ? '' : read(rulesPath(kitDir, gameplay));
-  const master = scanHtml(gameplay === 'none' ? commonPopups(kitDir, read) : read(masterPath(kitDir, gameplay))).elements;
+  // none = luật chung: gộp AI-RULES + MASTER của cả 2 gameplay; luật chỉ ăn khi trang có hook đó, không đòi hook bắt buộc.
+  const rules = gameplay === 'none' ? KIT_GAMEPLAYS.map((g) => read(rulesPath(kitDir, g))).join('\n') : read(rulesPath(kitDir, gameplay));
+  const master = scanHtml(gameplay === 'none'
+    ? [commonPopups(kitDir, read), ...KIT_GAMEPLAYS.map((g) => read(masterPath(kitDir, g)))].join('\n')
+    : read(masterPath(kitDir, gameplay))).elements;
 
   const catalog = withProductionSiblings(parseCatalog(rules), overrides.allow);
   const dropped = new Set(overrides.drop.filter(([kit, production]) => production === '-' && !kit.includes('@')).map(([kit]) => kit));
@@ -61,8 +64,8 @@ export function loadContract(gameplay, { kitDir, overridesPath, refDir }) {
     catalog,
     ...lists,
     singletons: lists.singletons.filter((t) => !allowed('repeat').has(t)),
-    required: requiredGroups(catalog, dropped, h5Tokens, overrides),
-    dont: parseDont(rules, catalog),
+    required: gameplay === 'none' ? [] : requiredGroups(catalog, dropped, h5Tokens, overrides),
+    dont: gameplay === 'none' ? commonDont(kitDir, read, overrides.allow) : parseDont(rules, catalog),
     textLeaf: backticked(between(rules, '### 3.2.', '```')),
     moduleWith: tableRows(between(rules, '### 3.4.', '\n## 4.')).filter((cells) => cells[2].includes('luôn kèm')).flatMap((cells) => backticked(cells[1])),
     nest: withProductionPlacements(nestRules(catalog, master, openers, dropped, idHooks), overrides.allow),
@@ -117,6 +120,16 @@ function requiredGroups(catalog, dropped, h5Tokens, overrides) {
 
 function applyAliases(text, aliases) {
   return aliases.reduce((t, [kit, production]) => t.replace(new RegExp(`\\b${kit}\\b`, 'g'), production), text);
+}
+
+// Cấm của gameplay này có thể là hook hợp lệ của gameplay kia (pm__btn-rank) → none chỉ giữ điều cấm chung.
+function commonDont(kitDir, read, allows) {
+  const [first, ...rest] = KIT_GAMEPLAYS.map((g) => {
+    const rules = read(rulesPath(kitDir, g));
+    return parseDont(rules, withProductionSiblings(parseCatalog(rules), allows));
+  });
+  const key = (d) => d.classes.join(' ');
+  return first.filter((d) => rest.every((list) => list.some((o) => key(o) === key(d))));
 }
 
 function commonPopups(kitDir, read) {

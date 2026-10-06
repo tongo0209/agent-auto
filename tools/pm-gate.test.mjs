@@ -344,6 +344,13 @@ const CASES = [
     ['target', gate(L, once(base(L), 'class="pm__login pm__anchor"', 'class="pm__login pm__anchor MJ__toogleActive" data-target="#popup_login"')), redOn('PG-DONT', 'data-target')],
     ['tên', gate(L, base(L)), (r) => noRed(r) && r.json.warns.some((w) => w.code === 'PG-NAME' && w.token === 'popup_login')],
   ]],
+  ['35d gameplay none = luật chung của 2 gameplay: trang đúng kit vẫn sạch, lỗi popup chung vẫn bị chặn, không đòi hook riêng gameplay', () => [
+    ...[L, P].map((g) => [`${g} chạy none`, gate('none', base(g)), noRed]),
+    ['thiếu btn-refresh', gate('none', once(base(L), 'class="btn-refresh"', 'class=""')), redOn('PG-PAIR', 'refresh-captcha')],
+    ['profile-form mất module', gate('none', once(base(L), 'pm__profileinfo-module', '')), redOn('PG-NEST', 'pm__profile-form')],
+    ['data-channel', gate('none', once(base(L), 'class="pm__btn-login pm__zing"', 'class="pm__btn-login pm__zing" data-channel="zing"')), redOn('PG-DONT', 'data-channel')],
+    ['không đòi pm__rut/pm__point', gate('none', '<html><body><a href="#" class="pm__login pm__anchor">Login</a></body></html>'), (r) => lacks(r, 'PG-REQ', 'pm__point') && !r.json.fails.some((f) => f.code === 'PG-REQ')],
+  ]],
   ['36 pm__login/pm__logout không kèm pm__anchor (production) → không 🔴; nút quiz vẫn phải kèm', () => [
     ['L', gate(L, once(once(once(base(L), 'class="pm__login pm__anchor"', 'class="pm__login"'), 'class="pm__logout pm__anchor"', 'class="pm__logout"'),
       'class="pm__anchor pm__text_get_point"', 'class="pm__text_get_point"')),

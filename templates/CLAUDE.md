@@ -37,7 +37,7 @@ Giao subagent viết code → brief phải trỏ `rules/code-style.md` **và** (
 - `git commit`: **tự làm được, KHÔNG hỏi** — nhưng gom đúng phạm vi project đang làm và BÁO LẠI đã commit gì.
 - `git push`: **KHÔNG BAO GIỜ tự làm** — hỏi user TỪNG lần.
 - 2 hệ format không lẫn: repo git VNG theo `/commit` (Conventional Commits) · repo nội bộ `[<leaf-folder>] <English subject>`.
-- `cdn-source`: trước MỌI commit tự `git pull --autostash origin master`; user kêu "push" mới chạy `git mr`, dừng ở tạo MR.
+- `cdn-source`: commit đúng path (`git add -- <paths> && git commit --only …` 1 lệnh) rồi tự `git pull --no-rebase --no-edit origin master` — CẤM `--autostash`/`--amend` (nhiều phiên chung worktree, hook `G-GIT-4`); user kêu "push" mới chạy `git mr`, dừng ở tạo MR.
 - `gt-promotion-template` / `new-mainsite`: KHÔNG commit hộ user — chỉ đưa `git diff --stat`.
 
 ## Guardrails cơ học (`rules/guardrails.md`)
@@ -53,6 +53,7 @@ Bị chặn thì đọc mã `G-*` rồi đổi cách làm — **KHÔNG tìm đư
 Context gửi lại **MỖI lượt** → 1 lần nạp thừa bị nhân với số lượt còn lại, và chi phí tăng theo **bình phương** độ dài phiên. Nạp đúng đủ, không nạp cho chắc.
 - Read: Grep/Glob định vị trước rồi Read theo `offset`/`limit`. Read cả file chỉ khi <300 dòng.
 - Bash: siết đầu ra — `| tail -30`, `| grep -E 'error|fail|warn'`. KHÔNG dump nguyên log build/test.
+- Chờ điều kiện (build/server/file): `Monitor` + vòng `until` hoặc `run_in_background` — `sleep N; cat` bị harness chặn (đã lặp ~42 lần/21 ngày).
 - Subagent: brief ghi rõ "trả ≤20 dòng, chỉ kết luận + `file:line`" — CẤM trả nguyên nội dung file đã đọc.
 - Ảnh design: mỗi lần mở lại là vision token mới, không nén được. Spec bóc xong thì làm trên spec.
 - KHÔNG Read lại file vừa Edit để "verify" — Edit sai thì đã báo lỗi ngay.

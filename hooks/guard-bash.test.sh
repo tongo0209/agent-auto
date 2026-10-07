@@ -83,6 +83,36 @@ check allow 'rm -f A1.png B1.png && python3 crop.py designs/GW-777/_src reward'
 check allow "grep -n 'process.env' src/main.js"
 check allow "grep -rn 'API_URL' src/ && sed -n '3p' webpack.config.js"
 
+# 7/10/2026: G-SECRET-1 chặn oan 161 lần ở auto-mode từ 28/8 — verb đọc nằm ở PHÂN ĐOẠN khác, hoặc chuỗi secret
+# chỉ là dữ liệu (heredoc ghi .gitignore, --env-file, process.env, file .example). Chỉ xét phân đoạn có verb đọc.
+check allow $'cat > .gitignore <<\'EOF\'\nnode_modules/\n.env\n.env.local\nEOF'
+check allow 'node --env-file=.env.local scripts/seed.mjs 2>&1 | tail -20'
+check allow 'ls -la apps/web/.env* | head -5'
+check allow 'npm test 2>&1 | tail -30; grep -rn process.env src/ | head'
+check allow 'cat apps/web/.env.local.example'
+check allow "grep -E 'API|SECRET' src/config.ts | head -3"
+check deny 'cd apps/web && cat .env.local'
+check deny 'echo $(cat .env)'
+check deny 'find . -name .env | xargs cat'
+check deny "grep -E 'API|SECRET' .env"
+check deny 'sudo cat /srv/cert/server.pem | tail -3'
+
+# 7/10/2026 G-GIT-4: cdn-source nhiều phiên commit chung worktree — autostash nuốt file vào stash, amend sửa commit người khác.
+check_cwd() { # $1=mong đợi  $2=cwd  $3=chuỗi fixture
+  local out got
+  out=$(jq -nc --arg c "$3" --arg d "$2" '{tool_name:"Bash",cwd:$d,tool_input:{command:$c}}' | bash "$HOOK")
+  if [ -z "$out" ]; then got=allow; else got=$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision'); fi
+  if [ "$got" = "$1" ]; then pass=$((pass+1)); else fail=$((fail+1)); printf 'FAIL  mong %-5s nhan %-5s | [%s] %s\n' "$1" "$got" "$2" "$3"; fi
+}
+CDN=/Users/lap17727/VNG/git-vng/cdn-source
+check_cwd deny  "$CDN" 'git pull --autostash origin master'
+check_cwd deny  "$CDN/products/jxm" 'git commit --amend --no-edit'
+check_cwd deny  /Users/lap17727/VNG 'git -C ~/VNG/git-vng/cdn-source pull --autostash --no-rebase origin master'
+check_cwd allow "$CDN" 'git add -- assets/a.scss && git commit --only -m "fix" -- assets/a.scss && git pull --no-rebase --no-edit origin master'
+check_cwd allow /Users/lap17727/VNG/agent-auto 'git commit --amend --no-edit'
+check_cwd allow "$CDN" $'python3 - <<\'PY\'\nprint("CAM git pull --autostash va commit --amend")\nPY'
+check_cwd allow "$CDN" "grep -rn 'autostash' ~/.claude/CLAUDE.md"
+
 # --- Phải ASK: việc của con người, agent không tự quyết ---
 check ask 'git push origin feature/gw-660'
 check ask 'git push --force-with-lease origin feature/gw-660'

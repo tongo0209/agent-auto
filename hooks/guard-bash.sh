@@ -56,19 +56,36 @@ if [[ $low =~ (curl|wget)[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|d)?sh([[:sp
 fi
 
 # G-SECRET-1 · đọc/copy secret qua shell (lỗ mà permissions.deny của tool Read không với tới)
-#   Chỉ tính khi có LỆNH ĐỌC thật. `| grep` là lọc stdout (vd `ls -a | grep '^\.env'`) → không tính.
-if [[ $low =~ (^|[[:space:];&|])(cat|less|more|head|tail|strings|xxd|base64|cp|scp|rsync|open|sed|awk|dd)[[:space:]] ]] \
-   || { [[ $low =~ (^|[[:space:];&])(grep|rg|ag)[[:space:]] ]] && [[ ! $low =~ \|[[:space:]]*(grep|rg|ag)[[:space:]] ]]; }; then
-  # Chỉ có sed/awk/grep (không verb đọc-file): chuỗi trong quote là pattern/script chứ không phải path —
-  # 27/8 vá chặn oan `grep -n 'process.env'` (deny thật ở auto-mode 26/8; cat/head giữ nguyên vì quote là path thật).
-  secret_scan="$cmd"
-  if [[ ! $low =~ (^|[[:space:];&|])(cat|less|more|head|tail|strings|xxd|base64|cp|scp|rsync|open|dd)[[:space:]] ]]; then
-    secret_scan=$(printf '%s' "$cmd" | sed -E "s/'[^']*'//g" | sed -E 's/"[^"]*"//g')
+# Chỉ xét PHÂN ĐOẠN mà lệnh đầu là verb đọc (7/10: quét cả chuỗi từng chặn oan 161 lần — `| tail` ở đoạn khác,
+# heredoc ghi .gitignore, `--env-file`). Ở grep/sed/awk, chuỗi trong quote là pattern chứ không phải path.
+file_readers='cat|less|more|head|tail|strings|xxd|base64|cp|scp|rsync|open|dd|source|\.'
+pattern_readers='grep|rg|ag|sed|awk'
+segments=$(printf '%s\n' "$cmd" | awk '
+  heredoc != "" { line = $0; gsub(/^[ \t]+|[ \t]+$/, "", line); if (line == heredoc) heredoc = ""; next }
+  {
+    if (match($0, /<<-?[ ]*["\047]?[A-Za-z_][A-Za-z_0-9]*/)) { heredoc = substr($0, RSTART, RLENGTH); gsub(/^<<-?[ ]*["\047]?/, "", heredoc) }
+    quote = ""
+    for (i = 1; i <= length($0); i++) {
+      c = substr($0, i, 1)
+      if (quote != "") { if (c == quote) quote = ""; printf "%s", c; continue }
+      if (c == "\047" || c == "\"") { quote = c; printf "%s", c; continue }
+      if (index(";&|()`", c)) { printf "\n"; continue }
+      printf "%s", c
+    }
+    printf "\n"
+  }')
+while IFS= read -r seg; do
+  seg=$(printf '%s' "$seg" | sed -E 's/^[[:space:]]*(([A-Za-z_][A-Za-z_0-9]*=[^[:space:]]*|sudo|command|exec|nohup|time)[[:space:]]+)*//')
+  verb=${seg%%[[:space:]]*}; verb=${verb##*/}
+  if [ "$verb" = xargs ] && [[ $seg =~ [[:space:]]($file_readers)([[:space:]]|$) ]]; then
+    is_secret_path "$cmd" && decide deny G-SECRET-1 "doc hoac copy file credential qua xargs - .env.test/.env.example thi duoc, ban nay khong"
+  elif [[ $verb =~ ^($file_readers)$ ]]; then
+    is_secret_path "$seg" && decide deny G-SECRET-1 "doc hoac copy file credential - .env.test/.env.example thi duoc, ban nay khong"
+  elif [[ $verb =~ ^($pattern_readers)$ ]]; then
+    is_secret_path "$(printf '%s' "$seg" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")" \
+      && decide deny G-SECRET-1 "doc hoac copy file credential - .env.test/.env.example thi duoc, ban nay khong"
   fi
-  if is_secret_path "$secret_scan"; then
-    decide deny G-SECRET-1 "doc hoac copy file credential - .env.test/.env.example thi duoc, ban nay khong"
-  fi
-fi
+done <<< "$segments"
 
 # G-GIT-1 · force-push vào nhánh chung
 if [[ $low =~ git[[:space:]]+push ]] && [[ $low =~ (--force|--mirror|[[:space:]]-f([[:space:]]|$)) ]] \
@@ -76,6 +93,17 @@ if [[ $low =~ git[[:space:]]+push ]] && [[ $low =~ (--force|--mirror|[[:space:]]
    && [[ $low =~ (origin[[:space:]]+)?(main|master|dev|develop|staging)([[:space:]]|$|:) ]]; then
   decide deny G-GIT-1 "force-push vao nhanh chung - viec nay khong hoi lai duoc"
 fi
+
+# G-GIT-4 · cdn-source có nhiều phiên commit chung 1 worktree (memory repo-dung-chung-nhieu-phien, 7/9 + 21/9):
+# --autostash cuốn file đang sửa vào stash rồi không pop; --amend sửa nhầm commit phiên khác vừa chen vào.
+cwd=$(printf '%s' "$input" | jq -r '.cwd // ""' 2>/dev/null)
+while IFS= read -r seg; do
+  seg=$(printf '%s' "$seg" | sed -E 's/^[[:space:]]*//' | tr 'A-Z' 'a-z')
+  [[ $seg == git[[:space:]]* ]] && [[ "$cwd $seg" == *cdn-source* ]] || continue
+  if [[ $seg =~ --autostash ]] || [[ $seg =~ [[:space:]]commit[[:space:]].*--amend ]]; then
+    decide deny G-GIT-4 "cdn-source nhieu phien commit chung - khong autostash/amend. Commit dung path: git add -- <paths> && git commit --only -m ... -- <paths>, roi git pull --no-rebase --no-edit origin master; sai thi tao commit MOI"
+  fi
+done <<< "$segments"
 
 # G-DB-1 · xoá cấu trúc dữ liệu (new-mainsite là Symfony/Doctrine nên rủi ro thật)
 if [[ $low =~ (drop|truncate)[[:space:]]+(database|table|schema) ]] \

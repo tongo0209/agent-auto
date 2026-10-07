@@ -6,12 +6,14 @@ Hook chặn ở **tầng harness**, trước khi lệnh chạy. Bị chặn thì
 
 | Mức | Mẫu bị bắt |
 |---|---|
-| **deny** | `rm -rf /` · `curl` pipe vào shell · đọc/copy file credential · force-push nhánh chung · drop database/table |
-| **ask** | `git commit` / `git push` · `git reset --hard` / `clean -fd` / `stash drop` · script deploy (`mergeDevToMain.sh`…) · `rm` nhắm `designs/` · `state.json` · `boards/` |
+| **deny** | `rm -rf /` · `curl` pipe vào shell · đọc/copy file credential · force-push nhánh chung · drop database/table · `G-GIT-4`: `--autostash` / `commit --amend` trong `cdn-source` |
+| **ask** | `git push` · `git reset --hard` / `clean -fd` / `stash drop` · script deploy (`mergeDevToMain.sh`…) · `rm` nhắm `designs/` · `state.json` · `boards/` |
 
 File cấu hình test của Symfony vẫn đọc được. Self-test: `bash ~/.claude/hooks/guard-bash.test.sh`.
 
-⚠️ `G-SECRET-1` bắt theo **chuỗi trong lệnh**, nên heredoc *viết tài liệu* có nhắc tên file credential cũng bị chặn (đã gặp 22/9/2026). Đó là false positive đúng thiết kế — xử lý bằng cách ghi file qua tool Write, KHÔNG né hook bằng cách mã hoá chuỗi.
+`G-SECRET-1` và `G-GIT-4` xét **từng phân đoạn lệnh** (tách theo `; & | ( )` ngoài quote, bỏ thân heredoc): chỉ phân đoạn mở đầu bằng verb đọc (`cat`/`head`/`cp`/`source`…, hoặc `xargs cat`) mới bị soi path secret. Ở `grep`/`sed`/`awk`, chuỗi trong quote coi là pattern. Vì vậy heredoc ghi `.gitignore`, `--env-file=.env.local`, `process.env` hay file `.env.*.example` không còn bị chặn (7/10/2026: phát lại 161 ca chặn thật thì 128 ca hết chặn oan, 33 ca còn lại đều là đọc credential thật).
+
+Chờ một điều kiện (build xong, server lên, file xuất hiện): dùng `Monitor` với vòng `until`, hoặc `run_in_background`. Harness chặn `sleep N; cat …` ngay, và agent đã lặp lỗi này khoảng 42 lần trong 21 ngày.
 
 ## `guard-state.sh` (PostToolUse `Write|Edit|Bash`)
 

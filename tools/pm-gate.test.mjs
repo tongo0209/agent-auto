@@ -451,6 +451,22 @@ const CASES = [
       (r) => r.exit === 1 && red('PG-CLAIM')(r) && lacks(r, 'PG-REQ', 'pm__point')],
     ['cdn + handoff, gameplay none thiếu hook của ref', hooksAtCase('h-ref', '- hooks-at: handoff', HISTORY_ONLY, { args: ['--gameplay', 'none', '--ref', refDir()] }), deferredWarn('PG-REF')],
   ]],
+  // 7/10/2026: caller gõ glob `assets/Popup*/*.html.twig` cho zsh → "no matches found" (19 lần lỗi/21 ngày). Gate tự dò.
+  ['62 nhận thư mục hoặc nhiều file → soát mọi file có pm__ (bỏ dist/ node_modules/)', () => {
+    const dir = mkdtempSync(join(root, 'dir-'));
+    mkdirSync(join(dir, 'assets/PopupA'), { recursive: true });
+    mkdirSync(join(dir, 'dist'));
+    writeFileSync(join(dir, 'assets/PopupA/a.html.twig'), POINT);
+    writeFileSync(join(dir, 'assets/PopupA/plain.html.twig'), '<div class="title"></div>');
+    writeFileSync(join(dir, 'dist/index.html'), POINT);
+    const second = writeCase(base(L), 'index.html');
+    const files = (r) => [].concat(r.json ?? []).map((page) => page.file.split('/').slice(-2).join('/')).sort();
+    return [
+      ['thư mục', run([dir, '--gameplay', L, '--baseline', 'none']), (r) => r.exit !== 2 && files(r).join() === 'PopupA/a.html.twig'],
+      ['thư mục + file', run([dir, second, '--gameplay', L, '--baseline', 'none']), (r) => r.exit !== 2 && files(r).length === 2],
+      ['thư mục không có pm__ → exit 2', run([mkdtempSync(join(root, 'empty-')), '--gameplay', L]), (r) => r.exit === 2],
+    ];
+  }],
   ['61 hooks-at lạ (cờ hoặc note) → exit 2', () => [
     ['cờ', hooksAtCase('h-bad-flag', '', base(L), { args: ['--hooks-at', 'sorce'] }), (r) => r.exit === 2 && r.stderr.includes('hooks-at "sorce"')],
     ['note', hooksAtCase('h-bad-note', '- hooks-at: sorce', base(L)), (r) => r.exit === 2 && r.stderr.includes('hooks-at "sorce"')],

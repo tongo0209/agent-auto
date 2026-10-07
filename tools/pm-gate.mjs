@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Cổng hợp đồng pm__ (R-PM-7/8) theo ai-template-kit — luật từng mã PG-* ở tools/pm-gate/checks.mjs.
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +10,7 @@ import { runChecks, WARN_CODES } from './pm-gate/checks.mjs';
 import { baselineText, splitNew } from './pm-gate/baseline.mjs';
 import { campaignOf, noteForAnyFile, readLock, HOOKS_AT, HOOKS_AT_DEFAULT } from './lib/project-lock.mjs';
 
-const USAGE = 'Dùng: node tools/pm-gate.mjs <file> [--page <campaignDir>] [--gameplay luckydraw-gift-exchange|payment|none] [--type <STT-slug>] [--ref <campaignDir>] [--hooks-at handoff|source] [--baseline <git-ref>|none] [--json]';
+const USAGE = 'Dùng: node tools/pm-gate.mjs <file|thư mục>… [--page <campaignDir>] [--gameplay luckydraw-gift-exchange|payment|none] [--type <STT-slug>] [--ref <campaignDir>] [--hooks-at handoff|source] [--baseline <git-ref>|none] [--json]';
 const KIT_DIR = process.env.PM_KIT_DIR || join(homedir(), 'VNG/git-vng/gt-promotion-template/standard-html-templates/ai-template-kit');
 const OVERRIDES = fileURLToPath(new URL('../rules/pm-kit-overrides.tsv', import.meta.url));
 const VALUE_FLAGS = ['--page', '--gameplay', '--type', '--ref', '--hooks-at', '--baseline'];
@@ -42,11 +42,22 @@ function parseArgs(argv) {
   return opts;
 }
 
+// Thư mục: dò mọi file .html/.twig có pm__, bỏ dist/ (việc của --page) — caller khỏi gõ glob cho zsh.
+function pmFilesIn(dir) {
+  return readdirSync(dir, { recursive: true })
+    .filter((n) => /\.(html|twig)$/.test(n) && !/(^|\/)(dist|node_modules)\//.test(n))
+    .map((n) => join(dir, n))
+    .filter((f) => readFileSync(f, 'utf8').includes('pm__'));
+}
+
 function targetsOf(opts) {
   if (!opts.page) {
-    if (opts.files.length !== 1) usageError('cần đúng 1 file (hoặc --page <campaignDir>)');
-    if (!existsSync(opts.files[0])) usageError(`không thấy file ${opts.files[0]}`);
-    return opts.files;
+    if (!opts.files.length) usageError('cần file hoặc thư mục (hoặc --page <campaignDir>)');
+    const missing = opts.files.find((f) => !existsSync(f));
+    if (missing) usageError(`không thấy ${missing}`);
+    const files = opts.files.flatMap((f) => (statSync(f).isDirectory() ? pmFilesIn(f) : [f]));
+    if (!files.length) usageError(`${opts.files.join(' ')} không có file .html/.twig nào chứa pm__`);
+    return files;
   }
   const dist = join(opts.page, 'dist');
   if (!existsSync(dist)) usageError(`${dist} chưa có — build trước`);
@@ -112,7 +123,8 @@ const contract = lock.gameplay && loadContract(lock.gameplay, { kitDir: KIT_DIR,
 const elsewhereOf = opts.page ? siblingTokens(targets) : () => [];
 const results = targets.map((file) => (contract ? gateFile(file, contract, lock, opts, elsewhereOf(file)) : unlockedResult(file, lock, opts)));
 
-if (opts.json) console.log(JSON.stringify(opts.page ? results : results[0], null, 2));
+const singleFile = !opts.page && results.length === 1 && !statSync(opts.files[0]).isDirectory();
+if (opts.json) console.log(JSON.stringify(singleFile ? results[0] : results, null, 2));
 else results.forEach(printText);
 
 const blocked = results.reduce((n, r) => n + r.fails.length, 0);

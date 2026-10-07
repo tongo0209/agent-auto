@@ -19,6 +19,7 @@ Giao tiếp với user **bằng tiếng Việt** — báo cáo, câu hỏi, tổ
 | Buglist QC (Sheets / Excel Online / doc / pdf / chat) | `/bug-fixer-lite` |
 | Audit website trước production | `/website-audit` |
 | Code rườm (comment thừa, trừu tượng 1-lần-dùng, CSS lặp) | `/clean-code` |
+| Phiên superpowers chạy sai/chậm/tốn token, skill không kích hoạt, cần báo bug cho maintainer | skill `superpowers:diagnosing-superpowers` |
 
 ## Rules có mã (đọc theo nhu cầu — KHÔNG nạp sẵn)
 Chi tiết ở `<AGENT_AUTO>/rules/`. `MUST` = chặn, `SHOULD` = cảnh báo. Báo lỗi thì **trích mã luật** (`R-PM-3 MUST`) thay vì diễn giải lại; giao subagent thì trỏ file, khỏi copy cả luật.

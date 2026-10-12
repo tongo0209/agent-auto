@@ -118,7 +118,9 @@ fi
 # thấy), hỏi từng lần chỉ tổ ngắt luồng; còn push là bước ĐI RA NGOÀI — người khác pull về,
 # CI/CD chạy — nên vẫn phải do người bấm.
 # Ở bypassPermissions không còn prompt để mà hỏi ⇒ hạ xuống deny, user tự gõ lệnh.
-if [[ $low =~ (^|[[:space:];&|])git[[:space:]]+push([[:space:]]|$) ]]; then
+# 12/10/2026: user cho tự push repo cá nhân ~/Code-Personal (force-push vẫn bị G-GIT-1 chặn ở trên)
+push_cwd=$(printf '%s' "$input" | jq -r '.cwd // ""' 2>/dev/null | tr 'A-Z' 'a-z')
+if [[ $low =~ (^|[[:space:];&|])git[[:space:]]+push([[:space:]]|$) ]] && [[ "$push_cwd $low" != *"$(printf '%s' "$HOME/Code-Personal" | tr 'A-Z' 'a-z')"* ]]; then
   if [ "$pmode" = "bypassPermissions" ]; then
     decide deny G-GIT-2 "dang o bypassPermissions - khong con prompt de duyet. Ban tu chay lenh push, hoac doi mode neu muon agent lam ho"
   fi

@@ -473,6 +473,10 @@ const CASES = [
   ]],  ['63 popup production ngoài kit khai kind=known (popup_getlist, popup_rule) → không PG-UNKNOWN', () => ['popup_getlist', 'popup_rule'].map((id) => [id,
     gate(L, once(base(L), '</body>', `<section id="${id}" class="MS__popup"></section>\n</body>`)),
     (r) => noRed(r) && !r.json.warns.some((w) => w.code === 'PG-UNKNOWN' && w.token === id)])],
+  ['64 data-src lazyload trên captcha-image khai kind=known → không PG-UNKNOWN', () => [
+    ['L', gate(L, base(L).replace(/<img([^>]*)id="captcha-image"/, '<img$1id="captcha-image" data-src="a.png"')),
+      (r) => noRed(r) && !r.json.warns.some((w) => w.code === 'PG-UNKNOWN' && w.token === 'data-src')],
+  ]],
 ];
 
 let pass = 0;

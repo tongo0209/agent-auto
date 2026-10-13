@@ -60,4 +60,4 @@ User không chọn gì → dừng ở commit local, ghi vào Tổng kết. Hook 
 
 Thêm vào template SKILL.md 2 dòng:
 - **Pha đã chạy:** `1✓ 2✓ 3✓ 4✓(2 vòng) 5✓ 6✓ 7 chờ user` — pha bỏ qua ghi `✗ <lý do>`.
-- **Bàn giao:** đích + commit hash từng repo + kết quả `check-handoff-sync` / "chưa push".
+- **Bàn giao:** đích + commit hash từng repo + kết quả `handoff-drift` (R-HO-11) + `check-handoff-sync` / "chưa push".

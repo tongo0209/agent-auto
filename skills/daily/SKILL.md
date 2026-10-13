@@ -43,7 +43,9 @@ xem mục handoff) và `closed` (Done thật).
 
 - **deliver** CHỈ áp cho task có kênh promotion. Nhận diện: tồn tại folder
   `<repos.gt-promotion-template>/<game>/<slug>-<nexusId>/` (nexusId bóc từ link
-  `nexus.vnggames.com/home/tickets-v2/<id>` trong ticket — chi tiết: `references/nexus.md`).
+  `nexus.vnggames.com/home/tickets-v2/<id>` hoặc `hub.vnggames.com/tickets/<id>` trong ticket — chi tiết: `references/nexus.md`).
+  Mở ticket (đọc comment: link design mới, timeline) LUÔN bằng `https://hub.vnggames.com/tickets/<id>` —
+  Nexus đã chuyển sang hub, link nexus cũ vào không được (13/10/2026).
   Task thuần mainsite: coding → wait-test.
 - Phase chỉ TIẾN khi có bằng chứng thật (file design tồn tại, code đã verify, HTML đã chép,
   buglist xuất hiện). Không có bằng chứng → giữ phase cũ.

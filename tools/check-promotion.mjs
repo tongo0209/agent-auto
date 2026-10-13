@@ -100,11 +100,11 @@ function mergeItems(files) {
   return [...byMain.values()];
 }
 
-function loadAliasPairs() {
+function overridesOfKind(kind) {
   return read(OVERRIDES)
     .split('\n')
     .map((line) => line.split('\t'))
-    .filter((cols) => cols[3] === 'alias')
+    .filter((cols) => cols[3] === kind)
     .map(([, kit, production]) => [kit, production]);
 }
 
@@ -195,7 +195,8 @@ function summaryIcon({ failed, structureOnly, warnings }) {
 
 export function checkHtml(html, type, { gameplay } = {}) {
   const els = scanHtml(html).elements;
-  const aliasPairs = loadAliasPairs();
+  const aliasPairs = overridesOfKind('alias');
+  const productionPopups = new Set(overridesOfKind('known').map(([kit]) => kit));
   const popups = new Map();
   els.forEach((el, i) => {
     if ((el.tag === 'section' || el.tag === 'div') && /^popup/.test(el.id) && !popups.has(el.id)) popups.set(el.id, i);
@@ -231,7 +232,7 @@ export function checkHtml(html, type, { gameplay } = {}) {
   const extra = !checksExtra
     ? []
     : [...popups.keys()]
-        .filter((id) => !matched.has(id) && !optionalIds.has(id) && !KIT_STANDARD_POPUPS.has(id))
+        .filter((id) => !matched.has(id) && !optionalIds.has(id) && !KIT_STANDARD_POPUPS.has(id) && !productionPopups.has(id))
         .map((id) => ({ popup: id, note: `⚠️ Không nằm trong checklist ${type.checklists.join(' + ')}` }));
   extra.forEach((x) => warnings.push(`${x.popup} thừa so với checklist`));
 

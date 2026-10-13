@@ -52,7 +52,7 @@ export function loadContract(gameplay, { kitDir, overridesPath, refDir }) {
   const refHooks = refDir ? hooksOfRef(refDir, platformPopups) : [];
   const vocabulary = [
     ...master.flatMap(tokensOf), ...catalog.flatMap((row) => row.tokens), ...lists.singletons, ...lists.repeatable, ...lists.perPopup,
-    ...bareJs, ...overrides.fix.map(([kit]) => kit.split('@')[0]), ...sharedHooks, ...refHooks,
+    ...bareJs, ...overrides.fix.map(([kit]) => kit.split('@')[0]), ...overrides.known.map(([kit]) => kit), ...sharedHooks, ...refHooks,
   ];
   const kitCatalogs = gameplay === 'none'
     ? KIT_GAMEPLAYS.flatMap((g) => withProductionSiblings(parseCatalog(read(rulesPath(kitDir, g))), overrides.allow))
@@ -86,9 +86,9 @@ export function loadContract(gameplay, { kitDir, overridesPath, refDir }) {
   };
 }
 
-// Cột kind của pm-kit-overrides.tsv → { alias: [[kit, production]], drop: …, when: …, anyof: …, allow: …, fix: … }.
+// Cột kind của pm-kit-overrides.tsv → { alias: [[kit, production]], drop: …, when: …, anyof: …, allow: …, fix: …, known: … }.
 function readOverrides(path, gameplay) {
-  const byKind = { alias: [], drop: [], when: [], anyof: [], allow: [], fix: [] };
+  const byKind = { alias: [], drop: [], when: [], anyof: [], allow: [], fix: [], known: [] };
   readFileSync(path, 'utf8').trim().split('\n').slice(1)
     .filter((line) => line.trim() && !line.startsWith('#'))
     .map((line) => line.split('\t'))

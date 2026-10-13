@@ -104,3 +104,8 @@ test('vote: popup_mrmiss_reg là popup đăng ký, thiếu input file ảnh → 
   assert.ok(r.structure.some((x) => x.popup === 'popup_mrmiss_reg' && x.check.includes('ServerID')));
   assert.ok(r.warnings.some((w) => w.includes('MediaImage')));
 });
+
+test('popup production khai kind=known (popup_getlist) không bị báo thừa', () => {
+  const r = checkHtml(page(INFORM_OK + '<section id="popup_getlist"></section>'), resolveType('5'));
+  assert.ok(!r.extra.some((x) => x.popup === 'popup_getlist'));
+});

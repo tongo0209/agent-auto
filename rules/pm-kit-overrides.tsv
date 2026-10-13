@@ -39,3 +39,4 @@ luckydraw-gift-exchange	pm__title-form	in:pm__condition-module	allow	gtp 3 reque
 *	mto-login-form	h5	drop	H5: khối form đăng nhập đi theo popup_login (đã drop h5) · kit thắng trên web từ 6/10/2026 (user chốt check bàn giao theo kit)	no
 *	pm__btn-show-condition	popup	allow	gtp 199-NSTT/Request-Dev-Landing-Promotion10-62633 đặt nút nhận lượt trong popup_getlist — user chốt 6/10/2026 là mẫu đúng	no
 *	popup_getlist	-	known	popup nhiệm vụ nhận lượt riêng (BE đổ list, không hook pm__): gt-promotion + cdn-source ~1514 lần; mẫu 688-TLBBVNG/Request-new-event-H5-58176/promotion; GW-890 user chốt 13/10	no
+*	popup_rule	-	known	popup thể lệ UI tự dựng (iframe, không hook pm__): gt-promotion 216 file html + cdn-source 136 dist/index.html; GW-890 user chốt 13/10	no

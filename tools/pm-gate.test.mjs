@@ -470,10 +470,9 @@ const CASES = [
   ['61 hooks-at lạ (cờ hoặc note) → exit 2', () => [
     ['cờ', hooksAtCase('h-bad-flag', '', base(L), { args: ['--hooks-at', 'sorce'] }), (r) => r.exit === 2 && r.stderr.includes('hooks-at "sorce"')],
     ['note', hooksAtCase('h-bad-note', '- hooks-at: sorce', base(L)), (r) => r.exit === 2 && r.stderr.includes('hooks-at "sorce"')],
-  ]],  ['63 popup production ngoài kit khai kind=known (popup_getlist) → không PG-UNKNOWN', () => [
-    ['L', gate(L, once(base(L), '</body>', '<section id="popup_getlist" class="MS__popup"></section>\n</body>')),
-      (r) => noRed(r) && !r.json.warns.some((w) => w.code === 'PG-UNKNOWN' && w.token === 'popup_getlist')],
-  ]],
+  ]],  ['63 popup production ngoài kit khai kind=known (popup_getlist, popup_rule) → không PG-UNKNOWN', () => ['popup_getlist', 'popup_rule'].map((id) => [id,
+    gate(L, once(base(L), '</body>', `<section id="${id}" class="MS__popup"></section>\n</body>`)),
+    (r) => noRed(r) && !r.json.warns.some((w) => w.code === 'PG-UNKNOWN' && w.token === id)])],
 ];
 
 let pass = 0;

@@ -35,13 +35,15 @@ export function ticketsOf(files, repo, issues) {
 export function designQueues(issues, nowMs) {
   const designScanDue = [];
   const driveCheck = [];
+  const accessCheck = [];
   for (const [key, { phase, design }] of Object.entries(issues)) {
+    if (design?.accessPending && phase !== 'closed') accessCheck.push({ key, ...design.accessPending });
     if (!PRE_TEST_PHASES.includes(phase) || design?.status !== 'đã-giao-đã-tải') continue;
     if (design.link?.includes('drive.google.com')) driveCheck.push({ key, link: design.link, sourceModified: design.sourceModified });
     const lastScan = Date.parse(design.lastScanAt ?? design.downloadedAt);
     if (design.manifest && !design.scanDue && nowMs - lastScan > DESIGN_RESCAN_AFTER) designScanDue.push(key);
   }
-  return { designScanDue, driveCheck };
+  return { designScanDue, driveCheck, accessCheck };
 }
 
 export function monthsStale(months, now) {

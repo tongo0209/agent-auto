@@ -204,7 +204,14 @@ Token đầu của `$ARGUMENTS`:
 **Xả hàng quét design** (cùng điều kiện): có ticket `design.scanDue = true` → tự chạy luôn quy
 trình `designwatch` cho các ticket đó ngay tại đây — radar chỉ xếp hàng, lượt /daily thường tự
 quét, user KHÔNG phải gõ lệnh riêng (mirror nếp `pendingSheetWrite`).
-Phiên nền không làm được 2 việc này (không có toolset chrome) nên đừng thử.
+**Kiểm quyền design đang chờ** (cùng điều kiện): ticket có `design.accessPending` (delta xếp ở
+`accessCheck`) → thử mở `accessPending.link`: Drive → `get_file_metadata`/`search_files parentId=`
+trước, "not found" thì mở bằng Chrome. Vẫn "Bạn cần có quyền truy cập"/Request access → giữ nguyên,
+1 dòng board "Cần bạn: design <KEY> vẫn chưa có quyền (từ <since>)" — CẤM tự bấm "Yêu cầu quyền
+truy cập" (là gửi tin thay user). Mở được → liệt kê file, tải theo `references/sharepoint.md`,
+xoá `accessPending`, set `design.status` theo coverage, ⚠️ đầu báo cáo "design <KEY> đã có quyền"
+và đưa `/check-design` (so bản cũ ↔ mới) vào kế hoạch Bước 3.
+Phiên nền không làm được 3 việc này (không có toolset chrome) nên đừng thử.
 
 **Pull gt-promotion đầu phiên** (mode mặc định/plan — `delta` để `delta-scan` pull, đừng pull lại): `git -C <root> pull --ff-only`
 — ⚠ **CẤM bọc lệnh git trong `timeout N`**: macOS không có `timeout` (thiếu coreutils), shell
@@ -261,7 +268,11 @@ tóm tắt việc, timeline milestones, link design, link nexus (bóc nexusId), 
   - Quét `description` + mọi `comment` tìm link design: dòng có nhãn `DESIGN`/`Design:`/`PSD`/
     `Link design`, hoặc bất kỳ URL thuộc `*.sharepoint.com`, `drive.google.com`,
     `*.canva.com`, `*.figma.com`, `app.box.com` (kể cả bọc trong
-    `<custom data-type="smartlink">` — bóc URL bên trong). Ghi `state.issues[KEY].designLink`
+    `<custom data-type="smartlink">` — bóc URL bên trong). Có `nexusId` → đọc THÊM comment trên
+    `https://hub.vnggames.com/tickets/<nexusId>` (Chrome): GS/PM gửi "link design mới" ở đó, Jira
+    KHÔNG đồng bộ (GW-912 13/10: Jira vẫn link cũ, design mới chỉ ở cmt hub). Link mới ≠ `designLink`
+    → giữ bản cũ ở `designLinkOld`, set `design.sourceChanged`; mở không được vì quyền → ghi
+    `design.accessPending = {link, since, source}` để Bước 0 lượt sau tự kiểm lại. Ghi `state.issues[KEY].designLink`
     + vào brief.
   - **NẤC 0b — SUBTASK "Design" (bằng chứng ĐỘC LẬP với link, rẻ, không bao giờ bỏ qua)**
     ⚠ lỗ hổng đã trả giá 10/8: GW-627 có subtask GW-628 "Design" (issuetype `Design sub-task`)

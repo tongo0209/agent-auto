@@ -46,7 +46,17 @@ test('xếp hàng quét design: folder SharePoint quá 48h, chưa tới wait-tes
   assert.deepStrictEqual(designQueues(issues, NOW), {
     designScanDue: ['GW-1'],
     driveCheck: [{ key: 'GW-5', link: 'https://drive.google.com/drive/folders/x', sourceModified: '2026-09-01T00:00:00Z' }],
+    accessCheck: [],
   });
+});
+
+test('xếp hàng kiểm quyền design: link chờ quyền ở mọi phase chưa closed', () => {
+  const pending = { link: 'https://drive.google.com/drive/folders/n', since: '2026-10-13' };
+  const issues = {
+    'GW-6': { phase: 'coding', design: { status: 'đã-giao-chưa-tải', accessPending: pending } },
+    'GW-7': { phase: 'closed', design: { status: 'đã-giao-chưa-tải', accessPending: pending } },
+  };
+  assert.deepStrictEqual(designQueues(issues, NOW).accessCheck, [{ key: 'GW-6', ...pending }]);
 });
 
 test('months.json cũ khi generatedAt khác hôm nay theo giờ local', () => {

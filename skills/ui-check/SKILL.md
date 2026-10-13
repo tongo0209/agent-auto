@@ -6,8 +6,8 @@ description: >
   "check UI", "check giao diện", "kiểm tra dist", "ảnh vỡ", "ảnh 404", "chữ bị cắt",
   "tràn ngang", "lệch design", "so output với design", "kiểm tra trước khi giao QC". Cờ `--autofix`: tự sửa
   vị trí asset lệch so với coords.json (psd-cut/figma-cut) trong SCSS rồi build + đo lại.
-  Chạy trên OUTPUT đã build qua browser thật, không phải đọc source chay. Skill này OPT-IN —
-  chỉ chạy khi được gọi, không tự động sau mỗi build.
+  Chạy trên OUTPUT đã build qua browser thật, không phải đọc source chay. BẮT BUỘC trước khi
+  báo xong/bàn giao QC một landing hoặc một đợt fix UI; ngoài mốc đó chỉ chạy khi được gọi.
 ---
 
 # UI Check — kiểm tra output build trước khi giao
@@ -21,7 +21,8 @@ không cần ảnh design), mắt so design sau (Lớp 2 — chỉ khi có ảnh
 ## The Iron Rules
 
 ```
-1. OPT-IN — chỉ chạy khi user gọi. Không tự kích hoạt sau build thường.
+1. BẮT BUỘC ở mốc bàn giao QC / báo xong đợt fix UI (đo 13/10/2026: 41/182 bug FE lọt QC là thứ
+   skill này bắt được — chúng lọt vì skill từng là opt-in). Build thường giữa chừng thì không tự chạy.
 2. Report mặc định — KHÔNG tự fix. Fix CHỈ khi user gọi kèm --fix, và chỉ case không nhập nhằng.
 3. Fix (nếu có) luôn ở SOURCE rồi rebuild — TUYỆT ĐỐI không vá trực tiếp dist/.
 4. Build one-shot `npm run build-dev` — CẤM `npm run dev` (watch treo phiên).
@@ -98,8 +99,10 @@ User chỉ định locale/trang cụ thể → chỉ check phần đó. Project 
    - MỘT `run_steps`: `goto` → `wait_for #MS__wrapper` → `expect_visible` section đầu → `wait 1500`.
    - `run_script` với NGUYÊN VĂN thân file `scripts/layer1-checks.js` (script tự scroll
      kích lazyload + chờ fonts — đừng cắt bớt đoạn nào).
+   - Ngay sau đó `run_script` với NGUYÊN VĂN `scripts/text-stress.js`: bơm chữ dài vào từng phần
+     tử chữ, báo chỗ PHÁT SINH cắt/tràn/đè (layout vừa khít mockup — loại lỗi FE lọt QC nhiều nhất).
    - Chuyển mobile: `set_viewport 768×1024` + `then_reload:true` (đúng 1 reload theo quy ước)
-     → chạy lại script. H5 thì bỏ bước này.
+     → chạy lại cả 2 script. H5 thì bỏ bước này.
    - Trang locale tiếp theo: `goto` URL mới, lặp lại.
    - Cuối mỗi trang: `read_signals since:last_run level:all` — nguồn DUY NHẤT cho 404/console.
      Report DOM sạch mà chưa đọc signals = CHƯA XONG (404 nằm ở network, không nằm trong DOM).
@@ -140,6 +143,14 @@ test end-to-end trên browserpilot.)
 | `lib-not-pruned` | Cả .MS__pc lẫn .MS__mb còn trong DOM → nghi lib init fail | 🟡 |
 | `lib-pruned-wrong-side` | Lib giữ nhầm nhánh so với viewport: PC (>768px) chỉ còn .MS__mb, hoặc mobile chỉ còn .MS__pc | 🔴 |
 | `read_signals` | 404 network + uncaught console error (không phải check của script, lấy từ signals) | 🔴 |
+| `stress-spill` | (text-stress.js) chữ dài tràn ra khỏi khung cao/rộng cố định | 🔴 vùng dữ liệu / 🟡 chữ tĩnh |
+| `stress-clipped` | (text-stress.js) chữ dài bị khung `overflow` cắt mất, không có ellipsis/line-clamp | 🔴 / 🟡 |
+| `stress-overlap` | (text-stress.js) chữ dài đè lên nút hoặc chữ khác (bỏ qua phần tử `position:fixed`) | 🔴 / 🟡 |
+
+`text-stress.js` — vùng dữ liệu = phần tử TỰ mang class `pm__` (không phải nút) hoặc nằm trong
+`[data-stress]`: bơm gấp 3, tối thiểu 40 ký tự, số thành `9.999.999.999` → 🔴. Chữ tĩnh: dài thêm
+50% (bản dịch) → 🟡 cho mắt người. Ellipsis/line-clamp là cắt chủ ý, không báo. Chữ được trả lại
+sau mỗi lần đo. Vùng dữ liệu không mang `pm__` (JS tự render) → gắn `data-stress` lên khung để soi.
 
 Phân loại report: 🔴 lỗi thật (kèm dẫn chứng selector + src) / 🟡 nghi ngờ cần mắt người /
 ⚪ waiver. Waiver đọc từ `.claude/knowledge/waivers.md` của campaign nếu có.
@@ -218,12 +229,21 @@ Bằng chứng đã chạy 15/9/2026: fixture wrapper `scale(0.96)` + popup ẩn
 
 ## Giới hạn trung thực
 
+`text-stress.js` chỉ soi phần tử ĐANG HIỆN: popup đóng, tab ẩn không được bơm — cần mở popup/tab
+rồi chạy lại script nếu đó là vùng nhận dữ liệu.
+
 Lớp 1 bắt lỗi máy-đo-được (ảnh vỡ, chữ cắt, section trống, 404). Lớp 2 bắt lệch tầm trung
 trở lên (thiếu/sai vị trí rõ, sai ảnh, sai màu rõ). Lệch tinh 1–3px và cảm quan spacing vẫn
 cần mắt người — skill là CỔNG CHẶN LỖI TO trước QC, không thay QC. Report phải ghi rõ phạm vi
 đã check (trang × viewport × lớp nào).
 
 ## Đã test (bằng chứng)
+
+2026-10-13, `text-stress.js`: `node --test skills/ui-check/scripts/text-stress.test.mjs` 11/11
+(fixture dựng theo CFL R1#18, R2#22, ananta + 4 ca báo oan). Trên dist thật `cfl/landing/2026-offline-tournament`
+PC: 4 🔴 đều thật (`.ot-event-card__meta` nowrap không ellipsis `_event.scss:333`, `.ot-home__rank-name`
+không giới hạn rộng `_home.scss:324`), 9 🟡 là nhãn tĩnh trong nút/tab cố định; bản đầu báo 49 → đã
+sửa 4 nguồn báo oan (nút mang `pm__`, nhãn trong khung `pm__`, nav fixed, số tĩnh).
 
 2026-07-10, trên `lan/landing/2026-that-tich` (3 locale, 7 section): trang sạch → 0 false
 positive ở cả PC 1920×1080 lẫn mobile 768×1024 + TH; tiêm lỗi (img src hỏng + text bị nén

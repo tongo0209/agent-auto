@@ -162,6 +162,12 @@ Token đầu của `$ARGUMENTS`:
   `claude -p` gọi được `searchJiraIssuesUsingJql` (OK GW-720, 16.6s) và gọi được cả skill
   (`/daily status`, 47s); launchd chạy `/daily delta` đủ cả `git pull` gt-promotion.
   Thiết kế: `agent-auto/docs/specs/2026-08-13-radar-auto-design.md`.
+- **Chat-radar (Teams, 14/10)** — job launchd riêng `com.tont.agent-auto.chat-radar` (`tools/chat-radar.mjs`,
+  30', khung giờ như radar), KHÔNG phải mode của skill. Haiku chỉ gọi tool M365, code ghép tin vào ticket
+  mở (mã game ở tên group ↔ `[A70…]` đầu summary; "Dí Everything"/1:1 theo GW-xxx hoặc tên game) + gắn nhãn
+  `bug/design/deadline/mention`. Lượt /daily mặc định ĐỌC `boards/chat-<hôm nay>.md` ở Bước 0: tin có nhãn
+  → đưa vào kế hoạch kèm link; link sheet/design trong đó → xếp cho `bugwatch`/`designwatch`. Chỉ đọc —
+  connector không gửi được tin Teams. Cài/gỡ: `tools/radar-install.sh install|uninstall chat-radar`.
 - `bugwatch` → **radar buglist hậu bàn giao**, KHÔNG hỏi gì, không quét Jira. Chi tiết luật +
   bằng chứng đo: mục "Bug-radar" bên dưới và `docs/specs/2026-08-17-bug-radar-design.md`.
 - `bugwrite` → **cổng duyệt** rồi xả hàng đợi `pendingSheetWrite` lên sheet (cần Chrome ⇒ chỉ

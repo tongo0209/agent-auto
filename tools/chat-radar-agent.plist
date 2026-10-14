@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.tont.agent-auto.chat-radar</string>
+  <!-- zsh -lc để có env của phiên đăng nhập (SSH key gitlab nội bộ cần).
+       PHẢI tự nạp nvm: `node` và `claude` đều nằm dưới ~/.nvm, mà nvm chỉ được nạp trong
+       .zshrc (shell TƯƠNG TÁC) nên login shell của launchd không thấy. Đo thật 13/8: bỏ đoạn
+       nvm thì launchd nhặt /opt/homebrew/bin/node (25.6.0, vỡ libllhttp) và chết ngay ở dyld,
+       last exit reason = OS_REASON_DYLD, sổ radar không có dòng nào.
+       Nạp nvm.sh (không hardcode số version) để nvm nâng bản là vẫn chạy. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] &amp;&amp; . "$NVM_DIR/nvm.sh" &gt;/dev/null; cd /Users/lap17727/VNG/agent-auto &amp;&amp; exec node tools/chat-radar.mjs</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/lap17727/VNG/agent-auto</string>
+  <!-- 30 phút/lượt; khung 08-18h T2-T6 do chat-radar.mjs tự chặn (config.chatRadar). -->
+  <key>StartInterval</key><integer>1800</integer>
+  <key>RunAtLoad</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>/Users/lap17727/VNG/agent-auto/history/chat-radar/stdout.log</string>
+  <key>StandardErrorPath</key><string>/Users/lap17727/VNG/agent-auto/history/chat-radar/stderr.log</string>
+</dict>
+</plist>

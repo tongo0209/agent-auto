@@ -207,14 +207,14 @@ function stampPoll(root, now, base) {
   writeMerged(path.join(root, 'state.json'), base, { ...base, bugWatch });
 }
 
-const readJSON = (p, fb) => {
+export const readJSON = (p, fb) => {
   try {
     return JSON.parse(fs.readFileSync(p, 'utf8'));
   } catch {
     return fb;
   }
 };
-const todayStr = (d) =>
+export const todayStr = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /** Gọi claude thật — tách riêng để test tiêm bản giả vào, không phải đốt token mỗi lần chạy test */

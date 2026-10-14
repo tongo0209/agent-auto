@@ -75,5 +75,10 @@
     "archiveKeepDays": 14,
     "archiveAutoDelete": true,
     "_note": "Dọn rác nặng, chạy ghép trong tools/radar-tick.mjs (1 lượt/ngày). CHỈ tự xoá thứ tải lại được từ SharePoint (có sp-manifest.json hoặc designLink); design.sourceIntegrity bắt đầu bằng BAD thì KHÔNG BAO GIỜ đụng (ca GW-660: nguồn hỏng, bản local là bản duy nhất). phase bugfix KHÔNG tính là đã xong — user chốt 18/8, đang fix bug là vẫn đang làm. Sổ hoàn tác: .janitor-log.jsonl. Xem trước: node tools/janitor.mjs --dry"
+  },
+  "chatRadar": {
+    "enabled": true,
+    "me": "<email>",
+    "myName": "<Tên hiển thị Teams>"
   }
 }

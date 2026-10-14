@@ -1,12 +1,14 @@
 #!/bin/zsh
 # Cài/gỡ radar nền (launchd → tools/radar-tick.mjs).
-# Dùng: tools/radar-install.sh [install|uninstall|status|kick]
+# Dùng: tools/radar-install.sh [install|uninstall|status|kick] [radar|chat-radar]
 #
 # Tắt TẠM thì đừng gỡ ở đây — sửa config.radar.enabled=false (hoặc bấm nút trên console) là
 # tick vẫn nổ đúng nhịp rồi thoát ngay ở cổng giờ, hoàn tác được bằng 1 khoá JSON.
 set -e
-LABEL=com.tont.agent-auto.radar
-SRC="$(cd "$(dirname "$0")" && pwd)/radar-agent.plist"
+# Tham số 2 = job: radar (mặc định) | chat-radar
+JOB=${2:-radar}
+LABEL=com.tont.agent-auto.$JOB
+SRC="$(cd "$(dirname "$0")" && pwd)/$JOB-agent.plist"
 DEST="$HOME/Library/LaunchAgents/$LABEL.plist"
 DOMAIN="gui/$(id -u)"
 
@@ -52,7 +54,7 @@ case "${1:-install}" in
     launchctl print "$DOMAIN/$LABEL" | grep -E '^\s*(state|runs|last exit|program)' || echo "chưa cài"
     ;;
   *)
-    echo "dùng: $0 [install|uninstall|status|kick]" >&2
+    echo "dùng: $0 [install|uninstall|status|kick] [radar|chat-radar]" >&2
     exit 2
     ;;
 esac

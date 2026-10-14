@@ -124,8 +124,16 @@ Token đầu của `$ARGUMENTS`:
   Đã đạp 17/9/2026 13:16: connector *still connecting* 4 lượt rồi *No matching deferred tools found*,
   `/mcp` xác nhận `CONNECT_TIMEOUT`; lượt đó giữ `lastRun` nên 13:26 quét bù bằng fallback vẫn bắt
   kịp GW-796 chuyển COMPLETED lúc 13:09 — nếu đã đóng dấu `lastRun` thì mất hẳn;
+  (1b) Lưu response JQL ra file tạm (fields `summary,status,updated,duedate,resolutiondate`) rồi
+  `node tools/jira-diff.mjs <file>` — máy phán MỚI/ĐỔI/GIỮ + field đổi (`status`/`duedate`/`summary`) +
+  alert `due-today`/`overdue`/`done-in-jira`. CẤM so tay JSON với state: 14/10 duedate GW-886 và GW-884
+  đổi chéo cho nhau chỉ lộ nhờ so tay. Mỗi `duedate` đổi → sửa `milestones.duedate` + `_duedateNote`;
+  alert → dòng ⏰ đầu báo cáo;
   (2) `byTicket` → suy phase theo Bước 2b (git chỉ NÂNG phase) + dòng "📦 promotion vừa cập nhật <task>"
-  kèm file đổi cho commit repo gt-promotion; commit ngoài ticket chỉ là số `untracked`, không soi thêm;
+  kèm file đổi cho commit repo gt-promotion; commit ngoài ticket chỉ là số `untracked`, không soi thêm.
+  "Chưa push" CHỈ được lấy từ `unpushed` (so `@{u}..HEAD`), CẤM suy từ board: 14/10 board ghi
+  "chưa push" cho 6 commit GW-886 trong khi chúng đã merge master lúc 13:22 ⇒ báo sai cho user.
+  `unpushed[KEY]` không rỗng → 1 dòng "Cần bạn: <KEY> N commit chưa push";
   (3) bóc link sheet mới trong comment → `state.issues[key].bugSheets`;
   (4) **refresh `history/months.json` khi `monthsStale: true`** (`generatedAt` ≠ hôm nay) — 1 query snapshot theo
   `references/jql.md` mục "Snapshot theo tháng", ghi đè (backup sang `.backups/months/`);

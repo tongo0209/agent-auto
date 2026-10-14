@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { localStamp, scanWindow, ticketsOf, designQueues, monthsStale, gitScan } from './delta-scan.mjs';
+import { localStamp, scanWindow, ticketsOf, designQueues, monthsStale, gitScan, parseGitLog, unpushedByTicket, unpushedScan } from './delta-scan.mjs';
 
 process.env.TZ = 'Asia/Ho_Chi_Minh';
 const H = 3600e3;
@@ -87,4 +87,57 @@ test('gitScan: không phải repo git thì báo lỗi, đánh dấu stale, khôn
   assert.strictEqual(r.stale, true);
   assert.ok(r.error);
   assert.deepStrictEqual(r.commits, []);
+});
+test('parseGitLog: tách hash/ngày/tác giả/subject và file đổi', () => {
+  const log = '\x1eabc123def456\x1f2026-10-14 13:16\x1ftont\x1ffeat x\na/1.html\na/2.scss\n\x1eff00\x1f2026-10-14 12:00\x1fbot\x1fno files\n';
+  assert.deepStrictEqual(parseGitLog(log), [
+    { hash: 'abc123def456', date: '2026-10-14 13:16', author: 'tont', subject: 'feat x', files: ['a/1.html', 'a/2.scss'] },
+    { hash: 'ff00', date: '2026-10-14 12:00', author: 'bot', subject: 'no files', files: [] },
+  ]);
+});
+
+test('unpushedByTicket: commit chưa push gom theo ticket, bỏ ticket closed', () => {
+  const issues = {
+    'GW-886': { phase: 'coding', paths: [{ repo: 'cdn-source', path: 'products/tlbb/landing/ghmh' }] },
+    'GW-9': { phase: 'closed', paths: [{ repo: 'cdn-source', path: 'products/old' }] },
+  };
+  const commits = [
+    { hash: '2d403656a1234', date: '2026-10-14 13:16', author: 'tont', subject: 'chest burst', files: ['products/tlbb/landing/ghmh/index.html'] },
+    { hash: 'eeee', date: '2026-10-14 10:00', author: 'tont', subject: 'old', files: ['products/old/a.js'] },
+  ];
+  assert.deepStrictEqual(unpushedByTicket({ 'cdn-source': commits }, issues), {
+    'GW-886': [{ repo: 'cdn-source', hash: '2d403656a', date: '2026-10-14 13:16', subject: 'chest burst' }],
+  });
+});
+
+const commitFile = (dir, file, msg) => {
+  fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+  fs.writeFileSync(path.join(dir, file), msg);
+  git(dir, ['add', '.']);
+  git(dir, ['-c', 'user.name=t', '-c', 'user.email=t@x', 'commit', '-qm', msg]);
+};
+
+test('unpushedScan: so với upstream, thiếu upstream thì so origin/<default>, không xác định được thì báo lỗi', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'unpushed-'));
+  const remote = path.join(base, 'remote.git');
+  git(base, ['init', '-q', '--bare', '-b', 'master', remote]);
+  const dir = path.join(base, 'work');
+  git(base, ['clone', '-q', remote, dir]);
+  git(dir, ['checkout', '-q', '-b', 'master']);
+  commitFile(dir, 'p/a.html', 'pushed');
+  git(dir, ['push', '-q', '-u', 'origin', 'master']);
+  git(dir, ['remote', 'set-head', 'origin', 'master']);
+  commitFile(dir, 'p/b.html', 'local only');
+  assert.deepStrictEqual(unpushedScan(dir, ['p']).commits.map((c) => c.subject), ['local only']);
+
+  git(dir, ['checkout', '-q', '-b', 'tont']);
+  commitFile(dir, 'p/c.html', 'on tont');
+  assert.deepStrictEqual(unpushedScan(dir, ['p']).commits.map((c) => c.subject), ['on tont', 'local only']);
+
+  const lone = path.join(base, 'lone');
+  git(base, ['init', '-q', lone]);
+  commitFile(lone, 'p/a.html', 'x');
+  const r = unpushedScan(lone, ['p']);
+  assert.deepStrictEqual(r.commits, []);
+  assert.ok(r.error);
 });

@@ -10,7 +10,7 @@ const CHATS_TOOL = 'mcp__claude_ai_Microsoft_365__teams_list_chats';
 const MAX_PAGES = 8;
 const TOPICS_TTL_MS = 24 * 3600e3;
 const TOPICS_RETRY_MS = 2 * 3600e3;
-// Search của Teams đánh chỉ mục trễ: quét lùi lại để không sót tin vào chỉ mục muộn, seenIds lọc trùng.
+// Search của Teams đánh chỉ mục trễ: quét lùi lại để không sót tin vào chỉ mục muộn, cursor.seen lọc trùng.
 const INDEX_LAG_MS = 30 * 60e3;
 const FETCH_TIMEOUT_MS = 4 * 60e3;
 const MIN_ALIAS_LEN = 3;
@@ -120,7 +120,8 @@ export function toolResults(streamText) {
 
 export function renderDigest(day, items) {
   const groups = {};
-  for (const it of items) (groups[it.keys.join(', ') || it.game || 'Chưa gắn task'] ||= []).push(it);
+  const uniqueItems = [...new Map(items.map((it) => [it.id, it])).values()];
+  for (const it of uniqueItems) (groups[it.keys.join(', ') || it.game || 'Chưa gắn task'] ||= []).push(it);
   const order = Object.keys(groups).sort((a, b) => (a === 'Chưa gắn task') - (b === 'Chưa gắn task') || a.localeCompare(b));
   const line = (it) => {
     const hhmm = new Date(it.at).toTimeString().slice(0, 5);
@@ -175,7 +176,7 @@ export function runChatRadar({ root, now = new Date(), argv = [], fetchChat = re
     log: path.join(dir, 'runs.jsonl'),
   };
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const cursor = readJSON(files.cursor, { lastAt: startOfDay, seenIds: [] });
+  const cursor = readJSON(files.cursor, { lastAt: startOfDay, seen: {} });
   const topics = readJSON(files.topics, { fetchedAt: 0, chats: {} });
   const topicsAge = Number(now) - topics.fetchedAt;
   const topicsStale = topicsAge > TOPICS_TTL_MS || (topics.hasUnknownChat && topicsAge > TOPICS_RETRY_MS);
@@ -197,8 +198,8 @@ export function runChatRadar({ root, now = new Date(), argv = [], fetchChat = re
     topics.chats = Object.fromEntries(res.chats.map((c) => [c.id, { topic: c.topic, type: c.chatType }]));
     topics.fetchedAt = Number(now);
   }
-  const seen = new Set(cursor.seenIds);
-  const fresh = res.messages.filter((m) => !seen.has(m.id));
+  const seen = cursor.seen || {};
+  const fresh = res.messages.filter((m) => !seen[m.id]);
   topics.hasUnknownChat = fresh.some((m) => !topics.chats[m.chatId]);
   fs.writeFileSync(files.topics, JSON.stringify(topics));
 
@@ -206,7 +207,10 @@ export function runChatRadar({ root, now = new Date(), argv = [], fetchChat = re
   const index = buildIndex(issues, topics.chats);
   const me = cfg.me;
   const kept = [];
+  // Đọc lại inbox sau fetch: lượt chạy chồng có thể vừa ghi đúng tin này.
+  const inboxIds = new Set(readJsonl(files.inbox).map((it) => it.id));
   for (const m of fresh) {
+    if (inboxIds.has(m.id)) continue;
     const keys = matchMessage(m, index, issues);
     const tags = classify(m.summary || '', cfg.myName);
     if (!shouldKeep(m, keys, tags, me)) continue;
@@ -231,7 +235,10 @@ export function runChatRadar({ root, now = new Date(), argv = [], fetchChat = re
   fs.writeFileSync(path.join(root, 'boards', `chat-${day}.md`), renderDigest(day, todayItems));
 
   const newest = res.messages.reduce((max, m) => (m.createdDateTime > max ? m.createdDateTime : max), cursor.lastAt);
-  fs.writeFileSync(files.cursor, JSON.stringify({ lastAt: newest, seenIds: res.messages.map((m) => m.id) }));
+  const nextScanFrom = Date.parse(newest) - INDEX_LAG_MS;
+  const seenNow = { ...seen, ...Object.fromEntries(res.messages.map((m) => [m.id, m.createdDateTime])) };
+  const seenInNextScan = Object.entries(seenNow).filter(([, at]) => Date.parse(at) >= nextScanFrom);
+  fs.writeFileSync(files.cursor, JSON.stringify({ lastAt: newest, seen: Object.fromEntries(seenInNextScan) }));
 
   const loud = kept.filter((it) => it.tags.some((t) => NOTIFY_TAGS.includes(t)));
   if (loud.length) {

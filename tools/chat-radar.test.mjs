@@ -106,10 +106,10 @@ test('toolResults gom kết quả theo tên tool từ stream-json', () => {
 
 test('renderDigest nhóm theo ticket, tin chưa gắn để cuối', () => {
   const md = renderDigest('2026-10-14', [
-    { at: '2026-10-14T03:00:00Z', keys: ['GW-912'], tags: ['bug'], from: 'Uyên', chat: 'A70 | NTH', text: 'lỗi', url: 'u1' },
-    { at: '2026-10-14T03:05:00Z', keys: [], tags: ['mention'], from: 'Phú', chat: 'Dí Everything', text: 'check', url: 'u2' },
-    { at: '2026-10-14T03:06:00Z', keys: ['GW-884', 'GW-886'], tags: [], from: 'Mai', chat: '688 | TLBBVNG', text: 'gửi design', url: 'u3' },
-    { at: '2026-10-14T03:07:00Z', keys: [], game: 'GNO', tags: ['bug'], from: 'Uyên', chat: '495 | GNO', text: 'buglist', url: 'u4' },
+    { id: 'r1', at: '2026-10-14T03:00:00Z', keys: ['GW-912'], tags: ['bug'], from: 'Uyên', chat: 'A70 | NTH', text: 'lỗi', url: 'u1' },
+    { id: 'r2', at: '2026-10-14T03:05:00Z', keys: [], tags: ['mention'], from: 'Phú', chat: 'Dí Everything', text: 'check', url: 'u2' },
+    { id: 'r3', at: '2026-10-14T03:06:00Z', keys: ['GW-884', 'GW-886'], tags: [], from: 'Mai', chat: '688 | TLBBVNG', text: 'gửi design', url: 'u3' },
+    { id: 'r4', at: '2026-10-14T03:07:00Z', keys: [], game: 'GNO', tags: ['bug'], from: 'Uyên', chat: '495 | GNO', text: 'buglist', url: 'u4' },
   ]);
   assert.match(md, /## GNO[\s\S]*## GW-884, GW-886\n[^#]*gửi design[\s\S]*## GW-912[\s\S]*lỗi[\s\S]*## Chưa gắn task[\s\S]*check/);
   assert.strictEqual(md.match(/gửi design/g).length, 1, 'tin group nhiều ticket chỉ hiện 1 lần');
@@ -138,6 +138,39 @@ test('runChatRadar: giữ tin đúng, dời cursor, không lặp tin đã xử, 
   assert.strictEqual(afters[1], '2026-10-14T02:41:00.000Z', 'quét lùi 30 phút trước tin mới nhất');
   assert.strictEqual(notes.length, 1);
   assert.match(fs.readFileSync(path.join(root, 'boards', 'chat-2026-10-14.md'), 'utf8'), /popup lỗi/);
+});
+
+test('renderDigest: inbox có bản lặp vẫn chỉ ra 1 dòng mỗi id', () => {
+  const item = { id: '1791952332601', at: '2026-10-14T04:32:57Z', keys: [], game: 'Light and Night', tags: [], from: 'Uyên', chat: 'A78', text: 'check', url: 'u/1791952332601' };
+  const md = renderDigest('2026-10-14', [item, { ...item }]);
+  assert.strictEqual(md.match(/1791952332601\)/g).length, 1);
+});
+
+const radarRoot = () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-'));
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues: ISSUES }));
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ chatRadar: { me: ME, myName: 'Tố. Ngô Tất' } }));
+  return root;
+};
+const boardOf = (root) => fs.readFileSync(path.join(root, 'boards', 'chat-2026-10-14.md'), 'utf8');
+const BUG = msg({ id: 'b1', chatId: 'g-nth', summary: 'popup lỗi rồi', createdDateTime: '2026-10-14T04:32:57Z' });
+const OTHER = msg({ id: 'o1', chatId: 'g-nth', summary: 'popup vỡ', createdDateTime: '2026-10-14T04:38:34Z' });
+
+test('runChatRadar: lượt giữa search sót tin vẫn trong cửa sổ quét lùi → lượt sau không ghi lại tin đó', () => {
+  const root = radarRoot();
+  const now = new Date('2026-10-14T11:45:00+07:00');
+  const rounds = [[BUG, OTHER], [OTHER], [BUG, OTHER]];
+  const results = rounds.map((messages) => runChatRadar({ root, now, notify: () => {}, fetchChat: () => ({ ok: true, messages, chats: [] }) }));
+  assert.deepStrictEqual(results.map((r) => [r.fresh, r.kept]), [[2, 2], [0, 0], [0, 0]]);
+  assert.strictEqual(boardOf(root).match(/popup lỗi/g).length, 1);
+});
+
+test('runChatRadar: 2 lượt chạy chồng nhau đọc cùng cursor cũ → board không ghi trùng', () => {
+  const root = radarRoot();
+  const now = new Date('2026-10-14T10:44:00+07:00');
+  const overlapped = () => runChatRadar({ root, now, notify: () => {}, fetchChat: () => ({ ok: true, messages: [BUG], chats: [] }) });
+  runChatRadar({ root, now, notify: () => {}, fetchChat: () => (overlapped(), { ok: true, messages: [BUG], chats: [] }) });
+  assert.strictEqual(boardOf(root).match(/popup lỗi/g).length, 1);
 });
 
 test('runChatRadar ngoài giờ thì bỏ lượt, không gọi fetch', () => {

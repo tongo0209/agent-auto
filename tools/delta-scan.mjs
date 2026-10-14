@@ -12,6 +12,7 @@ const DESIGN_RESCAN_AFTER = 48 * HOUR;
 const PRE_TEST_PHASES = ['waiting-design', 'ready', 'coding', 'deliver'];
 const GIT_TIMEOUT = 60e3;
 const PULLED_REPO = 'gt-promotion-template';
+const LOG_FORMAT = '%x1e%H%x1f%ad%x1f%an%x1f%s';
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -30,6 +31,23 @@ export function ticketsOf(files, repo, issues) {
     .filter(([, issue]) => issue.phase !== 'closed')
     .filter(([, issue]) => (issue.paths ?? []).some((p) => p.repo === repo && files.some((f) => f.startsWith(`${p.path}/`))))
     .map(([key]) => key);
+}
+
+export const parseGitLog = (log) =>
+  log.split('\x1e').filter(Boolean).map((record) => {
+    const [head, ...files] = record.split('\n');
+    const [hash, date, author, subject] = head.split('\x1f');
+    return { hash, date, author, subject, files: files.filter(Boolean) };
+  });
+
+export function unpushedByTicket(commitsByRepo, issues) {
+  const unpushed = {};
+  for (const [repo, commits] of Object.entries(commitsByRepo)) {
+    for (const { hash, date, subject, files } of commits) {
+      for (const key of ticketsOf(files, repo, issues)) (unpushed[key] ??= []).push({ repo, hash: hash.slice(0, 9), date, subject });
+    }
+  }
+  return unpushed;
 }
 
 export function designQueues(issues, nowMs) {
@@ -55,6 +73,8 @@ export function monthsStale(months, now) {
 
 const git = (dir, args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', timeout: GIT_TIMEOUT, stdio: ['ignore', 'pipe', 'pipe'] });
 
+const errorText = (err) => String(err.stderr || err.message).trim().slice(0, 300);
+
 // Fetch trước khi log: log suông chỉ thấy ref local, commit người khác vừa push là vô hình (ca 19/8).
 // format-local chứ không format: commit ghi +0000 (bot CMS, merge GitLab) sẽ hiện sớm 7 tiếng (ca 9/9).
 export function gitScan(dir, sinceIso, { pull }) {
@@ -62,20 +82,34 @@ export function gitScan(dir, sinceIso, { pull }) {
   try {
     git(dir, pull ? ['pull', '--ff-only', '--quiet'] : ['fetch', '--quiet', '--all']);
   } catch (err) {
-    Object.assign(result, { stale: true, error: String(err.stderr || err.message).trim().slice(0, 300) });
+    Object.assign(result, { stale: true, error: errorText(err) });
   }
   let log;
   try {
-    log = git(dir, ['log', '--all', `--since=${sinceIso}`, '--date=format-local:%Y-%m-%d %H:%M', '--pretty=format:%x1e%H%x1f%ad%x1f%an%x1f%s', '--name-only']);
+    log = git(dir, ['log', '--all', `--since=${sinceIso}`, '--date=format-local:%Y-%m-%d %H:%M', `--pretty=format:${LOG_FORMAT}`, '--name-only']);
   } catch (err) {
-    return { ...result, ok: false, stale: true, error: String(err.stderr || err.message).trim().slice(0, 300) };
+    return { ...result, ok: false, stale: true, error: errorText(err) };
   }
-  result.commits = log.split('\x1e').filter(Boolean).map((record) => {
-    const [head, ...files] = record.split('\n');
-    const [hash, date, author, subject] = head.split('\x1f');
-    return { hash, date, author, subject, files: files.filter(Boolean) };
-  });
+  result.commits = parseGitLog(log);
   return result;
+}
+
+// Nhánh không có upstream thì coi origin/<default> là nơi đã push (cdn-source: tont → MR vào master).
+export function unpushedScan(dir, paths) {
+  const upstreamOrDefault = () => {
+    try {
+      return git(dir, ['rev-parse', '--abbrev-ref', '@{u}']).trim();
+    } catch {
+      return git(dir, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']).trim();
+    }
+  };
+  try {
+    const base = upstreamOrDefault();
+    const log = git(dir, ['log', `${base}..HEAD`, '--date=format-local:%Y-%m-%d %H:%M', `--pretty=format:${LOG_FORMAT}`, '--name-only', '--', ...paths]);
+    return { base, commits: parseGitLog(log) };
+  } catch (err) {
+    return { commits: [], error: errorText(err) };
+  }
 }
 
 const readJson = (path, fallback) => {
@@ -93,6 +127,8 @@ export function deltaScan({ root, now = new Date() }) {
   const window = scanWindow(lastRun, now.getTime());
   const repos = {};
   const byTicket = {};
+  const unpushedCommits = {};
+  const unpushedError = {};
   for (const [name, dir] of Object.entries(repoDirs)) {
     const { commits, ...status } = gitScan(dir, window.sinceIso, { pull: name === PULLED_REPO });
     let untracked = 0;
@@ -102,11 +138,20 @@ export function deltaScan({ root, now = new Date() }) {
       for (const key of keys) (byTicket[key] ??= []).push({ repo: name, hash: hash.slice(0, 9), date, author, subject, files });
     }
     repos[name] = { ...status, commits: commits.length, untracked };
+    const openPaths = Object.values(issues)
+      .filter((issue) => issue.phase !== 'closed')
+      .flatMap((issue) => (issue.paths ?? []).filter((p) => p.repo === name).map((p) => p.path));
+    if (!openPaths.length) continue;
+    const { commits: ahead, error } = unpushedScan(dir, openPaths);
+    unpushedCommits[name] = ahead;
+    if (error) unpushedError[name] = error;
   }
   return {
     window,
     repos,
     byTicket,
+    unpushed: unpushedByTicket(unpushedCommits, issues),
+    unpushedError,
     monthsStale: monthsStale(readJson(join(root, 'history', 'months.json'), null), now),
     ...designQueues(issues, now.getTime()),
     ms: Date.now() - startedMs,

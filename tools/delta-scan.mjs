@@ -10,6 +10,10 @@ const HOUR = 3600e3;
 const JQL_OVERLAP = 30 * 60e3;
 const DESIGN_RESCAN_AFTER = 48 * HOUR;
 const PRE_TEST_PHASES = ['waiting-design', 'ready', 'coding', 'deliver'];
+const HUB_CHECK_PHASES = ['waiting-design', 'ready', 'coding'];
+const HUB_DESIGN_PENDING = ['chưa-có-link', 'đã-giao-chờ-link'];
+const HUB_RECHECKED_WITHIN = 4 * HOUR;
+const HUB_STALE_AFTER = 24 * HOUR;
 const GIT_TIMEOUT = 60e3;
 const PULLED_REPO = 'gt-promotion-template';
 const LOG_FORMAT = '%x1e%H%x1f%ad%x1f%an%x1f%s';
@@ -62,6 +66,21 @@ export function designQueues(issues, nowMs) {
     if (design.manifest && !design.scanDue && nowMs - lastScan > DESIGN_RESCAN_AFTER) designScanDue.push(key);
   }
   return { designScanDue, driveCheck, accessCheck };
+}
+
+export function hubCheckDue(issues, nowMs) {
+  const today = localStamp(new Date(nowMs)).slice(0, 10);
+  const due = [];
+  for (const [key, { phase, nexusId, milestones, design = {} }] of Object.entries(issues)) {
+    if (!HUB_CHECK_PHASES.includes(phase) || !nexusId) continue;
+    const sinceHubCheck = nowMs - (Date.parse(design.hubCheckedAt) || 0);
+    if (sinceHubCheck < HUB_RECHECKED_WITHIN) continue;
+    const designDue = HUB_DESIGN_PENDING.includes(design.status) && milestones?.design <= today;
+    const stale = phase === 'waiting-design' && sinceHubCheck > HUB_STALE_AFTER;
+    if (!designDue && !stale) continue;
+    due.push({ key, nexusId, url: `https://hub.vnggames.com/tickets/${nexusId}`, reason: designDue ? 'design-due' : 'stale' });
+  }
+  return due;
 }
 
 export function monthsStale(months, now) {
@@ -154,6 +173,7 @@ export function deltaScan({ root, now = new Date() }) {
     unpushedError,
     monthsStale: monthsStale(readJson(join(root, 'history', 'months.json'), null), now),
     ...designQueues(issues, now.getTime()),
+    hubCheckDue: hubCheckDue(issues, now.getTime()),
     ms: Date.now() - startedMs,
   };
 }

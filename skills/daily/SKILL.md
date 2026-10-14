@@ -1,6 +1,6 @@
 ---
 name: daily
-description: Điều phối ngày + vòng đời task của dev frontend VNG: quét Jira (project GW), bóc design đã giao, suy phase từ commit thật, trình kế hoạch duyệt 1 lần rồi tự chạy (code qua code-developer), canh buglist QC sau bàn giao, cập nhật board + console. KHÔNG ghi ngược Jira; commit qua code-developer full, push/release hỏi 1 lần cuối lượt. Modes: mặc định | plan | prep <KEY> | week | add | link | delta | bugwatch | bugwrite | designwatch | wrap | status | doctor. Dùng khi user gõ /daily hoặc nói "check task jira hôm nay", "hôm nay làm gì", "kế hoạch tuần", "chốt ngày".
+description: Điều phối ngày + vòng đời task của dev frontend VNG: quét Jira (project GW), bóc design đã giao, suy phase từ commit thật, trình kế hoạch duyệt 1 lần rồi tự chạy (code qua code-developer), canh buglist QC sau bàn giao, cập nhật board + console. KHÔNG ghi ngược Jira (trừ `done <KEY>` user gõ); commit qua code-developer full, push/release hỏi 1 lần cuối lượt. Modes: mặc định | plan | prep <KEY> | week | add | link | delta | bugwatch | bugwrite | designwatch | wrap | status | doctor | done <KEY>. Dùng khi user gõ /daily hoặc nói "check task jira hôm nay", "hôm nay làm gì", "kế hoạch tuần", "chốt ngày", "đánh done GW-xxx".
 ---
 
 # /daily — điều phối ngày + vòng đời task: Jira → kế hoạch → chạy → giao HTML → bug → chốt
@@ -134,6 +134,13 @@ Token đầu của `$ARGUMENTS`:
   "Chưa push" CHỈ được lấy từ `unpushed` (so `@{u}..HEAD`), CẤM suy từ board: 14/10 board ghi
   "chưa push" cho 6 commit GW-886 trong khi chúng đã merge master lúc 13:22 ⇒ báo sai cho user.
   `unpushed[KEY]` không rỗng → 1 dòng "Cần bạn: <KEY> N commit chưa push";
+  (2b) `node tools/chat-hints.mjs` (cửa sổ = cửa sổ JQL) → tin Teams theo ticket kèm `dates`/`links`
+  bóc sẵn. CHỈ là gợi ý — đọc text rồi tự quyết: chat báo dời mốc design/HTML ⇒ sửa `milestones` +
+  `_<mốc>Note` ghi nguồn "chat <from> <giờ>"; có link design mới ⇒ `design.scanDue = true`. Tin gắn
+  nhiều ticket (group chung của game) bị nhân lên mỗi ticket — chỉ áp cho ticket mà text nói tới.
+  Ca gốc 14/10: "mai full mobile, ngày mốt full ngôn ngữ" (GW-882) nằm trong chat, state vẫn mobile 14/10;
+  (2c) `hubCheckDue` (delta-scan) → 1 dòng board "hub <KEY> cần kiểm (<reason>)" — KHÔNG mở hub trong
+  delta (phiên nền không có Chrome); lượt /daily tương tác xả ở Bước 0;
   (3) bóc link sheet mới trong comment → `state.issues[key].bugSheets`;
   (4) **refresh `history/months.json` khi `monthsStale: true`** (`generatedAt` ≠ hôm nay) — 1 query snapshot theo
   `references/jql.md` mục "Snapshot theo tháng", ghi đè (backup sang `.backups/months/`);
@@ -208,6 +215,18 @@ Token đầu của `$ARGUMENTS`:
   ghi chú đặt sai chỗ — vd key mốc đặt ngoài object `milestones`) rồi chạy lại doctor để chứng
   minh sạch; cái không tự sửa được (thiếu bằng chứng, mập mờ) thì báo user kèm đúng mã luật
   (E1-E11/W1-W9). KHÔNG quét Jira, KHÔNG code.
+- `done <KEY>` → đánh Done 1 ticket, gói 3 việc vào 1 lệnh — **ngoại lệ DUY NHẤT của luật "không ghi
+  Jira"**, vì chính user gõ lệnh. Trình tự:
+  (1) Soát nợ, CHỈ đọc máy: `delta-scan` → `unpushed[KEY]` (cấm suy "chưa push" từ board — 14/10 báo
+  oan GW-886), folder gt-promotion `<game>/<slug>-<nexusId>/` có chưa (task có kênh promotion), mốc
+  tương lai còn lại trong `milestones`.
+  (2) Trình 1 câu AskUserQuestion: nợ vừa soát + "chuyển COMPLETED?" — user gật mới ghi (đổi status
+  là PM/QC thấy ngay; gõ lệnh ≠ đã thấy nợ).
+  (3) `getTransitionsForJiraIssue` → transition tên `COMPLETED` (GW: id 31; tra lại, đừng gõ cứng)
+  → `searchJiraIssuesUsingJql key = <KEY>` đọc ngược status (R-EV-1).
+  (4) State (`writeMerged`, backup trước): `status`, `lastSeenUpdated`, `lastAction`; phase
+  `coding`/`deliver` → `wait-test` (code xong ≠ hết việc — `autoclose` tự đóng khi qua mốc cuối);
+  dòng `history/phases.jsonl` reason `user done`; `node tools/board-log.mjs "<KEY> Jira → COMPLETED"`.
 
 ## Bước 0 — Config & state
 
@@ -225,7 +244,11 @@ trước, "not found" thì mở bằng Chrome. Vẫn "Bạn cần có quyền tr
 truy cập" (là gửi tin thay user). Mở được → liệt kê file, tải theo `references/sharepoint.md`,
 xoá `accessPending`, set `design.status` theo coverage, ⚠️ đầu báo cáo "design <KEY> đã có quyền"
 và đưa `/check-design` (so bản cũ ↔ mới) vào kế hoạch Bước 3.
-Phiên nền không làm được 3 việc này (không có toolset chrome) nên đừng thử.
+**Xả hàng kiểm hub** (cùng điều kiện): mỗi mục `hubCheckDue` của `delta-scan` → mở `url` bằng Chrome,
+đọc comment mới (GS/PM gửi "link design mới" ở hub, Jira không đồng bộ — GW-912 13/10). Có link design
+→ đi luồng NẤC 0 (Bước 2). Xong ghi `design.hubCheckedAt = <ISO>` dù có hay không có gì mới — thiếu
+field này là ticket bị xếp hàng lại mỗi lượt.
+Phiên nền không làm được 4 việc này (không có toolset chrome) nên đừng thử.
 
 **Pull gt-promotion đầu phiên** (mode mặc định/plan — `delta` để `delta-scan` pull, đừng pull lại): `git -C <root> pull --ff-only`
 — ⚠ **CẤM bọc lệnh git trong `timeout N`**: macOS không có `timeout` (thiếu coreutils), shell
@@ -454,8 +477,10 @@ Board `boards/YYYY-MM-DD.md`: bảng `# · Ticket · Phase · Việc · Đườn
 + `## Log` (`HH:MM — sự kiện`) + `## Cần bạn` (mục tiêu 0 dòng).
 Trạng thái: 📋 chờ · ⏳ chạy · ✅ xong-có-verify · ⚠️ kẹt · 🕐 chờ ngoài mình.
 
-⚠ **GIỜ TRONG LOG PHẢI LÀ GIỜ THẬT.** Trước khi ghi mỗi dòng log, lấy giờ bằng `date +%H:%M`
-rồi ghi số đó. **CẤM ghi literal `HH:MM`** — đã sai 3 board liền (30/7, 31/7, 1/8: 10 dòng log
+⚠ **GHI LOG CHỈ BẰNG `node tools/board-log.mjs "<sự kiện>"`** — script tự lấy giờ máy, chèn đúng
+vào mục `## Log` (console CHỈ đọc mục này) và bỏ dòng trùng. CẤM `echo >>`/Write/Edit tay vào board:
+14/10 có 16 dòng log bị append xuống dưới `## Cần bạn` (console không thấy), 3 dòng ghi `14/10` thay
+giờ, 1 cặp dòng lặp. Mục `## Cần bạn` vẫn sửa tay (checkbox). **CẤM ghi literal `HH:MM`** — đã sai 3 board liền (30/7, 31/7, 1/8: 10 dòng log
 đều `HH:MM —`), làm mất trục thời gian nên không tính được lead time cho vòng học. Console tô
 vàng mọi dòng còn `HH:MM` + đếm số dòng thiếu giờ, nên lỗi này không còn im lặng được.
 
@@ -661,7 +686,7 @@ mất 48/56 file. Bài học ở sai chỗ = chưa ghi.
 ## Luật an toàn (không thương lượng)
 
 - `git commit`: tự làm qua `/code-developer full` (cdn-source + repo bàn giao, đúng path của task, báo hash — R-GIT-4).
-  `git push` + release CMS: KHÔNG tự làm — gom 1 câu hỏi cuối lượt cho mọi task đã commit. KHÔNG ghi gì lên Jira.
+  `git push` + release CMS: KHÔNG tự làm — gom 1 câu hỏi cuối lượt cho mọi task đã commit. KHÔNG ghi gì lên Jira — trừ mode `done <KEY>` do user gõ.
 - Claim "xong" phải có lệnh + output thật. Chưa verify → nói "chưa verify" (R-EV-1/2, `rules/agent-evidence.md`).
 - Tối đa 3 cổng hỏi: (a) duyệt kế hoạch, (b) first-run JQL, (c) push/release cuối lượt (chỉ khi có commit chờ đẩy). Ngoại lệ được hỏi: xung đột
   merge gt-promotion, thiếu input không đoán được. Ca mập mờ khác → default an toàn + ghi board.

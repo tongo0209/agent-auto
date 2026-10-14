@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { localStamp, scanWindow, ticketsOf, designQueues, monthsStale, gitScan, parseGitLog, unpushedByTicket, unpushedScan } from './delta-scan.mjs';
+import { localStamp, scanWindow, ticketsOf, designQueues, hubCheckDue, monthsStale, gitScan, parseGitLog, unpushedByTicket, unpushedScan } from './delta-scan.mjs';
 
 process.env.TZ = 'Asia/Ho_Chi_Minh';
 const H = 3600e3;
@@ -57,6 +57,26 @@ test('xếp hàng kiểm quyền design: link chờ quyền ở mọi phase chư
     'GW-7': { phase: 'closed', design: { status: 'đã-giao-chưa-tải', accessPending: pending } },
   };
   assert.deepStrictEqual(designQueues(issues, NOW).accessCheck, [{ key: 'GW-6', ...pending }]);
+});
+
+test('xếp hàng mở hub: GW-909 tới mốc design mà chưa có link', () => {
+  const now = Date.parse('2026-10-14T03:00:00Z');
+  const gw909 = (extra = {}) => ({ phase: 'waiting-design', nexusId: '63245', milestones: { design: '2026-10-14' }, ...extra, design: { status: 'chưa-có-link', ...extra.design } });
+  const url = 'https://hub.vnggames.com/tickets/63245';
+  assert.deepStrictEqual(hubCheckDue({ 'GW-909': gw909() }, now), [{ key: 'GW-909', nexusId: '63245', url, reason: 'design-due' }]);
+  assert.deepStrictEqual(hubCheckDue({ 'GW-909': gw909({ design: { hubCheckedAt: new Date(now - 1 * H).toISOString() } }) }, now), []);
+  assert.deepStrictEqual(hubCheckDue({ 'GW-909': gw909({ phase: 'wait-test' }) }, now), []);
+  assert.deepStrictEqual(hubCheckDue({ 'GW-909': gw909({ nexusId: undefined }) }, now), []);
+});
+
+test('xếp hàng mở hub: waiting-design kiểm quá 24h là stale, mốc design chưa tới thì thôi', () => {
+  const now = Date.parse('2026-10-14T03:00:00Z');
+  const issues = {
+    'GW-1': { phase: 'waiting-design', nexusId: '1', milestones: { design: '2026-10-20' }, design: { status: 'chưa-có-link', hubCheckedAt: new Date(now - 25 * H).toISOString() } },
+    'GW-2': { phase: 'coding', nexusId: '2', milestones: { design: '2026-10-20' }, design: { status: 'chưa-có-link' } },
+    'GW-3': { phase: 'ready', nexusId: '3', milestones: { design: '2026-10-10' }, design: { status: 'đã-giao-đã-tải' } },
+  };
+  assert.deepStrictEqual(hubCheckDue(issues, now), [{ key: 'GW-1', nexusId: '1', url: 'https://hub.vnggames.com/tickets/1', reason: 'stale' }]);
 });
 
 test('months.json cũ khi generatedAt khác hôm nay theo giờ local', () => {

@@ -14,7 +14,7 @@ import {
 } from '@core/constants.mjs';
 import { icon } from '@core/icons';
 import { escapeHtml, inlineMd, shortDate, severityByDays, nextMilestone, isLate, daysUntil } from '@core/format.mjs';
-import { groupTasks } from '@core/grouping.mjs';
+import { groupTasks, nestSubtasks } from '@core/grouping.mjs';
 import { keepOnTimeline } from '@core/marks.mjs';
 import { showText } from '@components/modal';
 import { openTicket } from '@panels/ticketPanel';
@@ -180,9 +180,9 @@ export function renderOverview(data) {
   const soonest = ([, i]) => nextMilestone(i, today)?.days ?? Infinity;
   $('#gantt-box').html(
     ganttTimeline(
-      issues
+      nestSubtasks(issues)
         .filter(([, i]) =>
-          keepOnTimeline(i, {
+          keepOnTimeline({ ...i, phase: i.shownPhase }, {
             gonePhases: GONE_PHASES,
             donePhases: DONE_PHASES,
             daysUntilOf: (d) => daysUntil(d, today),
@@ -213,8 +213,13 @@ function renderDeadlineWarning(week) {
 }
 
 /** Một dòng task trong bảng */
-function taskRow([key, issue], { today, site }) {
-  let phase = PHASE[issue.phase] || { label: issue.phase, sev: 'wait', icon: 'dot' };
+function taskRow([key, issue], { today, site, parentSummary = '' }) {
+  const shownPhase = issue.shownPhase || issue.phase;
+  let phase = PHASE[shownPhase] || { label: shownPhase, sev: 'wait', icon: 'dot' };
+  const phaseTitle =
+    shownPhase === issue.phase ? phase.label : `${phase.label} (theo sub-task) · task cha: ${PHASE[issue.phase]?.label || issue.phase}`;
+  // Sub-task Jira hay lặp nguyên tên cha ("Fix bug - <tên cha>") — dưới hàng cha chỉ cần phần riêng
+  const title = parentSummary ? (issue.summary || '').replace(parentSummary, '').replace(/[\s\-–:]+$/, '') || issue.summary : issue.summary;
   // Ticket design ĐÃ GIAO (chỉ vướng khâu tải) không được đeo chip "chờ design" — hàng nằm
   // trong nhóm "Design đã giao · chờ tải về" mà chip lại nói "chờ design" là tự mâu thuẫn
   // ngay trên 1 dòng (feedback user 10/8, GW-627). Chip mượn nhãn/icon của design.status.
@@ -291,13 +296,14 @@ function taskRow([key, issue], { today, site }) {
   lastActionCount = Math.max(lastActionCount, buttons.length);
   const actions = buttons.join('');
 
-  return `<tr class="trow${ACTIVE_PHASES.includes(issue.phase) ? ' live' : ''}${late ? ' late' : ''}" style="--sev:var(--${sev})">
+  return `<tr class="trow${parentSummary ? ' subrow' : ''}${ACTIVE_PHASES.includes(shownPhase) ? ' live' : ''}${late ? ' late' : ''}" style="--sev:var(--${sev})">
     <td class="c-key"><a class="key" href="${site}/browse/${escapeHtml(key)}" target="_blank" rel="noopener"
         title="Mở ${escapeHtml(key)} trên Jira">${escapeHtml(key)}</a></td>
     <td class="c-title">
       <span class="titlerow">
         <button type="button" class="titlebtn" data-brief="${escapeHtml(key)}"
-          title="${escapeHtml(issue.summary || key)} — bấm để xem brief">${escapeHtml(issue.summary || '—')}</button>
+          title="${escapeHtml(issue.summary || key)} — bấm để xem brief">${escapeHtml(title || '—')}</button>
+        ${issue.subs?.length ? `<span class="subcount" title="${issue.subs.length} sub-task Jira nằm ngay dưới">${icon('bug')}${issue.subs.length}</span>` : ''}
         ${
           design
             ? `<span class="dsg" style="color:var(--${design.sev})" title="${escapeHtml(design.label)}">${icon(design.icon)}</span>`
@@ -306,7 +312,7 @@ function taskRow([key, issue], { today, site }) {
       </span>
       ${issue.note ? `<span class="rownote" title="${escapeHtml(issue.note)}">${escapeHtml(issue.note)}</span>` : ''}
     </td>
-    <td class="c-phase"><span class="ph" style="color:var(--${phase.sev})">${icon(phase.icon || 'dot')}${escapeHtml(phase.label)}</span></td>
+    <td class="c-phase"><span class="ph" style="color:var(--${phase.sev})" title="${escapeHtml(phaseTitle)}">${icon(phase.icon || 'dot')}${escapeHtml(phase.label)}</span></td>
     <td class="c-due"><span class="due" style="color:var(--${sev})">${escapeHtml(dueText)}</span>${fcHtml}</td>
     <td class="c-gate">${gateCell(key)}</td>
     <td class="c-push">${pushCell(key)}</td>
@@ -393,7 +399,13 @@ function rerenderTasks() {
             <span class="gcount">${g.items.length}</span>
           </th></tr>`;
 
-      const rows = g.items.map((entry) => taskRow(entry, { today, site })).join('');
+      const rows = g.items
+        .map(
+          (entry) =>
+            taskRow(entry, { today, site }) +
+            entry[1].subs.map((sub) => taskRow(sub, { today, site, parentSummary: entry[1].summary })).join('')
+        )
+        .join('');
       return head + (g.folded ? '' : rows);
     })
     .join('');

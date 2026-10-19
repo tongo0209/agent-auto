@@ -222,6 +222,43 @@
   padding-bottom: 3px;
 }
 
+/* Sub-task Jira nằm ngay dưới task cha: thụt vào + nhánh nối, chữ nhỏ hơn để mắt vẫn bám hàng cha */
+.trow.subrow {
+  background: color-mix(in srgb, var(--surface) 30%, transparent);
+}
+.trow.subrow .key {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.trow.subrow .c-title {
+  padding-left: 24px;
+  position: relative;
+}
+.trow.subrow .c-title::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 0;
+  height: 50%;
+  width: 9px;
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.trow.subrow .titlebtn {
+  font-size: var(--fs-sm);
+}
+.titlerow .subcount {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--raise);
+  color: var(--muted);
+  font: 600 var(--fs-xs) / 1.4 var(--font-mono);
+}
+
 /* Phase · design · mốc — icon + chữ, cùng một khuôn */
 .ph,
 .dsg,

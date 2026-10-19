@@ -124,7 +124,7 @@ Token đầu của `$ARGUMENTS`:
   Đã đạp 17/9/2026 13:16: connector *still connecting* 4 lượt rồi *No matching deferred tools found*,
   `/mcp` xác nhận `CONNECT_TIMEOUT`; lượt đó giữ `lastRun` nên 13:26 quét bù bằng fallback vẫn bắt
   kịp GW-796 chuyển COMPLETED lúc 13:09 — nếu đã đóng dấu `lastRun` thì mất hẳn;
-  (1b) Lưu response JQL ra file tạm (fields `summary,status,updated,duedate,resolutiondate`) rồi
+  (1b) Lưu response JQL ra file tạm (fields `summary,status,updated,duedate,resolutiondate,parent`) rồi
   `node tools/jira-diff.mjs <file>` — máy phán MỚI/ĐỔI/GIỮ + field đổi (`status`/`duedate`/`summary`) +
   alert `due-today`/`overdue`/`done-in-jira`. CẤM so tay JSON với state: 14/10 duedate GW-886 và GW-884
   đổi chéo cho nhau chỉ lộ nhờ so tay. Mỗi `duedate` đổi → sửa `milestones.duedate` + `_duedateNote`;
@@ -272,6 +272,13 @@ và luật đo `done` (KHÔNG lọc theo `resolutiondate` — nhiều ticket `CO
 đăng nhập, dùng cookie session, **chỉ GET**. Cách dùng + 3 luật cứng: `references/jql.md` mục
 "Fallback REST qua Chrome". Chỉ khi fallback cũng không chạy (phiên nền không có toolset chrome,
 hoặc chưa đăng nhập Jira) mới bỏ trống bước (1)+(3) — và khi đó **CẤM ghi `lastRun` mới**.
+
+**Sub-task Jira** (issuetype `Sub-task`, có field `parent`) → ghi `state.issues[KEY].parent = <key cha>`.
+Console gom sub-task vào ngay dưới hàng cha và cho cha mang phase nóng nhất của sub-task còn mở
+(`console/src/core/grouping.mjs`); thiếu `parent` là sub-task thành hàng riêng, không có paths, cha
+`done-fe` trông như hết việc (ca thật 19/10: GW-950 dưới GW-901, GW-952 dưới GW-909). Sub-task dùng
+`paths` của cha — đừng gắn lại. Nhận diện bằng field `parent`, CẤM đoán theo chữ "Fix bug" trong tên
+(GW-956 cùng kiểu tên nhưng là Task độc lập).
 
 Rút gọn: so `updated` với state → nhãn MỚI/ĐỔI/CÒN DỞ; comment/description mới có link
 `docs.google.com/spreadsheets` → `state.issues[key].bugSheets` (tên field CỐ ĐỊNH, console đọc

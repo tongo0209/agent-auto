@@ -228,7 +228,8 @@ export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
         warn('W1', key, `paths "${p.repo}/${p.path}" không tồn tại trên đĩa`);
       }
     }
-    if (!paths.length && activePhaseIds.has(issue.phase)) {
+    const parentPaths = state.issues[issue.parent]?.paths || [];
+    if (!paths.length && !parentPaths.length && activePhaseIds.has(issue.phase)) {
       warn('W2', key, `phase "${issue.phase}" mà chưa gắn paths — không đo được effort`);
     }
     if (needsHandoffIds.has(issue.phase) && !fs.existsSync(path.join(root, 'tasks', key, 'handoff.md'))) {

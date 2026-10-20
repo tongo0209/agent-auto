@@ -10,10 +10,23 @@ function git(args) {
   return r.stdout.trim();
 }
 
-export function addWorktree({ repo, parentDir, branch }) {
+// node_modules không vào git nên worktree mới không có — mượn của repo thật từ campaign lên tới gốc repo
+function linkNodeModules(top, dir, campaignDir) {
+  for (let real = campaignDir; real.startsWith(top); real = path.dirname(real)) {
+    const source = path.join(real, 'node_modules');
+    const link = path.join(dir, path.relative(top, real), 'node_modules');
+    if (fs.existsSync(source) && fs.existsSync(path.dirname(link)) && !fs.existsSync(link)) fs.symlinkSync(source, link);
+    if (real === top) break;
+  }
+}
+
+export function addWorktree({ repo, parentDir, branch, linkDirs = [] }) {
   const top = git(['-C', repo, 'rev-parse', '--show-toplevel']);
   const dir = path.join(parentDir, path.basename(top));
   if (!fs.existsSync(dir)) git(['-C', top, 'worktree', 'add', '-q', dir, '-b', branch]);
+  for (const campaignDir of linkDirs.filter((d) => d && fs.existsSync(d)).map((d) => fs.realpathSync(d))) {
+    if (campaignDir.startsWith(top)) linkNodeModules(top, dir, campaignDir);
+  }
   return { top, dir };
 }
 

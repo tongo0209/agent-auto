@@ -169,7 +169,7 @@ function isolate(run, deps) {
   if (!pending.length) return run;
   const worktrees = { ...run.worktrees };
   for (const repo of pending) {
-    const { top, dir } = deps.addWorktree({ repo, parentDir: path.join(runDir(run.key, run.runId), 'wt'), branch: `autopilot/${run.key}-${run.runId}` });
+    const { top, dir } = deps.addWorktree({ repo, parentDir: path.join(runDir(run.key, run.runId), 'wt'), branch: `autopilot/${run.key}-${run.runId}`, linkDirs: campaignsOf(run) });
     worktrees[top] = dir;
   }
   return { ...run, worktrees };

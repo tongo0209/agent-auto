@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { labWritesOn } from './worktree.mjs';
 
 const REVIEW = ['Read', 'Grep', 'Glob', 'Write', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git status:*)', 'Bash(node:*)'];
 const IMPLEMENT = [...REVIEW, 'Edit', 'Skill', 'Agent', 'Bash(npm run:*)', 'Bash(npm ci:*)', 'Bash(npx:*)', 'Bash(ls:*)', 'Bash(python3:*)'];
@@ -19,6 +20,9 @@ export const TOOLSETS = {
   ].join(','),
 };
 
+const SANDBOX_SETTINGS = JSON.stringify({
+  hooks: { PreToolUse: [{ matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash', hooks: [{ type: 'command', command: `node ${path.join(import.meta.dirname, 'sandbox-hook.mjs')}` }] }] },
+});
 const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 const FAKE_PASS = '```autopilot-verdict\n{"verdict":"pass"}\n```';
 
@@ -27,6 +31,7 @@ export function buildClaudeArgs({ prompt, model, toolset, resumeSessionId }) {
   const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--allowedTools', TOOLSETS[toolset]];
   if (model) args.push('--model', model);
   if (resumeSessionId) args.push('--resume', resumeSessionId);
+  if (!labWritesOn()) args.push('--settings', SANDBOX_SETTINGS);
   return args;
 }
 

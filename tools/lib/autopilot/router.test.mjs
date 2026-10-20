@@ -203,3 +203,19 @@ test('G7: campaignDirs gồm mọi path code (bỏ gt-promotion), pathsConfirmed
   const s = gatherSignals({ input: 'GW-1', agentRoot: root });
   assert.deepStrictEqual([s.campaignDirs.length, s.campaignCount, s.tooManyCampaigns, s.pathsUnconfirmed], [6, 6, true, true]);
 });
+
+test('G8: skin/mainsite đang live → manual, thắng mọi luồng code', () => {
+  const r = route({ ...base, liveSkin: true, hasDesign: true, phase: 'bugfix' }, RULES);
+  assert.strictEqual(r.flow, 'manual');
+  assert.match(r.reason, /live|production/);
+});
+
+test('G8: liveSkin khớp skin-* / *-mainsite, bỏ qua bản -renew', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-sig-'));
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ repos: { 'cdn-source': path.join(root, 'cdn') } }));
+  const at = (p) => ({ paths: [{ repo: 'cdn-source', path: p }] });
+  const issues = { 'GW-1': at('products/tf/skin-2026'), 'GW-2': at('products/tf/skin-2026-renew'), 'GW-3': at('products/x5/2026-mainsite'), 'GW-4': at('products/tf/landing/a') };
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues }));
+  const live = ['GW-1', 'GW-2', 'GW-3', 'GW-4'].map((k) => gatherSignals({ input: k, agentRoot: root }).liveSkin);
+  assert.deepStrictEqual(live, [true, false, true, false]);
+});

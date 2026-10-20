@@ -4,6 +4,8 @@ import { campaignOf, readLock } from '../project-lock.mjs';
 
 const HANDOFF_REPO = 'gt-promotion-template';
 const MAX_LANES = 5;
+const LIVE_SITE = /(^|\/)(skin-[^/]+|[^/]+-mainsite)$/;
+const RENEW = /-renew$/;
 const SHEET_INPUT = /docs\.google\.com\/spreadsheets|sharepoint\.com|\.xlsx(\?|$)/i;
 const GOOGLE_SHEET = /docs\.google\.com\/spreadsheets/i;
 const NO_BUG_ID_NOTE = /không có cột BugID/i;
@@ -69,6 +71,7 @@ export function gatherSignals({ input, agentRoot, campaign }) {
     campaignDirs,
     campaignCount: campaignDirs.length,
     tooManyCampaigns: campaignDirs.length > MAX_LANES,
+    liveSkin: campaignDirs.some((d) => LIVE_SITE.test(d) && !RENEW.test(d)),
     pathsUnconfirmed: issue.pathsConfirmed === false,
     handoffDir: handoff ? path.join(repos[handoff.repo], handoff.path) : null,
     repos: [...new Set([target, ...known].filter(Boolean).map((p) => repos[p.repo]))],

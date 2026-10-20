@@ -110,3 +110,34 @@ test('GET changes đọc git của run; POST code chỉ mở worktree của chí
   assert.strictEqual((await post({ key: 'GW-50', runId: '20261020-100000', dir: '/etc' })).status, 400);
   assert.deepStrictEqual(opened, ['/khong-co-repo-wt']);
 });
+
+test('retry/skip/goto/pick/break: soát trước khi spawn; GET /runs có actions; preview gọi route --json', async () => {
+  const post = (action, body) => fetch(`${base}/api/autopilot/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const make = (key, patch) => saveRun({
+    key, runId: '20261020-120000', flow: 'landing-fix', status: 'running', stage: 'plan', stopReason: null, routerReason: 'x', campaignDir: '/c',
+    blockedBy: [], loops: {}, sessions: {}, budget: { usd: 25, minutes: 120 }, receipts: [], ...patch,
+  });
+  make('GW-11', {});
+  const before = spawned.length;
+  const refused = await post('skip', { key: 'GW-11' });
+  assert.strictEqual(refused.status, 400);
+  assert.match((await refused.json()).error, /đang chạy/);
+  assert.strictEqual(spawned.length, before);
+
+  const passed = { stage: 'plan', round: 1, verdict: 'pass', blocking: 0, advisory: 0, turns: 1, costUsd: 0, ms: 1 };
+  make('GW-12', { status: 'stopped', stage: 'gates', stopReason: 'x', receipts: [passed] });
+  const ok = await post('goto', { key: 'GW-12', stage: 'plan', note: 'làm lại' });
+  assert.strictEqual(ok.status, 200);
+  assert.deepStrictEqual(spawned.at(-1), ['goto', 'GW-12', 'plan', '--note', 'làm lại']);
+  assert.strictEqual((await post('goto', { key: 'GW-12', stage: 'fix', note: 'x' })).status, 400);
+
+  const view = await (await fetch(`${base}/api/autopilot/runs`)).json();
+  const types = view.runs.find((r) => r.key === 'GW-12').actions.map((a) => a.type);
+  assert.ok(['retry', 'skip', 'goto'].every((t) => types.includes(t)));
+
+  const preview = await (await fetch(`${base}/api/autopilot/preview?input=GW-1&flow=feature`)).json();
+  assert.ok(preview.key);
+  assert.deepStrictEqual(execd.at(-1), ['route', 'GW-1', '--json', '--flow', 'feature']);
+  assert.strictEqual((await fetch(`${base}/api/autopilot/preview?input=--x`)).status, 400);
+  assert.strictEqual((await fetch(`${base}/api/autopilot/preview?input=GW-404`)).status, 400);
+});

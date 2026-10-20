@@ -1,10 +1,10 @@
 // View thuần cho trang /autopilot — đọc runs/ qua store của tools/lib/autopilot, không tự ghi run.json
 import fs from 'node:fs';
 import path from 'node:path';
-import { listRuns, runDir, loadRun } from '../tools/lib/autopilot/store.mjs';
+import { listRuns, runDir, loadRun, planOptions } from '../tools/lib/autopilot/store.mjs';
 import { runChanges } from '../tools/lib/autopilot/review.mjs';
 import { loadFlow, listFlows } from '../tools/lib/autopilot/flows.mjs';
-import { stageOf } from '../tools/lib/autopilot/engine.mjs';
+import { stageOf, allowedActions, chooseAction, checkRunPlan } from '../tools/lib/autopilot/engine.mjs';
 import { stageCells, totals } from '../tools/lib/autopilot/format.mjs';
 import { tokensOf } from '../tools/lib/autopilot/claude-runner.mjs';
 import { isInterrupted } from '../tools/lib/autopilot/lock.mjs';
@@ -40,8 +40,14 @@ function chatTotals(run) {
 function viewOf(saved) {
   const run = withTokens(saved);
   const flow = loadFlow(run.flow);
+  const options = run.stage === 'approve-plan' ? planOptions(run) : [];
   return {
     ...run,
+    plan: run.plan ?? { disabled: [], breakpoints: [] },
+    gateSkipped: run.gateSkipped ?? [],
+    choice: run.choice ?? null,
+    options,
+    actions: allowedActions(run, flow, { options }),
     interrupted: isInterrupted(run),
     awaitingReview: run.status === 'done' && !run.reviewedAt && Object.keys(run.worktrees ?? {}).length > 0,
     flowLabel: flow.label,
@@ -87,18 +93,57 @@ export function worktreeOf({ key, runId, dir }) {
   return dir;
 }
 
-export function actionArgs(action, { key, note, input, flow, attach } = {}) {
+const STAGE = /^[a-z][a-z-]*$/;
+const listFlag = (name, ids) => (ids?.length ? [name, ids.join(',')] : []);
+
+function stageList(ids = []) {
+  if (!ids.every((id) => STAGE.test(id))) throw new Error('stage không hợp lệ');
+  return ids;
+}
+
+export function checkInput(input) {
+  if (!input || input.startsWith('-')) throw new Error('input không hợp lệ');
+}
+
+export function actionArgs(action, { key, note, input, flow, attach, stage, option, reason, off, skip, skipReason, breaks } = {}) {
   if (action === 'run' || (action === 'open' && !attach)) {
-    if (!input || input.startsWith('-')) throw new Error('input không hợp lệ');
+    checkInput(input);
     if (flow && !listFlows().includes(flow)) throw new Error('flow không có');
-    return [action, input, ...(flow ? ['--flow', flow] : [])];
+    const plan = action === 'run'
+      ? [...listFlag('--skip', stageList(skip)), ...(skipReason?.trim() ? ['--skip-reason', skipReason.trim()] : []), ...listFlag('--break', stageList(breaks))]
+      : [];
+    return [action, input, ...(flow ? ['--flow', flow] : []), ...plan];
   }
-  if (!['approve', 'reject', 'pause', 'resume', 'abort', 'reviewed', 'open'].includes(action)) throw new Error(`action lạ: ${action}`);
+  if (!['approve', 'reject', 'pause', 'resume', 'abort', 'reviewed', 'open', 'retry', 'goto', 'skip', 'pick', 'break'].includes(action)) throw new Error(`action lạ: ${action}`);
   if (!KEY.test(key ?? '')) throw new Error('key không hợp lệ');
   const noteArgs = note?.trim() ? ['--note', note.trim()] : [];
   if (action === 'open') return ['open', key, '--attach'];
   if (action === 'reject' && !noteArgs.length) throw new Error('reject cần note');
+  if (action === 'goto' || action === 'break') {
+    if (!STAGE.test(stage ?? '')) throw new Error('stage không hợp lệ');
+    if (action === 'goto' && !noteArgs.length) throw new Error('goto cần note');
+    return action === 'goto' ? ['goto', key, stage, ...noteArgs] : ['break', key, stage, ...(off ? ['--off'] : [])];
+  }
+  if (action === 'pick') {
+    if (!/^[ABC]$/.test(option ?? '')) throw new Error('option không hợp lệ');
+    return ['pick', key, option, ...noteArgs];
+  }
+  if (action === 'skip') return ['skip', key, ...(reason?.trim() ? ['--reason', reason.trim()] : [])];
   return [action, key, ...noteArgs];
+}
+
+// CLI chạy tách nền nên lỗi sau spawn UI không thấy: soát trước, ném ⇒ server trả 400
+export function checkAction(action, body = {}) {
+  if (action === 'run') {
+    const error = body.flow && checkRunPlan(loadFlow(body.flow), { disabled: body.skip, breakpoints: body.breaks, skipReason: body.skipReason });
+    if (error) throw new Error(error);
+    return;
+  }
+  if (!['retry', 'goto', 'skip', 'pick', 'break'].includes(action)) return;
+  const run = loadRun(body.key);
+  if (!run) throw new Error(`không có run ${body.key}`);
+  const { stage, option, note, reason } = body;
+  chooseAction(run, loadFlow(run.flow), { type: action, stage, option, note, reason }, { options: planOptions(run) });
 }
 
 const TAIL_BYTES = 256 * 1024;

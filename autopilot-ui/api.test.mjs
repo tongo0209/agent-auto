@@ -6,7 +6,7 @@ import path from 'node:path';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-api-'));
 process.env.AUTOPILOT_CLAUDE_PROJECTS = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-proj-'));
-const { listView, artifactFile, listArtifacts, actionArgs, liveLog } = await import('./api.mjs');
+const { listView, artifactFile, listArtifacts, actionArgs, checkAction, liveLog } = await import('./api.mjs');
 const { saveRun, writeArtifact } = await import('../tools/lib/autopilot/store.mjs');
 
 const run = {
@@ -125,4 +125,46 @@ test('listView: run done có worktree mà chưa review → awaitingReview; đã 
   const view = await listView();
   const flag = (key) => view.runs.find((r) => r.key === key).awaitingReview;
   assert.deepStrictEqual([flag('GW-40'), flag('GW-41'), flag('GW-2'), flag('GW-1')], [true, false, false, false]);
+});
+
+test('actionArgs: goto/skip/pick/break và run có kế hoạch', () => {
+  assert.deepStrictEqual(actionArgs('goto', { key: 'GW-1', stage: 'plan', note: 'x' }), ['goto', 'GW-1', 'plan', '--note', 'x']);
+  assert.throws(() => actionArgs('goto', { key: 'GW-1', stage: '../x', note: 'x' }), /stage/);
+  assert.throws(() => actionArgs('goto', { key: 'GW-1', stage: 'plan', note: '  ' }), /goto cần note/);
+  assert.deepStrictEqual(actionArgs('pick', { key: 'GW-1', option: 'B', note: 'n' }), ['pick', 'GW-1', 'B', '--note', 'n']);
+  assert.throws(() => actionArgs('pick', { key: 'GW-1', option: 'D' }), /option/);
+  assert.deepStrictEqual(actionArgs('retry', { key: 'GW-1' }), ['retry', 'GW-1']);
+  assert.deepStrictEqual(actionArgs('skip', { key: 'GW-1', reason: 'bỏ' }), ['skip', 'GW-1', '--reason', 'bỏ']);
+  assert.deepStrictEqual(actionArgs('break', { key: 'GW-1', stage: 'fix', off: true }), ['break', 'GW-1', 'fix', '--off']);
+  assert.deepStrictEqual(actionArgs('break', { key: 'GW-1', stage: 'fix' }), ['break', 'GW-1', 'fix']);
+  assert.deepStrictEqual(
+    actionArgs('run', { input: 'GW-9', flow: 'feature', skip: ['a', 'b'], skipReason: 'vì', breaks: ['c', 'd'] }),
+    ['run', 'GW-9', '--flow', 'feature', '--skip', 'a,b', '--skip-reason', 'vì', '--break', 'c,d']);
+  assert.throws(() => actionArgs('run', { input: 'GW-9', skip: ['../a'] }), /stage/);
+  assert.throws(() => actionArgs('run', { input: 'GW-9', breaks: ['A'] }), /stage/);
+});
+
+test('checkAction: run đang chạy không skip được; run đã xong qua plan cho goto', () => {
+  saveRun({ ...run, key: 'GW-5', status: 'running', stage: 'plan', receipts: [] });
+  assert.throws(() => checkAction('skip', { key: 'GW-5' }), /đang chạy/);
+  assert.doesNotThrow(() => checkAction('break', { key: 'GW-5', stage: 'fix' }));
+  assert.doesNotThrow(() => checkAction('approve', { key: 'GW-5' }));
+  assert.throws(() => checkAction('retry', { key: 'GW-404' }), /run/);
+  assert.throws(() => checkAction('run', { input: 'GW-9', flow: 'landing-fix', skip: ['nope'] }), /stage nope/);
+  assert.doesNotThrow(() => checkAction('run', { input: 'GW-9' }));
+});
+
+test('listView: run có actions, options chỉ ở approve-plan, mặc định plan/gateSkipped/choice', async () => {
+  const view = await listView();
+  const first = view.runs.find((r) => r.key === 'GW-1');
+  assert.ok(Array.isArray(first.actions));
+  assert.deepStrictEqual(first.options, []);
+  assert.deepStrictEqual(first.plan, { disabled: [], breakpoints: [] });
+  assert.deepStrictEqual(first.gateSkipped, []);
+  assert.strictEqual(first.choice, null);
+  writeArtifact({ ...run, key: 'GW-6', runId: '20261020-110000' }, 'plan.md', '# P\n\n## Phương án\n\n### A · Một\nx\n\n### B · Hai\ny\n');
+  saveRun({ ...run, key: 'GW-6', runId: '20261020-110000' });
+  const withOptions = (await listView()).runs.find((r) => r.key === 'GW-6');
+  assert.deepStrictEqual(withOptions.options.map((o) => o.id), ['A', 'B']);
+  assert.ok(withOptions.actions.some((a) => a.type === 'pick'));
 });

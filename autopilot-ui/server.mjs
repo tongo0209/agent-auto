@@ -4,7 +4,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, execFile } from 'node:child_process';
-import { listView, listArtifacts, artifactFile, actionArgs, liveLog, changesOf, worktreeOf } from './api.mjs';
+import { listView, listArtifacts, artifactFile, actionArgs, checkAction, checkInput, liveLog, changesOf, worktreeOf } from './api.mjs';
 import { runsDir } from '../tools/lib/autopilot/store.mjs';
 import { attachTerminal } from './terminal.mjs';
 import { launchCommand } from './panel-claude.mjs';
@@ -68,6 +68,16 @@ async function handleAutopilot(req, res, { spawnCli, execCli, openEditor }) {
       const file = artifactFile(parts[3], parts[4], parts[6] ?? '');
       return file ? send(res, 200, fs.readFileSync(file, 'utf8'), 'text/plain; charset=utf-8') : send(res, 404, 'không có artifact', 'text/plain; charset=utf-8');
     }
+    if (req.method === 'GET' && parts[2] === 'preview') {
+      try {
+        const { input, flow } = Object.fromEntries(new URL(req.originalUrl, 'http://x').searchParams);
+        checkInput(input);
+        const out = await execCli(['route', input, '--json', ...(flow ? ['--flow', flow] : [])]);
+        return out.code ? send(res, 400, { error: out.stderr.trim() || `exit ${out.code}` }) : send(res, 200, JSON.parse(out.stdout));
+      } catch (e) {
+        return send(res, 400, { error: e.message });
+      }
+    }
     if (req.method === 'POST' && parts.length === 3) {
       if (!String(req.headers['content-type']).startsWith('application/json')) return send(res, 415, { error: 'cần JSON' });
       try {
@@ -77,6 +87,7 @@ async function handleAutopilot(req, res, { spawnCli, execCli, openEditor }) {
           return error ? send(res, 400, { error }) : send(res, 200, { ok: true });
         }
         const args = actionArgs(parts[2], body);
+        checkAction(parts[2], body);
         console.log(`${new Date().toISOString()} ${args.join(' ')}`);
         if (args[0] !== 'open') return send(res, 200, { ok: true, ...spawnCli(args) });
         const out = await execCli(args);

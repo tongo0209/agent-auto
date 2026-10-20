@@ -1,16 +1,25 @@
 #!/usr/bin/env node
-// Server riêng cho trang autopilot — tách khỏi console 4747, không phụ thuộc express
+// Console mới: trang autopilot + mọi API/terminal của console cũ (dùng lại router của console/server)
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { listView, listArtifacts, artifactFile, actionArgs } from './api.mjs';
 import { runsDir } from '../tools/lib/autopilot/store.mjs';
 
 const PORT = Number(process.env.AUTOPILOT_UI_PORT) || 4800;
-const PAGE = path.join(import.meta.dirname, 'index.html');
+const WEB = path.join(import.meta.dirname, 'web');
+const CONSOLE = path.join(import.meta.dirname, '..', 'console');
 const CLI = path.join(import.meta.dirname, '..', 'tools', 'autopilot.mjs');
 const LOCAL_HOST = /^(127\.0\.0\.1|localhost)(:\d+)?$/;
+const consoleRequire = createRequire(path.join(CONSOLE, 'server', 'index.js'));
+const express = consoleRequire('express');
+const CONSOLE_ROUTES = ['state', 'git', 'activity', 'months', 'docs', 'open', 'review', 'board', 'alerts', 'learn', 'ticket', 'doctor', 'handoff', 'jira', 'delta', 'radar', 'debt', 'bugs', 'queue', 'finish'];
+
+try {
+  process.loadEnvFile(path.join(CONSOLE, '.env'));
+} catch {}
 
 // CLI chạy tách nền vì 1 lượt duyệt kéo theo nhiều stage claude — trang tự poll thấy mốc dừng kế tiếp
 function spawnDetached(args) {
@@ -34,14 +43,9 @@ const readBody = (req) =>
     req.on('end', () => resolve(raw));
   });
 
-export function createServer({ spawnCli = spawnDetached } = {}) {
-  return http.createServer(async (req, res) => {
-    if (!LOCAL_HOST.test(req.headers.host ?? '')) return send(res, 403, { error: 'host lạ' });
-    const { pathname } = new URL(req.url, 'http://x');
+async function handleAutopilot(req, res, spawnCli) {
+    const { pathname } = new URL(req.originalUrl, 'http://x');
     const parts = pathname.split('/').filter(Boolean).map(decodeURIComponent);
-
-    if (req.method === 'GET' && (pathname === '/' || pathname === '/autopilot')) return send(res, 200, fs.readFileSync(PAGE, 'utf8'), 'text/html; charset=utf-8');
-    if (parts[0] !== 'api' || parts[1] !== 'autopilot') return send(res, 404, { error: 'không có' });
 
     if (req.method === 'GET' && parts[2] === 'runs' && parts.length === 3) return send(res, 200, await listView());
     if (req.method === 'GET' && parts[2] === 'runs' && parts[5] === 'artifacts') {
@@ -60,9 +64,26 @@ export function createServer({ spawnCli = spawnDetached } = {}) {
       }
     }
     send(res, 404, { error: 'không có' });
-  });
+}
+
+export function createServer({ spawnCli = spawnDetached } = {}) {
+  const app = express();
+  app.use((req, res, next) => (LOCAL_HOST.test(req.headers.host ?? '') ? next() : send(res, 403, { error: 'host lạ' })));
+  app.use('/api/autopilot', (req, res) => handleAutopilot(req, res, spawnCli));
+  app.use(express.json());
+  for (const name of CONSOLE_ROUTES) app.use('/api', consoleRequire(`./routes/${name}`));
+  app.use('/vendor/xterm', express.static(path.join(CONSOLE, 'node_modules/@xterm/xterm/lib')), express.static(path.join(CONSOLE, 'node_modules/@xterm/xterm/css')));
+  app.use('/vendor/xterm-fit', express.static(path.join(CONSOLE, 'node_modules/@xterm/addon-fit/lib')));
+  app.use(express.static(WEB));
+  app.use('/', consoleRequire('./routes/preview'));
+  app.get(/^[^.]*$/, (_req, res) => res.sendFile(path.join(WEB, 'index.html')));
+  return http.createServer(app);
 }
 
 if (import.meta.filename === process.argv[1]) {
-  createServer().listen(PORT, '127.0.0.1', () => console.log(`Autopilot UI  http://127.0.0.1:${PORT}`));
+  const server = createServer();
+  server.listen(PORT, '127.0.0.1', () => {
+    consoleRequire('./ws/terminal').attachTerminal(server, '/term');
+    console.log(`Console mới  http://127.0.0.1:${PORT}`);
+  });
 }

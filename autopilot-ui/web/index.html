@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Console</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/vendor/xterm/xterm.css">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/views.css">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<script src="/vendor/xterm/xterm.js"></script>
+<script src="/vendor/xterm-fit/addon-fit.js"></script>
+</head>
+<body>
+<nav class="nav" id="nav"></nav>
+<main id="view"></main>
+<aside class="term" id="term" hidden>
+  <div class="term-grip" id="termGrip"></div>
+  <div class="term-tabs" id="termTabs"></div>
+  <div class="term-body" id="termBody"></div>
+</aside>
+<div class="toast" id="toast"></div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

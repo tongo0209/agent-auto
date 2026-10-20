@@ -13,10 +13,23 @@ await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
 after(() => server.close());
 
-test('GET / trả trang autopilot', async () => {
+test('GET / trả trang console mới', async () => {
   const res = await fetch(`${base}/`);
   assert.strictEqual(res.status, 200);
-  assert.match(await res.text(), /<title>Autopilot<\/title>/);
+  assert.match(await res.text(), /<title>Console<\/title>/);
+});
+
+test('mount router của console cũ: /api/state trả JSON', async () => {
+  const res = await fetch(`${base}/api/state`);
+  assert.strictEqual(res.status, 200);
+  assert.ok(typeof (await res.json()) === 'object');
+});
+
+test('serve module trang và xterm', async () => {
+  assert.strictEqual((await fetch(`${base}/app.js`)).status, 200);
+  assert.strictEqual((await fetch(`${base}/vendor/xterm/xterm.js`)).status, 200);
+  assert.strictEqual((await fetch(`${base}/vendor/xterm/xterm.css`)).status, 200);
+  assert.strictEqual((await fetch(`${base}/vendor/xterm-fit/addon-fit.js`)).status, 200);
 });
 
 test('GET /api/autopilot/runs trả JSON danh sách', async () => {

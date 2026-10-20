@@ -56,3 +56,8 @@ projects/*
 # Skill riêng từng máy — không phải đồ dùng chung của repo này
 skills/psd-cut/
 skills/figma-cut/
+
+# Autopilot: run state + artifact riêng từng máy
+runs/*
+!runs/.gitkeep
+.superpowers/

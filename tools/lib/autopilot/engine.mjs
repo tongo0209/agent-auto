@@ -1,10 +1,10 @@
 const FINISHED = ['done', 'stopped'];
 const STATUS_BY_KIND = { pause: 'paused', attached: 'attached' };
 
-export function createRun({ key, runId, flow, routerReason, repo, campaignDir, repos = [repo], now }) {
+export function createRun({ key, runId, flow, routerReason, repo, campaignDir, handoffDir = null, repos = [repo], now }) {
   return {
-    key, runId, flow: flow.id, routerReason, repo, campaignDir,
-    repos: repos.filter(Boolean),
+    key, runId, flow: flow.id, routerReason, repo, campaignDir, handoffDir,
+    repos: [...new Set(repos.filter(Boolean))],
     worktrees: {},
     status: 'running',
     stage: flow.stages[0].id,

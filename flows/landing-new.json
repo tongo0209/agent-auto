@@ -141,6 +141,30 @@
         "back": "fix",
         "max": 2
       },
+      "next": "handoff"
+    },
+    {
+      "id": "handoff",
+      "kind": "claude",
+      "prompt": "handoff.md",
+      "toolset": "implement",
+      "model": "sonnet",
+      "when": "hasHandoff",
+      "next": "handoff-gates"
+    },
+    {
+      "id": "handoff-gates",
+      "kind": "gate",
+      "scope": "handoff",
+      "when": "hasHandoff",
+      "checks": [
+        "pm-gate-handoff",
+        "check-promotion"
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 2
+      },
       "next": "approve-result"
     },
     {

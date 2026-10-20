@@ -37,6 +37,11 @@ function hasPmHook(dir) {
   return false;
 }
 
+const handoffHtml = (dir) => {
+  const mainsite = path.join(dir, 'mainsite');
+  return fs.existsSync(mainsite) ? fs.readdirSync(mainsite).filter((f) => f.endsWith('.html')).map((f) => path.join(mainsite, f)) : [];
+};
+
 // Mỗi check trả lệnh cần chạy, hoặc {skip} / {error} khi không áp dụng được
 const CHECKS = {
   build: ({ campaignDir, repo }) => {
@@ -54,6 +59,15 @@ const CHECKS = {
   'landing-parity': ({ campaignDir, repo }) =>
     isCdnSource(repo) ? { cmd: 'node', args: [tool('landing-parity.mjs'), campaignDir] } : { skip: 'không phải cdn-source' },
   'layout-gate': ({ campaignDir }) => ({ cmd: 'node', args: [tool('layout-gate.mjs'), campaignDir] }),
+  // 2 check bàn giao nhận campaignDir = folder gt-promotion của ticket
+  'pm-gate-handoff': ({ campaignDir }) => {
+    const files = handoffHtml(campaignDir);
+    return files.length ? { cmd: 'node', args: [tool('pm-gate.mjs'), ...files, '--baseline', 'none'] } : { skip: 'chưa có mainsite/*.html' };
+  },
+  'check-promotion': ({ campaignDir }) => {
+    const files = handoffHtml(campaignDir);
+    return files.length ? { cmd: 'node', args: [tool('check-promotion.mjs'), ...files] } : { skip: 'chưa có mainsite/*.html' };
+  },
 };
 
 // -z: không quote tên có dấu, rename tách 2 path; -uall: liệt kê từng file trong thư mục chưa track

@@ -33,6 +33,32 @@
         "back": "fix",
         "max": 2
       },
+      "next": "pm-gates"
+    },
+    {
+      "id": "pm-gates",
+      "kind": "gate",
+      "when": "touchesPm",
+      "checks": [
+        "pm-gate"
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 2
+      },
+      "next": "ui-check"
+    },
+    {
+      "id": "ui-check",
+      "kind": "claude",
+      "prompt": "ui-check.md",
+      "toolset": "browser",
+      "model": "sonnet",
+      "when": "touchesUi",
+      "loop": {
+        "back": "fix",
+        "max": 2
+      },
       "next": "verify"
     },
     {
@@ -41,11 +67,35 @@
       "prompt": "verify.md",
       "toolset": "browser",
       "model": "sonnet",
-      "next": "approve-result",
+      "next": "handoff",
       "loop": {
         "back": "fix",
         "max": 2
       }
+    },
+    {
+      "id": "handoff",
+      "kind": "claude",
+      "prompt": "handoff.md",
+      "toolset": "implement",
+      "model": "sonnet",
+      "when": "hasHandoff",
+      "next": "handoff-gates"
+    },
+    {
+      "id": "handoff-gates",
+      "kind": "gate",
+      "scope": "handoff",
+      "when": "hasHandoff",
+      "checks": [
+        "pm-gate-handoff",
+        "check-promotion"
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 2
+      },
+      "next": "approve-result"
     },
     {
       "id": "fix",

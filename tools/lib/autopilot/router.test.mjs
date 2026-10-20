@@ -82,3 +82,13 @@ test('G1: task con kế thừa paths + bugSheets của cha', () => {
   const s = gatherSignals({ input: 'GW-2', agentRoot: root });
   assert.deepStrictEqual([s.parentKey, s.campaignDir, s.hasBugSheet], ['GW-1', path.join(repo, 'products/x/landing/a'), true]);
 });
+
+test('G2: path gt-promotion là handoffDir, campaignDir lấy path code', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-sig-'));
+  const repos = { 'cdn-source': path.join(root, 'cdn-source'), 'gt-promotion-template': path.join(root, 'gt') };
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ repos }));
+  const paths = [{ repo: 'gt-promotion-template', path: '688/e-1' }, { repo: 'cdn-source', path: 'products/t/landing/e' }];
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues: { 'GW-1': { paths } } }));
+  const s = gatherSignals({ input: 'GW-1', agentRoot: root });
+  assert.deepStrictEqual([s.campaignDir, s.handoffDir, s.repos], [path.join(repos['cdn-source'], 'products/t/landing/e'), path.join(repos['gt-promotion-template'], '688/e-1'), [repos['cdn-source'], repos['gt-promotion-template']]]);
+});

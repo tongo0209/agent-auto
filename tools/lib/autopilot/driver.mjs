@@ -14,8 +14,12 @@ import { addWorktree as realAddWorktree, toWorktree, isInWorktree, labWritesOn }
 const UI_FILE = /\.(twig|html|scss|css)$/;
 const CLI = 'node ~/VNG/agent-auto/tools/autopilot.mjs';
 
+const readIfExists = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '');
+
 const WHEN = {
   touchesUi: (run) => (run.files ?? []).some((f) => UI_FILE.test(f)),
+  touchesPm: (run) => (run.files ?? []).some((f) => UI_FILE.test(f) && readIfExists(path.join(toWorktree(run.worktrees, run.repo), f)).includes('pm__')),
+  hasHandoff: (run) => Boolean(run.handoffDir),
 };
 
 function planTitle(run) {
@@ -40,6 +44,7 @@ function stageVars(run, stage, input) {
     runDir: runDir(run.key, run.runId),
     repo: wt(run.repo),
     campaignDir: wt(run.campaignDir),
+    handoffDir: wt(run.handoffDir),
     round: String(roundOf(run, stage.id)),
     rejectNote: run.rejectNote ?? '',
     callerOfFix: run.callerOfFix ?? '',
@@ -86,14 +91,31 @@ async function runClaudeStage(run, stage, deps) {
   return { type: v.verdict, receipt, sessionId: res.sessionId };
 }
 
+const repoFor = (run, dir) => (run.repos ?? []).find((r) => dir.startsWith(`${r}${path.sep}`)) ?? run.repo;
+
+function gateTargets(run, stage) {
+  if (stage.scope === 'handoff') return [run.handoffDir];
+  if (stage.checks.includes('commit')) return [run.campaignDir, run.handoffDir].filter(Boolean);
+  return [run.campaignDir];
+}
+
+async function gatesOn(run, stage, deps, dir) {
+  const repo = toWorktree(run.worktrees, dir ? repoFor(run, dir) : run.repo);
+  return deps.runGates(stage.checks, {
+    repo, campaignDir: toWorktree(run.worktrees, dir), isolated: isInWorktree(run.worktrees, repo),
+    key: run.key, flowId: run.flow, files: run.files ?? [], planTitle: planTitle(run),
+  });
+}
+
 async function runGateStage(run, stage, deps) {
   const round = roundOf(run, stage.id);
   const started = deps.now();
-  const repo = toWorktree(run.worktrees, run.repo);
-  const result = await deps.runGates(stage.checks, {
-    repo, campaignDir: toWorktree(run.worktrees, run.campaignDir), isolated: isInWorktree(run.worktrees, repo),
-    key: run.key, flowId: run.flow, files: run.files ?? [], planTitle: planTitle(run),
-  });
+  const parts = [];
+  for (const dir of gateTargets(run, stage)) {
+    parts.push(await gatesOn(run, stage, deps, dir));
+    if (parts.at(-1).error) break;
+  }
+  const result = { pass: parts.every((p) => p.pass), error: parts.find((p) => p.error)?.error ?? null, results: parts.flatMap((p) => p.results) };
   writeArtifact(run, `${stage.id}-r${round}.json`, result);
   const failed = result.results.filter((r) => r.status === 'fail');
   const receipt = {

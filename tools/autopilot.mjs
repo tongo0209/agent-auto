@@ -98,11 +98,12 @@ async function cmdRun(opts, argv) {
   if (holder) die(`${signals.campaignDir} đang bị ${holder.key}/${holder.runId} giữ — xong/abort run đó trước.`);
 
   const flow = loadFlow(decided.flow);
+  const repo = signals.repo ?? (signals.campaignDir ? repoOf(signals.campaignDir) : null);
   const now = new Date();
   const runId = newRunId(now);
   const run = createRun({
     key: signals.key ?? `ADHOC-${runId}`, runId, flow, routerReason: decided.reason,
-    repo: signals.repo ?? (signals.campaignDir ? repoOf(signals.campaignDir) : null), campaignDir: signals.campaignDir, now: now.getTime(),
+    repo, campaignDir: signals.campaignDir, handoffDir: signals.handoffDir, repos: [repo, ...signals.repos], now: now.getTime(),
   });
   if (opts['budget-usd']) run.budget.usd = Number(opts['budget-usd']);
   console.log(`▶ ${run.key} → ${flow.id} (${decided.reason})`);

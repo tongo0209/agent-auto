@@ -202,3 +202,60 @@ test('G0: write-sheet (ghi thật) tự bỏ qua khi chưa có AUTOPILOT_LAB_WRI
   delete process.env.AUTOPILOT_LAB_WRITES;
   assert.deepStrictEqual([gated.status, gated.stage], ['attached', 'write-sheet']);
 });
+
+test('G2: landing-fix có handoffDir → stage handoff + cổng bàn giao trên worktree gt, commit cả 2 repo', async () => {
+  const cdn = tmpGitRepo();
+  const gt = tmpGitRepo();
+  const flow = loadFlow('landing-fix');
+  const start = { ...newRun('landing-fix'), repo: cdn.repo, repos: [cdn.repo, gt.repo], campaignDir: path.join(cdn.repo, 'products/x/landing/a'), handoffDir: path.join(gt.repo, 'products/x/landing/a') };
+  const { runClaude, calls } = fakeClaude({});
+  const gates = fakeGates();
+  let run = await drive(start, flow, { now: () => Date.now(), notify: () => {}, runClaude, runGates: gates.runGates });
+  run = applyEvent(run, flow, { type: 'approve' }, Date.now());
+  run = await drive(run, flow, { now: () => Date.now(), notify: () => {}, runClaude, runGates: gates.runGates });
+  assert.ok(calls.some((c) => c.stageId === 'handoff'));
+  const handoffGate = gates.calls.find((c) => c.checks.includes('pm-gate-handoff'));
+  assert.deepStrictEqual(handoffGate.checks, ['pm-gate-handoff', 'check-promotion']);
+  assert.strictEqual(handoffGate.ctx.campaignDir, path.join(run.worktrees[gt.repo], 'products/x/landing/a'));
+  run = applyEvent(run, flow, { type: 'approve' }, Date.now());
+  run = await drive(run, flow, { now: () => Date.now(), notify: () => {}, runClaude, runGates: gates.runGates });
+  const commits = gates.calls.filter((c) => c.checks[0] === 'commit').map((c) => c.ctx.repo);
+  assert.deepStrictEqual(commits, [run.worktrees[cdn.repo], run.worktrees[gt.repo]]);
+});
+
+test('G2: không có handoffDir → bỏ handoff + cổng bàn giao', async () => {
+  const flow = loadFlow('landing-fix');
+  const { runClaude, calls } = fakeClaude({});
+  const gates = fakeGates();
+  let run = await drive(newRun('landing-fix'), flow, base({ runClaude, runGates: gates.runGates }));
+  run = applyEvent(run, flow, { type: 'approve' }, Date.now());
+  run = await drive(run, flow, base({ runClaude, runGates: gates.runGates }));
+  assert.strictEqual(run.stage, 'approve-result');
+  assert.ok(!calls.some((c) => c.stageId === 'handoff'));
+  assert.ok(!gates.calls.some((c) => c.checks.includes('pm-gate-handoff')));
+});
+
+test('G2: buglist chạy pm-gate khi diff chạm pm__, ui-check khi chạm file giao diện', async () => {
+  const { repo } = tmpGitRepo();
+  fs.writeFileSync(path.join(repo, 'products/x/landing/a/index.html'), '<a class="pm__login"></a>');
+  const flow = loadFlow('buglist');
+  const start = { ...newRun('buglist'), repo, repos: [repo], campaignDir: path.join(repo, 'products/x/landing/a') };
+  const { runClaude, calls } = fakeClaude({ lanes: [{ result: verdict('pass', { files: ['products/x/landing/a/index.html'] }) }] });
+  const gates = fakeGates();
+  const wtWrite = async (opts) => {
+    if (opts.stageId === 'lanes') fs.writeFileSync(path.join(opts.cwd, 'products/x/landing/a/index.html'), '<a class="pm__login x"></a>');
+    return runClaude(opts);
+  };
+  await drive(start, flow, { now: () => Date.now(), notify: () => {}, runClaude: wtWrite, runGates: gates.runGates });
+  assert.ok(gates.calls.some((c) => c.checks.join() === 'pm-gate'));
+  assert.ok(calls.some((c) => c.stageId === 'ui-check'));
+});
+
+test('G2: buglist diff không chạm pm__/giao diện → bỏ pm-gate + ui-check', async () => {
+  const flow = loadFlow('buglist');
+  const { runClaude, calls } = fakeClaude({ lanes: [{ result: verdict('pass', { files: ['src/api.js'] }) }] });
+  const gates = fakeGates();
+  await drive(newRun('buglist'), flow, base({ runClaude, runGates: gates.runGates }));
+  assert.ok(!gates.calls.some((c) => c.checks.join() === 'pm-gate'));
+  assert.ok(!calls.some((c) => c.stageId === 'ui-check'));
+});

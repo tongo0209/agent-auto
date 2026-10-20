@@ -137,3 +137,25 @@ test('commitMessage bỏ tiền tố (type): có sẵn trong tiêu đề plan', 
   const { commitMessage } = await import('./gates.mjs');
   assert.match(commitMessage('landing-fix', '(feat): NTH mã mây (GW-912)'), /^\(fix\): nth mã mây \(gw-912\)\n/);
 });
+
+function handoffFixture(html = '<div class="pm__login"></div>') {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-gt-'));
+  const campaignDir = path.join(repo, '688-TLBBVNG/event-62839');
+  fs.mkdirSync(path.join(campaignDir, 'mainsite'), { recursive: true });
+  if (html) fs.writeFileSync(path.join(campaignDir, 'mainsite/index.html'), html);
+  return { repo, campaignDir };
+}
+
+test('G2: pm-gate-handoff chạy pm-gate --baseline none trên mainsite/*.html', async () => {
+  const f = handoffFixture();
+  const { exec, calls } = fakeExec();
+  const r = await runGates(['pm-gate-handoff', 'check-promotion'], ctx(f, exec));
+  assert.strictEqual(r.pass, true);
+  assert.match(calls[0].line, /pm-gate\.mjs .*mainsite\/index\.html --baseline none$/);
+  assert.match(calls[1].line, /check-promotion\.mjs .*mainsite\/index\.html$/);
+});
+
+test('G2: chưa có mainsite/*.html → handoff checks skipped', async () => {
+  const r = await runGates(['pm-gate-handoff', 'check-promotion'], ctx(handoffFixture(null), fakeExec().exec));
+  assert.deepStrictEqual(r.results.map((x) => x.status), ['skipped', 'skipped']);
+});

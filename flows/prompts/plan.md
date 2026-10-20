@@ -1,8 +1,8 @@
 # Stage plan — {{KEY}} (luồng {{flow}}, vòng {{round}})
 
-Repo: `{{repo}}` · Campaign: `{{campaignDir}}` · Thư mục run: `{{runDir}}`
-
 Việc: lập kế hoạch thực thi cho ticket {{KEY}}. KHÔNG sửa code ở stage này.
+
+Repo: `{{repo}}` · Campaign: `{{campaignDir}}` · Thư mục run: `{{runDir}}`
 
 1. Đọc: `~/VNG/agent-auto/tasks/{{KEY}}/brief.md` (nếu có), design trong `~/VNG/agent-auto/designs/{{KEY}}/` (ưu tiên `coords.json`/spec đã bóc, chỉ mở ảnh khi cần), code hiện có trong campaign.
 2. Campaign có class `pm__` → làm theo cửa vào R-PM-11 (`node ~/VNG/agent-auto/tools/project-note.mjs path {{campaignDir}}`, đọc file dự án, gameplay đã khoá chưa). Chưa khoá và không suy được từ file dự án → `fail`, ghi câu hỏi vào blocking.

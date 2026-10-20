@@ -162,6 +162,8 @@ function cmdAbort(opts) {
   releaseCampaign(run);
   for (const [top, dir] of Object.entries(run.worktrees ?? {})) removeWorktree({ top, dir, branch: `autopilot/${run.key}-${run.runId}` });
   fs.rmSync(runDir(run.key, run.runId), { recursive: true, force: true });
+  const keyDir = path.dirname(runDir(run.key, run.runId));
+  if (!fs.readdirSync(keyDir).length) fs.rmdirSync(keyDir);
   console.log(`${run.key} đã huỷ và dọn sạch worktree, nhánh, thư mục run.`);
 }
 

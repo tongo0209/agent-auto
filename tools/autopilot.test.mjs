@@ -91,7 +91,7 @@ test('abort nhả campaign + dọn sạch: worktree, nhánh autopilot/*, thư m�
   const repo = path.resolve(campaign, '../../../..');
   assert.strictEqual(cli('abort', 'GW-7').code, 0);
   assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8')), {});
-  assert.strictEqual(fs.existsSync(path.join(runs, 'GW-7', runId)), false);
+  assert.strictEqual(fs.existsSync(path.join(runs, 'GW-7')), false, 'thư mục task rỗng cũng phải xoá');
   assert.strictEqual(spawnSync('git', ['-C', repo, 'branch', '--list', `autopilot/GW-7-${runId}`], { encoding: 'utf8' }).stdout.trim(), '');
   assert.doesNotMatch(spawnSync('git', ['-C', repo, 'worktree', 'list'], { encoding: 'utf8' }).stdout, /GW-7/);
 });

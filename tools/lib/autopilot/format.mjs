@@ -5,10 +5,12 @@ const minutes = (ms) => Math.round(ms / 60_000);
 const usd = (n) => Math.round(n * 100) / 100;
 
 export function stageCells(run, flow) {
-  return flow.stages.map((s) => {
+  const ranLater = (i) => flow.stages.slice(i + 1).some((s) => s.id === run.stage || run.receipts.some((r) => r.stage === s.id));
+  return flow.stages.map((s, i) => {
     const receipts = run.receipts.filter((r) => r.stage === s.id);
     const last = receipts.at(-1);
-    const state = s.id === run.stage ? CURRENT_STATE[run.status] : receipts.length ? 'done' : 'pending';
+    const passedPause = s.kind === 'pause' && ranLater(i);
+    const state = s.id === run.stage ? CURRENT_STATE[run.status] : receipts.length || passedPause ? 'done' : 'pending';
     return {
       id: s.id, kind: s.kind, state, rounds: receipts.length,
       max: s.loop?.max ?? null,

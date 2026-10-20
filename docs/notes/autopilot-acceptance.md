@@ -11,7 +11,7 @@ Spec: `docs/superpowers/specs/2026-10-20-autopilot-design.md` §13. Chạy bằn
 
 Vòng review có ích thật: plan-review vòng 1 của GW-912 bắt 3 lỗi mà plan bỏ sót. Đó là bẫy kit §6.2 (lib xoá `#rewardContainer` rồi đổ lại markup, nên chỗ code định ghi sẽ bị đè), nút x10 bị cứng `.off` nên không bấm được, và kỳ vọng verify x10 không làm được với mock đang có. Plan vòng 2 đã sửa cả 3.
 
-Trong lúc chạy không cần người trông. Run dừng đúng ở `approve-plan`, có noti macOS, statusline hiện `🤖 GW-912 giữ 2026-ma-may-khai-van +1` và trang `/autopilot` hiện plan, receipts cùng nút Duyệt/Trả về.
+Trong lúc chạy không cần người trông. Run dừng đúng ở `approve-plan`, có noti macOS, statusline hiện `🤖 GW-912 giữ 2026-ma-may-khai-van +1` và trang autopilot hiện plan, receipts cùng nút Duyệt/Trả về.
 
 ## So với baseline (`docs/notes/wall-baseline-2026-09-23.json`, 14 ngày)
 
@@ -38,5 +38,5 @@ Trong lúc chạy không cần người trông. Run dừng đúng ở `approve-p
 
 ## Việc tiếp
 
-- Duyệt hoặc trả về plan GW-912 và GW-882 ở `/autopilot`. Console 4747 cần khởi động lại để nạp route mới; server phụ đã kiểm ở cổng 4790.
+- Duyệt hoặc trả về plan GW-912 và GW-882 ở http://127.0.0.1:4800 (`node autopilot-ui/server.mjs`).
 - Sau khi chạy hết vòng, điền cột chi phí cả task + số vòng fix + bug QC lọt vào bảng trên.

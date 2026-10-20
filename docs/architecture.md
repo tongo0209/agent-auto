@@ -32,7 +32,8 @@ Các thư mục dữ liệu vẫn còn sau khi clone nhờ `.gitkeep`, chỉ là
 | `history/phases.jsonl` | 1 dòng mỗi lần phase đổi → nguồn lead time thật |
 | `knowledge/metrics.jsonl` | Console tự ghi 1 dòng/ngày/ticket, **đo từ git** |
 | `knowledge/lessons.md` | Bài học liên-dự-án; `fe-gate` fail thì tự append block nháp |
-| `console/` | Web local (webpack + jQuery + xterm) — README riêng ở trong. Trang `/autopilot` tự đứng ở `console/server/autopilot-page/` |
+| `console/` | Web local (webpack + jQuery + xterm) — README riêng ở trong |
+| `autopilot-ui/` | Server riêng cổng 4800 (http thuần, chỉ nghe 127.0.0.1) + trang theo dõi/duyệt run autopilot, không dính console |
 | `flows/` | Luồng autopilot khai báo bằng JSON (`landing-new`, `landing-fix`, `feature`, `buglist`) + `router.json` + `prompts/` cho từng stage |
 | `runs/<KEY>/<runId>/` | `run.json` + artifact từng stage (`plan.md`, `<stage>-rN.json`/`.log`) của autopilot. Không vào git |
 

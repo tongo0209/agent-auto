@@ -7,7 +7,7 @@ Giao tiếp với user **bằng tiếng Việt** — báo cáo, câu hỏi, tổ
 | Loại việc | Đường ray |
 |---|---|
 | Sửa vặt frontend (≤2 file, chỗ sửa đã rõ, không component/logic mới) | Làm THẲNG trong phiên — không qua skill, vẫn verify build thật |
-| Ticket mid/full muốn chạy nền, chỉ duyệt ở mốc | `node ~/VNG/agent-auto/tools/autopilot.mjs run <KEY>` — duyệt ở console `/autopilot`; việc ≤2 file vẫn làm thẳng |
+| Ticket mid/full muốn chạy nền, chỉ duyệt ở mốc | `node ~/VNG/agent-auto/tools/autopilot.mjs run <KEY>` — duyệt ở http://127.0.0.1:4800 (`node ~/VNG/agent-auto/autopilot-ui/server.mjs`); việc ≤2 file vẫn làm thẳng |
 | Có `.psd`/`.psb` chưa bóc (chưa có `_auto-export/<slug>/assets/`) | `/psd-cut` TRƯỚC — asset + toạ độ từ `coords.json`, KHÔNG cắt tay/`sips` |
 | Design là **Figma** (link `figma.com`) chưa bóc | `/figma-cut` TRƯỚC (KHÔNG phải `/psd-cut`) — toạ độ từ `coords.json`, text vùng data-bind lấy `textLive`. Token ở `~/.config/figma-cut/token` |
 | Có video phải "đọc" (feedback QC, animation, tutorial) | `/video-digest` TRƯỚC. CẤM ném frame thô vào model (1 clip 12 phút ≈ 34 triệu vision token) |

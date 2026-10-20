@@ -27,6 +27,11 @@ test('stageCells: stage đang dừng → stopped, đang chạy → running', () 
   assert.strictEqual(stageCells({ ...run, status: 'running', stage: 'review' }, flow)[1].state, 'running');
 });
 
+test('stageCells: mốc duyệt đã qua (stage sau đã chạy) → done', () => {
+  const past = { ...run, status: 'running', stage: 'commit', receipts: [...run.receipts, { stage: 'commit', round: 1, verdict: 'pass', blocking: 0, advisory: 0, turns: 0, costUsd: 0, ms: 1000 }] };
+  assert.strictEqual(stageCells(past, flow)[2].state, 'done');
+});
+
 test('totals cộng turns, phút, $', () => {
   assert.deepStrictEqual(totals(run), { runs: 3, turns: 112, minutes: 10, usd: 4.17 });
 });

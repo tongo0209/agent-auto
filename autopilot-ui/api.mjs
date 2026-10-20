@@ -1,10 +1,10 @@
 // View thuần cho trang /autopilot — đọc runs/ qua store của tools/lib/autopilot, không tự ghi run.json
 import fs from 'node:fs';
 import path from 'node:path';
-import { listRuns, runDir } from '../../../tools/lib/autopilot/store.mjs';
-import { loadFlow, listFlows } from '../../../tools/lib/autopilot/flows.mjs';
-import { stageOf } from '../../../tools/lib/autopilot/engine.mjs';
-import { stageCells, totals } from '../../../tools/lib/autopilot/format.mjs';
+import { listRuns, runDir } from '../tools/lib/autopilot/store.mjs';
+import { loadFlow, listFlows } from '../tools/lib/autopilot/flows.mjs';
+import { stageOf } from '../tools/lib/autopilot/engine.mjs';
+import { stageCells, totals } from '../tools/lib/autopilot/format.mjs';
 
 const STATUS_ORDER = ['paused', 'attached', 'running', 'stopped', 'done'];
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -15,7 +15,10 @@ function viewOf(run) {
   return {
     ...run,
     flowLabel: flow.label,
-    cells: stageCells(run, flow),
+    cells: stageCells(run, flow).map((c) => {
+      const stage = stageOf(flow, c.id);
+      return { ...c, next: stage.next ?? null, back: stage.loop?.back ?? null, side: stage.returnTo === 'caller' };
+    }),
     totals: totals(run),
     show: stageOf(flow, run.stage)?.show ?? [],
     command: stageOf(flow, run.stage)?.command ?? null,

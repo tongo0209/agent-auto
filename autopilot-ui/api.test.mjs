@@ -5,8 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-api-'));
-const { listView, artifactFile, listArtifacts, actionArgs } = await import('./autopilot-api.mjs');
-const { saveRun, writeArtifact } = await import('../../../tools/lib/autopilot/store.mjs');
+const { listView, artifactFile, listArtifacts, actionArgs } = await import('./api.mjs');
+const { saveRun, writeArtifact } = await import('../tools/lib/autopilot/store.mjs');
 
 const run = {
   key: 'GW-1', runId: '20261020-100000', flow: 'landing-fix', status: 'paused', stage: 'approve-plan', stopReason: null,
@@ -22,6 +22,8 @@ test('listView: chờ bạn xếp trước, có cells + totals + show của stag
   assert.deepStrictEqual(view.runs.map((r) => r.key), ['GW-1', 'GW-2']);
   const first = view.runs[0];
   assert.strictEqual(first.cells.find((c) => c.id === 'approve-plan').state, 'waiting');
+  assert.deepStrictEqual(first.cells.find((c) => c.id === 'gates'), { ...first.cells.find((c) => c.id === 'gates'), back: 'fix', side: false });
+  assert.strictEqual(first.cells.find((c) => c.id === 'fix').side, true);
   assert.deepStrictEqual(first.totals, { runs: 1, turns: 10, minutes: 1, usd: 1.5 });
   assert.deepStrictEqual(first.show, ['plan.md', 'plan-review-r*.json']);
   assert.ok(first.flowLabel.length > 0);

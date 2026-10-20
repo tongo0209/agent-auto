@@ -493,3 +493,30 @@ button.bd-box:hover { color: var(--ok); } button.bd-box:active { transform: scal
   .lc-fcnote { white-space: normal; }
   .lc-board { grid-auto-columns: 240px; }
 }
+
+.palette.previewing { width: min(1040px, calc(100vw - 32px)); max-height: 78dvh; overflow-y: auto; }
+.palette.previewing > input, .palette.previewing .flows, .palette.previewing > .foot { display: none; }
+.palette:not(.previewing) .preview { display: none; }
+.preview { padding: 16px 18px 14px; display: grid; gap: 12px; }
+.pv-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pv-head .btn { padding: 6px 10px; }
+.pv-head select { margin-left: auto; min-width: 240px; max-width: 100%; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: var(--r); padding: 7px 10px; }
+.pv-reason, .pv-empty { margin: 0; color: var(--text-2); font-size: 13px; }
+.pv-stages { display: flex; flex-wrap: wrap; gap: 8px; }
+.pv-cell { width: 112px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; text-align: center; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: var(--r); }
+.pv-cell b { font-size: 12px; line-height: 1.25; overflow-wrap: anywhere; }
+.pv-cell small { font-size: 11px; color: var(--text-3); font-family: var(--mono); }
+.pv-cell.gate, .pv-cell.pause { border-style: dashed; }
+.pv-cell.auto-skip, .pv-cell.off { opacity: .45; }
+.pv-cell.off b { text-decoration: line-through; }
+.pv-auto { font-family: var(--sans); }
+.pv-ctl { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px; }
+.pv-sw { position: relative; width: 30px; height: 18px; border-radius: 9px; background: var(--idle); border: 0; padding: 0; transition: background .2s; }
+.pv-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text); transition: transform .2s var(--ease); }
+.pv-sw.on { background: var(--ok); }
+.pv-sw.on::after { transform: translateX(12px); }
+.pv-pin { color: var(--text-3); padding: 2px; border-radius: 6px; line-height: 0; }
+.pv-pin.on { color: var(--stop); }
+.pv-lock { margin-top: auto; padding-top: 4px; }
+.palette .pv-why { width: 100%; background: var(--bg-2); border: 1px solid var(--stop); border-radius: var(--r); padding: 10px 12px; font-size: 14px; }
+.pv-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--text-3); }

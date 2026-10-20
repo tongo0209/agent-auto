@@ -1,4 +1,4 @@
-import { $, esc, toast } from '../lib.js';
+import { $, api, esc, toast } from '../lib.js';
 import { openTerminal, hasTab } from '../terminal.js';
 
 const money = (n) => `$${(n ?? 0).toFixed(2)}`;
@@ -37,6 +37,7 @@ let artifact = null;
 let lastStates = {};
 let lastSig = '';
 let flowChoice = 0;
+let preview = null;
 let runFiles = [];
 const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp', reviewed: 'đã review' };
 const ABORT_BTN = '<button class="btn ghost" data-act="abort">Huỷ run</button>';
@@ -394,18 +395,77 @@ function openPalette() {
   $('#veil').classList.add('show');
   setTimeout(() => $('#ticket').focus(), 50);
 }
-const closePalette = () => $('#veil').classList.remove('show');
-async function startRun(mode) {
-  const input = $('#ticket').value.trim();
-  if (!input) return toast('Nhập mã ticket hoặc link.', true);
-  const flow = [{ id: '' }, ...data.flows][flowChoice].id || undefined;
-  const out = mode === 'chat' ? await post('open', { input, flow }, 'Đã tạo worktree, mở tab Claude.') : await post('run', { input, flow });
-  if (!out) return;
+function closePalette() {
+  $('#veil').classList.remove('show');
+  backToInput();
+}
+function backToInput() {
+  preview = null;
+  $('#palette').classList.remove('previewing');
+  $('#ticket').focus();
+}
+function launched(mode, input, out) {
   $('#ticket').value = '';
   closePalette();
   if (mode === 'chat') openChatTab(out);
   selectedKey = mode === 'chat' ? out.key : input.match(/[A-Z][A-Z0-9]*-\d+/)?.[0] ?? selectedKey;
   setTimeout(() => { lastSig = ''; refresh(); }, mode === 'chat' ? 0 : 2500);
+}
+async function startRun(mode) {
+  const input = $('#ticket').value.trim();
+  if (!input) return toast('Nhập mã ticket hoặc link.', true);
+  const flow = [{ id: '' }, ...data.flows][flowChoice].id || undefined;
+  if (mode !== 'chat') return loadPreview(input, flow);
+  const out = await post('open', { input, flow }, 'Đã tạo worktree, mở tab Claude.');
+  if (out) launched('chat', input, out);
+}
+
+const AUTO_SKIP_HINT = 'tự bỏ nếu không đụng UI/pm';
+const isApproval = (s) => s.kind === 'pause' || s.kind === 'attached';
+const needsSkipReason = () => preview.stages.some((s) => preview.off.has(s.id) && s.gateLike);
+const canRunPreview = () => Boolean(preview.flow) && (!needsSkipReason() || preview.skipReason.trim() !== '');
+
+async function loadPreview(input, flow) {
+  try {
+    const query = new URLSearchParams({ input, ...(flow && { flow }) });
+    preview = { input, ...(await api(`autopilot/preview?${query}`)), off: new Set(), stops: new Set(), skipReason: '' };
+  } catch (e) {
+    return toast(`Không xem trước được: ${e.message}`, true);
+  }
+  renderPreview();
+}
+function previewCell(s) {
+  const off = preview.off.has(s.id);
+  const stop = preview.stops.has(s.id);
+  const controls = isApproval(s)
+    ? '<small class="pv-lock">mốc duyệt</small>'
+    : `<span class="pv-ctl"><button class="pv-sw ${off ? '' : 'on'}" data-pv="toggle" role="switch" aria-checked="${!off}" aria-label="Bật/tắt ${esc(s.id)}"></button><button class="pv-pin ${stop ? 'on' : ''}" data-pv="stop" aria-pressed="${stop}" title="Dừng sau bước này"><i class="ph-bold ph-map-pin"></i></button></span>`;
+  const hint = s.predicted === 'skip' && !off ? `<small class="pv-auto">${AUTO_SKIP_HINT}</small>` : '';
+  return `<div class="pv-cell ${s.kind} ${off ? 'off' : ''} ${s.predicted === 'skip' ? 'auto-skip' : ''}" data-id="${esc(s.id)}"><b>${esc(s.id)}</b><small>${s.gateLike ? 'cổng' : esc(s.kind)}</small>${hint}${controls}</div>`;
+}
+function renderPreview() {
+  const flows = preview.flow ? preview.flows : [{ id: '', label: '— chọn luồng —' }, ...preview.flows];
+  $('#palette').classList.add('previewing');
+  $('#preview').innerHTML = `
+    <div class="pv-head"><button class="btn ghost" data-pv="back"><i class="ph ph-arrow-left"></i></button><b>${esc(preview.input)}</b>
+      <select id="pvFlow" aria-label="Luồng">${flows.map((f) => `<option value="${esc(f.id)}" ${f.id === (preview.flow ?? '') ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}</select></div>
+    <p class="pv-reason">${esc(preview.reason)}</p>
+    <div class="pv-stages">${preview.stages.map(previewCell).join('') || '<p class="pv-empty">Chọn luồng để xem các bước.</p>'}</div>
+    ${needsSkipReason() ? `<input id="pvReason" class="pv-why" placeholder="Lý do tắt cổng (bắt buộc)" value="${esc(preview.skipReason)}" autocomplete="off">` : ''}
+    <div class="pv-foot"><span>Enter chạy · Esc đóng · 📍 dừng sau bước</span><button class="btn go" data-pv="run" ${canRunPreview() ? '' : 'disabled'}>Chạy <kbd>↵</kbd></button></div>`;
+}
+async function runPreview() {
+  const { input, flow, off, stops, skipReason } = preview;
+  const out = await post('run', { input, flow, skip: [...off], skipReason, breaks: [...stops] });
+  if (out) launched('run', input, out);
+}
+function onPreviewClick(action, stageId) {
+  if (action === 'back') return backToInput();
+  if (action === 'run') return runPreview();
+  const set = action === 'toggle' ? preview.off : preview.stops;
+  set.has(stageId) ? set.delete(stageId) : set.add(stageId);
+  renderPreview();
+  if (action === 'toggle' && needsSkipReason() && !preview.skipReason) $('#pvReason').focus();
 }
 
 
@@ -433,10 +493,11 @@ const MARKUP = `
 </div>
 
 <div class="veil" id="veil">
-  <div class="palette" role="dialog" aria-label="Chạy ticket mới">
+  <div class="palette" id="palette" role="dialog" aria-label="Chạy ticket mới">
     <input id="ticket" placeholder="GW-123 hoặc link sheet / Jira" autocomplete="off">
     <div class="flows" id="flows"></div>
-    <div class="foot"><span>↑↓ chọn luồng · Esc đóng</span><span class="modes"><button class="btn ghost" data-mode="auto" title="Chạy các bước bằng claude -p tới mốc cần bạn">Chạy tự động <kbd>⌘↵</kbd></button><button class="btn go" data-mode="chat" title="Tạo worktree rồi mở một tab Claude để làm cùng bạn">Mở tab chat <kbd>↵</kbd></button></span></div>
+    <div class="preview" id="preview"></div>
+    <div class="foot"><span>↑↓ chọn luồng · Esc đóng</span><span class="modes"><button class="btn ghost" data-mode="auto" title="Xem các bước, chỉnh rồi chạy bằng claude -p tới mốc cần bạn">Xem trước &amp; chạy <kbd>↵</kbd></button><button class="btn go" data-mode="chat" title="Tạo worktree rồi mở một tab Claude để làm cùng bạn">Mở tab chat</button></span></div>
   </div>
 </div>`;
 
@@ -496,8 +557,18 @@ export function mount(el) {
     if (e.target.id === 'veil') return closePalette();
     const mode = e.target.closest('[data-mode]');
     if (mode) return startRun(mode.dataset.mode);
+    const pv = e.target.closest('[data-pv]');
+    if (pv) return onPreviewClick(pv.dataset.pv, pv.closest('.pv-cell')?.dataset.id);
     const opt = e.target.closest('.flowopt');
     if (opt) { flowChoice = Number(opt.dataset.i); renderFlows(); $('#ticket').focus(); }
+  });
+  $('#preview').addEventListener('change', (e) => {
+    if (e.target.id === 'pvFlow') loadPreview(preview.input, e.target.value || undefined);
+  });
+  $('#preview').addEventListener('input', (e) => {
+    if (e.target.id !== 'pvReason') return;
+    preview.skipReason = e.target.value;
+    $('[data-pv="run"]').disabled = !canRunPreview();
   });
   const onKey = (e) => {
     const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
@@ -505,9 +576,13 @@ export function mount(el) {
     if ($('#veil').classList.contains('show')) {
       const total = data.flows.length + 1;
       if (e.key === 'Escape') closePalette();
+      if (preview) {
+        if (e.key === 'Enter' && document.activeElement.tagName !== 'BUTTON' && canRunPreview()) runPreview();
+        return;
+      }
       if (e.key === 'ArrowDown') { flowChoice = (flowChoice + 1) % total; renderFlows(); e.preventDefault(); }
       if (e.key === 'ArrowUp') { flowChoice = (flowChoice + total - 1) % total; renderFlows(); e.preventDefault(); }
-      if (e.key === 'Enter') startRun(e.metaKey || e.ctrlKey ? 'auto' : 'chat');
+      if (e.key === 'Enter') startRun('auto');
       return;
     }
     if (typing || !$('#dock').classList.contains('show')) return;

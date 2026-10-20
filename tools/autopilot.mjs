@@ -83,6 +83,9 @@ async function cmdRun(opts, argv) {
   const decided = opts.flow ? { flow: opts.flow, reason: `chọn tay --flow ${opts.flow}` } : route(signals, loadRules());
   if (!decided.flow) die(`Không chọn được luồng: ${decided.reason}`);
 
+  const holder = signals.campaignDir && heldCampaigns()[signals.campaignDir];
+  if (holder) die(`${signals.campaignDir} đang bị ${holder.key}/${holder.runId} giữ — xong/abort run đó trước.`);
+
   const flow = loadFlow(decided.flow);
   const now = new Date();
   const runId = newRunId(now);

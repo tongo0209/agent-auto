@@ -95,3 +95,12 @@ test('route --validate báo 4 luồng hợp lệ', () => {
   assert.strictEqual(r.code, 0);
   assert.match(r.out, /4 luồng hợp lệ/);
 });
+
+test('run thứ 2 cùng campaign khi run trước còn giữ → từ chối, không ghi đè quyền giữ', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-10', '--flow', 'landing-fix', '--campaign', campaign);
+  const r = cli('run', 'GW-11', '--flow', 'landing-fix', '--campaign', campaign);
+  assert.strictEqual(r.code, 1);
+  assert.match(r.out, /GW-10/);
+  assert.deepStrictEqual(Object.values(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8'))).map((o) => o.key), ['GW-10']);
+});

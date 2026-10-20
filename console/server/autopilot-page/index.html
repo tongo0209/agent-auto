@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autopilot</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --line: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --done: #2ea043; --running: #1f6feb; --waiting: #d29922; --stopped: #da3633; --skipped: #6e7681;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; gap: 12px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0 auto 0 0; }
+  main { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 57px); }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  input, select, textarea, button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+  button { cursor: pointer; }
+  button.primary { background: var(--done); border-color: var(--done); }
+  button.danger { border-color: var(--stopped); color: #ffa198; }
+  button:disabled { opacity: .5; cursor: default; }
+  .list { border-right: 1px solid var(--line); overflow-y: auto; }
+  .run { padding: 12px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .run:hover, .run.active { background: var(--panel); }
+  .run b { margin-right: 6px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .badge { display: inline-block; padding: 0 8px; border-radius: 10px; font-size: 12px; border: 1px solid currentColor; }
+  .s-paused, .s-attached { color: var(--waiting); } .s-running { color: #58a6ff; } .s-stopped { color: #ffa198; } .s-done { color: #56d364; }
+  .detail { padding: 20px; overflow-x: hidden; }
+  .stages { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0; }
+  .cell { min-width: 108px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); font-size: 12px; }
+  .cell .name { font-weight: 600; font-size: 13px; }
+  .cell.done { background: color-mix(in srgb, var(--done) 25%, transparent); border-color: var(--done); }
+  .cell.running { background: color-mix(in srgb, var(--running) 30%, transparent); border-color: var(--running); }
+  .cell.waiting { background: color-mix(in srgb, var(--waiting) 25%, transparent); border-color: var(--waiting); }
+  .cell.stopped { background: color-mix(in srgb, var(--stopped) 25%, transparent); border-color: var(--stopped); }
+  .cell.pending { border-style: dashed; color: var(--muted); }
+  .decide { background: var(--panel); border: 1px solid var(--waiting); border-radius: 8px; padding: 14px; margin: 16px 0; }
+  .decide textarea { width: 100%; min-height: 60px; margin: 8px 0; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tfoot td { font-weight: 600; }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 20px; }
+  .tabs button.on { border-color: #58a6ff; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; white-space: pre-wrap; word-break: break-word; max-height: 60vh; overflow: auto; font-size: 12px; }
+  .empty { color: var(--muted); padding: 40px 20px; text-align: center; }
+  .toast { position: fixed; right: 16px; bottom: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; max-width: 360px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🤖 Autopilot</h1>
+  <input id="input" placeholder="GW-123 hoặc link" size="18">
+  <select id="flow"><option value="">Router tự chọn luồng</option></select>
+  <button id="start" class="primary">Chạy</button>
+</header>
+<main>
+  <div class="list" id="list"></div>
+  <div class="detail" id="detail"><div class="empty">Chọn một run bên trái.</div></div>
+</main>
+<div class="toast" id="toast" hidden></div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const STATUS_TEXT = { paused: 'chờ bạn duyệt', attached: 'chờ chạy trong phiên', running: 'đang chạy', stopped: 'đã dừng', done: 'xong' };
+const minutes = (ms) => Math.round(ms / 60000);
+const globToRegex = (glob) => new RegExp('^' + glob.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$');
+
+let state = { runs: [], flows: [] };
+let selected = null;
+let artifact = null;
+
+function toast(text) {
+  $('toast').textContent = text;
+  $('toast').hidden = false;
+  setTimeout(() => ($('toast').hidden = true), 5000);
+}
+
+async function post(action, body) {
+  const res = await fetch(`/api/autopilot/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json();
+  toast(res.ok ? `Đã gửi ${action} — chạy nền, trang tự cập nhật.` : `Lỗi: ${data.error}`);
+  return res.ok;
+}
+
+function renderList() {
+  if (!state.runs.length) return ($('list').innerHTML = '<div class="empty">Chưa có run nào.</div>');
+  $('list').innerHTML = state.runs.map((r) => `
+    <div class="run ${selected === r.key ? 'active' : ''}" data-key="${esc(r.key)}">
+      <div><b>${esc(r.key)}</b><span class="badge s-${r.status}">${STATUS_TEXT[r.status]}</span></div>
+      <div class="muted">${esc(r.flowLabel)} · ${esc(r.stage ?? '—')} · $${r.totals.usd} · ${r.totals.minutes}′</div>
+    </div>`).join('');
+}
+
+function cellHtml(c) {
+  const rounds = c.max ? ` · vòng ${c.rounds}/${c.max + 1}` : c.rounds > 1 ? ` · ${c.rounds} lượt` : '';
+  const cost = c.usd ? ` · $${c.usd}` : '';
+  return `<div class="cell ${c.state}"><div class="name">${esc(c.id)}</div><div>${esc(c.verdict ?? c.state)}${rounds}${cost}</div></div>`;
+}
+
+function decideHtml(run) {
+  if (run.status === 'paused') return `
+    <div class="decide">
+      <b>Chờ bạn ở ${esc(run.stage)}</b> — xem các tab bên dưới rồi quyết.
+      ${run.rejectNote ? `<div class="muted">Lần trả về trước: ${esc(run.rejectNote)}</div>` : ''}
+      <textarea id="note" placeholder="Ghi chú (bắt buộc khi trả về): cần sửa gì…"></textarea>
+      <div class="row"><button class="primary" data-act="approve">Duyệt</button><button class="danger" data-act="reject">Trả về</button><button data-act="abort">Huỷ run</button></div>
+    </div>`;
+  if (run.status === 'attached') return `
+    <div class="decide"><b>Bước này chạy trong phiên Claude:</b> <code>${esc(run.command)}</code><br>Xong việc trong phiên thì bấm:
+      <div class="row" style="margin-top:8px"><button class="primary" data-act="approve">Đã xong, chạy tiếp</button><button data-act="abort">Huỷ run</button></div></div>`;
+  if (run.status === 'stopped') return `
+    <div class="decide"><b>Dừng: ${esc(run.stopReason)}</b>
+      <div class="row" style="margin-top:8px">${run.stopReason === 'aborted' ? '' : '<button class="primary" data-act="resume">Chạy tiếp</button>'}</div></div>`;
+  return '';
+}
+
+function receiptsHtml(run) {
+  if (!run.receipts.length) return '<div class="muted">Chưa có lượt nào.</div>';
+  const rows = run.receipts.map((r) => `<tr><td>${esc(r.stage)}</td><td>r${r.round}</td><td>${esc(r.verdict)}</td><td class="num">${r.blocking}</td><td class="num">${r.advisory}</td><td class="num">${r.turns}</td><td class="num">${minutes(r.ms)}</td><td class="num">$${(r.costUsd ?? 0).toFixed(2)}</td></tr>`).join('');
+  const t = run.totals;
+  return `<table><thead><tr><th>Stage</th><th>Vòng</th><th>Verdict</th><th class="num">Blocking</th><th class="num">Advisory</th><th class="num">Turns</th><th class="num">Phút</th><th class="num">$</th></tr></thead>
+    <tbody>${rows}</tbody><tfoot><tr><td colspan="5">${t.runs} lượt claude</td><td class="num">${t.turns}</td><td class="num">${t.minutes}</td><td class="num">$${t.usd}</td></tr></tfoot></table>
+    <div class="muted">Ngân sách: $${run.budget.usd} · ${run.budget.minutes} phút</div>`;
+}
+
+async function renderDetail() {
+  const run = state.runs.find((r) => r.key === selected);
+  if (!run) return ($('detail').innerHTML = '<div class="empty">Chọn một run bên trái.</div>');
+  const files = await (await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/artifacts`)).json();
+  const highlighted = files.filter((f) => run.show.some((g) => globToRegex(g).test(f)));
+  const ordered = [...highlighted, ...files.filter((f) => !highlighted.includes(f))];
+  if (!artifact || !files.includes(artifact)) artifact = ordered[0] ?? null;
+  const note = $('note')?.value ?? '';
+  $('detail').innerHTML = `
+    <div class="row"><h2 style="margin:0">${esc(run.key)}</h2><span class="badge s-${run.status}">${STATUS_TEXT[run.status]}</span></div>
+    <div class="muted">${esc(run.flowLabel)} · run ${esc(run.runId)} · ${esc(run.campaignDir ?? 'chưa có campaign')}</div>
+    <div class="muted">Vì sao luồng này: ${esc(run.routerReason)}</div>
+    ${run.blockedBy?.length ? `<div class="muted">Chờ: ${run.blockedBy.map(esc).join(', ')}</div>` : ''}
+    <div class="stages">${run.cells.map(cellHtml).join('')}</div>
+    ${decideHtml(run)}
+    <h3>Receipts</h3>${receiptsHtml(run)}
+    <div class="tabs">${ordered.map((f) => `<button data-file="${esc(f)}" class="${f === artifact ? 'on' : ''}">${highlighted.includes(f) ? '★ ' : ''}${esc(f)}</button>`).join('')}</div>
+    <pre id="artifact">${artifact ? 'Đang tải…' : 'Chưa có artifact.'}</pre>`;
+  if ($('note')) $('note').value = note;
+  if (artifact) $('artifact').textContent = await (await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/artifacts/${encodeURIComponent(artifact)}`)).text();
+}
+
+async function refresh() {
+  state = await (await fetch('/api/autopilot/runs')).json();
+  if ($('flow').options.length === 1) $('flow').insertAdjacentHTML('beforeend', state.flows.map((f) => `<option value="${esc(f.id)}">${esc(f.label)}</option>`).join(''));
+  selected ??= state.runs[0]?.key ?? null;
+  renderList();
+  if (document.activeElement?.id !== 'note') await renderDetail();
+}
+
+$('list').addEventListener('click', (e) => {
+  const key = e.target.closest('.run')?.dataset.key;
+  if (!key) return;
+  selected = key;
+  artifact = null;
+  renderList();
+  renderDetail();
+});
+
+$('detail').addEventListener('click', async (e) => {
+  if (e.target.dataset.file) {
+    artifact = e.target.dataset.file;
+    return renderDetail();
+  }
+  const act = e.target.dataset.act;
+  if (!act) return;
+  const note = $('note')?.value.trim();
+  if (act === 'reject' && !note) return toast('Trả về cần ghi chú để stage sau biết sửa gì.');
+  e.target.disabled = true;
+  if (await post(act, { key: selected, note }) && $('note')) $('note').value = '';
+  setTimeout(refresh, 1500);
+});
+
+$('start').addEventListener('click', async () => {
+  const input = $('input').value.trim();
+  if (!input) return toast('Nhập mã ticket hoặc link.');
+  if (await post('run', { input, flow: $('flow').value || undefined })) $('input').value = '';
+  setTimeout(refresh, 2000);
+});
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

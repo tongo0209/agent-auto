@@ -56,6 +56,7 @@ app.use('/api', require('./routes/debt'));
 app.use('/api', require('./routes/bugs'));
 app.use('/api', require('./routes/queue'));
 app.use('/api', require('./routes/finish'));
+app.use('/', require('./routes/autopilot'));
 // Serve dist/ thật của ticket (ngoài /api vì đây là trang web, không phải JSON)
 app.use('/', require('./routes/preview'));
 

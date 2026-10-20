@@ -78,7 +78,7 @@ function activate(id) {
 }
 
 function addTab({ command, title } = {}) {
-  const tab = { id: `t-${Date.now().toString(36)}`, title: title ?? `zsh ${state.tabs.length + 1}` };
+  const tab = { id: `t-${Date.now().toString(36)}`, title: title ?? `claude ${state.tabs.length + 1}` };
   state.tabs.push(tab);
   connect(tab, { fresh: true, command });
   activate(tab.id);

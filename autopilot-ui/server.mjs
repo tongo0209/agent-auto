@@ -72,9 +72,10 @@ async function handleAutopilot(req, res, spawnCli) {
 export function createServer({ spawnCli = spawnDetached, allowWrites = process.env.AUTOPILOT_LAB_WRITES === '1' } = {}) {
   const app = express();
   app.use((req, res, next) => (LOCAL_HOST.test(req.headers.host ?? '') ? next() : send(res, 403, { error: 'host lạ' })));
+  // autopilot đi trước cổng chặn ghi: run chạy trong worktree, hook sandbox chặn ghi ra source gốc
+  app.use('/api/autopilot', (req, res) => handleAutopilot(req, res, spawnCli));
   app.use('/api', (req, res, next) =>
     allowWrites || req.method === 'GET' ? next() : send(res, 403, { error: 'Bản thử (agent-auto-lab) chặn ghi dữ liệu thật. Chạy với AUTOPILOT_LAB_WRITES=1 nếu thật sự muốn ghi.' }));
-  app.use('/api/autopilot', (req, res) => handleAutopilot(req, res, spawnCli));
   app.use(express.json());
   for (const name of CONSOLE_ROUTES) app.use('/api', consoleRequire(`./routes/${name}`));
   app.use('/vendor/xterm', express.static(path.join(CONSOLE, 'node_modules/@xterm/xterm/lib')), express.static(path.join(CONSOLE, 'node_modules/@xterm/xterm/css')));

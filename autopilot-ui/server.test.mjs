@@ -60,15 +60,15 @@ test('artifact không có → 404', async () => {
   assert.strictEqual((await fetch(`${base}/api/autopilot/runs/GW-1/r1/artifacts/x.md`)).status, 404);
 });
 
-test('bản thử mặc định chặn mọi lệnh ghi, kể cả autopilot', async () => {
+test('bản thử: nút autopilot chạy được (run nằm trong worktree + sandbox), lệnh ghi của console vẫn chặn', async () => {
   const lab = createServer({ spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
   await new Promise((r) => lab.listen(0, '127.0.0.1', r));
   const url = `http://127.0.0.1:${lab.address().port}`;
   const before = spawned.length;
   const post = (p) => fetch(`${url}${p}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"key":"GW-1"}' });
-  assert.strictEqual((await post('/api/autopilot/approve')).status, 403);
+  assert.notStrictEqual((await post('/api/autopilot/approve')).status, 403);
   assert.strictEqual((await post('/api/board/check')).status, 403);
   assert.strictEqual((await fetch(`${url}/api/state`)).status, 200);
-  assert.strictEqual(spawned.length, before);
+  assert.strictEqual(spawned.length, before + 1);
   lab.close();
 });

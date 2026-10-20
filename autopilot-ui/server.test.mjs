@@ -39,11 +39,13 @@ test('GET /api/autopilot/runs trả JSON danh sách', async () => {
   assert.strictEqual(data.flows.length, listFlows().length);
 });
 
-test('POST approve gọi CLI; reject thiếu note → 400', async () => {
+test('POST approve/pause gọi CLI; reject thiếu note → 400', async () => {
   const post = (action, body) => fetch(`${base}/api/autopilot/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   assert.strictEqual((await post('approve', { key: 'GW-1' })).status, 200);
   assert.deepStrictEqual(spawned.at(-1), ['approve', 'GW-1']);
   assert.strictEqual((await post('reject', { key: 'GW-1' })).status, 400);
+  assert.strictEqual((await post('pause', { key: 'GW-1' })).status, 200);
+  assert.deepStrictEqual(spawned.at(-1), ['pause', 'GW-1']);
 });
 
 test('Host lạ (DNS rebinding) → 403', async () => {

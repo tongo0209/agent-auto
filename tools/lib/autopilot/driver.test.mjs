@@ -7,9 +7,9 @@ import { spawnSync } from 'node:child_process';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-drive-'));
 const { drive } = await import('./driver.mjs');
-const { createRun, applyEvent } = await import('./engine.mjs');
+const { createRun, applyEvent, resumeRun } = await import('./engine.mjs');
 const { loadFlow } = await import('./flows.mjs');
-const { runDir, loadRun, saveRun } = await import('./store.mjs');
+const { runDir, loadRun, saveRun, pauseFile } = await import('./store.mjs');
 const { holdCampaign, heldCampaigns } = await import('./lock.mjs');
 
 const verdict = (v, extra = {}) => '```autopilot-verdict\n' + JSON.stringify({ verdict: v, ...extra }) + '\n```';
@@ -328,4 +328,28 @@ test('G9: buglist không có bản bàn giao → bỏ drift-check', async () => 
   const { runClaude, calls } = fakeClaude({});
   await drive(newRun('buglist'), loadFlow('buglist'), base({ runClaude, runGates: fakeGates().runGates }));
   assert.strictEqual(calls[0].stageId, 'intake-triage');
+});
+
+test('pause: marker đặt giữa stage → chạy xong stage đó rồi dừng paused; resume chạy tiếp stage kế, budget giữ nguyên', async () => {
+  const flow = loadFlow('landing-fix');
+  const start = newRun('landing-fix');
+  const pausing = fakeClaude({});
+  const runClaude = async (opts) => {
+    if (opts.stageId === 'plan') {
+      fs.mkdirSync(runDir(start.key, start.runId), { recursive: true });
+      fs.writeFileSync(pauseFile(start.key, start.runId), '');
+    }
+    return pausing.runClaude(opts);
+  };
+  let run = await drive(start, flow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.deepStrictEqual([run.status, run.stopReason, run.stage], ['stopped', 'paused', 'plan-review']);
+  assert.deepStrictEqual(pausing.calls.map((c) => c.stageId), ['plan']);
+  assert.strictEqual(fs.existsSync(pauseFile(start.key, start.runId)), false);
+  assert.deepStrictEqual(loadRun(start.key, start.runId).stopReason, 'paused');
+
+  const resumed = resumeRun(run);
+  assert.deepStrictEqual([resumed.budget, resumed.loops], [run.budget, run.loops]);
+  run = await drive(resumed, flow, base({ runClaude: pausing.runClaude, runGates: fakeGates().runGates }));
+  assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-plan']);
+  assert.deepStrictEqual(pausing.calls.map((c) => c.stageId), ['plan', 'plan-review']);
 });

@@ -6,6 +6,7 @@ import { loadFlow, listFlows } from '../tools/lib/autopilot/flows.mjs';
 import { stageOf } from '../tools/lib/autopilot/engine.mjs';
 import { stageCells, totals } from '../tools/lib/autopilot/format.mjs';
 import { tokensOf } from '../tools/lib/autopilot/claude-runner.mjs';
+import { isInterrupted } from '../tools/lib/autopilot/lock.mjs';
 
 const STATUS_ORDER = ['paused', 'attached', 'running', 'stopped', 'done'];
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -29,6 +30,7 @@ function viewOf(saved) {
   const flow = loadFlow(run.flow);
   return {
     ...run,
+    interrupted: isInterrupted(run),
     flowLabel: flow.label,
     cells: stageCells(run, flow).map((c) => {
       const stage = stageOf(flow, c.id);
@@ -50,7 +52,7 @@ export async function listView() {
 export function listArtifacts(key, runId) {
   if (!SAFE_SEGMENT.test(key) || !SAFE_SEGMENT.test(runId)) return [];
   const dir = runDir(key, runId);
-  return fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f !== 'run.json').sort() : [];
+  return fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f !== 'run.json' && !f.startsWith('.')).sort() : [];
 }
 
 export function artifactFile(key, runId, name) {
@@ -65,7 +67,7 @@ export function actionArgs(action, { key, note, input, flow } = {}) {
     if (flow && !listFlows().includes(flow)) throw new Error('flow không có');
     return ['run', input, ...(flow ? ['--flow', flow] : [])];
   }
-  if (!['approve', 'reject', 'resume', 'abort'].includes(action)) throw new Error(`action lạ: ${action}`);
+  if (!['approve', 'reject', 'pause', 'resume', 'abort'].includes(action)) throw new Error(`action lạ: ${action}`);
   if (!KEY.test(key ?? '')) throw new Error('key không hợp lệ');
   if (action === 'reject' && !note?.trim()) throw new Error('reject cần note');
   return [action, key, ...(note?.trim() ? ['--note', note.trim()] : [])];

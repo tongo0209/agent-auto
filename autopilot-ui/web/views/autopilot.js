@@ -6,9 +6,13 @@ const globRe = (g) => new RegExp('^' + g.split('*').map((p) => p.replace(/[.+?^$
 
 const STATUS = { paused: 'Chờ bạn duyệt', attached: 'Chờ chạy trong phiên', running: 'Đang chạy', stopped: 'Đã dừng', done: 'Xong' };
 const isAborted = (r) => r.stopReason === 'aborted';
+const isUserPaused = (r) => r.stopReason === 'paused';
+const statusClass = (r) => (r.interrupted ? 'interrupted' : r.status);
+const statusLabel = (r) => (r.interrupted ? 'Bị ngắt' : isUserPaused(r) ? 'Tạm dừng' : STATUS[r.status]);
 const GROUPS = [
   ['need', 'Cần bạn', (r) => ['paused', 'attached'].includes(r.status)],
-  ['run', 'Đang chạy', (r) => r.status === 'running'],
+  ['broken', 'Bị ngắt', (r) => r.interrupted],
+  ['run', 'Đang chạy', (r) => r.status === 'running' && !r.interrupted],
   ['stop', 'Đã dừng', (r) => r.status === 'stopped' && !isAborted(r)],
   ['done', 'Xong', (r) => r.status === 'done'],
   ['aborted', 'Đã huỷ', isAborted],
@@ -31,11 +35,11 @@ let runFiles = [];
 const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ', resume: 'chạy tiếp' };
 
 
-async function post(action, body) {
+async function post(action, body, sentMessage = 'Đã gửi. Autopilot chạy nền, trang tự cập nhật.') {
   try {
     const res = await fetch(`/api/autopilot/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const out = await res.json();
-    toast(res.ok ? 'Đã gửi. Autopilot chạy nền, trang tự cập nhật.' : `Không gửi được: ${out.error}`, !res.ok);
+    toast(res.ok ? sentMessage : `Không gửi được: ${out.error}`, !res.ok);
     return res.ok;
   } catch (e) {
     toast(`Không tới được server autopilot: ${e.message}`, true);
@@ -124,7 +128,7 @@ function drawWires(run) {
     paths.push(`<path class="wire loop ${used ? 'used' : ''}" d="${d}"/>`);
     if (run.stage === c.back && target?.side) live = { d: `M${from.x},${from.y} C${from.x},${(from.y + to.y) / 2} ${to.x},${(from.y + to.y) / 2} ${to.x},${to.y}`, wait: false };
   }
-  const packet = live && run.status !== 'stopped'
+  const packet = live && run.status !== 'stopped' && !run.interrupted
     ? `<circle r="4" class="packet ${live.wait ? 'wait' : ''}"><animateMotion dur="${live.wait ? '2.6s' : '1.1s'}" repeatCount="indefinite" path="${live.d}"/></circle>`
     : '';
   $('#wires').innerHTML = paths.join('') + packet;
@@ -183,7 +187,7 @@ async function renderLog(run) {
   const { file, lines } = await res.json();
   const stick = !pane.firstElementChild || pane.scrollHeight - pane.scrollTop - pane.clientHeight < 40;
   pane.innerHTML = `<div class="log">
-    <div class="log-h">${artifact === LIVE && run.status === 'running' ? '<span class="pulse"></span>' : ''}<code>${esc(file)}</code><span>${lines.length} sự kiện</span></div>
+    <div class="log-h">${artifact === LIVE && run.status === 'running' && !run.interrupted ? '<span class="pulse"></span>' : ''}<code>${esc(file)}</code><span>${lines.length} sự kiện</span></div>
     ${lines.map((l) => `<div class="ll ${l.kind}"><i class="ph ${LOG_ICON[l.kind]}"></i><span>${esc(l.text)}</span></div>`).join('')}
   </div>`;
   if (stick) pane.scrollTop = pane.scrollHeight;
@@ -222,7 +226,7 @@ async function renderMain() {
   $('#apMain').innerHTML = `
     <div class="top">
       <div>
-        <div class="head"><h1>${esc(run.key)}</h1><span class="state ${run.status}">${STATUS[run.status]}${run.stopReason ? ` · ${esc(run.stopReason)}` : ''}</span></div>
+        <div class="head"><h1>${esc(run.key)}</h1><span class="state ${statusClass(run)}">${statusLabel(run)}${run.stopReason && !isUserPaused(run) ? ` · ${esc(run.stopReason)}` : ''}</span>${run.status === 'running' && !run.interrupted ? '<button class="btn ghost" data-pause><i class="ph-bold ph-pause"></i>Tạm dừng</button>' : ''}</div>
         <div class="meta">${esc(run.flowLabel)}. Router chọn vì: ${esc(run.routerReason)}</div>
         <div class="meta"><code>${esc(run.campaignDir ?? 'chưa có campaign')}</code></div>
       </div>
@@ -262,12 +266,21 @@ function placeSideLane(run, lane) {
   if (Number.isFinite(callerIdx)) sideLane.style.paddingLeft = `${callerIdx * (92 + 44)}px`;
 }
 
+function dockMessage(run) {
+  const stage = `<b>${esc(run.stage ?? '')}</b>`;
+  if (run.interrupted) return `Run bị ngắt ở ${stage} (không còn process chạy). Chạy tiếp để làm lại bước này.`;
+  if (run.status === 'paused') return `Chờ bạn ở ${stage}. Duyệt để chạy tiếp, hoặc ghi chú rồi trả về.`;
+  if (run.status === 'attached') return `Chờ bạn ở ${stage}: chạy <code>${esc(run.command)}</code> trong phiên Claude.`;
+  if (isUserPaused(run)) return `Đã tạm dừng trước ${stage}. Chạy tiếp khi bạn sẵn sàng.`;
+  return `Run đã dừng <b>(${esc(run.stopReason)})</b>.`;
+}
+
 function renderDock(run) {
-  const show = run.status === 'paused' || run.status === 'attached' || run.status === 'stopped';
+  const show = ['paused', 'attached', 'stopped'].includes(run.status) || run.interrupted;
   $('#dock').classList.toggle('show', show);
   if (!show) return;
   const paused = run.status === 'paused';
-  $('#dockStage').textContent = run.status === 'stopped' ? `run đã dừng (${run.stopReason})` : run.status === 'attached' ? `${run.stage}: chạy ${run.command} trong phiên Claude` : run.stage;
+  $('#dockMessage').innerHTML = dockMessage(run);
   $('#note').style.display = paused ? '' : 'none';
   $('#prevNote').textContent = run.rejectNote ? `Lần trả về trước: ${run.rejectNote}` : '';
   $('#actions').innerHTML = paused
@@ -302,6 +315,13 @@ async function act(action) {
   $('#actions').innerHTML = `<span class="sending"><i class="ph-bold ph-circle-notch spin"></i>Đã gửi lệnh ${ACTION_LABEL[action]}, chờ autopilot nhận…</span>`;
   lastSig = '';
   setTimeout(refresh, 1500);
+}
+
+async function pauseRun(btn) {
+  const run = data.runs.find((r) => r.key === selectedKey);
+  btn.disabled = true;
+  if (await post('pause', { key: run.key }, `Sẽ dừng sau bước ${run.stage} đang chạy.`)) btn.innerHTML = '<i class="ph-bold ph-circle-notch spin"></i>Chờ dừng…';
+  else btn.disabled = false;
 }
 
 function renderFlows() {
@@ -343,7 +363,7 @@ const MARKUP = `
 <div class="dock" id="dock">
   <div class="dock-card">
     <div>
-      <label for="note">Chờ bạn ở <b id="dockStage"></b>. Duyệt để chạy tiếp, hoặc ghi chú rồi trả về.</label>
+      <label for="note" id="dockMessage"></label>
       <textarea id="note" placeholder="Ghi chú khi trả về: cần sửa gì..."></textarea>
       <div class="prev" id="prevNote"></div>
     </div>
@@ -382,6 +402,8 @@ export function mount(el) {
     return id === 'plan' && runFiles.includes('plan.md') ? 'plan.md' : rounds.at(-1);
   }
   $('#apMain').addEventListener('click', (e) => {
+    const pauseBtn = e.target.closest('[data-pause]');
+    if (pauseBtn) return pauseRun(pauseBtn);
     const node = e.target.closest('.node');
     if (node) {
       const file = stageFile(node.id.slice(2));

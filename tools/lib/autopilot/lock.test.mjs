@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-lock-'));
-const { acquire, release, holdCampaign, releaseCampaign, heldCampaigns } = await import('./lock.mjs');
+const { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted } = await import('./lock.mjs');
 
 const A = { key: 'GW-1', runId: 'r1' };
 const B = { key: 'GW-2', runId: 'r2' };
@@ -51,4 +51,17 @@ test('cùng owner nhưng PID khác còn sống → không chiếm (2 process cù
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, '.lock-run'), JSON.stringify({ pid: process.ppid, ...A }));
   assert.strictEqual(acquire('run', A).ok, false);
+});
+
+test('isInterrupted: run running mà không process nào giữ lock run của nó', () => {
+  const running = { ...A, status: 'running' };
+  assert.strictEqual(isInterrupted(running), true);
+  fs.writeFileSync(path.join(dir, '.lock-run'), JSON.stringify({ pid: 999999, ...A }));
+  assert.strictEqual(isInterrupted(running), true);
+  fs.writeFileSync(path.join(dir, '.lock-run'), JSON.stringify({ pid: process.pid, ...B }));
+  assert.strictEqual(isInterrupted(running), true);
+  fs.writeFileSync(path.join(dir, '.lock-run'), JSON.stringify({ pid: process.pid, ...A }));
+  assert.strictEqual(isInterrupted(running), false);
+  fs.rmSync(path.join(dir, '.lock-run'));
+  assert.strictEqual(isInterrupted({ ...A, status: 'paused' }), false);
 });

@@ -134,3 +134,43 @@ test('G5: design-intake không đụng repo — không tạo worktree, không gi
   const run = lastRun(runs, 'GW-12');
   assert.deepStrictEqual([run.stage, run.repo, run.campaignDir, run.worktrees], ['pm-block', null, null, {}]);
 });
+
+const lockRun = (runs, run, pid) => fs.writeFileSync(path.join(runs, '.lock-run'), JSON.stringify({ pid, key: run.key, runId: run.runId }));
+
+test('pause: chỉ nhận run đang chạy có process giữ; ghi .pause, không đụng run.json', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-6', '--flow', 'landing-fix', '--campaign', campaign);
+  const waiting = lastRun(runs, 'GW-6');
+  const runJson = path.join(runs, 'GW-6', waiting.runId, 'run.json');
+  const marker = path.join(runs, 'GW-6', waiting.runId, '.pause');
+  assert.strictEqual(cli('pause', 'GW-6').code, 1);
+
+  fs.writeFileSync(runJson, JSON.stringify({ ...waiting, status: 'running', stage: 'implement' }));
+  assert.match(cli('pause', 'GW-6').out, /bị ngắt/);
+  assert.strictEqual(fs.existsSync(marker), false);
+
+  lockRun(runs, waiting, process.pid);
+  const before = fs.readFileSync(runJson, 'utf8');
+  const r = cli('pause', 'GW-6');
+  assert.strictEqual(r.code, 0);
+  assert.match(r.out, /implement/);
+  assert.ok(fs.existsSync(marker));
+  assert.strictEqual(fs.readFileSync(runJson, 'utf8'), before);
+});
+
+test('pause rồi resume: dừng trước stage kế, resume chạy tiếp đúng stage, budget giữ nguyên', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-7', '--flow', 'landing-fix', '--campaign', campaign);
+  const waiting = lastRun(runs, 'GW-7');
+  fs.writeFileSync(path.join(runs, 'GW-7', waiting.runId, '.pause'), '');
+  cli('approve', 'GW-7');
+  const paused = lastRun(runs, 'GW-7');
+  assert.deepStrictEqual([paused.status, paused.stopReason, paused.stage], ['stopped', 'paused', 'implement']);
+  assert.match(cli('status').out, /stopped \(paused\)/);
+
+  cli('resume', 'GW-7');
+  const after = lastRun(runs, 'GW-7');
+  assert.strictEqual(after.receipts.at(paused.receipts.length).stage, 'implement');
+  assert.deepStrictEqual(after.budget, paused.budget);
+  assert.strictEqual(after.status, 'paused');
+});

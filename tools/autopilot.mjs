@@ -9,8 +9,8 @@ import { drive } from './lib/autopilot/driver.mjs';
 import { loadFlow, listFlows, validateFlow, PROMPTS_DIR } from './lib/autopilot/flows.mjs';
 import { gatherSignals } from './lib/autopilot/signals.mjs';
 import { route, loadRules } from './lib/autopilot/router.mjs';
-import { newRunId, loadRun, listRuns, saveRun, runsDir } from './lib/autopilot/store.mjs';
-import { acquire, release, holdCampaign, releaseCampaign, heldCampaigns } from './lib/autopilot/lock.mjs';
+import { newRunId, loadRun, listRuns, saveRun, runsDir, pauseFile } from './lib/autopilot/store.mjs';
+import { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted } from './lib/autopilot/lock.mjs';
 import { formatStatus } from './lib/autopilot/format.mjs';
 
 const AGENT_ROOT = path.resolve(import.meta.dirname, '..');
@@ -22,6 +22,7 @@ const USAGE = `Dùng:
   autopilot status [KEY]
   autopilot approve <KEY> [--note "…"]
   autopilot reject <KEY> --note "…"
+  autopilot pause <KEY>    (chạy xong bước hiện tại rồi dừng; resume để chạy tiếp)
   autopilot resume <KEY> [--budget-usd n] [--budget-minutes n]   (dừng vì budget mà không truyền → tự nới 1.5×)
   autopilot abort <KEY>
   autopilot route <KEY|link> | route --validate`;
@@ -132,6 +133,14 @@ async function cmdResume(opts) {
   await continueRun(kind === 'pause' ? { ...resumed, status: 'paused' } : resumed);
 }
 
+function cmdPause(opts) {
+  const run = mustLoad(opts._[1] ?? die(USAGE));
+  if (run.status !== 'running') die(`${run.key} đang ${run.status}, không có gì để tạm dừng.`);
+  if (isInterrupted(run)) die(`${run.key} đã bị ngắt (không còn process chạy) — dùng resume để chạy tiếp.`);
+  fs.writeFileSync(pauseFile(run.key, run.runId), '');
+  console.log(`${run.key} sẽ dừng sau bước ${run.stage} đang chạy.`);
+}
+
 function cmdAbort(opts) {
   const run = mustLoad(opts._[1] ?? die(USAGE));
   saveRun({ ...run, status: 'stopped', stopReason: 'aborted' });
@@ -169,6 +178,7 @@ const COMMANDS = {
   status: () => cmdStatus(opts),
   approve: () => cmdDecide(opts, 'approve'),
   reject: () => cmdDecide(opts, 'reject'),
+  pause: () => cmdPause(opts),
   resume: () => cmdResume(opts),
   abort: () => cmdAbort(opts),
   route: () => cmdRoute(opts),

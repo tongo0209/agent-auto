@@ -47,6 +47,7 @@ test('artifact: chỉ đọc file trong thư mục run, chặn path traversal', 
 
 test('actionArgs: dựng đúng lệnh CLI, chặn đầu vào xấu', () => {
   assert.deepStrictEqual(actionArgs('approve', { key: 'GW-1' }), ['approve', 'GW-1']);
+  assert.deepStrictEqual(actionArgs('pause', { key: 'GW-1' }), ['pause', 'GW-1']);
   assert.deepStrictEqual(actionArgs('reject', { key: 'GW-1', note: 'thêm tab' }), ['reject', 'GW-1', '--note', 'thêm tab']);
   assert.deepStrictEqual(actionArgs('run', { input: 'GW-9', flow: 'feature' }), ['run', 'GW-9', '--flow', 'feature']);
   assert.throws(() => actionArgs('reject', { key: 'GW-1' }), /note/);
@@ -74,4 +75,17 @@ test('liveLog: đọc .log mới nhất của run, đổi stream-json thành dò
   assert.strictEqual(liveLog('GW-1', '20261020-100000', 'plan.md'), null);
   assert.strictEqual(liveLog('../x', '1'), null);
   assert.strictEqual(liveLog('GW-2', '20261020-100000'), null);
+});
+
+test('listView: run running mà không process giữ lock → interrupted; run chờ duyệt thì không', async () => {
+  saveRun({ ...run, key: 'GW-4', status: 'running', stage: 'implement' });
+  const view = await listView();
+  assert.strictEqual(view.runs.find((r) => r.key === 'GW-4').interrupted, true);
+  assert.strictEqual(view.runs.find((r) => r.key === 'GW-1').interrupted, false);
+});
+
+test('listArtifacts: ẩn file đánh dấu .pause', () => {
+  writeArtifact({ ...run, key: 'GW-5' }, '.pause', '');
+  writeArtifact({ ...run, key: 'GW-5' }, 'plan.md', '# x');
+  assert.deepStrictEqual(listArtifacts('GW-5', run.runId), ['plan.md']);
 });

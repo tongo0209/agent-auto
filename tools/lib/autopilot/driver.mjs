@@ -4,7 +4,7 @@ import { nextAction, applyEvent, roundOf } from './engine.mjs';
 import { parseVerdict } from './verdict.mjs';
 import { renderPrompt } from './prompts.mjs';
 import { PROMPTS_DIR } from './flows.mjs';
-import { runDir, saveRun, loadRun, writeArtifact } from './store.mjs';
+import { runDir, saveRun, loadRun, writeArtifact, pauseFile } from './store.mjs';
 import { acquire, release, holdCampaign, heldCampaigns } from './lock.mjs';
 import { runClaude as realRunClaude, guardCode } from './claude-runner.mjs';
 import { runGates as realRunGates } from './gates.mjs';
@@ -191,6 +191,11 @@ export async function drive(startRun, flow, overrides = {}) {
       saveRun(run);
       announce(run, action.stage, deps);
       return run;
+    }
+    if (fs.existsSync(pauseFile(run.key, run.runId))) {
+      fs.rmSync(pauseFile(run.key, run.runId));
+      run = applyEvent(run, flow, { type: 'halt', reason: 'paused' }, deps.now());
+      continue;
     }
     const stage = action.stage;
     try {

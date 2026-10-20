@@ -30,6 +30,13 @@ export function release(name, owner) {
   if (holder && sameOwner(holder, owner)) fs.rmSync(lockFile(name));
 }
 
+// running trên đĩa mà không process nào còn giữ lock run của nó = bị tắt ngang
+export function isInterrupted(run) {
+  if (run.status !== 'running') return false;
+  const holder = readJson(lockFile('run'), null);
+  return !(holder && sameOwner(holder, run) && isAlive(holder.pid));
+}
+
 export const heldCampaigns = () => readJson(heldFile(), {});
 
 export function holdCampaign(campaignDir, owner) {

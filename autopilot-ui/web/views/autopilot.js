@@ -355,10 +355,10 @@ async function refresh() {
   const sig = JSON.stringify(next.runs);
   data = next;
   selectedKey ??= data.runs.find((r) => !isAborted(r))?.key ?? null;
-  if (sig === lastSig) return;
+  if (sig === lastSig || stageMenu || ['note', 'smText'].includes(document.activeElement?.id)) return;
   lastSig = sig;
   renderQueue();
-  if (!['note', 'smText'].includes(document.activeElement?.id)) await renderMain();
+  await renderMain();
 }
 
 // Huỷ xoá hẳn worktree + nhánh + thư mục run nên phải bấm 2 lần
@@ -419,7 +419,7 @@ function stageMenuItems(run, cell) {
   if (cell.id === run.stage) {
     if (retry) items.push({ type: 'retry', label: 'Chạy lại' });
     if (skip) items.push({ type: 'skip', label: 'Bỏ qua', ask: skip.needsReason ? 'reason' : null });
-    if (!isAborted(run)) items.push({ type: 'claude', label: 'Mở trong Claude' });
+    if (['stopped', 'paused'].includes(run.status)) items.push({ type: 'claude', label: 'Mở trong Claude' });
   }
   if (brk && (brk.stages.includes(cell.id) || cell.breakpoint)) items.push({ type: 'break', off: cell.breakpoint, label: cell.breakpoint ? 'Gỡ điểm dừng 📍' : 'Dừng sau bước này 📍' });
   return items;

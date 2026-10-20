@@ -112,10 +112,10 @@ test('thời gian chờ người duyệt không tính vào budget phút', () => 
   assert.deepStrictEqual([run.status, run.stage], ['running', 'implement']);
 });
 
-test('resume sau budget tự nới 1.5× giới hạn khi không truyền budget mới', () => {
+test('resume run cũ còn trần budget (trước khi bỏ giới hạn) → chạy tiếp không giới hạn', () => {
   const run = applyEvent(fresh(), FLOW, { type: 'pass', receipt: receipt('plan', 11) }, T0);
   const resumed = resumeRun(run);
-  assert.deepStrictEqual(resumed.budget, { usd: 15, minutes: 90 });
+  assert.deepStrictEqual(resumed.budget, {});
   assert.strictEqual(applyEvent(resumed, FLOW, { type: 'pass', receipt: receipt('plan-review') }, T0).status, 'paused');
 });
 

@@ -98,12 +98,9 @@ export function applyEvent(run, flow, event, now) {
   return next.status !== 'done' && next.status !== 'stopped' && overBudget(next) ? stop(next, 'budget') : next;
 }
 
-const BUDGET_BUMP = 1.5;
-
-function resumedBudget(run, { budgetUsd, budgetMinutes }) {
-  if (budgetUsd || budgetMinutes) return { ...run.budget, ...(budgetUsd && { usd: budgetUsd }), ...(budgetMinutes && { minutes: budgetMinutes }) };
-  if (run.stopReason !== 'budget') return run.budget;
-  return Object.fromEntries(Object.entries(run.budget).map(([k, v]) => [k, v * BUDGET_BUMP]));
+// Mặc định không giới hạn: run tạo trước khi bỏ trần vẫn mang budget cũ, chạy tiếp thì xoá
+function resumedBudget({ budgetUsd, budgetMinutes }) {
+  return { ...(budgetUsd && { usd: budgetUsd }), ...(budgetMinutes && { minutes: budgetMinutes }) };
 }
 
 export function resumeRun(run, overrides = {}) {
@@ -113,6 +110,6 @@ export function resumeRun(run, overrides = {}) {
     status: 'running',
     stopReason: null,
     loops: exhausted ? { ...run.loops, [exhausted]: 0 } : run.loops,
-    budget: resumedBudget(run, overrides),
+    budget: resumedBudget(overrides),
   };
 }

@@ -29,6 +29,13 @@ function fakeExec(codes = {}, porcelain = '') {
 
 const ctx = (f, exec, extra = {}) => ({ ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa tab quà.', exec, isolated: true, ...extra });
 
+test('landing chỉ có build-dev + build-pro → chạy build-pro (bản dev sinh sprite sau dist ⇒ dist-stale)', async () => {
+  const f = fixture({ scripts: { 'build-dev': 'x', 'build-pro': 'y' } });
+  const { exec, calls } = fakeExec();
+  await runGates(['build'], ctx(f, exec));
+  assert.match(calls[0].line, /npm run build-pro/);
+});
+
 test('build ưu tiên build-optimize', async () => {
   const f = fixture();
   const { exec, calls } = fakeExec();

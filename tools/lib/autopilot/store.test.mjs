@@ -40,3 +40,11 @@ test('writeArtifact ghi vào thư mục run', () => {
   assert.strictEqual(fs.readFileSync(p, 'utf8'), '# x');
   assert.strictEqual(path.dirname(p), runDir('GW-1', '20261020-090000'));
 });
+
+test('planOptions đọc phương án trong plan.md của run; chưa có file → []', async () => {
+  const { planOptions } = await import('./store.mjs');
+  const r = run('GW-1', '20261020-090000');
+  assert.deepStrictEqual(planOptions(r), []);
+  writeArtifact(r, 'plan.md', '## Phương án\n### A · Một\nx\n### B · Hai\ny\n');
+  assert.deepStrictEqual(planOptions(r).map((o) => [o.id, o.title, o.body]), [['A', 'Một', 'x'], ['B', 'Hai', 'y']]);
+});

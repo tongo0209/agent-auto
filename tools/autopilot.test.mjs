@@ -395,3 +395,125 @@ test('open --attach run chưa có: báo lỗi', () => {
   const { cli } = sandbox();
   assert.match(cli('open', 'GW-404', '--attach').out, /Chưa có run/);
 });
+
+test('route --json: landing-fix trả stages có gateLike, when + predicted; --flow ghi lý do chọn tay', () => {
+  const { cli, campaign } = sandbox();
+  const r = cli('route', 'GW-30', '--json', '--flow', 'landing-fix', '--campaign', campaign);
+  assert.strictEqual(r.code, 0, r.out);
+  const preview = JSON.parse(r.out);
+  assert.strictEqual(preview.flow, 'landing-fix');
+  assert.strictEqual(preview.reason, 'chọn tay --flow landing-fix');
+  assert.ok(preview.flows.some((f) => f.id === 'buglist' && f.label));
+  const byId = Object.fromEntries(preview.stages.map((s) => [s.id, s]));
+  assert.deepStrictEqual([byId.gates.gateLike, byId['ui-check'].gateLike, byId.plan.gateLike], [true, true, false]);
+  assert.deepStrictEqual([byId.plan.predicted, byId.handoff.when, byId.handoff.predicted], ['run', 'hasHandoff', 'skip']);
+});
+
+test('route --json khi router dừng hỏi → flow null kèm lý do, exit 0', () => {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-data-'));
+  fs.writeFileSync(path.join(data, 'state.json'), JSON.stringify({ issues: { 'GW-1': { phase: 'wait-test' }, 'GW-2': { parent: 'GW-1', phase: 'wait-test' } } }));
+  const r = spawnSync(process.execPath, [CLI, 'route', 'GW-2', '--json'], { env: { ...process.env, AUTOPILOT_DATA_ROOT: data }, encoding: 'utf8' });
+  assert.strictEqual(r.status, 0, r.stderr);
+  const preview = JSON.parse(r.stdout);
+  assert.strictEqual(preview.flow, null);
+  assert.match(preview.reason, /task con của GW-1/);
+});
+
+test('run --skip stage lạ / mốc duyệt / gate thiếu lý do → exit≠0, chưa tạo run', () => {
+  const { cli, campaign, runs } = sandbox();
+  const ghost = cli('run', 'GW-30', '--flow', 'landing-fix', '--campaign', campaign, '--skip', 'ghost');
+  assert.notStrictEqual(ghost.code, 0);
+  assert.match(ghost.out, /không có stage ghost trong luồng landing-fix/);
+  assert.match(cli('run', 'GW-30', '--flow', 'landing-fix', '--campaign', campaign, '--skip', 'approve-plan').out, /không tắt được mốc duyệt approve-plan/);
+  assert.notStrictEqual(cli('run', 'GW-30', '--flow', 'landing-fix', '--campaign', campaign, '--skip', 'gates').code, 0);
+  assert.notStrictEqual(cli('run', 'GW-30', '--flow', 'landing-fix', '--campaign', campaign, '--skip', 'gates', '--skip-reason', ' ').code, 0);
+  assert.match(cli('run', 'GW-30', '--flow', 'landing-fix', '--campaign', campaign, '--break', 'ghost').out, /không có stage ghost/);
+  assert.strictEqual(fs.existsSync(path.join(runs, 'GW-30')), false);
+});
+
+test('run --skip gates có lý do → bỏ gates; --break implement → dừng breakpoint, resume tới approve-result', () => {
+  const { cli, campaign, runs } = sandbox();
+  assert.strictEqual(cli('run', 'GW-31', '--flow', 'landing-fix', '--campaign', campaign, '--skip', 'gates', '--skip-reason', 'đã chạy tay', '--break', 'implement').code, 0);
+  assert.deepStrictEqual(lastRun(runs, 'GW-31').plan, { disabled: ['gates'], breakpoints: ['implement'], skipReason: 'đã chạy tay' });
+  cli('approve', 'GW-31');
+  const halted = lastRun(runs, 'GW-31');
+  assert.deepStrictEqual([halted.status, halted.stopReason], ['stopped', 'breakpoint:implement']);
+  cli('resume', 'GW-31');
+  const after = lastRun(runs, 'GW-31');
+  assert.deepStrictEqual([after.status, after.stage], ['paused', 'approve-result']);
+  assert.strictEqual(after.receipts.find((r) => r.stage === 'gates').verdict, 'skipped-by-user');
+});
+
+test('goto plan ở approve-plan cần --note; có note → plan chạy vòng 2 mang note', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-32', '--flow', 'landing-fix', '--campaign', campaign);
+  assert.notStrictEqual(cli('goto', 'GW-32', 'plan').code, 0);
+  assert.strictEqual(cli('goto', 'GW-32', 'plan', '--note', 'thêm tab').code, 0);
+  const run = lastRun(runs, 'GW-32');
+  assert.deepStrictEqual([run.status, run.stage, run.rejectNote], ['paused', 'approve-plan', 'thêm tab']);
+  assert.strictEqual(run.receipts.filter((r) => r.stage === 'plan').at(-1).round, 2);
+});
+
+test('goto stage chưa đi qua → exit≠0 "chưa đi qua"', () => {
+  const { cli, campaign } = sandbox();
+  cli('run', 'GW-33', '--flow', 'landing-fix', '--campaign', campaign);
+  const r = cli('goto', 'GW-33', 'approve-result', '--note', 'x');
+  assert.notStrictEqual(r.code, 0);
+  assert.match(r.out, /chưa đi qua/);
+});
+
+const stopAt = (runs, key, stage, stopReason) => {
+  const run = lastRun(runs, key);
+  fs.writeFileSync(path.join(runs, key, run.runId, 'run.json'), JSON.stringify({ ...run, status: 'stopped', stage, stopReason }));
+};
+
+test('skip gates sau khi gates fail: thiếu --reason → exit≠0; có → gateSkipped, chạy tiếp', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-34', '--flow', 'landing-fix', '--campaign', campaign);
+  cli('approve', 'GW-34');
+  stopAt(runs, 'GW-34', 'gates', 'loop-exhausted:gates');
+  assert.match(cli('skip', 'GW-34').out, /cần lý do/);
+  assert.strictEqual(cli('skip', 'GW-34', '--reason', 'build lỗi môi trường').code, 0);
+  const run = lastRun(runs, 'GW-34');
+  assert.deepStrictEqual(run.gateSkipped.map((g) => [g.stage, g.reason]), [['gates', 'build lỗi môi trường']]);
+  assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-result']);
+});
+
+test('pick B khi plan.md có A/B → choice B, chạy tới approve-result', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-35', '--flow', 'landing-fix', '--campaign', campaign);
+  assert.notStrictEqual(cli('pick', 'GW-35', 'B').code, 0, 'chưa có plan.md thì không có phương án');
+  fs.writeFileSync(path.join(runs, 'GW-35', lastRun(runs, 'GW-35').runId, 'plan.md'), '## Phương án\n### A · Một\nx\n### B · Hai\ny\n');
+  assert.strictEqual(cli('pick', 'GW-35', 'B', '--note', 'gọn hơn').code, 0);
+  const run = lastRun(runs, 'GW-35');
+  assert.deepStrictEqual(run.choice, { id: 'B', title: 'Hai', note: 'gọn hơn' });
+  assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-result']);
+});
+
+test('retry sau loop-exhausted:plan-review → chạy lại plan-review', () => {
+  const { cli, campaign, runs } = sandbox({ 'plan-review': [{ result: verdict('revise', { blocking: ['x'] }) }, { result: verdict('revise', { blocking: ['x'] }) }, { result: verdict('revise', { blocking: ['x'] }) }, { result: verdict('revise', { blocking: ['x'] }) }, { result: verdict('pass') }] });
+  cli('run', 'GW-36', '--flow', 'landing-fix', '--campaign', campaign);
+  const stopped = lastRun(runs, 'GW-36');
+  assert.strictEqual(stopped.stopReason, 'loop-exhausted:plan-review');
+  assert.strictEqual(cli('retry', 'GW-36').code, 0);
+  const run = lastRun(runs, 'GW-36');
+  assert.strictEqual(run.receipts.at(stopped.receipts.length).stage, 'plan-review');
+  assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-plan']);
+});
+
+test('break bật/tắt điểm dừng không chạy run; --off tắt; run done → từ chối', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-37', '--flow', 'landing-fix', '--campaign', campaign);
+  assert.strictEqual(cli('break', 'GW-37', 'code-review').code, 0);
+  assert.deepStrictEqual(lastRun(runs, 'GW-37').plan.breakpoints, ['code-review']);
+  assert.strictEqual(lastRun(runs, 'GW-37').stage, 'approve-plan');
+  cli('break', 'GW-37', 'code-review');
+  assert.deepStrictEqual(lastRun(runs, 'GW-37').plan.breakpoints, ['code-review']);
+  cli('break', 'GW-37', 'code-review', '--off');
+  assert.deepStrictEqual(lastRun(runs, 'GW-37').plan.breakpoints, []);
+  assert.match(cli('break', 'GW-37', 'ghost').out, /không có stage ghost/);
+  cli('approve', 'GW-37');
+  cli('approve', 'GW-37');
+  assert.strictEqual(lastRun(runs, 'GW-37').status, 'done');
+  assert.notStrictEqual(cli('break', 'GW-37', 'commit').code, 0);
+});

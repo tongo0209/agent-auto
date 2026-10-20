@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { createRun, applyEvent, resumeRun, reopenRun, finalApproval, stageOf, roundOf } from './lib/autopilot/engine.mjs';
+import { createRun, applyEvent, resumeRun, reopenRun, finalApproval, stageOf, roundOf, isGateLike, chooseAction } from './lib/autopilot/engine.mjs';
 import { drive, isolate, runGateStage, WHEN } from './lib/autopilot/driver.mjs';
 import { runGates } from './lib/autopilot/gates.mjs';
 import { briefOf, briefFile, chatLaunch, followupBriefOf, attachBriefOf, attachFile, attachLaunch } from './lib/autopilot/chat.mjs';
@@ -12,7 +12,7 @@ import { runChanges } from './lib/autopilot/review.mjs';
 import { loadFlow, listFlows, validateFlow, PROMPTS_DIR } from './lib/autopilot/flows.mjs';
 import { gatherSignals } from './lib/autopilot/signals.mjs';
 import { route, loadRules } from './lib/autopilot/router.mjs';
-import { newRunId, loadRun, listRuns, saveRun, runsDir, runDir, pauseFile, childFile, writeArtifact } from './lib/autopilot/store.mjs';
+import { newRunId, loadRun, listRuns, saveRun, runsDir, runDir, pauseFile, childFile, writeArtifact, planOptions } from './lib/autopilot/store.mjs';
 import { addWorktree, removeWorktree, branchOf } from './lib/autopilot/worktree.mjs';
 import { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted } from './lib/autopilot/lock.mjs';
 import { formatStatus } from './lib/autopilot/format.mjs';
@@ -22,7 +22,8 @@ const AGENT_ROOT = path.resolve(import.meta.dirname, '..');
 const MAIN_ROOT = path.join(os.homedir(), 'VNG', 'agent-auto');
 const DATA_ROOT = process.env.AUTOPILOT_DATA_ROOT || (fs.existsSync(path.join(AGENT_ROOT, 'state.json')) ? AGENT_ROOT : MAIN_ROOT);
 const USAGE = `Dùng:
-  autopilot run <KEY|link> [--flow id] [--campaign dir] [--budget-usd n] [--bg]
+  autopilot run <KEY|link> [--flow id] [--campaign dir] [--budget-usd n] [--bg] [--skip a,b] [--skip-reason "…"] [--break c,d]
+                                   (--skip tắt stage từ đầu, cổng cần --skip-reason; --break dừng sau stage đó)
   autopilot open <KEY|link> [--flow id] [--campaign dir]   (run chat: worktree + brief.md, in JSON để mở tab claude)
   autopilot open <KEY> --attach                             (tab claude cho run bất kỳ: run chat nối phiên mới nhất, run khác phiên mới với attach.md)
   autopilot mark <KEY> <bước> <doing|pass|fail|ask> [--note "…"]
@@ -36,7 +37,12 @@ const USAGE = `Dùng:
   autopilot pause <KEY>    (dừng ngay bước claude đang chạy; resume nối tiếp đúng phiên)
   autopilot resume <KEY> [--note "…"] [--budget-usd n] [--budget-minutes n]   (--note: nhắn vào bước bị dừng giữa chừng)
   autopilot abort <KEY>
-  autopilot route <KEY|link> | route --validate`;
+  autopilot retry <KEY> [--note "…"]         (run dừng: chạy lại đúng stage đang dừng)
+  autopilot goto <KEY> <stage> --note "…"    (quay về stage đã đi qua, chạy lại từ đó)
+  autopilot skip <KEY> [--reason "…"]        (run dừng: bỏ qua stage đang dừng; cổng bắt buộc --reason)
+  autopilot pick <KEY> <A|B|C> [--note "…"]  (ở approve-plan: chọn phương án trong plan.md rồi chạy tiếp)
+  autopilot break <KEY> <stage> [--off]      (bật/tắt điểm dừng sau stage; không chạy run)
+  autopilot route <KEY|link> [--json] [--flow id] | route --validate   (--json: xem trước luồng + stage, 1 dòng JSON)`;
 
 const STOP_DECISIONS = ['ask', 'manual'];
 
@@ -48,7 +54,7 @@ function describeDecision({ flow, target, reason, questions = [] }) {
 function parseArgs(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i++) {
-    if (['--bg', '--validate', '--attach', '--followup'].includes(argv[i])) opts[argv[i].slice(2)] = true;
+    if (['--bg', '--validate', '--attach', '--followup', '--json', '--off'].includes(argv[i])) opts[argv[i].slice(2)] = true;
     else if (argv[i].startsWith('--')) opts[argv[i].slice(2)] = argv[++i];
     else opts._.push(argv[i]);
   }
@@ -98,22 +104,43 @@ function startBackground(argv) {
   console.log(`Chạy nền PID ${child.pid} · log: ${log}`);
 }
 
+const decide = (opts, signals) => (opts.flow ? { flow: opts.flow, reason: `chọn tay --flow ${opts.flow}` } : route(signals, loadRules()));
+
+const listOpt = (value) => (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+
+function mustStage(flow, id) {
+  return stageOf(flow, id) ?? die(`không có stage ${id} trong luồng ${flow.id}`);
+}
+
+// Kiểm --skip/--break trước khi tạo run: mốc duyệt không tắt được, tắt cổng phải có lý do
+function planOf(opts, flow) {
+  const disabled = listOpt(opts.skip).map((id) => mustStage(flow, id));
+  const breakpoints = listOpt(opts.break).map((id) => mustStage(flow, id).id);
+  const approval = disabled.find((s) => ['pause', 'attached'].includes(s.kind));
+  if (approval) die(`không tắt được mốc duyệt ${approval.id}`);
+  const skipReason = opts['skip-reason']?.trim() || null;
+  const gate = disabled.find(isGateLike);
+  if (gate && !skipReason) die(`tắt cổng ${gate.id} cần --skip-reason "…"`);
+  return { disabled: disabled.map((s) => s.id), breakpoints, skipReason };
+}
+
 function newRun(opts, input) {
   const signals = gatherSignals({ input, agentRoot: DATA_ROOT, campaign: opts.campaign });
-  const decided = opts.flow ? { flow: opts.flow, reason: `chọn tay --flow ${opts.flow}` } : route(signals, loadRules());
+  const decided = decide(opts, signals);
   if (STOP_DECISIONS.includes(decided.flow)) die(describeDecision(decided));
 
   const holder = signals.campaignDir && heldCampaigns()[signals.campaignDir];
   if (holder) die(`${signals.campaignDir} đang bị ${holder.key}/${holder.runId} giữ — xong/abort run đó trước.`);
 
   const flow = loadFlow(decided.flow);
+  const plan = planOf(opts, flow);
   const target = flow.usesRepo === false ? { campaignDir: null, campaignDirs: [], handoffDir: null, repos: [] } : signals;
   const repo = flow.usesRepo === false ? null : signals.repo ?? (signals.campaignDir ? repoOf(signals.campaignDir) : null);
   const now = new Date();
   const runId = newRunId(now);
   const run = createRun({
     key: signals.key ?? `ADHOC-${runId}`, runId, flow, routerReason: decided.reason,
-    repo, campaignDir: target.campaignDir, campaignDirs: target.campaignDirs, handoffDir: target.handoffDir, cloneSource: signals.cloneSource, sheetUrl: signals.sheetUrl, sheetKind: signals.sheetKind, repos: [repo, ...target.repos], now: now.getTime(),
+    repo, campaignDir: target.campaignDir, campaignDirs: target.campaignDirs, handoffDir: target.handoffDir, cloneSource: signals.cloneSource, sheetUrl: signals.sheetUrl, sheetKind: signals.sheetKind, repos: [repo, ...target.repos], ...plan, now: now.getTime(),
   });
   return { run, flow, reason: decided.reason };
 }
@@ -260,6 +287,41 @@ async function cmdResume(opts) {
   await continueRun(kind === 'pause' ? { ...resumed, status: 'paused' } : resumed);
 }
 
+function mustChoose(run, flow, action) {
+  try {
+    return chooseAction(run, flow, action, { options: planOptions(run), now: Date.now() });
+  } catch (e) {
+    die(e.message);
+  }
+}
+
+// Lệnh lựa chọn trên pipeline: engine kiểm hợp lệ, CLI chỉ dịch cờ sang action
+async function cmdChoose(opts, type) {
+  const run = mustLoad(opts._[1] ?? die(USAGE));
+  const flow = loadFlow(run.flow);
+  const action = {
+    type,
+    note: opts.note,
+    ...(type === 'goto' && { stage: mustStage(flow, opts._[2] ?? die(USAGE)).id }),
+    ...(type === 'skip' && { reason: opts.reason }),
+    ...(type === 'pick' && { option: opts._[2] ?? die(USAGE) }),
+  };
+  if (type === 'goto' && !opts.note?.trim()) die('goto cần --note "…" để stage đó biết làm lại gì.');
+  const next = mustChoose(run, flow, action);
+  await continueRun(stageOf(flow, next.stage)?.kind === 'pause' ? { ...next, status: 'paused' } : next);
+}
+
+function cmdBreak(opts) {
+  const run = mustLoad(opts._[1] ?? die(USAGE));
+  const flow = loadFlow(run.flow);
+  const stage = mustStage(flow, opts._[2] ?? die(USAGE)).id;
+  const isOn = (run.plan?.breakpoints ?? []).includes(stage);
+  const wantOn = !opts.off;
+  const next = isOn === wantOn ? run : mustChoose(run, flow, { type: 'break', stage });
+  saveRun(next);
+  console.log(formatStatus(next, flow));
+}
+
 function cmdPause(opts) {
   const run = mustLoad(opts._[1] ?? die(USAGE));
   if (run.status !== 'running') die(`${run.key} đang ${run.status}, không có gì để tạm dừng.`);
@@ -305,6 +367,20 @@ function cmdStatus(opts) {
   if (held.length) console.log(`\nCampaign đang bị giữ:\n${held.map(([dir, o]) => `  ${o.key} → ${dir}`).join('\n')}`);
 }
 
+// when phụ thuộc file sẽ sửa thì chưa biết trước; chỉ hasHandoff đoán được từ tín hiệu
+const PREDICT = { hasHandoff: (signals) => (signals.handoffDir ? 'run' : 'skip') };
+
+function preview(signals, decided) {
+  const flows = listFlows().map((id) => ({ id, label: loadFlow(id).label }));
+  if (STOP_DECISIONS.includes(decided.flow)) return { flow: null, label: null, reason: decided.reason, flows, stages: [] };
+  const flow = loadFlow(decided.flow);
+  const stages = flow.stages.map((s) => ({
+    id: s.id, kind: s.kind, gateLike: isGateLike(s), when: s.when ?? null,
+    predicted: !s.when ? 'run' : PREDICT[s.when]?.(signals) ?? 'unknown',
+  }));
+  return { flow: flow.id, label: flow.label, reason: decided.reason, flows, stages };
+}
+
 function cmdRoute(opts) {
   if (opts.validate) {
     const problems = listFlows().flatMap((id) => validateFlow(loadFlow(id), { promptsDir: PROMPTS_DIR }).map((e) => `${id}: ${e}`));
@@ -312,6 +388,7 @@ function cmdRoute(opts) {
     return console.log(`${listFlows().length} luồng hợp lệ: ${listFlows().join(', ')}`);
   }
   const signals = gatherSignals({ input: opts._[1] ?? die(USAGE), agentRoot: DATA_ROOT, campaign: opts.campaign });
+  if (opts.json) return console.log(JSON.stringify(preview(signals, decide(opts, signals))));
   console.log(describeDecision(route(signals, loadRules())));
   console.log(JSON.stringify({ ...signals, briefText: signals.briefText.slice(0, 80) }, null, 2));
 }
@@ -332,5 +409,10 @@ const COMMANDS = {
   resume: () => cmdResume(opts),
   abort: () => cmdAbort(opts),
   route: () => cmdRoute(opts),
+  retry: () => cmdChoose(opts, 'retry'),
+  goto: () => cmdChoose(opts, 'goto'),
+  skip: () => cmdChoose(opts, 'skip'),
+  pick: () => cmdChoose(opts, 'pick'),
+  break: () => cmdBreak(opts),
 };
 await (COMMANDS[opts._[0]] ?? (() => die(USAGE)))();

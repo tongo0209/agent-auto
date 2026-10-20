@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { parseOptions } from './format.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
 
@@ -50,4 +51,9 @@ export function writeArtifact(run, name, content) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   return file;
+}
+
+export function planOptions(run) {
+  const file = path.join(runDir(run.key, run.runId), 'plan.md');
+  return fs.existsSync(file) ? parseOptions(fs.readFileSync(file, 'utf8')) : [];
 }

@@ -201,6 +201,9 @@ export function isolate(run, deps) {
   return { ...run, worktrees, bases };
 }
 
+// break ghi run.json không qua lock; plan trên đĩa thắng bản trong bộ nhớ để lần saveRun sau không xoá nó
+const withPlanOnDisk = (run) => ({ ...run, plan: loadRun(run.key, run.runId)?.plan ?? run.plan });
+
 export async function drive(startRun, flow, overrides = {}) {
   const deps = {
     now: Date.now, runClaude: realRunClaude, runGates: realRunGates, notify: realNotify, repoOf: () => null, addWorktree: realAddWorktree,
@@ -208,6 +211,7 @@ export async function drive(startRun, flow, overrides = {}) {
   };
   let run = { ...startRun };
   for (;;) {
+    run = withPlanOnDisk(run);
     const action = nextAction(run, flow);
     if (action.type === 'attached' && action.stage.realWrite && !labWritesOn()) {
       run = applyEvent(run, flow, { type: 'skip' }, deps.now());
@@ -248,6 +252,7 @@ export async function drive(startRun, flow, overrides = {}) {
     if (event.cutSession) fs.rmSync(pauseFile(run.key, run.runId), { force: true });
     const { cutSession, resumeNote, ...rest } = run;
     run = applyEvent(event.cutSession ? { ...rest, cutSession: event.cutSession } : rest, flow, event, deps.now());
+    run = withPlanOnDisk(run);
     if (['pass', 'skip'].includes(event.type) && run.status === 'running' && (run.plan?.breakpoints ?? []).includes(stage.id)) {
       run = applyEvent(run, flow, { type: 'halt', reason: `breakpoint:${stage.id}` }, deps.now());
     }

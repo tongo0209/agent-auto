@@ -26,6 +26,21 @@ export function createRun({ key, runId, flow, routerReason, repo, campaignDir, h
 
 export const isGateLike = (stage) => stage.kind === 'gate' || stage.id === 'ui-check';
 
+const APPROVAL_KINDS = ['pause', 'attached'];
+
+// Kiểm kế hoạch chạy trước khi tạo run; null = hợp lệ, chuỗi = lý do từ chối
+export function checkRunPlan(flow, { disabled = [], breakpoints = [], skipReason = null }) {
+  const unknown = [...disabled, ...breakpoints].find((id) => !stageOf(flow, id));
+  if (unknown) return `không có stage ${unknown} trong luồng ${flow.id}`;
+  const approvalOff = disabled.find((id) => APPROVAL_KINDS.includes(stageOf(flow, id).kind));
+  if (approvalOff) return `không tắt được mốc duyệt ${approvalOff}`;
+  const approvalBreak = breakpoints.find((id) => APPROVAL_KINDS.includes(stageOf(flow, id).kind));
+  if (approvalBreak) return `không đặt điểm dừng ở mốc duyệt ${approvalBreak}`;
+  const gate = disabled.find((id) => isGateLike(stageOf(flow, id)));
+  if (gate && !skipReason?.trim()) return `tắt cổng ${gate} cần lý do (--skip-reason)`;
+  return null;
+}
+
 export const stageOf = (flow, id) => flow.stages.find((s) => s.id === id);
 
 export const roundOf = (run, stageId) => run.receipts.filter((r) => r.stage === stageId).length + 1;
@@ -170,7 +185,11 @@ export function chooseAction(run, flow, action, { options = [], now } = {}) {
     throw new Error(run.status === 'running' ? `run đang chạy, chỉ đặt được điểm dừng (không làm được "${action.type}")` : `không làm được "${action.type}" ở trạng thái ${run.status}, stage ${run.stage}`);
   }
   const { cutSession, resumeNote, ...withoutCut } = run;
-  const resumed = { ...(['retry', 'goto'].includes(action.type) ? withoutCut : run), status: 'running', stopReason: null };
+  const resumed = {
+    ...(['retry', 'goto'].includes(action.type) ? withoutCut : run),
+    ...(run.status === 'stopped' && { budget: resumedBudget({}) }),
+    status: 'running', stopReason: null,
+  };
 
   switch (action.type) {
     case 'retry': {

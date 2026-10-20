@@ -512,3 +512,19 @@ test('goto sau dừng ngay: không nối cutSession cũ, chạy phiên mới', a
   assert.strictEqual(calls[0].stageId, 'implement');
   assert.ok(calls.every((c) => c.resumeSessionId !== 's-old' && !/bị dừng giữa chừng/.test(c.prompt)));
 });
+
+test('plan: điểm dừng ghi vào run.json trong lúc stage chạy → driver dừng đúng chỗ, không ghi đè', async () => {
+  const flow = loadFlow('landing-fix');
+  const start = atImplement(planned({}), flow);
+  const { runClaude: fake } = fakeClaude({});
+  const runClaude = async (opts) => {
+    if (opts.stageId === 'implement') {
+      const onDisk = loadRun(start.key, start.runId);
+      saveRun({ ...onDisk, plan: { ...onDisk.plan, breakpoints: ['code-review'] } });
+    }
+    return fake(opts);
+  };
+  const run = await drive(start, flow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.deepStrictEqual([run.status, run.stopReason], ['stopped', 'breakpoint:code-review']);
+  assert.deepStrictEqual(loadRun(start.key, start.runId).plan.breakpoints, ['code-review']);
+});

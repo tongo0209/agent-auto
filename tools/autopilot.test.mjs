@@ -516,4 +516,31 @@ test('break bật/tắt điểm dừng không chạy run; --off tắt; run done 
   cli('approve', 'GW-37');
   assert.strictEqual(lastRun(runs, 'GW-37').status, 'done');
   assert.notStrictEqual(cli('break', 'GW-37', 'commit').code, 0);
+  assert.notStrictEqual(cli('break', 'GW-37', 'commit', '--off').code, 0, 'run done: từ chối cả khi không đổi gì');
+});
+
+const overBudgetAt = (runs, key, stage) => {
+  const run = lastRun(runs, key);
+  fs.writeFileSync(path.join(runs, key, run.runId, 'run.json'), JSON.stringify({ ...run, status: 'stopped', stage, stopReason: 'budget', budget: { usd: -1 } }));
+};
+
+test('run dừng vì budget: skip/retry bỏ trần cũ, chạy tới mốc dừng kế', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-38', '--flow', 'landing-fix', '--campaign', campaign);
+  overBudgetAt(runs, 'GW-38', 'plan-review');
+  assert.strictEqual(cli('retry', 'GW-38').code, 0);
+  assert.deepStrictEqual([lastRun(runs, 'GW-38').status, lastRun(runs, 'GW-38').stage], ['paused', 'approve-plan']);
+  cli('approve', 'GW-38');
+  overBudgetAt(runs, 'GW-38', 'gates');
+  assert.strictEqual(cli('skip', 'GW-38', '--reason', 'x').code, 0);
+  assert.deepStrictEqual([lastRun(runs, 'GW-38').status, lastRun(runs, 'GW-38').stage], ['paused', 'approve-result']);
+});
+
+test('run --break mốc duyệt → từ chối; route --json --flow lạ → báo flow không có', () => {
+  const { cli, campaign, runs } = sandbox();
+  assert.match(cli('run', 'GW-39', '--flow', 'landing-fix', '--campaign', campaign, '--break', 'approve-plan').out, /mốc duyệt approve-plan/);
+  assert.strictEqual(fs.existsSync(path.join(runs, 'GW-39')), false);
+  const r = cli('route', 'GW-39', '--json', '--flow', 'ghost', '--campaign', campaign);
+  assert.notStrictEqual(r.code, 0);
+  assert.match(r.out, /flow không có: ghost/);
 });

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { createRun, applyEvent, resumeRun, reopenRun, finalApproval, stageOf, roundOf, isGateLike, chooseAction } from './lib/autopilot/engine.mjs';
+import { createRun, applyEvent, resumeRun, reopenRun, finalApproval, stageOf, roundOf, isGateLike, chooseAction, checkRunPlan } from './lib/autopilot/engine.mjs';
 import { drive, isolate, runGateStage, WHEN } from './lib/autopilot/driver.mjs';
 import { runGates } from './lib/autopilot/gates.mjs';
 import { briefOf, briefFile, chatLaunch, followupBriefOf, attachBriefOf, attachFile, attachLaunch } from './lib/autopilot/chat.mjs';
@@ -104,7 +104,11 @@ function startBackground(argv) {
   console.log(`Chạy nền PID ${child.pid} · log: ${log}`);
 }
 
-const decide = (opts, signals) => (opts.flow ? { flow: opts.flow, reason: `chọn tay --flow ${opts.flow}` } : route(signals, loadRules()));
+function decide(opts, signals) {
+  if (!opts.flow) return route(signals, loadRules());
+  if (!listFlows().includes(opts.flow)) die(`flow không có: ${opts.flow}`);
+  return { flow: opts.flow, reason: `chọn tay --flow ${opts.flow}` };
+}
 
 const listOpt = (value) => (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -112,16 +116,11 @@ function mustStage(flow, id) {
   return stageOf(flow, id) ?? die(`không có stage ${id} trong luồng ${flow.id}`);
 }
 
-// Kiểm --skip/--break trước khi tạo run: mốc duyệt không tắt được, tắt cổng phải có lý do
 function planOf(opts, flow) {
-  const disabled = listOpt(opts.skip).map((id) => mustStage(flow, id));
-  const breakpoints = listOpt(opts.break).map((id) => mustStage(flow, id).id);
-  const approval = disabled.find((s) => ['pause', 'attached'].includes(s.kind));
-  if (approval) die(`không tắt được mốc duyệt ${approval.id}`);
-  const skipReason = opts['skip-reason']?.trim() || null;
-  const gate = disabled.find(isGateLike);
-  if (gate && !skipReason) die(`tắt cổng ${gate.id} cần --skip-reason "…"`);
-  return { disabled: disabled.map((s) => s.id), breakpoints, skipReason };
+  const plan = { disabled: listOpt(opts.skip), breakpoints: listOpt(opts.break), skipReason: opts['skip-reason']?.trim() || null };
+  const problem = checkRunPlan(flow, plan);
+  if (problem) die(problem);
+  return plan;
 }
 
 function newRun(opts, input) {
@@ -313,6 +312,7 @@ async function cmdChoose(opts, type) {
 
 function cmdBreak(opts) {
   const run = mustLoad(opts._[1] ?? die(USAGE));
+  if (run.status === 'done') die(`${run.key} đã xong, không đặt điểm dừng được.`);
   const flow = loadFlow(run.flow);
   const stage = mustStage(flow, opts._[2] ?? die(USAGE)).id;
   const isOn = (run.plan?.breakpoints ?? []).includes(stage);

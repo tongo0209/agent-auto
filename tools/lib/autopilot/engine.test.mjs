@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { createRun, nextAction, applyEvent, resumeRun, roundOf, reopenRun, finalApproval, allowedActions, chooseAction } from './engine.mjs';
+import { createRun, nextAction, applyEvent, resumeRun, roundOf, reopenRun, finalApproval, allowedActions, chooseAction, checkRunPlan } from './engine.mjs';
 
 const FLOW = {
   id: 'mini',
@@ -339,4 +339,23 @@ test('chooseAction retry/goto: bỏ cutSession + resumeNote để chạy phiên 
     const run = chooseAction(cut, FLOW, action, { now: T0 });
     assert.deepStrictEqual([run.cutSession, run.resumeNote], [undefined, undefined]);
   }
+});
+
+test('chooseAction trên run dừng vì budget: bỏ trần cũ như resume', () => {
+  const stopped = { ...stoppedAtGates(), stopReason: 'budget', budget: { usd: 0.01 } };
+  for (const action of [{ type: 'retry' }, { type: 'goto', stage: 'implement' }]) {
+    assert.deepStrictEqual(chooseAction(stopped, FLOW, action, { now: T0 }).budget, {});
+  }
+  const skipped = chooseAction(stopped, FLOW, { type: 'skip', reason: 'x' }, { now: T0 });
+  assert.deepStrictEqual([skipped.status, skipped.stage, skipped.budget], ['running', 'design-gap-check', {}]);
+});
+
+test('checkRunPlan: hợp lệ → null; stage lạ, mốc duyệt, cổng thiếu lý do → câu báo lỗi', () => {
+  assert.strictEqual(checkRunPlan(FLOW, { disabled: ['review', 'gates'], breakpoints: ['implement'], skipReason: 'đã chạy tay' }), null);
+  assert.strictEqual(checkRunPlan(FLOW, { disabled: [], breakpoints: [] }), null);
+  assert.strictEqual(checkRunPlan(FLOW, { disabled: ['ghost'], breakpoints: [] }), 'không có stage ghost trong luồng mini');
+  assert.strictEqual(checkRunPlan(FLOW, { disabled: [], breakpoints: ['ghost'] }), 'không có stage ghost trong luồng mini');
+  assert.strictEqual(checkRunPlan(FLOW, { disabled: ['approve'], breakpoints: [] }), 'không tắt được mốc duyệt approve');
+  assert.strictEqual(checkRunPlan(FLOW, { disabled: [], breakpoints: ['final'] }), 'không đặt điểm dừng ở mốc duyệt final');
+  assert.strictEqual(checkRunPlan(FLOW, { disabled: ['gates'], breakpoints: [], skipReason: '  ' }), 'tắt cổng gates cần lý do (--skip-reason)');
 });

@@ -55,9 +55,10 @@ const CHECKS = {
   'layout-gate': ({ campaignDir }) => ({ cmd: 'node', args: [tool('layout-gate.mjs'), campaignDir] }),
 };
 
+// -z: không quote tên có dấu, rename tách 2 path; -uall: liệt kê từng file trong thư mục chưa track
 function changedFiles(ctx) {
-  const { stdout } = ctx.exec('git', ['status', '--porcelain', '--', ctx.campaignDir], { cwd: ctx.repo });
-  const changed = new Set(stdout.split('\n').filter(Boolean).map((line) => line.slice(3).trim()));
+  const { stdout } = ctx.exec('git', ['status', '--porcelain', '-z', '-uall', '--', ctx.campaignDir], { cwd: ctx.repo });
+  const changed = new Set(stdout.split('\0').filter(Boolean).map((entry) => (/^[ MADRCU?!]{2} /.test(entry) ? entry.slice(3) : entry)));
   return ctx.files.filter((f) => changed.has(f));
 }
 
@@ -102,7 +103,7 @@ export async function runGates(checks, ctx) {
   const full = { exec: defaultExec, ...ctx };
   const results = [];
   for (const name of checks) {
-    const result = runCheck(name, full);
+    const result = full.campaignDir ? runCheck(name, full) : { check: name, status: 'error', blocking: [], note: 'run chưa có campaignDir' };
     results.push(result);
     if (result.status === 'error') return { pass: false, error: name, results };
   }

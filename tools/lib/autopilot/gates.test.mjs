@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { spawnSync } from 'node:child_process';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -69,7 +70,7 @@ test('không có pm__ → pm-gate skipped', async () => {
 
 test('commit chỉ lấy giao files verdict với git status', async () => {
   const f = fixture();
-  const porcelain = ' M products/x/landing/a/index.html\n M products/y/other.scss\n';
+  const porcelain = ' M products/x/landing/a/index.html\0 M products/y/other.scss\0';
   const { exec, calls } = fakeExec({}, porcelain);
   const files = ['products/x/landing/a/index.html', 'products/x/landing/a/not-changed.js'];
   await runGates(['commit'], ctx(f, exec, { files }));
@@ -81,7 +82,7 @@ test('commit message đúng format + trailer, cdn-source có pull', async () => 
   const repo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ap-cdn-')), 'cdn-source');
   const campaignDir = path.join(repo, 'products/x/landing/a');
   fs.mkdirSync(campaignDir, { recursive: true });
-  const { exec, calls } = fakeExec({}, ' M products/x/landing/a/index.html\n');
+  const { exec, calls } = fakeExec({}, ' M products/x/landing/a/index.html\0');
   await runGates(['commit'], ctx({ repo, campaignDir }, exec, { files: ['products/x/landing/a/index.html'] }));
   const commit = calls.find((c) => c.line.startsWith('git commit'));
   assert.match(commit.line, /--only products\/x\/landing\/a\/index.html -m \(fix\): sửa tab quà\n\nCo-Authored-By: Claude Code <noreply@anthropic.com>$/);
@@ -92,4 +93,29 @@ test('commit không có file giao → skipped', async () => {
   const f = fixture();
   const r = await runGates(['commit'], ctx(f, fakeExec().exec, { files: ['a.js'] }));
   assert.strictEqual(r.results[0].status, 'skipped');
+});
+
+function gitRepo() {
+  const f = fixture();
+  const git = (...args) => spawnSync('git', args, { cwd: f.repo, encoding: 'utf8' });
+  git('init', '-q');
+  git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init');
+  return { ...f, git };
+}
+
+test('commit: campaign mới chưa track (landing-new) vẫn commit đúng file trong verdict', async () => {
+  const f = gitRepo();
+  fs.mkdirSync(path.join(f.campaignDir, 'mới'), { recursive: true });
+  fs.writeFileSync(path.join(f.campaignDir, 'mới', 'ảnh.txt'), 'x');
+  fs.writeFileSync(path.join(f.repo, 'khac.txt'), 'của phiên khác');
+  const files = ['products/x/landing/a/index.html', 'products/x/landing/a/mới/ảnh.txt'];
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-new', files, planTitle: 'Dựng landing' });
+  assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
+  const committed = f.git('-c', 'core.quotepath=off', 'show', '--name-only', '--format=', 'HEAD').stdout.trim().split('\n').sort();
+  assert.deepStrictEqual(committed, files.sort());
+});
+
+test('chưa có campaignDir → error, không ném', async () => {
+  const r = await runGates(['build'], { repo: '/r', campaignDir: null, key: 'GW-1', files: [], exec: fakeExec().exec });
+  assert.deepStrictEqual([r.pass, r.error], [false, 'build']);
 });

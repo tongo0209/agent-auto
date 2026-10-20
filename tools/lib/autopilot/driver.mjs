@@ -4,8 +4,8 @@ import { nextAction, applyEvent, roundOf } from './engine.mjs';
 import { parseVerdict } from './verdict.mjs';
 import { renderPrompt } from './prompts.mjs';
 import { PROMPTS_DIR } from './flows.mjs';
-import { runDir, saveRun, writeArtifact } from './store.mjs';
-import { acquire, release } from './lock.mjs';
+import { runDir, saveRun, loadRun, writeArtifact } from './store.mjs';
+import { acquire, release, holdCampaign, heldCampaigns } from './lock.mjs';
 import { runClaude as realRunClaude, guardCode } from './claude-runner.mjs';
 import { runGates as realRunGates } from './gates.mjs';
 import { notify as realNotify } from './notify.mjs';
@@ -73,6 +73,9 @@ async function runClaudeStage(run, stage, deps) {
   if (!res.ok) return { type: 'halt', reason: `runner:${stage.id}`, receipt };
 
   if (v.campaignDir && !run.campaignDir) {
+    const holder = heldCampaigns()[v.campaignDir];
+    if (holder && holder.key !== run.key) return { type: 'halt', reason: `campaign-held:${holder.key}/${holder.runId}`, receipt };
+    holdCampaign(v.campaignDir, { key: run.key, runId: run.runId });
     run.campaignDir = v.campaignDir;
     run.repo = deps.repoOf(v.campaignDir);
   }
@@ -116,6 +119,15 @@ async function withStageLock(run, stage, fn) {
   }
 }
 
+async function runStage(run, stage, deps) {
+  if (stage.when && !WHEN[stage.when](run)) return { type: 'skip' };
+  try {
+    return await withStageLock(run, stage, () => (stage.kind === 'claude' ? runClaudeStage(run, stage, deps) : runGateStage(run, stage, deps)));
+  } catch (e) {
+    return { type: 'halt', reason: `crash:${stage.id}: ${e.message}` };
+  }
+}
+
 export async function drive(startRun, flow, overrides = {}) {
   const deps = {
     now: Date.now, runClaude: realRunClaude, runGates: realRunGates, notify: realNotify, repoOf: () => null,
@@ -130,10 +142,9 @@ export async function drive(startRun, flow, overrides = {}) {
       return run;
     }
     const stage = action.stage;
-    const skip = stage.when && !WHEN[stage.when](run);
-    const event = skip
-      ? { type: 'skip' }
-      : await withStageLock(run, stage, () => (stage.kind === 'claude' ? runClaudeStage(run, stage, deps) : runGateStage(run, stage, deps)));
+    const event = await runStage(run, stage, deps);
+    const onDisk = loadRun(run.key, run.runId);
+    if (onDisk?.stopReason === 'aborted') return onDisk;
     run = applyEvent(run, flow, event, deps.now());
     saveRun(run);
   }

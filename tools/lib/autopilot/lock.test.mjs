@@ -46,3 +46,9 @@ test('held campaign thêm và xoá theo owner', () => {
 test('heldCampaigns khi chưa có file → rỗng', () => {
   assert.deepStrictEqual(heldCampaigns(), {});
 });
+
+test('cùng owner nhưng PID khác còn sống → không chiếm (2 process cùng run)', () => {
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, '.lock-run'), JSON.stringify({ pid: process.ppid, ...A }));
+  assert.strictEqual(acquire('run', A).ok, false);
+});

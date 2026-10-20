@@ -8,7 +8,8 @@ process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-drive
 const { drive } = await import('./driver.mjs');
 const { createRun, applyEvent } = await import('./engine.mjs');
 const { loadFlow } = await import('./flows.mjs');
-const { runDir, loadRun } = await import('./store.mjs');
+const { runDir, loadRun, saveRun } = await import('./store.mjs');
+const { holdCampaign, heldCampaigns } = await import('./lock.mjs');
 
 const verdict = (v, extra = {}) => '```autopilot-verdict\n' + JSON.stringify({ verdict: v, ...extra }) + '\n```';
 
@@ -114,4 +115,33 @@ test('buglist: intake báo campaignDir thì run nhận campaign', async () => {
   const { runClaude } = fakeClaude({ 'intake-triage': [{ result: verdict('pass', { campaignDir: '/repo/products/y/landing/b' }) }] });
   const run = await drive(start, flow, base({ runClaude, runGates: fakeGates().runGates, repoOf: () => '/repo' }));
   assert.deepStrictEqual([run.campaignDir, run.repo, run.stage], ['/repo/products/y/landing/b', '/repo', 'approve-result']);
+});
+
+test('abort từ process khác giữa chừng → driver dừng, không ghi đè aborted', async () => {
+  const start = newRun('landing-fix');
+  const runClaude = async (opts) => {
+    if (opts.stageId === 'plan') saveRun({ ...loadRun(start.key, start.runId) ?? start, status: 'stopped', stopReason: 'aborted' });
+    return { ok: true, sessionId: 's', turns: 1, costUsd: 0.1, ms: 10, result: verdict('pass'), error: null };
+  };
+  const run = await drive(start, loadFlow('landing-fix'), base({ runClaude, runGates: fakeGates().runGates }));
+  assert.strictEqual(run.stopReason, 'aborted');
+  assert.strictEqual(loadRun(start.key, start.runId).stopReason, 'aborted');
+});
+
+test('campaign biết giữa chừng: được giữ; đang bị run khác giữ → stopped', async () => {
+  const flow = loadFlow('buglist');
+  const dirA = `/repo/products/y/landing/${Math.random()}`;
+  const { runClaude } = fakeClaude({ 'intake-triage': [{ result: verdict('pass', { campaignDir: dirA }) }] });
+  const a = await drive({ ...newRun('buglist'), key: 'GW-31', campaignDir: null, repo: null }, flow, base({ runClaude, runGates: fakeGates().runGates, repoOf: () => '/repo' }));
+  assert.strictEqual(heldCampaigns()[dirA].key, 'GW-31');
+  const b = await drive({ ...newRun('buglist'), key: 'GW-32', campaignDir: null, repo: null }, flow, base({ runClaude, runGates: fakeGates().runGates, repoOf: () => '/repo' }));
+  assert.match(b.stopReason, /^campaign-held:GW-31/);
+  assert.strictEqual(a.stage, 'approve-result');
+});
+
+test('stage ném lỗi → stopped crash:<stage>, run.json không kẹt running', async () => {
+  const runClaude = async () => { throw new Error('nổ'); };
+  const run = await drive(newRun('landing-fix'), loadFlow('landing-fix'), base({ runClaude, runGates: fakeGates().runGates }));
+  assert.match(run.stopReason, /^crash:plan/);
+  assert.strictEqual(loadRun(run.key, run.runId).status, 'stopped');
 });

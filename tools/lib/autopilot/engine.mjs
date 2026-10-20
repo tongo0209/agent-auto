@@ -73,9 +73,11 @@ function transition(run, flow, stage, event) {
   }
 }
 
-function overBudget(run, now) {
+// Phút = thời gian máy chạy stage, không tính lúc chờ người duyệt
+function overBudget(run) {
   const usd = run.receipts.reduce((sum, r) => sum + (r.costUsd ?? 0), 0);
-  return usd > run.budget.usd || now - run.startedAt > run.budget.minutes * 60_000;
+  const ms = run.receipts.reduce((sum, r) => sum + (r.ms ?? 0), 0);
+  return usd > run.budget.usd || ms > run.budget.minutes * 60_000;
 }
 
 export function applyEvent(run, flow, event, now) {
@@ -90,16 +92,24 @@ export function applyEvent(run, flow, event, now) {
   if (event.sessionId && stage.keepSession) next = { ...next, sessions: { ...next.sessions, [stage.id]: event.sessionId } };
 
   next = transition(next, flow, stage, event);
-  return next.status !== 'done' && next.status !== 'stopped' && overBudget(next, now) ? stop(next, 'budget') : next;
+  return next.status !== 'done' && next.status !== 'stopped' && overBudget(next) ? stop(next, 'budget') : next;
 }
 
-export function resumeRun(run, { budgetUsd } = {}) {
+const BUDGET_BUMP = 1.5;
+
+function resumedBudget(run, { budgetUsd, budgetMinutes }) {
+  if (budgetUsd || budgetMinutes) return { usd: budgetUsd ?? run.budget.usd, minutes: budgetMinutes ?? run.budget.minutes };
+  if (run.stopReason !== 'budget') return run.budget;
+  return { usd: run.budget.usd * BUDGET_BUMP, minutes: run.budget.minutes * BUDGET_BUMP };
+}
+
+export function resumeRun(run, overrides = {}) {
   const exhausted = run.stopReason?.match(/^loop-exhausted:(.+)$/)?.[1];
   return {
     ...run,
     status: 'running',
     stopReason: null,
     loops: exhausted ? { ...run.loops, [exhausted]: 0 } : run.loops,
-    budget: budgetUsd ? { ...run.budget, usd: budgetUsd } : run.budget,
+    budget: resumedBudget(run, overrides),
   };
 }

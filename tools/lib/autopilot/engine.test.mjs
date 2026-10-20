@@ -93,9 +93,22 @@ test('vượt budget usd → stopped budget', () => {
   assert.strictEqual(run.stopReason, 'budget');
 });
 
-test('vượt budget phút → stopped budget', () => {
-  const run = step(fresh(), 'pass', {}, T0 + 61 * 60_000);
+test('vượt budget phút (máy chạy) → stopped budget', () => {
+  const run = applyEvent(fresh(), FLOW, { type: 'pass', receipt: { ...receipt('plan'), ms: 61 * 60_000 } }, T0);
   assert.strictEqual(run.stopReason, 'budget');
+});
+
+test('thời gian chờ người duyệt không tính vào budget phút', () => {
+  let run = step(step(fresh(), 'pass'), 'pass');
+  run = applyEvent(run, FLOW, { type: 'approve' }, T0 + 121 * 60_000);
+  assert.deepStrictEqual([run.status, run.stage], ['running', 'implement']);
+});
+
+test('resume sau budget tự nới 1.5× giới hạn khi không truyền budget mới', () => {
+  const run = applyEvent(fresh(), FLOW, { type: 'pass', receipt: receipt('plan', 11) }, T0);
+  const resumed = resumeRun(run);
+  assert.deepStrictEqual(resumed.budget, { usd: 15, minutes: 90 });
+  assert.strictEqual(applyEvent(resumed, FLOW, { type: 'pass', receipt: receipt('plan-review') }, T0).status, 'paused');
 });
 
 test('keepSession lưu sessionId', () => {

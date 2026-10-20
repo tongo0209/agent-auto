@@ -19,7 +19,8 @@ const readJson = (file, fallback) => (fs.existsSync(file) ? JSON.parse(fs.readFi
 
 export function acquire(name, owner) {
   const holder = readJson(lockFile(name), null);
-  if (holder && isAlive(holder.pid) && !sameOwner(holder, owner)) return { ok: false, holder };
+  const mine = holder && holder.pid === process.pid && sameOwner(holder, owner);
+  if (holder && !mine && isAlive(holder.pid)) return { ok: false, holder };
   writeJsonAtomic(lockFile(name), { pid: process.pid, key: owner.key, runId: owner.runId, at: new Date().toISOString() });
   return { ok: true };
 }

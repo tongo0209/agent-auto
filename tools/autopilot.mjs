@@ -18,7 +18,7 @@ const USAGE = `Dùng:
   autopilot status [KEY]
   autopilot approve <KEY> [--note "…"]
   autopilot reject <KEY> --note "…"
-  autopilot resume <KEY> [--budget-usd n]
+  autopilot resume <KEY> [--budget-usd n] [--budget-minutes n]   (dừng vì budget mà không truyền → tự nới 1.5×)
   autopilot abort <KEY>
   autopilot route <KEY|link> | route --validate`;
 
@@ -113,7 +113,8 @@ async function cmdDecide(opts, type) {
 async function cmdResume(opts) {
   const run = mustLoad(opts._[1] ?? die(USAGE));
   if (run.status !== 'stopped' && run.status !== 'running') die(`${run.key} đang ${run.status} — dùng approve/reject.`);
-  const resumed = resumeRun(run, { budgetUsd: opts['budget-usd'] ? Number(opts['budget-usd']) : undefined });
+  const num = (flag) => (opts[flag] ? Number(opts[flag]) : undefined);
+  const resumed = resumeRun(run, { budgetUsd: num('budget-usd'), budgetMinutes: num('budget-minutes') });
   const kind = stageOf(loadFlow(run.flow), resumed.stage)?.kind;
   await continueRun(kind === 'pause' ? { ...resumed, status: 'paused' } : resumed);
 }

@@ -253,7 +253,7 @@ pre.raw { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word
   .ap-queue { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
   .queue { max-height: 240px; }
   .ap-main { padding: 20px 16px 160px; }
-  .top, .panes { grid-template-columns: 1fr; }
+  .top, .panes { grid-template-columns: minmax(0, 1fr); }
   .dock { left: var(--nav-w); padding: 12px 16px 16px; }
   .dock-card { grid-template-columns: 1fr; }
   .lane { gap: 28px; }

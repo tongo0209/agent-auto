@@ -19,7 +19,21 @@ export const MILESTONE = { design: 'Design', html: 'HTML', deliver: 'Giao HTML',
 
 export const daysUntil = (iso, fromIso) => Math.round((new Date(`${iso}T00:00:00`) - new Date(`${fromIso}T00:00:00`)) / 864e5);
 export const shortDate = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : '');
-export const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--');
+const URGENT_DAYS = 4;
+const SOON_DAYS = 8;
+const OFF_MY_PLATE = ['reassigned', 'closed'];
+const LATE_EXEMPT = ['wait-test', 'bugfix', 'done-fe', 'reassigned', 'closed'];
+export const toneByDays = (days) => (days <= URGENT_DAYS ? 'crit' : days <= SOON_DAYS ? 'warn' : 'ok');
+export const realMilestones = (issue) => Object.entries(issue.milestones ?? {}).filter(([name]) => !name.startsWith('_'));
+export const isLate = (issue, today) => Boolean(issue.milestones?.html) && daysUntil(issue.milestones.html, today) < 0 && !LATE_EXEMPT.includes(issue.phase);
+export function nextMilestone(issue, today) {
+  if (OFF_MY_PLATE.includes(issue.phase)) return null;
+  return realMilestones(issue)
+    .map(([name, date]) => ({ name, date, days: daysUntil(date, today) }))
+    .filter((m) => m.days >= 0)
+    .sort((a, b) => a.days - b.days)[0] ?? null;
+}
+export const hhmm =(iso) => (iso ? new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--');
 export const stamp = (iso) => String(iso ?? '').replace('T', ' ').slice(0, 16);
 
 export const inlineMd = (s) =>

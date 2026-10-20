@@ -1,30 +1,26 @@
 import { esc } from '../lib.js';
-import { JIRA, phaseOf, MILESTONE, daysUntil, shortDate, stamp, markdown, settler, skeleton, note, errNote, pill, draft } from './_kit.js';
+import { JIRA, phaseOf, MILESTONE, daysUntil, shortDate, stamp, markdown, settler, skeleton, note, errNote, pill, draft, realMilestones, toneByDays, nextMilestone, isLate } from './_kit.js';
 
 const STATE_REFRESH_MS = 20000;
 const EXTRA_REFRESH_MS = 60000;
 const HEAT = ['bugfix', 'coding', 'deliver', 'ready', 'waiting-design', 'wait-test', 'done-fe', 'reassigned', 'closed'];
 const GROUP_ORDER = ['Fix bug', 'Đang code', 'Giao HTML', 'Sẵn sàng', 'Chờ design', 'Chờ test', 'Phase lạ', 'Đã xong / ra khỏi tay'];
-const OFF_MY_PLATE = ['reassigned', 'closed'];
-const LATE_EXEMPT = ['wait-test', 'bugfix', 'done-fe', 'reassigned', 'closed'];
 const MANUAL_FINISH = ['wait-test', 'bugfix'];
-const URGENT_DAYS = 4;
-const SOON_DAYS = 8;
 const VIEWPORT_WIDTH = { pc: 1920, mb: 768 };
 const MOBILE_NAME = /(^|[_\-. ])(mb|mobile|m)([_\-. ]|$)/i;
 
-const heat = (phase) => (HEAT.includes(phase) ? HEAT.indexOf(phase) : HEAT.length);
-const realMilestones = (issue) => Object.entries(issue.milestones ?? {}).filter(([name]) => !name.startsWith('_'));
-const toneByDays = (days) => (days <= URGENT_DAYS ? 'crit' : days <= SOON_DAYS ? 'warn' : 'ok');
+const DONE_GROUP = 'Đã xong / ra khỏi tay';
+const COLLAPSED_KEY = 'tk.collapsed';
 
-function nextMilestone(issue, today) {
-  if (OFF_MY_PLATE.includes(issue.phase)) return null;
-  return realMilestones(issue)
-    .map(([name, date]) => ({ name, date, days: daysUntil(date, today) }))
-    .filter((m) => m.days >= 0)
-    .sort((a, b) => a.days - b.days)[0] ?? null;
+function loadCollapsed() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY)) ?? [DONE_GROUP]);
+  } catch {
+    return new Set([DONE_GROUP]);
+  }
 }
-const isLate = (issue, today) => Boolean(issue.milestones?.html) && daysUntil(issue.milestones.html, today) < 0 && !LATE_EXEMPT.includes(issue.phase);
+
+const heat = (phase) => (HEAT.includes(phase) ? HEAT.indexOf(phase) : HEAT.length);
 
 function nest(entries) {
   const keys = new Set(entries.map(([k]) => k));
@@ -43,6 +39,8 @@ const MARKUP = `<div class="page-pad tk">
     <div><h1>Task</h1><div class="vw-sub mono" id="tkSub">&nbsp;</div></div>
     <div class="vw-tools">
       <label class="vw-search"><i class="ph ph-magnifying-glass"></i><input class="vw-input" id="tkFilter" placeholder="Lọc theo mã, tên, ghi chú" aria-label="Lọc task"></label>
+      <button class="btn ghost vw-sm" data-fold-all="close"><i class="ph ph-arrows-in-line-vertical"></i>Thu gọn hết</button>
+      <button class="btn ghost vw-sm" data-fold-all="open"><i class="ph ph-arrows-out-line-vertical"></i>Mở hết</button>
       <button class="btn ghost vw-sm" id="tkReload"><i class="ph ph-arrows-clockwise"></i>Làm mới</button>
     </div>
   </header>
@@ -56,7 +54,7 @@ const MARKUP = `<div class="page-pad tk">
 export function mount(el, ctx) {
   el.innerHTML = MARKUP;
   const $ = (s) => el.querySelector(s);
-  const expanded = new Set();
+  const collapsed = loadCollapsed();
   let st = null;
   let stateError = null;
   let gates = {};
@@ -135,13 +133,14 @@ export function mount(el, ctx) {
     const groups = GROUP_ORDER.map((label) => ({ label, items: rows.filter((r) => phaseOf(r.shownPhase).group === label) })).filter((g) => g.items.length);
     let n = 0;
     $('#tkList').innerHTML = groups.map((g) => {
-      const foldable = g.label === 'Đã xong / ra khỏi tay';
-      const folded = foldable && !expanded.has(g.label) && !q;
+      const folded = collapsed.has(g.label) && !q;
       const tone = phaseOf(g.items[0].shownPhase).tone;
-      return `<section class="tk-group ${folded ? 'folded' : ''}">
-        <h2 class="t-${tone}">${foldable ? `<button class="tk-fold" data-fold="${esc(g.label)}" aria-expanded="${!folded}"><i class="ph ph-caret-right"></i>` : '<span class="tk-fold">'}
-          <span class="dot"></span>${esc(g.label)}<span class="mono">${g.items.length}</span>${foldable ? '</button>' : '</span>'}</h2>
-        ${folded ? '' : g.items.map((r) => row(r, n++) + r.subs.map(([k, s]) => row({ key: k, issue: s }, n++, true)).join('')).join('')}
+      return `<section class="tk-group t-${tone} ${folded ? 'folded' : ''}">
+        <h2><button class="tk-fold" data-fold="${esc(g.label)}" aria-expanded="${!folded}"><i class="ph ph-caret-right"></i>
+          <span class="dot"></span>${esc(g.label)}<span class="mono">${g.items.length}</span>
+          ${folded ? `<span class="tk-peek mono">${g.items.map((r) => esc(r.key)).join(' · ')}</span>` : ''}
+          <span class="tk-fold-hint">${folded ? 'Mở' : 'Thu gọn'}</span></button></h2>
+        ${folded ? '' : `<div class="tk-items">${g.items.map((r) => row(r, n++) + r.subs.map(([k, s]) => row({ key: k, issue: s }, n++, true)).join('')).join('')}</div>`}
       </section>`;
     }).join('');
   }
@@ -440,9 +439,14 @@ export function mount(el, ctx) {
   el.addEventListener('click', async (e) => {
     const t = e.target;
     const fold = t.closest('[data-fold]');
-    if (fold) {
-      const label = fold.dataset.fold;
-      expanded.has(label) ? expanded.delete(label) : expanded.add(label);
+    const foldAll = t.closest('[data-fold-all]');
+    if (fold || foldAll) {
+      if (fold) collapsed.has(fold.dataset.fold) ? collapsed.delete(fold.dataset.fold) : collapsed.add(fold.dataset.fold);
+      else if (foldAll.dataset.foldAll === 'close') GROUP_ORDER.forEach((label) => collapsed.add(label));
+      else collapsed.clear();
+      try {
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed]));
+      } catch {}
       return renderList();
     }
     const rowEl = t.closest('.tk-row');

@@ -11,3 +11,7 @@ Làm theo skill `/code-developer` (đọc mục `## Chạy dưới autopilot` c�
 KHÔNG commit, KHÔNG push — stage commit làm việc đó sau khi user duyệt.
 
 Verdict: `pass` + `files` = MỌI file đã sửa/tạo (đường dẫn tương đối với `{{repo}}`); `fail` khi kẹt.
+
+Ticket nhiều campaign (mỗi dòng 1 folder):
+{{campaignDirs}}
+Từ 2 campaign trở lên: mỗi campaign 1 lane Agent riêng, tập file rời nhau, tối đa 5 lane song song; build chung do stage gates chạy từng campaign.

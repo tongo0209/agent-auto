@@ -1,5 +1,15 @@
 {
   "rules": [
+    {
+      "flow": "ask", "all": ["pathsUnconfirmed"],
+      "reason": "paths của {key} đang mượn/chưa confirm (pathsConfirmed=false) — không chạy trên folder đoán",
+      "questions": ["Folder nào thật sự thuộc {key} (products/… và bản bàn giao)?"]
+    },
+    {
+      "flow": "ask", "all": ["tooManyCampaigns"],
+      "reason": "{key} có {campaignCount} campaign, vượt trần 5 lane song song",
+      "questions": ["Chia đợt thế nào — 5 campaign nào chạy trước?"]
+    },
     { "flow": "buglist", "all": ["inputIsSheet"], "needsCampaign": false },
     { "flow": "gameplay-change", "all": ["gameplayChanged"] },
     { "flow": "buglist", "all": ["parentKey", "hasBugSheet"] },

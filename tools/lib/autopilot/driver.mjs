@@ -35,6 +35,8 @@ function feedbackFile(run) {
   return fs.existsSync(file) ? file : '';
 }
 
+const campaignsOf = (run) => (run.campaignDirs?.length ? run.campaignDirs : [run.campaignDir].filter(Boolean));
+
 function stageVars(run, stage, input) {
   const wt = (p) => toWorktree(run.worktrees, p) ?? '';
   return {
@@ -45,6 +47,7 @@ function stageVars(run, stage, input) {
     repo: wt(run.repo),
     campaignDir: wt(run.campaignDir),
     handoffDir: wt(run.handoffDir),
+    campaignDirs: campaignsOf(run).map(wt).join('\n'),
     cloneSource: wt(run.cloneSource),
     sheetKind: run.sheetKind ?? '',
     round: String(roundOf(run, stage.id)),
@@ -86,6 +89,7 @@ async function runClaudeStage(run, stage, deps) {
     if (holder && holder.key !== run.key) return { type: 'halt', reason: `campaign-held:${holder.key}/${holder.runId}`, receipt };
     holdCampaign(v.campaignDir, { key: run.key, runId: run.runId });
     run.campaignDir = v.campaignDir;
+    run.campaignDirs = [v.campaignDir];
     run.repo = deps.repoOf(v.campaignDir);
     run.repos = [...new Set([...(run.repos ?? []), run.repo].filter(Boolean))];
   }
@@ -97,8 +101,8 @@ const repoFor = (run, dir) => (run.repos ?? []).find((r) => dir.startsWith(`${r}
 
 function gateTargets(run, stage) {
   if (stage.scope === 'handoff') return [run.handoffDir];
-  if (stage.checks.includes('commit')) return [run.campaignDir, run.handoffDir].filter(Boolean);
-  return [run.campaignDir];
+  if (stage.checks.includes('commit')) return [...campaignsOf(run), run.handoffDir].filter(Boolean);
+  return run.campaignDir ? campaignsOf(run) : [null];
 }
 
 async function gatesOn(run, stage, deps, dir) {

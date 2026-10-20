@@ -162,7 +162,7 @@ function tmpGitRepo() {
 test('G0: stage claude + gate chạy trong worktree riêng autopilot/<KEY>-<runId>, không cwd vào repo thật', async () => {
   const { repo, git } = tmpGitRepo();
   const flow = loadFlow('landing-fix');
-  const start = { ...newRun('landing-fix'), repo, repos: [repo], campaignDir: path.join(repo, 'products/x/landing/a') };
+  const start = { ...newRun('landing-fix'), repo, repos: [repo], campaignDir: path.join(repo, 'products/x/landing/a'), campaignDirs: [path.join(repo, 'products/x/landing/a')] };
   const { runClaude, calls } = fakeClaude({});
   const gates = fakeGates();
   let run = await drive(start, flow, { now: () => Date.now(), notify: () => {}, runClaude, runGates: gates.runGates });
@@ -182,7 +182,7 @@ test('G0: stage claude + gate chạy trong worktree riêng autopilot/<KEY>-<runI
 test('G0: không tạo được worktree → stopped, không lùi về repo thật', async () => {
   const notGit = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-nogit-'));
   const { runClaude, calls } = fakeClaude({});
-  const start = { ...newRun('landing-fix'), repo: notGit, repos: [notGit], campaignDir: notGit };
+  const start = { ...newRun('landing-fix'), repo: notGit, repos: [notGit], campaignDir: notGit, campaignDirs: [notGit] };
   const run = await drive(start, loadFlow('landing-fix'), { now: () => Date.now(), notify: () => {}, runClaude, runGates: fakeGates().runGates });
   assert.match(run.stopReason, /^worktree:/);
   assert.strictEqual(calls.length, 0);
@@ -207,7 +207,7 @@ test('G2: landing-fix có handoffDir → stage handoff + cổng bàn giao trên 
   const cdn = tmpGitRepo();
   const gt = tmpGitRepo();
   const flow = loadFlow('landing-fix');
-  const start = { ...newRun('landing-fix'), repo: cdn.repo, repos: [cdn.repo, gt.repo], campaignDir: path.join(cdn.repo, 'products/x/landing/a'), handoffDir: path.join(gt.repo, 'products/x/landing/a') };
+  const start = { ...newRun('landing-fix'), repo: cdn.repo, repos: [cdn.repo, gt.repo], campaignDir: path.join(cdn.repo, 'products/x/landing/a'), campaignDirs: [path.join(cdn.repo, 'products/x/landing/a')], handoffDir: path.join(gt.repo, 'products/x/landing/a') };
   const { runClaude, calls } = fakeClaude({});
   const gates = fakeGates();
   let run = await drive(start, flow, { now: () => Date.now(), notify: () => {}, runClaude, runGates: gates.runGates });
@@ -239,7 +239,7 @@ test('G2: buglist chạy pm-gate khi diff chạm pm__, ui-check khi chạm file 
   const { repo } = tmpGitRepo();
   fs.writeFileSync(path.join(repo, 'products/x/landing/a/index.html'), '<a class="pm__login"></a>');
   const flow = loadFlow('buglist');
-  const start = { ...newRun('buglist'), repo, repos: [repo], campaignDir: path.join(repo, 'products/x/landing/a') };
+  const start = { ...newRun('buglist'), repo, repos: [repo], campaignDir: path.join(repo, 'products/x/landing/a'), campaignDirs: [path.join(repo, 'products/x/landing/a')] };
   const { runClaude, calls } = fakeClaude({ lanes: [{ result: verdict('pass', { files: ['products/x/landing/a/index.html'] }) }] });
   const gates = fakeGates();
   const wtWrite = async (opts) => {
@@ -300,4 +300,16 @@ test('G6: gameplay-change luôn dừng ở approve-plan sau relock + plan-review
   const run = await drive(newRun('gameplay-change'), flow, base({ runClaude, runGates: fakeGates().runGates }));
   assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-plan']);
   assert.deepStrictEqual(calls.map((c) => c.stageId), ['relock', 'plan', 'plan-review']);
+});
+
+test('G7: gates chạy cho từng campaign, prompt lanes liệt kê mọi campaign', async () => {
+  const flow = loadFlow('buglist');
+  const dirs = ['/repo/products/x/landing/a', '/repo/products/x/landing/b'];
+  const { runClaude, calls } = fakeClaude({});
+  const gates = fakeGates();
+  const run = await drive({ ...newRun('buglist'), campaignDirs: dirs }, flow, base({ runClaude, runGates: gates.runGates }));
+  const inWt = dirs.map((d) => d.replace('/repo', run.worktrees['/repo']));
+  assert.deepStrictEqual(gates.calls.filter((c) => c.checks.join() === 'build').map((c) => c.ctx.campaignDir), inWt);
+  const lanes = calls.find((c) => c.stageId === 'lanes');
+  assert.ok(inWt.every((d) => lanes.prompt.includes(d)));
 });

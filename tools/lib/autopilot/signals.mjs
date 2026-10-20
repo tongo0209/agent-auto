@@ -3,6 +3,7 @@ import path from 'node:path';
 import { campaignOf, readLock } from '../project-lock.mjs';
 
 const HANDOFF_REPO = 'gt-promotion-template';
+const MAX_LANES = 5;
 const SHEET_INPUT = /docs\.google\.com\/spreadsheets|sharepoint\.com|\.xlsx(\?|$)/i;
 const GOOGLE_SHEET = /docs\.google\.com\/spreadsheets/i;
 const NO_BUG_ID_NOTE = /không có cột BugID/i;
@@ -36,7 +37,9 @@ export function gatherSignals({ input, agentRoot, campaign }) {
   const clone = issue.cloneFrom?.find((c) => repos[c.repo]);
   const cloneSourceDir = clone ? path.join(repos[clone.repo], clone.from) : null;
   const known = [...paths, ...(clone ? [{ repo: clone.repo, path: clone.to }] : [])].filter((p) => repos[p.repo]);
-  const target = known.find((p) => p.repo !== HANDOFF_REPO);
+  const code = known.filter((p) => p.repo !== HANDOFF_REPO);
+  const target = code[0];
+  const campaignDirs = campaign ? [campaign] : code.map((p) => path.join(repos[p.repo], p.path));
   const handoff = known.find((p) => p.repo === HANDOFF_REPO);
   const repo = campaign ? Object.values(repos).find((r) => campaign.startsWith(r)) ?? null : target ? repos[target.repo] : null;
   const campaignDir = campaign ?? (target ? path.join(repos[target.repo], target.path) : null);
@@ -63,6 +66,10 @@ export function gatherSignals({ input, agentRoot, campaign }) {
     campaignExists: Boolean(campaignDir && fs.existsSync(campaignDir)),
     cloneSource: cloneSourceDir ?? issue.cloneRef ?? null,
     cloneSourceDir: cloneSourceDir && fs.existsSync(cloneSourceDir) ? cloneSourceDir : null,
+    campaignDirs,
+    campaignCount: campaignDirs.length,
+    tooManyCampaigns: campaignDirs.length > MAX_LANES,
+    pathsUnconfirmed: issue.pathsConfirmed === false,
     handoffDir: handoff ? path.join(repos[handoff.repo], handoff.path) : null,
     repos: [...new Set([target, ...known].filter(Boolean).map((p) => repos[p.repo]))],
     designDir,

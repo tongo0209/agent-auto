@@ -183,3 +183,23 @@ test('G6: gameplayChanged từ note + gameplayLocked đọc mục Khoá của fi
   assert.deepStrictEqual([s.gameplayChanged, s.gameplayLocked], [true, true]);
   assert.strictEqual(gatherSignals({ input: 'GW-890', agentRoot: root }).gameplayChanged, false);
 });
+
+test('G7: >5 campaign → ask chia đợt; paths chưa confirm → ask', () => {
+  const many = route({ ...base, phase: 'bugfix', hasBugSheet: true, tooManyCampaigns: true, campaignCount: 7 }, RULES);
+  assert.strictEqual(many.flow, 'ask');
+  assert.match(many.reason, /7 campaign/);
+  const borrowed = route({ ...base, phase: 'bugfix', hasBugSheet: true, pathsUnconfirmed: true }, RULES);
+  assert.strictEqual(borrowed.flow, 'ask');
+  assert.match(borrowed.reason, /chưa confirm/);
+});
+
+test('G7: campaignDirs gồm mọi path code (bỏ gt-promotion), pathsConfirmed=false → pathsUnconfirmed', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-sig-'));
+  const repos = { 'cdn-source': path.join(root, 'cdn'), 'gt-promotion-template': path.join(root, 'gt') };
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ repos }));
+  const paths = ['a', 'b', 'c', 'd', 'e', 'f'].map((x) => ({ repo: 'cdn-source', path: `products/g/landing/${x}` }));
+  const issues = { 'GW-1': { pathsConfirmed: false, paths: [...paths, { repo: 'gt-promotion-template', path: 'z' }] } };
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues }));
+  const s = gatherSignals({ input: 'GW-1', agentRoot: root });
+  assert.deepStrictEqual([s.campaignDirs.length, s.campaignCount, s.tooManyCampaigns, s.pathsUnconfirmed], [6, 6, true, true]);
+});

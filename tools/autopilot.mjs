@@ -98,13 +98,13 @@ async function cmdRun(opts, argv) {
   if (holder) die(`${signals.campaignDir} đang bị ${holder.key}/${holder.runId} giữ — xong/abort run đó trước.`);
 
   const flow = loadFlow(decided.flow);
-  const target = flow.usesRepo === false ? { campaignDir: null, handoffDir: null, repos: [] } : signals;
+  const target = flow.usesRepo === false ? { campaignDir: null, campaignDirs: [], handoffDir: null, repos: [] } : signals;
   const repo = flow.usesRepo === false ? null : signals.repo ?? (signals.campaignDir ? repoOf(signals.campaignDir) : null);
   const now = new Date();
   const runId = newRunId(now);
   const run = createRun({
     key: signals.key ?? `ADHOC-${runId}`, runId, flow, routerReason: decided.reason,
-    repo, campaignDir: target.campaignDir, handoffDir: target.handoffDir, cloneSource: signals.cloneSource, sheetKind: signals.sheetKind, repos: [repo, ...target.repos], now: now.getTime(),
+    repo, campaignDir: target.campaignDir, campaignDirs: target.campaignDirs, handoffDir: target.handoffDir, cloneSource: signals.cloneSource, sheetKind: signals.sheetKind, repos: [repo, ...target.repos], now: now.getTime(),
   });
   if (opts['budget-usd']) run.budget.usd = Number(opts['budget-usd']);
   console.log(`▶ ${run.key} → ${flow.id} (${decided.reason})`);

@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { TOOLSETS, buildClaudeArgs, runClaude, guardCode } from './claude-runner.mjs';
+import { TOOLSETS, buildClaudeArgs, runClaude, guardCode, tokensOf } from './claude-runner.mjs';
 
 test('buildClaudeArgs có --resume và --model khi truyền', () => {
   const args = buildClaudeArgs({ prompt: 'p', model: 'sonnet', toolset: 'review', resumeSessionId: 's1' });
@@ -28,6 +28,11 @@ test('chưa bật AUTOPILOT_LAB_WRITES → gắn hook sandbox chặn ghi ra ngo�
   } finally {
     delete process.env.AUTOPILOT_LAB_WRITES;
   }
+});
+
+test('tokensOf cộng cả 4 loại token của usage, thiếu usage → 0', () => {
+  assert.strictEqual(tokensOf({ input_tokens: 10, output_tokens: 20, cache_read_input_tokens: 300, cache_creation_input_tokens: 4000 }), 4330);
+  assert.strictEqual(tokensOf(undefined), 0);
 });
 
 test('toolset lạ → ném lỗi', () => {

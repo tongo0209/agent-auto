@@ -1,10 +1,6 @@
 {
   "id": "design-intake",
   "label": "Nhận design: tải → soát đủ chưa → block hỏi PM",
-  "budget": {
-    "usd": 6,
-    "minutes": 45
-  },
   "usesRepo": false,
   "ask": [
     {

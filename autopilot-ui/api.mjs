@@ -5,12 +5,27 @@ import { listRuns, runDir } from '../tools/lib/autopilot/store.mjs';
 import { loadFlow, listFlows } from '../tools/lib/autopilot/flows.mjs';
 import { stageOf } from '../tools/lib/autopilot/engine.mjs';
 import { stageCells, totals } from '../tools/lib/autopilot/format.mjs';
+import { tokensOf } from '../tools/lib/autopilot/claude-runner.mjs';
 
 const STATUS_ORDER = ['paused', 'attached', 'running', 'stopped', 'done'];
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const KEY = /^[A-Z][A-Z0-9]*-[A-Za-z0-9-]+$/;
 
-function viewOf(run) {
+const logTokens = new Map();
+function tokensFromLog(run, receipt) {
+  const log = path.join(runDir(run.key, run.runId), `${receipt.stage}-r${receipt.round}.log`);
+  if (!logTokens.has(log)) {
+    const result = fs.existsSync(log) && fs.readFileSync(log, 'utf8').split('\n').findLast((line) => line.includes('"type":"result"'));
+    logTokens.set(log, result ? tokensOf(JSON.parse(result).usage) : 0);
+  }
+  return logTokens.get(log);
+}
+
+// run chạy trước khi receipt có trường tokens: đọc bù từ log của stage
+const withTokens = (run) => ({ ...run, receipts: run.receipts.map((r) => (r.tokens != null || !r.turns ? r : { ...r, tokens: tokensFromLog(run, r) })) });
+
+function viewOf(saved) {
+  const run = withTokens(saved);
   const flow = loadFlow(run.flow);
   return {
     ...run,

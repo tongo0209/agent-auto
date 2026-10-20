@@ -32,8 +32,13 @@ test('stageCells: mốc duyệt đã qua (stage sau đã chạy) → done', () =
   assert.strictEqual(stageCells(past, flow)[2].state, 'done');
 });
 
+test('totals cộng token tiêu hao, receipt cũ không có token tính 0', () => {
+  const withTokens = { ...run, receipts: [...run.receipts, { stage: 'plan', verdict: 'pass', blocking: 0, advisory: 0, turns: 1, costUsd: 0, ms: 0, tokens: 1500 }] };
+  assert.strictEqual(totals(withTokens).tokens, 1500);
+});
+
 test('totals cộng turns, phút, $', () => {
-  assert.deepStrictEqual(totals(run), { runs: 3, turns: 112, minutes: 10, usd: 4.17 });
+  assert.deepStrictEqual(totals(run), { runs: 3, turns: 112, minutes: 10, usd: 4.17, tokens: 0 });
 });
 
 test('formatStatus có hàng stage, dòng round và dòng tổng', () => {

@@ -132,13 +132,10 @@ function drawWires(run) {
   $('#wires').setAttribute('height', host.scrollHeight);
 }
 
-function meter(label, used, limit, fmt) {
-  const ratio = limit ? Math.min(used / limit, 1) : 0;
-  const c = 2 * Math.PI * 20;
-  const cls = ratio >= 1 ? 'over' : ratio > 0.75 ? 'hot' : '';
-  return `<div class="meter"><svg width="52" height="52" viewBox="0 0 52 52"><circle class="track" cx="26" cy="26" r="20"/><circle class="val ${cls}" cx="26" cy="26" r="20" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - ratio)}"/></svg>
-    <div><b>${fmt(used)}</b><small>${label} / ${fmt(limit)}</small></div></div>`;
-}
+const compact = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : `${n}`);
+
+const usage = (icon, value, label, title) =>
+  `<div class="usage" title="${esc(title)}"><i class="ph ${icon}"></i><div><b>${value}</b><small>${label}</small></div></div>`;
 
 const BLOCK_TAG = 'h1|h2|h3|ul|ol|table|blockquote';
 const tableHtml = (rows) => {
@@ -221,6 +218,7 @@ async function renderMain() {
 
   const { lane, side } = mainLane(run.cells);
   const elapsed = run.receipts.reduce((n, r) => n + (r.ms ?? 0), 0);
+  const tokens = run.totals.tokens ?? 0;
   $('#apMain').innerHTML = `
     <div class="top">
       <div>
@@ -228,7 +226,7 @@ async function renderMain() {
         <div class="meta">${esc(run.flowLabel)}. Router chọn vì: ${esc(run.routerReason)}</div>
         <div class="meta"><code>${esc(run.campaignDir ?? 'chưa có campaign')}</code></div>
       </div>
-      <div class="meters">${meter('ngân sách', run.totals.usd, run.budget.usd, money)}${meter('phút máy', mins(elapsed), run.budget.minutes, (n) => `${n}′`)}</div>
+      <div class="meters">${usage('ph-lightning', compact(tokens), 'token tiêu hao', `${tokens.toLocaleString('vi-VN')} token (gồm cache) · ${money(run.totals.usd)}`)}${usage('ph-timer', `${mins(elapsed)}′`, 'phút tiêu hao', 'thời gian máy chạy các bước, không tính lúc chờ duyệt')}</div>
     </div>
     <div class="flow"><div class="flow-inner" id="flowInner">
       <svg class="wires" id="wires"></svg>

@@ -80,7 +80,7 @@ function transition(run, flow, stage, event) {
 function overBudget(run) {
   const usd = run.receipts.reduce((sum, r) => sum + (r.costUsd ?? 0), 0);
   const ms = run.receipts.reduce((sum, r) => sum + (r.ms ?? 0), 0);
-  return usd > run.budget.usd || ms > run.budget.minutes * 60_000;
+  return usd > (run.budget.usd ?? Infinity) || ms > (run.budget.minutes ?? Infinity) * 60_000;
 }
 
 export function applyEvent(run, flow, event, now) {
@@ -101,9 +101,9 @@ export function applyEvent(run, flow, event, now) {
 const BUDGET_BUMP = 1.5;
 
 function resumedBudget(run, { budgetUsd, budgetMinutes }) {
-  if (budgetUsd || budgetMinutes) return { usd: budgetUsd ?? run.budget.usd, minutes: budgetMinutes ?? run.budget.minutes };
+  if (budgetUsd || budgetMinutes) return { ...run.budget, ...(budgetUsd && { usd: budgetUsd }), ...(budgetMinutes && { minutes: budgetMinutes }) };
   if (run.stopReason !== 'budget') return run.budget;
-  return { usd: run.budget.usd * BUDGET_BUMP, minutes: run.budget.minutes * BUDGET_BUMP };
+  return Object.fromEntries(Object.entries(run.budget).map(([k, v]) => [k, v * BUDGET_BUMP]));
 }
 
 export function resumeRun(run, overrides = {}) {

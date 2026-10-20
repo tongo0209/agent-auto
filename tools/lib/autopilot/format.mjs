@@ -28,6 +28,7 @@ export function totals(run) {
     turns: run.receipts.reduce((n, r) => n + r.turns, 0),
     minutes: minutes(run.receipts.reduce((n, r) => n + r.ms, 0)),
     usd: usd(run.receipts.reduce((n, r) => n + r.costUsd, 0)),
+    tokens: run.receipts.reduce((n, r) => n + (r.tokens ?? 0), 0),
   };
 }
 

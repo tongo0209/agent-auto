@@ -1,10 +1,6 @@
 {
   "id": "landing-new",
   "label": "Dựng landing mới từ design",
-  "budget": {
-    "usd": 40,
-    "minutes": 240
-  },
   "ask": [
     {
       "need": [

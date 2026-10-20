@@ -1,10 +1,6 @@
 {
   "id": "buglist",
   "label": "Xử lý buglist QC",
-  "budget": {
-    "usd": 30,
-    "minutes": 150
-  },
   "ask": [
     {
       "need": [

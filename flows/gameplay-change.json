@@ -1,10 +1,6 @@
 {
   "id": "gameplay-change",
   "label": "Đổi cơ chế gameplay giữa chừng (khoá lại → diff kit → sửa)",
-  "budget": {
-    "usd": 30,
-    "minutes": 150
-  },
   "ask": [
     {
       "need": [

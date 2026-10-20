@@ -1,10 +1,6 @@
 {
   "id": "landing-clone",
   "label": "Clone-reskin landing có sẵn (giữ cấu trúc, thay ảnh/chữ)",
-  "budget": {
-    "usd": 15,
-    "minutes": 90
-  },
   "ask": [
     {
       "need": [

@@ -93,6 +93,14 @@ test('vượt budget usd → stopped budget', () => {
   assert.strictEqual(run.stopReason, 'budget');
 });
 
+test('flow không khai budget → không giới hạn, tốn bao nhiêu cũng chạy tiếp', () => {
+  const free = { ...FLOW, budget: undefined };
+  const start = createRun({ key: 'GW-1', runId: 'r1', flow: free, routerReason: 'x', repo: '/r', campaignDir: '/r/c', now: T0 });
+  const run = applyEvent(start, free, { type: 'pass', receipt: { ...receipt('plan', 500), ms: 600 * 60_000 } }, T0);
+  assert.strictEqual(run.status, 'running');
+  assert.deepStrictEqual(resumeRun({ ...run, status: 'stopped', stopReason: 'x' }, {}).budget, {});
+});
+
 test('vượt budget phút (máy chạy) → stopped budget', () => {
   const run = applyEvent(fresh(), FLOW, { type: 'pass', receipt: { ...receipt('plan'), ms: 61 * 60_000 } }, T0);
   assert.strictEqual(run.stopReason, 'budget');

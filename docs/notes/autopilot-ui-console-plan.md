@@ -49,3 +49,9 @@ Bấm Duyệt thì chặn POST bằng `page.route` để không duyệt thật G
 - Lỗi lab: autopilot route đọc state.json ở lab (không có) ⇒ phase null ⇒ không khớp luồng. Sửa: đọc state của main chỉ-đọc.
 - Implement của autopilot sửa thẳng cdn-source thật ⇒ cần worktree cdn-source riêng + tắt write-sheet trước khi chạy thử task thật.
 - Đang làm: thư viện trường hợp task (task-cases) — bóc từ state.json/memory/lessons/git → bảng case → luồng; trình user duyệt trước khi code.
+
+## Checkpoint 20/10 15:xx — chạy thử 7 luồng
+- Sandbox hook (7f2dce5): claude của run bị chặn Edit/Write/Bash nhắm git-vng, agent-auto, ~/.claude; worktree mượn node_modules.
+- Script chạy thử: scratchpad/run-all.sh → run-all.log; snapshot source gốc trước/sau mỗi run (snap-before/after-<KEY>.txt).
+- Thứ tự: GW-912 landing-fix · GW-963 gameplay-change · GW-909 design-intake · GW-950 buglist · GW-844 landing-new · GW-627 feature · GW-806 landing-clone.
+- Chờ user: mở nút autopilot qua cổng 403 (server.mjs sửa, CHƯA commit — classifier chặn); restart 4800 phải hỏi; push 2 nhánh.

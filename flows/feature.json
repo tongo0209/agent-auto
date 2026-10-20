@@ -1,10 +1,6 @@
 {
   "id": "feature",
   "label": "Tính năng/sửa không kèm design",
-  "budget": {
-    "usd": 25,
-    "minutes": 120
-  },
   "ask": [
     {
       "need": [

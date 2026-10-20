@@ -99,14 +99,10 @@ button { cursor: pointer; border: 0; background: none; }
 
 .top { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: start; }
 .meters { display: flex; gap: 18px; }
-.meter { display: grid; grid-template-columns: 52px auto; align-items: center; gap: 10px; }
-.meter svg { transform: rotate(-90deg); }
-.meter circle { fill: none; stroke-width: 5; }
-.meter .track { stroke: var(--line); }
-.meter .val { stroke: var(--ok); stroke-linecap: round; transition: stroke-dashoffset 1s var(--ease), stroke .3s; }
-.meter .val.hot { stroke: var(--wait); } .meter .val.over { stroke: var(--stop); }
-.meter b { display: block; font-family: var(--mono); font-size: 16px; }
-.meter small { color: var(--text-3); font-size: 12px; }
+.usage { display: flex; align-items: center; gap: 10px; }
+.usage > i { font-size: 22px; color: var(--ok); }
+.usage b { display: block; font-family: var(--mono); font-size: 16px; }
+.usage small { color: var(--text-3); font-size: 12px; }
 
 .flow { position: relative; margin: 34px 0 10px; padding: 8px 4px 0; overflow-x: auto; scrollbar-color: var(--line-2) transparent; }
 .flow-inner { position: relative; min-width: max-content; }

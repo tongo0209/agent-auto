@@ -43,3 +43,9 @@ test('C: mỗi luồng phải khai 1–3 câu ask có need + question', () => {
   assert.ok(validateFlow(mini(stages, four), { promptsDir: PROMPTS_DIR }).some((e) => e.includes('ask')));
   assert.ok(validateFlow(mini(stages, [{ question: 'q' }]), { promptsDir: PROMPTS_DIR }).some((e) => e.includes('need')));
 });
+
+test('budget không bắt buộc (mặc định không giới hạn), có khai thì phải > 0', () => {
+  const stages = [{ id: 'a', kind: 'claude', prompt: 'x', next: null }];
+  assert.ok(!validateFlow({ ...mini(stages), budget: undefined }, { promptsDir: PROMPTS_DIR }).some((e) => /budget/.test(e)));
+  assert.ok(validateFlow({ ...mini(stages), budget: { usd: 0 } }, { promptsDir: PROMPTS_DIR }).some((e) => /budget/.test(e)));
+});

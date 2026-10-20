@@ -1,10 +1,6 @@
 {
   "id": "landing-fix",
   "label": "Sửa landing có sẵn theo design",
-  "budget": {
-    "usd": 25,
-    "minutes": 120
-  },
   "ask": [
     {
       "need": [

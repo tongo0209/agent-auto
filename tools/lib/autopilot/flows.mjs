@@ -41,7 +41,7 @@ export function validateFlow(flow, { promptsDir }) {
   const errors = [];
   const ids = flow.stages.map((s) => s.id);
   for (const id of new Set(ids)) if (ids.filter((x) => x === id).length > 1) errors.push(`stage trùng id: ${id}`);
-  if (!(flow.budget?.usd > 0 && flow.budget?.minutes > 0)) errors.push('budget usd/minutes phải > 0');
+  if (flow.budget && !Object.values(flow.budget).every((v) => v > 0)) errors.push('budget usd/minutes nếu khai thì phải > 0');
   if (!(flow.ask?.length >= 1 && flow.ask.length <= MAX_ASK)) errors.push(`ask phải có 1–${MAX_ASK} câu hỏi khi thiếu đầu vào`);
   for (const a of flow.ask ?? []) if (!a.need?.length || !a.question) errors.push(`ask thiếu need/question: ${JSON.stringify(a)}`);
 

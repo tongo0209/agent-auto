@@ -59,7 +59,7 @@ function stageVars(run, stage, input) {
 
 const receiptOf = (stage, v, res) => ({
   stage: stage.id, verdict: v.verdict, blocking: v.blocking.length, advisory: v.advisory.length,
-  turns: res.turns, costUsd: res.costUsd, ms: res.ms,
+  turns: res.turns, costUsd: res.costUsd, tokens: res.tokens ?? 0, ms: res.ms,
 });
 
 async function runClaudeStage(run, stage, deps) {

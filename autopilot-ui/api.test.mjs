@@ -17,14 +17,22 @@ saveRun(run);
 writeArtifact(run, 'plan.md', '# Sửa tab');
 saveRun({ ...run, key: 'GW-2', status: 'done', stage: null });
 
+test('listView: receipt cũ chưa ghi token → đọc bù từ dòng result trong log của stage', async () => {
+  const old = { ...run, key: 'GW-3', runId: '20261019-100000', status: 'done', stage: null };
+  saveRun(old);
+  writeArtifact(old, 'plan-r1.log', '{"type":"assistant"}\n{"duration_ms":5,"usage":{"input_tokens":1,"output_tokens":2,"cache_read_input_tokens":30,"cache_creation_input_tokens":400},"type":"result"}\n');
+  const view = await listView();
+  assert.strictEqual(view.runs.find((r) => r.key === 'GW-3').totals.tokens, 433);
+});
+
 test('listView: chờ bạn xếp trước, có cells + totals + show của stage hiện tại', async () => {
   const view = await listView();
-  assert.deepStrictEqual(view.runs.map((r) => r.key), ['GW-1', 'GW-2']);
+  assert.deepStrictEqual(view.runs.map((r) => r.key).slice(0, 2), ['GW-1', 'GW-2']);
   const first = view.runs[0];
   assert.strictEqual(first.cells.find((c) => c.id === 'approve-plan').state, 'waiting');
   assert.deepStrictEqual(first.cells.find((c) => c.id === 'gates'), { ...first.cells.find((c) => c.id === 'gates'), back: 'fix', side: false });
   assert.strictEqual(first.cells.find((c) => c.id === 'fix').side, true);
-  assert.deepStrictEqual(first.totals, { runs: 1, turns: 10, minutes: 1, usd: 1.5 });
+  assert.deepStrictEqual(first.totals, { runs: 1, turns: 10, minutes: 1, usd: 1.5, tokens: 0 });
   assert.deepStrictEqual(first.show, ['plan.md', 'plan-review-r*.json']);
   assert.ok(first.flowLabel.length > 0);
 });

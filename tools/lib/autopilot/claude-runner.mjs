@@ -26,6 +26,9 @@ const SANDBOX_SETTINGS = JSON.stringify({
 const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 const FAKE_PASS = '```autopilot-verdict\n{"verdict":"pass"}\n```';
 
+export const tokensOf = (usage = {}) =>
+  (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
+
 export function buildClaudeArgs({ prompt, model, toolset, resumeSessionId }) {
   if (!TOOLSETS[toolset]) throw new Error(`toolset lạ: ${toolset}`);
   const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--allowedTools', TOOLSETS[toolset]];
@@ -45,6 +48,7 @@ function runFake({ stageId, round }) {
     sessionId: `fake-${stageId}-${round}`,
     turns: entry.turns ?? 1,
     costUsd: entry.costUsd ?? 0,
+    tokens: entry.tokens ?? 0,
     ms: 0,
     result: entry.result ?? FAKE_PASS,
     error: entry.ok === false ? 'fake error' : null,
@@ -91,6 +95,7 @@ export function runClaude({ stageId, round, prompt, model, toolset, resumeSessio
         sessionId: json.session_id ?? null,
         turns: json.num_turns ?? 0,
         costUsd: json.total_cost_usd ?? 0,
+        tokens: tokensOf(json.usage),
         ms: json.duration_ms ?? ms,
         result: json.result ?? '',
         error: code === 0 && !json.is_error ? null : `exit ${code}${json.subtype ? ` · ${json.subtype}` : ''}`,

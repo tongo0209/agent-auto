@@ -10,7 +10,7 @@ agent-auto phải chuẩn hoá theo nó ở 3 chỗ:
 
 - **Đầu vào:** file dự án ghi bảng quà trước khi code.
 - **Cổng:** `pm-gate` bắt được trang có `pm__rut` mà thiếu hoặc sai cấu hình rút thăm.
-- **Đầu ra:** bản bàn giao giữ khối `prodTemplate` ở cả `Promotion/` lẫn `mainsite/`.
+- **Đầu ra:** bản bàn giao `mainsite/` giữ khối `prodTemplate`. Folder `Promotion/` **không thuộc phạm vi** (user chốt 20/10/2026: chỉ quan tâm `mainsite/` đúng chuẩn, không đụng `Promotion/`).
 
 Thành công khi:
 - `pm-gate` chặn được trang Lucky có `pm__rut` mà thiếu `prodTemplate`, thiếu `spoint`, thiếu `names.en`, hoặc `data-item` lệch `items`.
@@ -25,21 +25,20 @@ Thành công khi:
 | `rules/pm-contract.md` R-PM-7 | Ghi "5 luật bất biến AI-GUIDE §3"; kit giờ có 6 → lỗi thời |
 | Luật 6 | Chưa có cổng/luật nào trong agent-auto bắt |
 
-Đối chiếu luật 6 với lib `libraryMainsite-1.3.2.js` và 107 file HTML bàn giao có `pm__rut` trong gt-promotion-template:
+Đối chiếu luật 6 với lib `libraryMainsite-1.3.2.js` và 62 file `mainsite/*.html` có `pm__rut` trong gt-promotion-template (đo 20/10/2026):
 
 | Kit đòi | Lib 1.3.2 | Production | Quyết định |
 |---|---|---|---|
-| Có khối `prodTemplate` | `defaultSettings(){const e="undefined"==typeof prodTemplate?{}:prodTemplate…` | 97/107 | 🔴 |
-| Khai bằng `var` | Đọc tên trần → `const` ở cấp trên cùng của script cổ điển vẫn thấy | 95 `const`, 2 `var` | Production thắng: nhận `var`/`const`/`let` cấp trên cùng; chặn `type="module"` và khai trong hàm |
-| `pm__point spoint` trên cùng 1 thẻ | `el:{cp:".spoint"…}` mặc định | 68 cùng thẻ, 81 có `spoint` | Không có `spoint` = 🔴; khác thẻ = 🟡 |
+| Có khối `prodTemplate` | `defaultSettings(){const e="undefined"==typeof prodTemplate?{}:prodTemplate…` | 57/62 | 🔴 |
+| Khai bằng `var` | Đọc tên trần → `const` ở cấp trên cùng của script cổ điển vẫn thấy | 55 `const`, 2 `var` | Production thắng: nhận `var`/`const`/`let` cấp trên cùng; chặn `type="module"` và khai trong hàm |
+| `pm__point spoint` trên cùng 1 thẻ | `el:{cp:".spoint"…}` mặc định | 34 cùng thẻ, 46 có `spoint` | Không có `spoint` = 🔴; khác thẻ = 🟡 |
 | `names.en` + key = class `<body>` | `${r.en?`…${r[i("body").attr("class")][e.indexWord]}`:""}` | — | 🔴 |
-| `data-item` trên ô quà | Chỉ hiệu ứng mẫu của kit dùng | 6/107 | Không có = 🟡; có mà lệch `items` = 🔴 |
-| Comment `BACKEND:` trên khối | — | 3/107 | 🔴 ở file bàn giao, 🟡 trong cdn-source |
+| `data-item` trên ô quà | Chỉ hiệu ứng mẫu của kit dùng | 4/62 | Không có = 🟡; có mà lệch `items` = 🔴 |
+| Comment `BACKEND:` trên khối | — | 2/62 | 🔴 ở file bàn giao, 🟡 trong cdn-source |
 | `timeWait` dạng getter | `$.extend` nông → `settings.config` chung object; gán lại trong `animResult` cũng chạy | — | Nhận cả hai, task mới ưu tiên getter |
 
-Lỗi thật đã lộ: `gt-promotion-template/454-TNTQC2/landing-sinhnhat-62857` có `prodTemplate` ở `mainsite/index.html:1204`,
-nhưng `Promotion/index.html` không có. Đây chính là landing mẫu kit dẫn. Nguyên nhân không bị bắt: `tools/handoff-drift.mjs:38` xoá mọi `<script>` trước khi so.
-Theo R-PM-13, bản này không tự sửa, chỉ báo user.
+Ghi nhận: `454-TNTQC2/landing-sinhnhat-62857/Promotion/index.html` thiếu `prodTemplate` (bản `mainsite/` có, dòng 1204).
+User chốt: `Promotion/` ngoài phạm vi, không sửa, không soát.
 
 ## 3. Thiết kế
 
@@ -47,7 +46,7 @@ Theo R-PM-13, bản này không tự sửa, chỉ báo user.
 
 - Xuất `checkDraw(html, els, ctx)`. `runChecks` (`tools/pm-gate/checks.mjs`) nhận thêm HTML thô rồi gọi nó.
   Lý do: `scan.mjs` làm trống ruột `<script>` trước khi quét.
-- Chạy khi: `fullDocument` (cùng điều kiện `PG-REQ`) **và** trang có phần tử mang `pm__rut` **và** gameplay ≠ `payment`.
+- Chạy khi: `fullDocument` (cùng điều kiện `PG-REQ`) **và** trang có phần tử mang `pm__rut` **và** gameplay ≠ `payment` **và** đường dẫn file không nằm trong thư mục `Promotion/` của gt-promotion-template.
   Partial Twig thì bỏ qua; `--page` trên `dist/` soát vì `configProduction.html.twig` được include lúc build.
 - Đọc khối: tìm `<script>` không có `type="module"`, khai `var|const|let prodTemplate =` ở cấp trên cùng.
   Cắt object literal (đếm ngoặc, bỏ qua chuỗi/comment), đánh giá bằng `node:vm` trong context rỗng (`baseURL` undefined, timeout ngắn).
@@ -79,13 +78,13 @@ Theo R-PM-13, bản này không tự sửa, chỉ báo user.
 | `rules/pm-contract.md` | R-PM-7: 5 → 6 luật AI-GUIDE §3, nêu luật 6 + trỏ `fe-draw/`. Bảng mã thêm `PG-DRAW` (🔴·🟡). R-PM-10 thêm (h): test x1 và x5/x10 ở debug, popup bật **sau** khi hiệu ứng dừng, đóng popup tắt sáng ô trúng. R-PM-11 bước 3: Lucky có `pm__rut` ⇒ ghi bảng quà vào mục 5 (xem 3.4) |
 | `rules/landing-js.md` R-JS-1 | Thêm: ô lượt `pm__point spoint` cùng thẻ; khởi tạo ở `window.load`; `directory: ''` + lấy ảnh theo `src` quà đang hiển thị; `<body>` chỉ mang class ngôn ngữ (lib tra `names` theo nó). Dẫn mẫu `fe-draw/draw-animation.js` + `tn3q/landing/2026-ld-sinhnhat` |
 | `rules/landing-js.md` R-JS-2 | `timeWait`: getter (kit) hoặc gán lại trong `animResult`, cả hai hợp lệ; task mới dùng getter. Ghi dẫn chứng đọc lib |
-| `rules/pm-kit-overrides.tsv` | 1 dòng `*  prodTemplate  -  known  <dẫn chứng 95/107 const + lib typeof>  no`. Ghi thêm vào `docs/notes/2026-09-23-kit-vs-production.md` (R-PM-9) |
+| `rules/pm-kit-overrides.tsv` | 1 dòng `*  prodTemplate  -  known  <dẫn chứng 55/57 mainsite khai const + lib typeof>  no`. Ghi thêm vào `docs/notes/2026-09-23-kit-vs-production.md` (R-PM-9) |
 
 ### 3.3. Bàn giao — `rules/html-handoff.md` R-HO-13 MUST
 
-Trang có `pm__rut` thì khối `prodTemplate` cùng comment `BACKEND:` phải có ở **cả** `Promotion/` lẫn `mainsite/`, và bàn giao với `debug.status: true`.
-Nêu rõ: `handoff-drift` bỏ qua `<script>`, nên phần này do `PG-DRAW` soát qua R-HO-7 (chạy `pm-gate` trên từng file bàn giao).
-Dẫn chứng: ca 62857.
+Trang có `pm__rut` thì `mainsite/<file>.html` phải có khối `prodTemplate` cùng comment `BACKEND:`, và bàn giao với `debug.status: true`.
+`Promotion/` không soát, không sửa (user chốt 20/10/2026).
+Nêu rõ: `handoff-drift` bỏ qua `<script>`, nên phần này do `PG-DRAW` soát qua R-HO-7 (chạy `pm-gate` trên từng file `mainsite/`).
 
 Hệ quả user đã biết và chấp nhận: R-HO-7 dùng `--baseline none` cả với landing cũ, nên bàn giao lại landing quay cũ sẽ phải thêm comment `BACKEND:` / vá `names.en` (sửa 1 dòng, vô hại).
 
@@ -97,16 +96,17 @@ gameplay Lucky có `pm__rut` ⇒ trước khi code, thêm vào mục *5. Quyết
 
 ## 4. Kiểm thử
 
-- `tools/pm-gate.test.mjs` thêm fixture: 1 trang đạt (không lỗi `PG-DRAW`), 1 trang cho mỗi dòng 🔴 ở bảng 3.1, 1 trang `const` (phải đạt), 1 trang `type="module"` (🔴), 1 trang payment có `pm__rut` (không chạy `PG-DRAW`).
+- `tools/pm-gate.test.mjs` thêm fixture: 1 trang đạt (không lỗi `PG-DRAW`), 1 trang cho mỗi dòng 🔴 ở bảng 3.1, 1 trang `const` (phải đạt), 1 trang `type="module"` (🔴), 1 trang payment có `pm__rut` (không chạy `PG-DRAW`), 1 trang nằm dưới `Promotion/` (không chạy `PG-DRAW`).
 - Chạy thật:
   - `454-TNTQC2/landing-sinhnhat-62857/mainsite/index.html`: không có 🔴 `PG-DRAW`.
-  - `…/Promotion/index.html`: 🔴 thiếu khối.
+  - `…/Promotion/index.html`: không chạy `PG-DRAW` (ngoài phạm vi).
   - 1 bàn giao dùng `const`: không bị chặn vì `const`.
-- Đo lại 107 file: in phân bố mã `PG-DRAW` để xác nhận mức chặn khớp bảng production ở mục 2. Lệch lớn thì quay lại thiết kế.
+- Đo lại các file `mainsite/` có `pm__rut`: in phân bố mã `PG-DRAW` để xác nhận mức chặn khớp bảng production ở mục 2. Lệch lớn thì quay lại thiết kế.
 - Full suite `node --test tools/` chạy 1 lần cuối.
 
 ## 5. Ngoài phạm vi
 
-- Không sửa landing đã bàn giao (R-PM-13). Ca 62857 chỉ báo user.
+- Không sửa landing đã bàn giao (R-PM-13).
+- Không soát, không sửa folder `Promotion/` (user chốt 20/10/2026).
 - Không sửa kit (của team promotion; lệch ghi vào note báo team).
 - Không đụng `/check-promotion`, `handoff-drift`, code `project-note`.

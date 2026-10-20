@@ -166,8 +166,8 @@ button { cursor: pointer; border: 0; background: none; }
 .btn.claude:hover { background: color-mix(in srgb, var(--run) 30%, var(--bg-2)); }
 .dock-hint { display: block; margin-top: 4px; font-size: 12px; color: var(--text-3); }
 .dock-card label kbd { font-family: var(--mono); font-size: 11px; padding: 0 5px; border: 1px solid var(--line-2); border-radius: 4px; }
-.gate-strip { display: block; margin-bottom: 8px; padding: 8px 12px; border-radius: var(--r); background: color-mix(in srgb, var(--stop) 14%, var(--bg)); border: 1px solid color-mix(in srgb, var(--stop) 55%, var(--line)); color: #fecaca; }
-.gate-strip b { color: #fecaca; }
+.gate-strip { display: block; margin-bottom: 8px; padding: 8px 12px; border-radius: var(--r); background: color-mix(in srgb, var(--stop) 14%, var(--bg)); border: 1px solid color-mix(in srgb, var(--stop) 55%, var(--line)); color: color-mix(in srgb, var(--stop) 35%, var(--text)); }
+.gate-strip b { color: var(--stop); }
 .dock-card.stack { grid-template-columns: minmax(0, 1fr); }
 .dock-card.stack .actions { justify-content: flex-end; }
 .opt-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; max-height: 34vh; overflow-y: auto; margin-bottom: 10px; }

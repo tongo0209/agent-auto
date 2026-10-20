@@ -126,7 +126,6 @@ function renderTabs() {
   $('#termBody').classList.toggle('grid', state.grid && live.size > 1);
   $('#termBody').style.setProperty('--cols', live.size > 1 && $('#termBody').offsetWidth >= 720 ? 2 : 1);
   $('#termGridBtn')?.classList.toggle('on', state.grid);
-  live.get(state.active)?.term.focus();
 }
 
 function renderTools() {
@@ -166,6 +165,7 @@ function activate(id) {
   if (entry) entry.done = false;
   persist();
   renderTabs();
+  live.get(id)?.term.focus();
   requestAnimationFrame(fitVisible);
 }
 

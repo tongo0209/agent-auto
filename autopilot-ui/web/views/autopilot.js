@@ -332,6 +332,7 @@ let dockAsk = null;
 const stopCode = (run) => run.stopReason?.split(':')[0];
 const stopStage = (run) => run.stopReason?.split(':')[1];
 const reasonText = (stopReason) => {
+  if (!stopReason) return '';
   const [code, stage] = stopReason.split(':');
   return Object.hasOwn(STOP_REASON, code) ? STOP_REASON[code](stage) : stopReason;
 };
@@ -342,7 +343,8 @@ const askingNow = (run) => (dockAsk?.key === run.key && dockAsk.stage === run.st
 
 function stopMessage(run) {
   const text = reasonText(run.stopReason);
-  if (isBreakpointStop(run)) return `${text[0].toUpperCase()}${text.slice(1)}.`;
+  if (!text) return 'Run đã dừng.';
+  if (isBreakpointStop(run)) return `${esc(text[0].toUpperCase() + text.slice(1))}.`;
   const max = run.cells.find((c) => c.id === stopStage(run))?.max;
   const count = stopCode(run) === 'loop-exhausted' && max ? ` (${run.loops[stopStage(run)]}/${max})` : '';
   return `Run dừng: <b>${esc(text)}${count}</b>.`;
@@ -432,7 +434,7 @@ async function refresh() {
   const sig = JSON.stringify(next.runs);
   data = next;
   selectedKey ??= data.runs.find((r) => !isAborted(r))?.key ?? null;
-  if (sig === lastSig || stageMenu || ['note', 'smText'].includes(document.activeElement?.id)) return;
+  if (sig === lastSig || stageMenu || ['note', 'smText', 'gotoStage'].includes(document.activeElement?.id)) return;
   lastSig = sig;
   renderQueue();
   await renderMain();
@@ -829,14 +831,18 @@ export function mount(el) {
       if (e.key === 'Enter') startRun('auto');
       return;
     }
-    if (typing || !$('#dock').classList.contains('show')) return;
+    if (e.key === 'Escape' && dockAsk) {
+      dockAsk = null;
+      return renderDock(currentRun());
+    }
+    if (typing || stageMenu || !$('#dock').classList.contains('show')) return;
     if (e.key === 'a' && $('#actions [data-act="approve"]')) act('approve');
     if (e.key === 'r') $('#note').focus();
-    const pickBtn = !(e.metaKey || e.ctrlKey || e.altKey) && '123'.includes(e.key) && document.querySelectorAll('#dock [data-pick]')[Number(e.key) - 1];
+    const pickBtn = !(e.metaKey || e.ctrlKey || e.altKey) && '123'.includes(e.key) && document.querySelectorAll('#dock [data-pick]:not(:disabled)')[Number(e.key) - 1];
     if (pickBtn) act('pick', { option: pickBtn.dataset.pick });
   };
   $('#note').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) act('reject');
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $(`#actions [data-act="${askingNow(currentRun()) ?? 'reject'}"]`)?.click();
   });
   const onResize = () => {
     const run = data.runs.find((r) => r.key === selectedKey);

@@ -121,7 +121,7 @@ export function mount(el, ctx) {
     const items = r.value.items;
     const count = items.reduce((n, i) => n + i.changes.length, 0);
     if (!count) return ($('#tdDelta').innerHTML = '');
-    const change = (c) => `${DELTA_LABEL[c.type] ?? c.type}${c.name ? ` ${esc(c.name)}` : ''} <span class="mono">${esc(c.from ?? '--')}</span> <i class="ph ph-arrow-right"></i> <span class="mono">${esc(c.to ?? '--')}</span>`;
+    const change = (c) => `${c.sub ? `<b>bổ sung ${esc(c.sub)}:</b> ` : ''}${DELTA_LABEL[c.type] ?? c.type}${c.name ? ` ${esc(c.name)}` : ''} <span class="mono">${esc(c.from ?? '--')}</span> <i class="ph ph-arrow-right"></i> <span class="mono">${esc(c.to ?? '--')}</span>`;
     $('#tdDelta').innerHTML = `<div class="td-delta ${deltaOpen ? 'open' : ''}">
       <button class="td-delta-bar" data-delta-toggle><i class="ph ph-broadcast"></i><b>${count} thay đổi</b><span>Jira và phase từ ${hhmm(seenAt())}</span><i class="ph ph-caret-down caret"></i></button>
       <div class="td-delta-list">${items.map((i, n) => `<div class="vw-in" style="--i:${n}"><button class="vw-key" data-ticket="${esc(i.key)}">${esc(i.key)}</button>${i.changes.map(change).join('<span class="dot">·</span>')}</div>`).join('')}

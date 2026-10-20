@@ -512,6 +512,23 @@ test('mốc muộn nhất mới là mốc chốt, kể cả khi nằm sau releas
   assert.equal(shouldRetire({ keys: ['GW-2'] }, issues, T(10)), false);
 });
 
+test('buglist gắn mã subtask: xét cả task chính + subtask — task chính chưa release thì chưa nghỉ', () => {
+  const issues = {
+    'GW-901': { milestones: { release: '2026-08-22' } },
+    'GW-950': { parent: 'GW-901', milestones: { duedate: '2026-08-05' } },
+  };
+  assert.equal(shouldRetire({ keys: ['GW-950'] }, issues, T(10)), false);
+  assert.equal(shouldRetire({ keys: ['GW-950'] }, issues, new Date(2026, 7, 25, 10)), true);
+});
+
+test('buglist gắn task chính: subtask bổ sung còn mốc sau release thì chưa nghỉ', () => {
+  const issues = {
+    'GW-901': { milestones: { release: '2026-08-12' } },
+    'GW-950': { parent: 'GW-901', milestones: { duedate: '2026-08-20' } },
+  };
+  assert.equal(shouldRetire({ keys: ['GW-901'] }, issues, T(15)), false);
+});
+
 const FULL = { buildOk: true, liveMatch: true, hasQcImage: true, repro: true };
 
 test('đủ bằng chứng máy ⇒ verified', () => {

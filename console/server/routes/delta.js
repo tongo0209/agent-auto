@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { file } = require('../lib/paths');
-const { readJSONL } = require('../lib/fsutil');
+const { readJSON, readJSONL } = require('../lib/fsutil');
 const { buildDelta } = require('../lib/delta');
 
 const router = Router();
@@ -18,6 +18,7 @@ router.get('/delta', (req, res) => {
       issueRows: readJSONL(file.issues),
       phaseRows: readJSONL(file.phases),
       sinceISO: since,
+      issues: readJSON(file.state, { issues: {} }).issues || {},
     }),
   });
 });

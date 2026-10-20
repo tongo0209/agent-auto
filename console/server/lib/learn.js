@@ -3,6 +3,7 @@ const { readJSON, readJSONL, todayStr } = require('./fsutil');
 const { appendJSONL } = require('./backup');
 const { activityForIssue } = require('./activity');
 const { cleanPhaseRows } = require('./phaselog');
+const { parentKeyOf } = require('./vocab');
 
 /**
  * Vòng học — dữ liệu phải sinh ra như TÁC DỤNG PHỤ của việc đang làm.
@@ -82,12 +83,11 @@ function percentile(nums, p) {
  * Khoảng CHƯA đóng (phase hiện tại) không tính vào median — nếu tính thì phase đang chạy
  * luôn kéo median xuống và dự báo thành vô nghĩa.
  */
-function leadTimes() {
+function leadTimes({ rows = cleanPhaseRows(readJSONL(file.phases)), issues = readJSON(file.state, { issues: {} }).issues || {} } = {}) {
   // LÀM SẠCH trước khi tính, dùng chung luật với lib/delta.js (xem lib/phaselog.js).
   // Đo thật 3/8: 2 dòng rác của GW-556 (1 dòng TRÙNG cách 18 phút + 1 dòng NO-OP `coding→coding`)
   // biến thành 2 mẫu "phase coding dài 0.3h", kéo median phase `coding` từ ~47h xuống 23.5h →
   // dự báo báo "xong hôm nay" cho ticket đang đứng yên 2 ngày. Đọc sổ thô là tính sai.
-  const rows = cleanPhaseRows(readJSONL(file.phases));
 
   const byKey = {};
   for (const r of rows) (byKey[r.key] ||= []).push(r);
@@ -98,11 +98,12 @@ function leadTimes() {
     for (let i = 0; i < list.length; i++) {
       const cur = list[i];
       const next = list[i + 1];
-      if (next) {
+      if (!next) {
+        open[key] = { phase: cur.to, since: cur.at, hours: (Date.now() - parse(cur.at)) / HOUR };
+      } else if (!parentKeyOf(issues, key)) {
+        // subtask là việc bổ sung ngắn — lấy làm mẫu sẽ kéo median phase của task chính xuống
         const hours = (parse(next.at) - parse(cur.at)) / HOUR;
         if (hours >= 0) (closed[cur.to] ||= []).push(hours);
-      } else {
-        open[key] = { phase: cur.to, since: cur.at, hours: (Date.now() - parse(cur.at)) / HOUR };
       }
     }
   }

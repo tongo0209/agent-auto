@@ -62,7 +62,7 @@ export const ticketNames = (summary) =>
 export function buildIndex(issues, chats) {
   const tickets = {};
   for (const [key, issue] of Object.entries(issues)) {
-    if (issue.phase === 'closed' || !issue.summary) continue;
+    if (issue.phase === 'closed' || !issue.summary || issues[issue.parent]) continue;
     tickets[key] = { code: ticketCode(issue.summary), aliases: new Set(ticketNames(issue.summary)) };
   }
   const chatTickets = {};
@@ -81,7 +81,9 @@ export function buildIndex(issues, chats) {
 
 export function matchMessage(msg, index, issues) {
   const text = msg.summary || '';
-  const byKey = (text.match(/\bGW-\d+\b/g) || []).filter((k) => issues[k]);
+  const byKey = (text.match(/\bGW-\d+\b/g) || [])
+    .filter((k) => issues[k])
+    .map((k) => (issues[issues[k].parent] ? issues[k].parent : k));
   if (byKey.length) return [...new Set(byKey)];
   if (index.chatTickets[msg.chatId]) return index.chatTickets[msg.chatId];
   return Object.entries(index.tickets)

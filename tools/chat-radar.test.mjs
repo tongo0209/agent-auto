@@ -77,6 +77,14 @@ test('matchMessage: group game → ticket; Dí/1:1 → theo nội dung', () => {
   assert.deepStrictEqual(matchMessage(msg({ summary: 'MONTHLY report' }), idx, ISSUES), [], 'không khớp nửa từ');
 });
 
+test('subtask đi cùng task chính: tin nhắc mã subtask quy về task chính, index không có dòng subtask', () => {
+  const issues = { ...ISSUES, 'GW-963': { parent: 'GW-890', phase: 'wait-test', summary: 'Fix design - [688][TLBBVNG] Hồng Bao' } };
+  const idx = buildIndex(issues, CHATS);
+  assert.strictEqual(idx.tickets['GW-963'], undefined);
+  assert.deepStrictEqual(matchMessage(msg({ summary: 'GW-963 sửa giúp' }), idx, issues), ['GW-890']);
+  assert.deepStrictEqual(matchMessage(msg({ summary: 'bên TLBBVNG lỗi popup' }), idx, issues), ['GW-890']);
+});
+
 test('classify gắn nhãn bug/design/deadline/mention/link', () => {
   assert.deepStrictEqual(classify('trang bị lỗi không hiện popup', 'Tố. Ngô Tất'), ['bug']);
   assert.deepStrictEqual(classify('update design mới https://www.figma.com/design/x', 'Tố. Ngô Tất'), ['design', 'link']);

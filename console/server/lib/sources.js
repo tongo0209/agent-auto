@@ -1,5 +1,5 @@
 const path = require('path');
-const { AGENT_AUTO, file } = require('./paths');
+const { AGENT_AUTO, DATA_ROOT, file } = require('./paths');
 const { readJSON, readJSONL, todayStr } = require('./fsutil');
 const { through } = require('./cache');
 const { activityForIssue } = require('./activity');
@@ -40,7 +40,7 @@ async function currentDoctor() {
   try {
     // ESM (import.meta.dirname) — CJS chỉ được dynamic-import, require() sẽ nổ ERR_REQUIRE_ESM
     const { runDoctor } = await import(path.join(AGENT_AUTO, 'tools', 'state-doctor.mjs'));
-    const r = runDoctor({ root: AGENT_AUTO });
+    const r = runDoctor({ root: AGENT_AUTO, dataRoot: DATA_ROOT });
     const issues = readJSON(file.state, { issues: {} }).issues || {};
     const mine = (f) => !f.key || !isOffMyPlate(issues[f.key]);
     const errors = (r.errors || []).filter(mine);

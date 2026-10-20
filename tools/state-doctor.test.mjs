@@ -458,3 +458,36 @@ test('không có config.example.json → im lặng, không báo W10/W11', () => 
   assert.ok(!w.includes('W10'));
   assert.ok(!w.includes('W11'));
 });
+
+test('subtask không mốc: im khi task chính có mốc hoặc đã giao — mốc thuộc task chính', () => {
+  const root = fixture({
+    issues: {
+      'GW-1': { phase: 'wait-test', summary: 'a', milestones: { release: '2026-08-10' } },
+      'GW-2': { phase: 'bugfix', summary: 'b', parent: 'GW-1', milestones: {} },
+      'GW-3': { phase: 'done-fe', summary: 'c', milestones: {} },
+      'GW-4': { phase: 'bugfix', summary: 'd', parent: 'GW-3', milestones: {} },
+    },
+  });
+  const w4 = runDoctor({ root, skipIcons: true }).warns.filter((w) => w.code === 'W4').map((w) => w.key);
+  assert.deepStrictEqual(w4, ['GW-3']);
+});
+
+test('subtask không mốc mà task chính cũng chưa có mốc, còn đang làm → vẫn W4', () => {
+  const root = fixture({
+    issues: {
+      'GW-1': { phase: 'coding', summary: 'a', milestones: {} },
+      'GW-2': { phase: 'bugfix', summary: 'b', parent: 'GW-1', milestones: {} },
+    },
+  });
+  const w4 = runDoctor({ root, skipIcons: true }).warns.filter((w) => w.code === 'W4').map((w) => w.key);
+  assert.deepStrictEqual(w4.sort(), ['GW-1', 'GW-2']);
+});
+
+test('dataRoot tách khỏi root code: worktree chỉ có code vẫn soi đúng state/config thật', () => {
+  const data = fixture({ issues: { 'GW-1': { phase: 'coding', summary: 'a', milestones: { html: '2026-08-10' } } } });
+  const code = fs.mkdtempSync(path.join(os.tmpdir(), 'doctor-code-'));
+  fs.mkdirSync(path.join(code, 'schema'), { recursive: true });
+  fs.copyFileSync(new URL('../schema/vocab.json', import.meta.url), path.join(code, 'schema/vocab.json'));
+  const r = runDoctor({ root: code, dataRoot: data, skipIcons: true });
+  assert.deepStrictEqual(codes(r.errors).filter((c) => ['E5', 'E10'].includes(c)), []);
+});

@@ -123,3 +123,16 @@ test('mốc đổi báo THEO TỪNG MỐC, không nhả khối JSON, và bỏ ke
     ['html:2026-08-07→2026-08-10', 'test:—→2026-08-20']
   );
 });
+
+test('thay đổi của subtask đi dưới task chính, mỗi change mang `sub` — không thành dòng riêng', () => {
+  const issues = { 'GW-1': { phase: 'coding' }, 'GW-2': { parent: 'GW-1', phase: 'bugfix' } };
+  const items = buildDelta({
+    issueRows: [],
+    phaseRows: [{ at: '2026-08-03T11:00:00+07:00', key: 'GW-2', from: 'wait-test', to: 'bugfix', reason: 'jira' }],
+    sinceISO: '2026-08-03T10:00:00+07:00',
+    issues,
+  });
+  assert.deepStrictEqual(items.map((i) => i.key), ['GW-1']);
+  assert.strictEqual(items[0].changes[0].sub, 'GW-2');
+  assert.strictEqual(items[0].changes[0].to, 'bugfix');
+});

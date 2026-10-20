@@ -3,7 +3,7 @@ const http = require('http');
 const path = require('path');
 const express = require('express');
 
-const { DIST, AGENT_AUTO, PTY_CWD, file } = require('./lib/paths');
+const { DIST, AGENT_AUTO, DATA_ROOT, PTY_CWD, file } = require('./lib/paths');
 const { attachTerminal } = require('./ws/terminal');
 const { syncMetrics } = require('./lib/learn');
 const { listenWithFallback } = require('./lib/listen');
@@ -142,7 +142,7 @@ listenWithFallback(server, {
     // nuốt lỗi vì đây chỉ là tiện ích log, /api/doctor mới là nguồn thật cho UI.
     import(path.join(AGENT_AUTO, 'tools', 'state-doctor.mjs'))
       .then(({ runDoctor }) => {
-        const r = runDoctor({ root: AGENT_AUTO });
+        const r = runDoctor({ root: AGENT_AUTO, dataRoot: DATA_ROOT });
         if (r.errors.length) console.log(`  ⚠ state-doctor: ${r.errors.length} ERROR — mở /api/doctor để xem`);
       })
       .catch(() => {});

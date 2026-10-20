@@ -353,8 +353,15 @@ export function shouldRetire(entry = {}, issues = {}, now = new Date()) {
   const keys = entry.keys || [];
   if (!keys.length) return false;
   const today = new Date(now).toISOString().slice(0, 10);
+  // Buglist thuộc task chính + mọi subtask bổ sung của nó: nghỉ khi mốc muộn nhất CẢ NHÀ đã qua
   return keys.every((key) => {
-    const last = lastMilestone(issues[key]?.milestones);
+    const task = issues[issues[key]?.parent] ? issues[key].parent : key;
+    const last = Object.entries(issues)
+      .filter(([k, issue]) => k === task || issue.parent === task)
+      .map(([, issue]) => lastMilestone(issue.milestones))
+      .filter(Boolean)
+      .sort()
+      .at(-1);
     return Boolean(last) && last < today;
   });
 }

@@ -8,6 +8,7 @@
  * issues.jsonl không mang field bugSheets — bịa loại thay đổi là báo sai cho user.
  */
 const { cleanPhaseRows, phaseRowTime: at } = require('./phaselog');
+const { parentKeyOf } = require('./vocab');
 
 /** So 2 dòng issues.jsonl liền kề (baseline → hiện tại) của CÙNG 1 ticket */
 function diffRows(prev, cur) {
@@ -38,7 +39,7 @@ function diffRows(prev, cur) {
  * dòng MỚI NHẤT overall làm hiện tại — không phải so 2 dòng liên tiếp bất kỳ. Không có dòng
  * nào MỚI HƠN `since` thì ticket đó không có gì mới (không báo bừa dù có nhiều dòng cũ hơn).
  */
-function buildDelta({ issueRows = [], phaseRows = [], sinceISO }) {
+function buildDelta({ issueRows = [], phaseRows = [], sinceISO, issues = {} }) {
   const since = new Date(sinceISO).getTime();
   const byKey = {};
 
@@ -78,7 +79,13 @@ function buildDelta({ issueRows = [], phaseRows = [], sinceISO }) {
     else items.push({ key: row.key, changes: [change] });
   }
 
-  return items;
+  const changesByTask = new Map();
+  for (const { key, changes } of items) {
+    const parent = parentKeyOf(issues, key);
+    const tagged = parent ? changes.map((c) => ({ ...c, sub: key })) : changes;
+    changesByTask.set(parent || key, [...(changesByTask.get(parent || key) || []), ...tagged]);
+  }
+  return [...changesByTask].map(([key, changes]) => ({ key, changes }));
 }
 
 module.exports = { buildDelta };

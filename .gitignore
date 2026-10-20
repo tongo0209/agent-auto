@@ -1,5 +1,6 @@
 # Build output + dependency của console
 console/node_modules/
+console/node_modules
 console/dist/
 
 # Backup quay vòng do console/skill ghi (state, board) — lưới an toàn, không phải lịch sử

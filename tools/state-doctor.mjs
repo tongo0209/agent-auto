@@ -63,10 +63,11 @@ function iconNames(root) {
   );
 }
 
-export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
+// dataRoot: worktree lab chỉ có code, state/config/tasks thật nằm ở repo chính
+export function runDoctor({ root = REPO_ROOT, dataRoot = root, skipIcons = false } = {}) {
   const vocab = readJSON(path.join(root, 'schema/vocab.json')) || readJSON(path.join(REPO_ROOT, 'schema/vocab.json'));
-  const state = readJSON(path.join(root, 'state.json'), {});
-  const config = readJSON(path.join(root, 'config.json'), {});
+  const state = readJSON(path.join(dataRoot, 'state.json'), {});
+  const config = readJSON(path.join(dataRoot, 'config.json'), {});
   const errors = [];
   const warns = [];
   const err = (code, key, text) => errors.push({ code, key, text });
@@ -82,6 +83,8 @@ export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
   // doctor tự nhận, không phải sửa file .mjs này lần nữa.
   const activePhaseIds = new Set(vocab.phases.filter((p) => p.active).map((p) => p.id));
   const needsHandoffIds = new Set(vocab.phases.filter((p) => p.needsHandoff).map((p) => p.id));
+  const lateExemptIds = new Set(vocab.phases.filter((p) => p.lateExempt).map((p) => p.id));
+  const realMilestoneCount = (issue) => Object.keys(issue?.milestones || {}).filter((n) => !n.startsWith('_')).length;
 
   // E5: state.json phải khai đúng schemaVersion hiện dùng (2) — sai/thiếu nghĩa là state cũ
   // hoặc ghi tay, console có thể đọc sai cấu trúc.
@@ -102,7 +105,7 @@ export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
   // "✓ 0 ERROR · 0 WARN". Mà README bảo member dùng đúng lệnh này để nghiệm thu cài đặt.
   // Báo xanh sai tệ hơn báo đỏ: member tin đã xong, rồi chết ở bước quét Jira mà không biết
   // vì sao. E10 chỉ bắt thứ CHẮC CHẮN sai (thiếu file, để trống, còn `<...>`), không đoán.
-  const configPath = path.join(root, 'config.json');
+  const configPath = path.join(dataRoot, 'config.json');
   const isPlaceholder = (v) => /^<.*>$/.test(String(v).trim());
   const unset = (v) => v == null || String(v).trim() === '' || isPlaceholder(v);
   if (!fs.existsSync(configPath)) {
@@ -175,7 +178,10 @@ export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
       if (!ISO_DATE.test(String(date))) err('E3', key, `mốc "${name}" = "${date}" không phải YYYY-MM-DD`);
     }
     // task ADHOC (buglist ngoài Jira) không có mốc Jira để đòi — W4 ở đó là cảnh báo oan
-    if (issue.source !== 'adhoc' && Object.keys(ms).filter((n) => !n.startsWith('_')).length === 0) {
+    // subtask đi theo mốc task chính: cha có mốc hoặc đã giao (phase miễn trễ) thì không đòi
+    const parent = state.issues[issue.parent];
+    const parentCoversDeadline = parent && (realMilestoneCount(parent) > 0 || lateExemptIds.has(parent.phase));
+    if (issue.source !== 'adhoc' && !parentCoversDeadline && realMilestoneCount(issue) === 0) {
       warn('W4', key, 'không có mốc nào — không biết deadline');
     }
     // W5: ngược với E2/E3, `_conflict` LÀ đáng cảnh báo — mốc còn tranh chấp chưa ai hỏi lại,
@@ -232,7 +238,7 @@ export function runDoctor({ root = REPO_ROOT, skipIcons = false } = {}) {
     if (!paths.length && !parentPaths.length && activePhaseIds.has(issue.phase)) {
       warn('W2', key, `phase "${issue.phase}" mà chưa gắn paths — không đo được effort`);
     }
-    if (needsHandoffIds.has(issue.phase) && !fs.existsSync(path.join(root, 'tasks', key, 'handoff.md'))) {
+    if (needsHandoffIds.has(issue.phase) && !fs.existsSync(path.join(dataRoot, 'tasks', key, 'handoff.md'))) {
       warn('W3', key, 'đã chuyển người mà chưa có tasks/' + key + '/handoff.md');
     }
   }

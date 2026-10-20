@@ -9,6 +9,7 @@ Soi:
 - File/selector/hook plan nhắc tới có thật không (grep để kiểm, không đoán).
 - Có đụng hợp đồng `pm__`/`id`/`data-*` không (R-PM, cấm đổi tên/xoá lẻ).
 - Có cách verify chạy được không.
+- Mục `## Phương án`: các cách có đánh đổi thật, không trùng nhau; thiếu mục này là `blocking`.
 
 Ghi `{{runDir}}/plan-review-r{{round}}.json` dạng `{"blocking":[...],"advisory":[...]}`.
 Verdict: `revise` khi có lỗi chặn (plan sai/thiếu/không làm được), `pass` khi chỉ còn góp ý.

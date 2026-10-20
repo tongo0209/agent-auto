@@ -44,7 +44,7 @@ export function spawnDetached(args, { waitMs = EARLY_EXIT_MS, cli = CLI } = {}) 
   });
 }
 
-// open phải chờ CLI in JSON (worktree + lệnh claude) thì UI mới mở được tab
+// open phải chờ CLI in JSON (cwd + lệnh claude) thì UI mới mở được tab
 const runCliAndWait = (args) =>
   new Promise((resolve) =>
     execFile(process.execPath, [CLI, ...args], { cwd: path.dirname(CLI) }, (err, stdout, stderr) => resolve({ code: err ? err.code ?? 1 : 0, stdout, stderr })));
@@ -120,7 +120,7 @@ async function handleAutopilot(req, res, { spawnCli, execCli, openEditor }) {
 export function createServer({ spawnCli = spawnDetached, execCli = runCliAndWait, openEditor = openInVsCode, allowWrites = process.env.AUTOPILOT_LAB_WRITES === '1' } = {}) {
   const app = express();
   app.use((req, res, next) => (LOCAL_HOST.test(req.headers.host ?? '') ? next() : send(res, 403, { error: 'host lạ' })));
-  // autopilot đi trước cổng chặn ghi: run chạy trong worktree, hook sandbox chặn ghi ra source gốc
+  // autopilot đi trước cổng chặn ghi: run chỉ ghi được repo của nó, hook sandbox chặn repo khác + git ghi
   app.use('/api/autopilot', (req, res) => handleAutopilot(req, res, { spawnCli, execCli, openEditor }));
   app.use('/api', (req, res, next) =>
     allowWrites || req.method === 'GET' ? next() : send(res, 403, { error: 'Bản thử (agent-auto-lab) chặn ghi dữ liệu thật. Chạy với AUTOPILOT_LAB_WRITES=1 nếu thật sự muốn ghi.' }));

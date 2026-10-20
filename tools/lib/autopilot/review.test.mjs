@@ -54,3 +54,30 @@ test('runChanges: repo không có commit mới → khối rỗng, không có l�
   const [block] = runChanges({ ...run, worktrees: { [top]: dir }, bases: { [top]: base } });
   assert.deepStrictEqual([block.commits, block.files, block.cherryPick], [[], [], null]);
 });
+
+test('R19 runChanges: run làm thẳng trên repo gốc → chỉ commit của run (bỏ commit phiên khác chen giữa), file gộp theo path', () => {
+  const { top, git } = repoWithRun();
+  const commit = (file, text, msg) => {
+    fs.writeFileSync(path.join(top, file), text);
+    git(top, 'add', file);
+    git(top, 'commit', '-qm', msg);
+    return git(top, 'rev-parse', 'HEAD').stdout.trim();
+  };
+  const startHead = git(top, 'rev-parse', 'HEAD').stdout.trim();
+  const first = commit('a.txt', 'một\nbốn\n', 'run lần 1');
+  commit('khac.txt', 'phiên khác\n', 'phiên khác');
+  const second = commit('a.txt', 'một\nnăm\n', 'run lần 2');
+  const run = { key: 'GW-9', runId: 'r1', worktrees: {}, workBranch: { [top]: 'main' }, startHead: { [top]: startHead }, commits: [{ repo: top, sha: first }, { repo: top, sha: second }] };
+  const [block] = runChanges(run);
+  assert.deepStrictEqual([block.repo, block.worktree, block.branch, block.cherryPick], [top, top, 'main', null]);
+  assert.deepStrictEqual(block.commits.map((c) => c.subject), ['run lần 1', 'run lần 2']);
+  assert.deepStrictEqual(block.files.map((f) => [f.path, f.status]), [['a.txt', 'M']]);
+  assert.match(block.files[0].diff, /^\+bốn$/m);
+  assert.match(block.files[0].diff, /^\+năm$/m);
+});
+
+test('R19 runChanges: run chưa commit gì → mỗi repo 1 khối rỗng', () => {
+  const { top } = repoWithRun();
+  const [block] = runChanges({ key: 'GW-9', runId: 'r2', workBranch: { [top]: 'main' }, startHead: { [top]: 'x' } });
+  assert.deepStrictEqual([block.commits, block.files], [[], []]);
+});

@@ -5,11 +5,11 @@ import { parseVerdict } from './verdict.mjs';
 import { renderPrompt } from './prompts.mjs';
 import { PROMPTS_DIR } from './flows.mjs';
 import { runDir, saveRun, loadRun, writeArtifact, pauseFile, childFile } from './store.mjs';
-import { acquire, release, holdCampaign, heldCampaigns } from './lock.mjs';
+import { acquire, release, holdCampaign, heldCampaigns, holdRepo } from './lock.mjs';
 import { runClaude as realRunClaude, guardCode } from './claude-runner.mjs';
 import { runGates as realRunGates } from './gates.mjs';
 import { notify as realNotify } from './notify.mjs';
-import { addWorktree as realAddWorktree, toWorktree, isInWorktree, labWritesOn, branchOf } from './worktree.mjs';
+import { repoState as realRepoState, toWorktree, labWritesOn } from './worktree.mjs';
 import { runChanges } from './review.mjs';
 
 const UI_FILE = /\.(twig|html|scss|css)$/;
@@ -73,7 +73,7 @@ const stopRequested = (run) => fs.existsSync(pauseFile(run.key, run.runId)) || i
 
 function continuePrompt(run, marker) {
   const note = run.resumeNote ? `\nNgười dùng nhắn khi dừng: ${run.resumeNote}\n` : '';
-  return `AUTOPILOT_RUN: ${marker}\nBước này bị dừng giữa chừng theo lệnh người dùng. Làm tiếp từ chỗ dở (kiểm lại file đang sửa dở trong worktree), rồi trả verdict như yêu cầu ban đầu.${note}`;
+  return `AUTOPILOT_RUN: ${marker}\nBước này bị dừng giữa chừng theo lệnh người dùng. Làm tiếp từ chỗ dở (kiểm lại file đang sửa dở trong repo), rồi trả verdict như yêu cầu ban đầu.${note}`;
 }
 
 async function runClaudeStage(run, stage, deps) {
@@ -86,6 +86,7 @@ async function runClaudeStage(run, stage, deps) {
     prompt: cut ? continuePrompt(run, marker) : renderPrompt(template, stageVars(run, stage, deps.input), marker),
     resumeSessionId: cut ? cut.sessionId : stage.resume ? run.sessions[stage.resume] : null,
     cwd: run.repo ? toWorktree(run.worktrees, run.repo) : deps.agentRoot,
+    writable: Object.keys(run.workBranch ?? {}),
     logFile: path.join(runDir(run.key, run.runId), `${stage.id}-r${round}${cut ? '-tiep' : ''}.log`),
     childFile: childFile(run.key, run.runId),
   };
@@ -123,11 +124,13 @@ function gateTargets(run, stage) {
 }
 
 async function gatesOn(run, stage, deps, dir) {
-  const repo = toWorktree(run.worktrees, dir ? repoFor(run, dir) : run.repo);
-  return deps.runGates(stage.checks, {
-    repo, campaignDir: toWorktree(run.worktrees, dir), isolated: isInWorktree(run.worktrees, repo),
+  const real = dir ? repoFor(run, dir) : run.repo;
+  const repo = toWorktree(run.worktrees, real);
+  const result = await deps.runGates(stage.checks, {
+    repo, campaignDir: toWorktree(run.worktrees, dir), dirty: run.dirtyAtStart?.[real] ?? [],
     key: run.key, flowId: run.flow, files: run.files ?? [], planTitle: planTitle(run),
   });
+  return { ...result, repo };
 }
 
 export async function runGateStage(run, stage, deps) {
@@ -140,6 +143,8 @@ export async function runGateStage(run, stage, deps) {
   }
   const result = { pass: parts.every((p) => p.pass), error: parts.find((p) => p.error)?.error ?? null, results: parts.flatMap((p) => p.results) };
   writeArtifact(run, `${stage.id}-r${round}.json`, result);
+  const commits = parts.flatMap((p) => p.results.filter((r) => r.commit).map((r) => ({ repo: p.repo, sha: r.commit })));
+  if (commits.length) run.commits = [...(run.commits ?? []), ...commits];
   const failed = result.results.filter((r) => r.status === 'fail');
   const receipt = {
     stage: stage.id, verdict: result.pass ? 'pass' : 'revise', turns: 0, costUsd: 0, ms: deps.now() - started,
@@ -187,18 +192,24 @@ async function runStage(run, stage, deps) {
   }
 }
 
-// Stage sửa code chỉ được chạy trong worktree riêng: tạo không được thì dừng, không lùi về repo thật
-export function isolate(run, deps) {
-  const pending = (run.repos ?? [run.repo]).filter((r) => r && !isInWorktree(run.worktrees, toWorktree(run.worktrees, r)));
-  if (!pending.length) return run;
-  const worktrees = { ...run.worktrees };
-  const bases = { ...run.bases };
-  for (const repo of pending) {
-    const { top, dir, base } = deps.addWorktree({ repo, parentDir: path.join(runDir(run.key, run.runId), 'wt'), branch: branchOf(run), linkDirs: campaignsOf(run) });
-    worktrees[top] = dir;
-    bases[top] = base;
+// Run làm thẳng trên repo gốc: mỗi repo chỉ 1 run, nhánh chốt lúc bắt đầu và không được đổi giữa chừng
+export function claimRepos(run, deps) {
+  if (Object.keys(run.worktrees ?? {}).length) return run;
+  const next = { ...run, workBranch: { ...run.workBranch }, startHead: { ...run.startHead }, dirtyAtStart: { ...run.dirtyAtStart } };
+  for (const repo of (run.repos ?? [run.repo]).filter(Boolean)) {
+    const { top, branch, head, dirty } = deps.repoState(repo);
+    const held = holdRepo(top, run);
+    if (!held.ok) throw new Error(`repo đang có run ${held.holder.key} (${top})`);
+    const want = next.workBranch[top];
+    if (!want) {
+      next.workBranch[top] = branch;
+      next.startHead[top] = head;
+      next.dirtyAtStart[top] = dirty;
+    } else if (want !== branch) {
+      throw new Error(`${top} đang ở nhánh ${branch}, run làm trên ${want} — checkout lại ${want} rồi resume`);
+    }
   }
-  return { ...run, worktrees, bases };
+  return next;
 }
 
 // break chỉ ghi breakpoints vào run.json không qua lock; breakpoints trên đĩa thắng để lần saveRun sau không xoá nó
@@ -209,7 +220,7 @@ const withPlanOnDisk = (run) => {
 
 export async function drive(startRun, flow, overrides = {}) {
   const deps = {
-    now: Date.now, runClaude: realRunClaude, runGates: realRunGates, notify: realNotify, repoOf: () => null, addWorktree: realAddWorktree,
+    now: Date.now, runClaude: realRunClaude, runGates: realRunGates, notify: realNotify, repoOf: () => null, repoState: realRepoState,
     agentRoot: path.resolve(import.meta.dirname, '../../..'), ...overrides,
   };
   let run = { ...startRun };
@@ -244,9 +255,9 @@ export async function drive(startRun, flow, overrides = {}) {
       continue;
     }
     try {
-      run = isolate(run, deps);
+      run = claimRepos(run, deps);
     } catch (e) {
-      run = applyEvent(run, flow, { type: 'halt', reason: `worktree: ${e.message}` }, deps.now());
+      run = applyEvent(run, flow, { type: 'halt', reason: `repo: ${e.message}` }, deps.now());
       continue;
     }
     saveRun(run);

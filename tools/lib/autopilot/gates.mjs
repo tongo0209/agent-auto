@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { labWritesOn } from './worktree.mjs';
 
 const AGENT_ROOT = path.resolve(import.meta.dirname, '../../..');
 const BUILD_SCRIPTS = ['build-optimize', 'build-pro', 'build-dev', 'build'];
@@ -88,21 +87,25 @@ export function commitMessage(flowId, planTitle) {
   return `(${COMMIT_TYPE[flowId] ?? 'fix'}): ${title}\n\nCo-Authored-By: Claude Code <noreply@anthropic.com>`;
 }
 
+// R-GIT-5: chỉ add đúng file run đã sửa (bỏ file dở có sẵn lúc run bắt đầu), cdn-source pull ngay sau commit
 function runCommit(ctx) {
-  if (!ctx.isolated && !labWritesOn()) return { check: 'commit', status: 'skipped', blocking: [], note: 'repo thật — chỉ commit khi AUTOPILOT_LAB_WRITES=1' };
-  const files = changedFiles(ctx);
+  const dirtyAtStart = new Set(ctx.dirty ?? []);
+  const files = changedFiles(ctx).filter((f) => !dirtyAtStart.has(f));
   if (files.length === 0) return { check: 'commit', status: 'skipped', blocking: [], note: 'không có file nào vừa sửa trong campaign' };
 
-  const steps = [
-    ['add', '--', ...files],
-    ['commit', '--only', ...files, '-m', commitMessage(ctx.flowId, ctx.planTitle)],
-    ...(isCdnSource(ctx.repo) && labWritesOn() ? [['pull', '--no-rebase', '--no-edit', 'origin', 'master']] : []),
-  ];
-  for (const args of steps) {
-    const r = ctx.exec('git', args, { cwd: ctx.repo });
-    if (r.code !== 0) return { check: 'commit', status: 'error', blocking: tail(r), note: `git ${args[0]} lỗi` };
+  const git = (args) => ctx.exec('git', args, { cwd: ctx.repo });
+  const fail = (r, args) => ({ check: 'commit', status: 'error', blocking: tail(r), note: `git ${args[0]} lỗi` });
+  for (const args of [['add', '--', ...files], ['commit', '--only', ...files, '-m', commitMessage(ctx.flowId, ctx.planTitle)]]) {
+    const r = git(args);
+    if (r.code !== 0) return fail(r, args);
   }
-  return { check: 'commit', status: 'pass', blocking: [], note: files.join(', ') };
+  const commit = git(['rev-parse', 'HEAD']).stdout.trim();
+  const pull = ['pull', '--no-rebase', '--no-edit', 'origin', 'master'];
+  if (isCdnSource(ctx.repo)) {
+    const r = git(pull);
+    if (r.code !== 0) return { ...fail(r, pull), commit };
+  }
+  return { check: 'commit', status: 'pass', blocking: [], note: files.join(', '), commit };
 }
 
 const tail = (r) => `${r.stdout}\n${r.stderr}`.trim().split('\n').filter(Boolean).slice(-BLOCKING_TAIL);

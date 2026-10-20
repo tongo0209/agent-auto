@@ -20,23 +20,25 @@ export const TOOLSETS = {
   ].join(','),
 };
 
-const SANDBOX_SETTINGS = JSON.stringify({
-  hooks: { PreToolUse: [{ matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash', hooks: [{ type: 'command', command: `node ${path.join(import.meta.dirname, 'sandbox-hook.mjs')}` }] }] },
-});
+// writable = repo của run: hook cho ghi ở đó, chặn agent-auto, ~/.claude và repo khác
+const sandboxSettings = (writable) => {
+  const command = ['node', path.join(import.meta.dirname, 'sandbox-hook.mjs'), ...writable].map((a) => JSON.stringify(a)).join(' ');
+  return JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash', hooks: [{ type: 'command', command }] }] } });
+};
 const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 const FAKE_PASS = '```autopilot-verdict\n{"verdict":"pass"}\n```';
 
-export const sandboxArgs = () => (labWritesOn() ? [] : ['--settings', SANDBOX_SETTINGS]);
+export const sandboxArgs = (writable = []) => (labWritesOn() ? [] : ['--settings', sandboxSettings(writable)]);
 
 export const tokensOf = (usage = {}) =>
   (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
 
-export function buildClaudeArgs({ prompt, model, toolset, resumeSessionId }) {
+export function buildClaudeArgs({ prompt, model, toolset, resumeSessionId, writable }) {
   if (!TOOLSETS[toolset]) throw new Error(`toolset lạ: ${toolset}`);
   const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--allowedTools', TOOLSETS[toolset]];
   if (model) args.push('--model', model);
   if (resumeSessionId) args.push('--resume', resumeSessionId);
-  return [...args, ...sandboxArgs()];
+  return [...args, ...sandboxArgs(writable)];
 }
 
 export const guardCode = (text = '') => text.match(/\bG-[A-Z]+-\d+\b/)?.[0] ?? null;
@@ -56,10 +58,10 @@ function runFake({ stageId, round }) {
   };
 }
 
-export function runClaude({ stageId, round, prompt, model, toolset, resumeSessionId, cwd, marker, timeoutMs = DEFAULT_TIMEOUT_MS, logFile, childFile }) {
+export function runClaude({ stageId, round, prompt, model, toolset, resumeSessionId, writable, cwd, marker, timeoutMs = DEFAULT_TIMEOUT_MS, logFile, childFile }) {
   if (process.env.AUTOPILOT_FAKE) return Promise.resolve(runFake({ stageId, round }));
 
-  const args = buildClaudeArgs({ prompt, model, toolset, resumeSessionId });
+  const args = buildClaudeArgs({ prompt, model, toolset, resumeSessionId, writable });
   const started = Date.now();
   return new Promise((resolve) => {
     // detached: tiến trình con thành trưởng nhóm, pause/abort tắt được cả nhóm (claude + lệnh Bash nó gọi)

@@ -118,3 +118,9 @@ test('đường thật: ghi PID ra childFile, bị tắt giữa chừng vẫn tr
     process.env.PATH = oldPath;
   }
 });
+
+test('R19: hook sandbox nhận danh sách repo của run được ghi', () => {
+  const args = buildClaudeArgs({ prompt: 'p', toolset: 'implement', writable: ['/Users/u/VNG/git-vng/cdn-source'] });
+  const command = JSON.parse(args[args.indexOf('--settings') + 1]).hooks.PreToolUse[0].hooks[0].command;
+  assert.match(command, /sandbox-hook\.mjs" "\/Users\/u\/VNG\/git-vng\/cdn-source"$/);
+});

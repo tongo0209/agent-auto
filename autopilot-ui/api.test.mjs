@@ -6,7 +6,7 @@ import path from 'node:path';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-api-'));
 process.env.AUTOPILOT_CLAUDE_PROJECTS = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-proj-'));
-const { listView, artifactFile, listArtifacts, actionArgs, checkAction, liveLog } = await import('./api.mjs');
+const { listView, artifactFile, listArtifacts, actionArgs, checkAction, liveLog, worktreeOf } = await import('./api.mjs');
 const { saveRun, writeArtifact } = await import('../tools/lib/autopilot/store.mjs');
 const { acquire } = await import('../tools/lib/autopilot/lock.mjs');
 
@@ -126,6 +126,20 @@ test('listView: run done có worktree mà chưa review → awaitingReview; đã 
   const view = await listView();
   const flag = (key) => view.runs.find((r) => r.key === key).awaitingReview;
   assert.deepStrictEqual([flag('GW-40'), flag('GW-41'), flag('GW-2'), flag('GW-1')], [true, false, false, false]);
+});
+
+test('R19 listView: run làm thẳng repo gốc có commit mà chưa review → awaitingReview; chưa commit gì thì không', async () => {
+  saveRun({ ...run, key: 'GW-42', status: 'done', stage: null, worktrees: {}, workBranch: { '/r': 'tont' }, commits: [{ repo: '/r', sha: 'abc' }] });
+  saveRun({ ...run, key: 'GW-43', status: 'done', stage: null, worktrees: {}, workBranch: { '/r': 'tont' }, commits: [] });
+  const view = await listView();
+  const flag = (key) => view.runs.find((r) => r.key === key).awaitingReview;
+  assert.deepStrictEqual([flag('GW-42'), flag('GW-43')], [true, false]);
+});
+
+test('R19 worktreeOf: mở được repo gốc của run mới, từ chối thư mục khác', () => {
+  saveRun({ ...run, key: 'GW-44', worktrees: {}, workBranch: { '/r': 'tont' } });
+  assert.strictEqual(worktreeOf({ key: 'GW-44', runId: run.runId, dir: '/r' }), '/r');
+  assert.throws(() => worktreeOf({ key: 'GW-44', runId: run.runId, dir: '/etc' }), /không phải/);
 });
 
 test('actionArgs: goto/skip/pick/break và run có kế hoạch', () => {

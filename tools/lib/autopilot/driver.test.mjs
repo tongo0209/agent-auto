@@ -37,12 +37,16 @@ function fakeGates(byRound = {}) {
 }
 
 const notified = [];
-const fakeWorktree = ({ repo, parentDir }) => ({ top: repo, dir: path.join(parentDir, path.basename(repo)), base: 'b0' });
-const base = (extra = {}) => ({ now: () => Date.now(), notify: (t, m) => notified.push(m), addWorktree: fakeWorktree, ...extra });
+const fakeRepoState = (repo) => ({ top: repo, branch: 'tont', head: 'h0', dirty: [] });
+const base = (extra = {}) => ({ now: () => Date.now(), notify: (t, m) => notified.push(m), repoState: fakeRepoState, ...extra });
 const newRun = (flowId) =>
   createRun({ key: 'GW-1', runId: `r${Math.random().toString(36).slice(2, 8)}`, flow: loadFlow(flowId), routerReason: 't', repo: '/repo', campaignDir: '/repo/products/x/landing/a', now: Date.now() });
 
-beforeEach(() => (notified.length = 0));
+// Các test dùng chung repo giả /repo: mỗi test bắt đầu khi chưa run nào giữ repo
+beforeEach(() => {
+  notified.length = 0;
+  fs.rmSync(path.join(process.env.AUTOPILOT_RUNS_DIR, '.repos.json'), { force: true });
+});
 
 test('landing-fix: chạy tới pause duyệt plan, ghi artifact + receipt', async () => {
   const { runClaude, calls } = fakeClaude({});
@@ -134,9 +138,9 @@ test('campaign biết giữa chừng: được giữ; đang bị run khác giữ
   const flow = loadFlow('buglist');
   const dirA = `/repo/products/y/landing/${Math.random()}`;
   const { runClaude } = fakeClaude({ 'intake-triage': [{ result: verdict('pass', { campaignDir: dirA }) }] });
-  const a = await drive({ ...newRun('buglist'), key: 'GW-31', campaignDir: null, repo: null }, flow, base({ runClaude, runGates: fakeGates().runGates, repoOf: () => '/repo' }));
+  const a = await drive({ ...newRun('buglist'), key: 'GW-31', campaignDir: null, repo: null, repos: [] }, flow, base({ runClaude, runGates: fakeGates().runGates, repoOf: () => '/repo' }));
   assert.strictEqual(heldCampaigns()[dirA].key, 'GW-31');
-  const b = await drive({ ...newRun('buglist'), key: 'GW-32', campaignDir: null, repo: null }, flow, base({ runClaude, runGates: fakeGates().runGates, repoOf: () => '/repo' }));
+  const b = await drive({ ...newRun('buglist'), key: 'GW-32', campaignDir: null, repo: null, repos: [] }, flow, base({ runClaude, runGates: fakeGates().runGates, repoOf: () => '/repo' }));
   assert.match(b.stopReason, /^campaign-held:GW-31/);
   assert.strictEqual(a.stage, 'approve-result');
 });
@@ -159,33 +163,62 @@ function tmpGitRepo() {
   return { repo: fs.realpathSync(repo), git };
 }
 
-test('G0: stage claude + gate chạy trong worktree riêng autopilot/<KEY>-<runId>, không cwd vào repo thật', async () => {
+const onRepo = (repo, extra = {}) => ({ ...newRun('landing-fix'), repo, repos: [repo], campaignDir: path.join(repo, 'products/x/landing/a'), campaignDirs: [path.join(repo, 'products/x/landing/a')], ...extra });
+const realDeps = (extra) => ({ now: () => Date.now(), notify: () => {}, ...extra });
+
+test('R19: stage claude + gate chạy thẳng trên repo gốc, nhánh đang checkout; ghi workBranch/startHead/dirtyAtStart, không worktree/nhánh riêng', async () => {
   const { repo, git } = tmpGitRepo();
+  fs.writeFileSync(path.join(repo, 'dang-do.txt'), 'của phiên khác');
   const flow = loadFlow('landing-fix');
-  const start = { ...newRun('landing-fix'), repo, repos: [repo], campaignDir: path.join(repo, 'products/x/landing/a'), campaignDirs: [path.join(repo, 'products/x/landing/a')] };
   const { runClaude, calls } = fakeClaude({});
   const gates = fakeGates();
-  let run = await drive(start, flow, { now: () => Date.now(), notify: () => {}, runClaude, runGates: gates.runGates });
+  let run = await drive(onRepo(repo), flow, realDeps({ runClaude, runGates: gates.runGates }));
   run = applyEvent(run, flow, { type: 'approve' }, Date.now());
-  run = await drive(run, flow, { now: () => Date.now(), notify: () => {}, runClaude, runGates: gates.runGates });
+  run = await drive(run, flow, realDeps({ runClaude, runGates: gates.runGates }));
 
-  const wt = path.join(runDir(run.key, run.runId), 'wt', path.basename(repo));
-  assert.ok(calls.every((c) => c.cwd === wt), calls.map((c) => c.cwd).join(','));
-  assert.ok(calls.every((c) => !c.prompt.includes(`${repo}/products`)));
-  assert.strictEqual(gates.calls[0].ctx.repo, wt);
-  assert.strictEqual(gates.calls[0].ctx.campaignDir, path.join(wt, 'products/x/landing/a'));
-  assert.strictEqual(gates.calls[0].ctx.isolated, true);
-  assert.match(git('branch', '--list', `autopilot/${run.key}-${run.runId}`).stdout, /autopilot\//);
-  assert.strictEqual(git('status', '--porcelain').stdout, '');
+  assert.ok(calls.every((c) => c.cwd === repo && c.writable.join() === repo), calls.map((c) => c.cwd).join(','));
+  assert.deepStrictEqual([gates.calls[0].ctx.repo, gates.calls[0].ctx.campaignDir], [repo, path.join(repo, 'products/x/landing/a')]);
+  assert.deepStrictEqual(run.worktrees, {});
+  assert.deepStrictEqual(run.workBranch, { [repo]: git('rev-parse', '--abbrev-ref', 'HEAD').stdout.trim() });
+  assert.deepStrictEqual(run.startHead, { [repo]: git('rev-parse', 'HEAD').stdout.trim() });
+  assert.deepStrictEqual(run.dirtyAtStart, { [repo]: ['dang-do.txt'] });
+  assert.deepStrictEqual(gates.calls[0].ctx.dirty, ['dang-do.txt']);
+  assert.strictEqual(git('branch', '--list', 'autopilot/*').stdout, '');
 });
 
-test('G0: không tạo được worktree → stopped, không lùi về repo thật', async () => {
+test('R19: thư mục không phải git → stopped repo:, không chạy stage nào', async () => {
   const notGit = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-nogit-'));
   const { runClaude, calls } = fakeClaude({});
   const start = { ...newRun('landing-fix'), repo: notGit, repos: [notGit], campaignDir: notGit, campaignDirs: [notGit] };
-  const run = await drive(start, loadFlow('landing-fix'), { now: () => Date.now(), notify: () => {}, runClaude, runGates: fakeGates().runGates });
-  assert.match(run.stopReason, /^worktree:/);
+  const run = await drive(start, loadFlow('landing-fix'), realDeps({ runClaude, runGates: fakeGates().runGates }));
+  assert.match(run.stopReason, /^repo:/);
   assert.strictEqual(calls.length, 0);
+});
+
+test('R19: nhánh repo bị đổi giữa chừng → stopped nói rõ, không tự checkout, stage sau không chạy', async () => {
+  const { repo, git } = tmpGitRepo();
+  const flow = loadFlow('landing-fix');
+  const { runClaude, calls } = fakeClaude({});
+  const deps = realDeps({ runClaude, runGates: fakeGates().runGates });
+  const paused = await drive(onRepo(repo), flow, deps);
+  git('checkout', '-q', '-b', 'khac');
+  calls.length = 0;
+  const run = await drive(applyEvent(paused, flow, { type: 'approve' }, Date.now()), flow, deps);
+  assert.strictEqual(run.status, 'stopped');
+  assert.match(run.stopReason, /nhánh khac.*checkout lại/);
+  assert.deepStrictEqual(calls, []);
+  assert.strictEqual(git('rev-parse', '--abbrev-ref', 'HEAD').stdout.trim(), 'khac');
+});
+
+test('R19: repo đang có run khác (chưa xong) → run thứ 2 bị từ chối "repo đang có run <KEY>"', async () => {
+  const { repo } = tmpGitRepo();
+  const flow = loadFlow('landing-fix');
+  const deps = realDeps({ runClaude: fakeClaude({}).runClaude, runGates: fakeGates().runGates });
+  const first = await drive(onRepo(repo), flow, deps);
+  assert.strictEqual(first.status, 'paused');
+  const second = await drive(onRepo(repo, { key: 'GW-2' }), flow, deps);
+  assert.match(second.stopReason, /repo đang có run GW-1/);
+  assert.strictEqual(second.receipts.length, 0);
 });
 
 test('G0: write-sheet (ghi thật) tự bỏ qua khi chưa có AUTOPILOT_LAB_WRITES', async () => {
@@ -216,11 +249,11 @@ test('G2: landing-fix có handoffDir → stage handoff + cổng bàn giao trên 
   assert.ok(calls.some((c) => c.stageId === 'handoff'));
   const handoffGate = gates.calls.find((c) => c.checks.includes('pm-gate-handoff'));
   assert.deepStrictEqual(handoffGate.checks, ['pm-gate-handoff', 'check-promotion']);
-  assert.strictEqual(handoffGate.ctx.campaignDir, path.join(run.worktrees[gt.repo], 'products/x/landing/a'));
+  assert.strictEqual(handoffGate.ctx.campaignDir, path.join(gt.repo, 'products/x/landing/a'));
   run = applyEvent(run, flow, { type: 'approve' }, Date.now());
   run = await drive(run, flow, { now: () => Date.now(), notify: () => {}, runClaude, runGates: gates.runGates });
   const commits = gates.calls.filter((c) => c.checks[0] === 'commit').map((c) => c.ctx.repo);
-  assert.deepStrictEqual(commits, [run.worktrees[cdn.repo], run.worktrees[gt.repo]]);
+  assert.deepStrictEqual(commits, [cdn.repo, gt.repo]);
 });
 
 test('G2: không có handoffDir → bỏ handoff + cổng bàn giao', async () => {
@@ -308,10 +341,9 @@ test('G7: gates chạy cho từng campaign, prompt lanes liệt kê mọi campai
   const { runClaude, calls } = fakeClaude({});
   const gates = fakeGates();
   const run = await drive({ ...newRun('buglist'), campaignDirs: dirs }, flow, base({ runClaude, runGates: gates.runGates }));
-  const inWt = dirs.map((d) => d.replace('/repo', run.worktrees['/repo']));
-  assert.deepStrictEqual(gates.calls.filter((c) => c.checks.join() === 'build').map((c) => c.ctx.campaignDir), inWt);
+  assert.deepStrictEqual(gates.calls.filter((c) => c.checks.join() === 'build').map((c) => c.ctx.campaignDir), dirs);
   const lanes = calls.find((c) => c.stageId === 'lanes');
-  assert.ok(inWt.every((d) => lanes.prompt.includes(d)));
+  assert.ok(dirs.every((d) => lanes.prompt.includes(d)));
 });
 
 test('G9: buglist có bản bàn giao → drift-check chạy trước intake, chỉ được curl/đọc', async () => {
@@ -399,17 +431,12 @@ test('chạy tiếp sau dừng ngay → nối đúng phiên đang dở, xong th�
   assert.deepStrictEqual([run.cutSession, run.resumeNote], [undefined, undefined]);
 });
 
-test('isolate lưu base của từng worktree để review so đúng điểm tách', async () => {
-  const { repo, git } = tmpGitRepo();
-  const start = { ...newRun('landing-fix'), repo, repos: [repo], campaignDir: path.join(repo, 'products/x/landing/a'), campaignDirs: [path.join(repo, 'products/x/landing/a')] };
-  const run = await drive(start, loadFlow('landing-fix'), { now: () => Date.now(), notify: () => {}, runClaude: fakeClaude({}).runClaude, runGates: fakeGates().runGates });
-  assert.deepStrictEqual(run.bases, { [repo]: git('rev-parse', 'HEAD').stdout.trim() });
-});
-
 const committingGates = async (checks, ctx) => {
   if (checks.includes('commit')) {
     fs.writeFileSync(path.join(ctx.campaignDir, 'index.html'), `<p>${Date.now()}</p>`);
     spawnSync('git', ['-C', ctx.repo, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'ap'], { encoding: 'utf8' });
+    const commit = spawnSync('git', ['-C', ctx.repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+    return { pass: true, error: null, results: [{ check: 'commit', status: 'pass', blocking: [], note: '', commit }] };
   }
   return { pass: true, error: null, results: checks.map((check) => ({ check, status: 'pass', blocking: [], note: '' })) };
 };
@@ -422,6 +449,7 @@ test('done: báo chờ review kèm số file + repo đã sửa', async () => {
   let run = await drive(start, flow, deps);
   for (let i = 0; i < 3 && run.status === 'paused'; i++) run = await drive(applyEvent(run, flow, { type: 'approve' }, Date.now()), flow, deps);
   assert.strictEqual(run.status, 'done');
+  assert.deepStrictEqual(run.commits.map((c) => c.repo), [repo]);
   assert.match(notified.at(-1), /chờ review · 1 file ở ap-wt-/);
 });
 

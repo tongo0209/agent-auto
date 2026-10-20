@@ -49,7 +49,7 @@ function viewOf(saved) {
     options,
     actions: allowedActions(run, flow, { options, interrupted: isInterrupted(run) }),
     interrupted: isInterrupted(run),
-    awaitingReview: run.status === 'done' && !run.reviewedAt && Object.keys(run.worktrees ?? {}).length > 0,
+    awaitingReview: run.status === 'done' && !run.reviewedAt && (Object.keys(run.worktrees ?? {}).length > 0 || (run.commits ?? []).length > 0),
     flowLabel: flow.label,
     cells: stageCells(run, flow).map((c) => {
       const stage = stageOf(flow, c.id);
@@ -88,8 +88,10 @@ export function changesOf(key, runId) {
   return run ? runChanges(run) : null;
 }
 
+// Run cũ mở worktree riêng, run mới mở repo gốc nó làm trên đó
 export function worktreeOf({ key, runId, dir }) {
-  if (!Object.values(runOf(key, runId)?.worktrees ?? {}).includes(dir)) throw new Error('không phải worktree của run');
+  const run = runOf(key, runId);
+  if (![...Object.values(run?.worktrees ?? {}), ...Object.keys(run?.workBranch ?? {})].includes(dir)) throw new Error('không phải thư mục của run');
   return dir;
 }
 

@@ -47,7 +47,7 @@ test('buglist: chưa bật AUTOPILOT_LAB_WRITES → bỏ write-sheet, approve k�
   cli('approve', 'GW-2');
   const run = lastRun(runs, 'GW-2');
   assert.strictEqual(run.status, 'done');
-  assert.strictEqual(Object.values(run.worktrees).filter((wt) => wt.startsWith(runs)).length, 1);
+  assert.deepStrictEqual([run.worktrees, Object.keys(run.workBranch)], [{}, [path.resolve(campaign, '../../../..')]]);
 });
 
 test('plan-review revise 4 lần → stopped loop-exhausted, status báo lý do', () => {
@@ -85,16 +85,29 @@ test('resume sau loop-exhausted chạy tiếp', () => {
   assert.strictEqual(lastRun(runs, 'GW-6').stage, 'approve-plan');
 });
 
-test('abort nhả campaign + dọn sạch: worktree, nhánh autopilot/*, thư mục run', () => {
+test('R19 abort: nhả campaign + repo, xoá thư mục run; không đụng repo gốc, in file run đổi chưa commit (bỏ file dở có từ trước)', () => {
   const { cli, campaign, runs } = sandbox();
-  cli('run', 'GW-7', '--flow', 'landing-fix', '--campaign', campaign);
-  const { runId } = lastRun(runs, 'GW-7');
   const repo = path.resolve(campaign, '../../../..');
-  assert.strictEqual(cli('abort', 'GW-7').code, 0);
+  fs.writeFileSync(path.join(repo, 'cu.txt'), 'dở từ trước');
+  cli('run', 'GW-7', '--flow', 'landing-fix', '--campaign', campaign);
+  fs.writeFileSync(path.join(campaign, 'run-sua.html'), '<p>run</p>');
+  const r = cli('abort', 'GW-7');
+  assert.strictEqual(r.code, 0, r.out);
   assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8')), {});
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(runs, '.repos.json'), 'utf8')), {});
   assert.strictEqual(fs.existsSync(path.join(runs, 'GW-7')), false, 'thư mục task rỗng cũng phải xoá');
-  assert.strictEqual(spawnSync('git', ['-C', repo, 'branch', '--list', `autopilot/GW-7-${runId}`], { encoding: 'utf8' }).stdout.trim(), '');
-  assert.doesNotMatch(spawnSync('git', ['-C', repo, 'worktree', 'list'], { encoding: 'utf8' }).stdout, /GW-7/);
+  assert.ok(fs.existsSync(path.join(campaign, 'run-sua.html')) && fs.existsSync(path.join(repo, 'cu.txt')));
+  assert.match(r.out, /products\/x\/landing\/a\/run-sua\.html/);
+  assert.doesNotMatch(r.out, /cu\.txt/);
+});
+
+test('R19 run thứ 2 trên cùng repo khi run đầu chưa xong → dừng "repo đang có run"', () => {
+  const { cli, campaign, runs } = sandbox();
+  const other = path.join(campaign, '../b');
+  fs.mkdirSync(other);
+  cli('run', 'GW-8', '--flow', 'landing-fix', '--campaign', campaign);
+  cli('run', 'GW-9', '--flow', 'landing-fix', '--campaign', other);
+  assert.match(lastRun(runs, 'GW-9').stopReason, /repo đang có run GW-8/);
 });
 
 test('route --validate báo mọi luồng hợp lệ', () => {
@@ -207,13 +220,13 @@ function openChat(key = 'GW-20') {
   return { ...box, launch: JSON.parse(r.out) };
 }
 
-test('open: tạo run chat + worktree + brief.md, in JSON để UI mở tab', () => {
+test('R19 open: tạo run chat làm thẳng trên repo gốc + brief.md, in JSON để UI mở tab', () => {
   const { launch, runs, campaign } = openChat();
   const run = lastRun(runs, 'GW-20');
-  assert.deepStrictEqual([run.mode, run.status, run.stage], ['chat', 'chat', 'plan']);
-  const wt = Object.values(run.worktrees)[0];
-  assert.ok(wt.startsWith(path.join(runs, 'GW-20', run.runId, 'wt')));
-  assert.strictEqual(launch.cwd, path.join(wt, 'products/x/landing'));
+  assert.deepStrictEqual([run.mode, run.status, run.stage, run.worktrees], ['chat', 'chat', 'plan', {}]);
+  const repo = path.resolve(campaign, '../../../..');
+  assert.deepStrictEqual(Object.keys(run.workBranch), [repo]);
+  assert.strictEqual(launch.cwd, path.dirname(campaign));
   assert.ok(fs.existsSync(launch.cwd));
   assert.deepStrictEqual(launch.env, { AUTOPILOT_RUN: `GW-20/${run.runId}` });
   assert.ok(launch.args.includes('--settings'));
@@ -223,7 +236,8 @@ test('open: tạo run chat + worktree + brief.md, in JSON để UI mở tab', ()
   for (const stage of ['plan', 'approve-plan', 'implement', 'gates', 'commit']) assert.match(text, new RegExp(`\\*\\*${stage}\\*\\*`));
   assert.match(text, /autopilot\.mjs mark GW-20 <bước> <doing\|pass\|fail\|ask>/);
   assert.match(text, /autopilot\.mjs gates GW-20/);
-  assert.ok(text.includes(`campaignDir: \`${wt}/products/x/landing/a\``));
+  assert.ok(text.includes(`campaignDir: \`${campaign}\``));
+  assert.ok(launch.args.some((a) => a.includes(`sandbox-hook.mjs\\" \\"${repo}`)));
   assert.strictEqual(Object.values(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8')))[0].key, 'GW-20');
   assert.ok(campaign);
 });
@@ -279,19 +293,20 @@ test('gates: chạy cổng của luồng trên worktree, ghi artifact + receipt;
   assert.match(cli('gates', 'GW-20', 'xoa-het').out, /check lạ/);
 });
 
-test('done: run chat xong, nhả campaign, giữ worktree + nhánh để review', () => {
+test('done: run chat xong, nhả campaign + repo, repo vẫn nguyên', () => {
   const { cli, runs, launch } = openChat();
   assert.strictEqual(cli('done', 'GW-20').code, 0);
   const run = lastRun(runs, 'GW-20');
   assert.deepStrictEqual([run.status, run.stage], ['done', null]);
   assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8')), {});
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(runs, '.repos.json'), 'utf8')), {});
   assert.ok(fs.existsSync(launch.cwd));
 });
 
-test('abort run chat: dọn worktree + thư mục run như run tự động', () => {
+test('R19 abort run chat: xoá thư mục run, repo gốc giữ nguyên', () => {
   const { cli, runs, launch } = openChat();
   assert.strictEqual(cli('abort', 'GW-20').code, 0);
-  assert.strictEqual(fs.existsSync(launch.cwd), false);
+  assert.ok(fs.existsSync(path.join(launch.cwd, 'a/index.html')));
   assert.strictEqual(fs.existsSync(path.join(runs, 'GW-20')), false);
 });
 
@@ -333,7 +348,7 @@ test('reject run done khi campaign đang bị run khác giữ → từ chối', 
   assert.strictEqual(lastRun(runs, 'GW-33').status, 'done');
 });
 
-test('open --followup: chat tiếp trên chính worktree của run done, brief kèm thay đổi + lời nhắn', () => {
+test('open --followup: chat tiếp trên repo của run done, brief kèm thay đổi + lời nhắn', () => {
   const { cli, runs, campaign } = doneRun('GW-34');
   const before = lastRun(runs, 'GW-34');
   const r = cli('open', 'GW-34', '--followup', '--note', 'đổi màu nút');
@@ -341,10 +356,10 @@ test('open --followup: chat tiếp trên chính worktree của run done, brief k
   const launch = JSON.parse(r.out);
   const run = lastRun(runs, 'GW-34');
   assert.deepStrictEqual([run.runId, run.mode, run.status, run.stage, run.worktrees], [before.runId, 'chat', 'chat', 'fix', before.worktrees]);
-  assert.ok(launch.cwd.startsWith(Object.values(before.worktrees)[0]));
+  assert.strictEqual(launch.cwd, before.repo);
   const brief = fs.readFileSync(path.join(runs, 'GW-34', run.runId, 'brief.md'), 'utf8');
   assert.match(brief, /đổi màu nút/);
-  assert.match(brief, /autopilot\/GW-34-/);
+  assert.ok(brief.includes(`nhánh \`${Object.values(before.workBranch)[0]}\``));
   assert.match(brief, /autopilot\.mjs gates GW-34 commit/);
   assert.strictEqual(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8'))[campaign].key, 'GW-34');
   assert.match(cli('open', 'GW-34', '--followup').out, /chưa xong/);
@@ -361,20 +376,20 @@ const attach = (cli, runs, key) => {
   return { launch, run, brief: fs.readFileSync(brief, 'utf8') };
 };
 
-test('open --attach run done: không đổi run, phiên mới trên worktree, brief có trạng thái + lượt + nhánh + artifact + lệnh dùng được + luật source', () => {
+test('open --attach run done: không đổi run, phiên mới trên repo, brief có trạng thái + lượt + nhánh + artifact + lệnh dùng được + luật source', () => {
   const { cli, runs } = doneRun('GW-35');
   const before = lastRun(runs, 'GW-35');
   const { launch, run, brief } = attach(cli, runs, 'GW-35');
   assert.deepStrictEqual(run, before);
-  assert.ok(launch.cwd.startsWith(Object.values(before.worktrees)[0]));
+  assert.strictEqual(launch.cwd, before.repo);
   assert.deepStrictEqual(launch.env, { AUTOPILOT_RUN: `GW-35/${run.runId}` });
   assert.match(brief, /done/);
   assert.match(brief, /commit · vòng 1 · pass/);
-  assert.match(brief, /autopilot\/GW-35-/);
+  assert.ok(brief.includes(`nhánh \`${Object.values(before.workBranch)[0]}\``));
   assert.match(brief, /gates-r1\.json/);
   for (const cmd of ['reviewed GW-35', 'reject GW-35 --note', 'open GW-35 --followup', 'abort GW-35', 'status GW-35']) assert.ok(brief.includes(cmd), cmd);
   for (const cmd of ['pause GW-35', 'resume GW-35', 'approve GW-35']) assert.ok(!brief.includes(cmd), cmd);
-  assert.match(brief, /KHÔNG tự cherry-pick/);
+  assert.match(brief, /KHÔNG push/);
 });
 
 test('open --attach run dừng / chờ duyệt: lệnh theo trạng thái, kèm lý do dừng', () => {

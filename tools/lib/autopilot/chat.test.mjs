@@ -7,7 +7,7 @@ import path from 'node:path';
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-chat-'));
 process.env.AUTOPILOT_CLAUDE_PROJECTS = root;
 process.env.AUTOPILOT_RUNS_DIR = path.join(root, 'runs');
-const { latestSession, sessionUsage, chatCwd, attachBriefOf } = await import('./chat.mjs');
+const { latestSession, sessionUsage, chatCwd, attachBriefOf, chatLaunch, briefOf } = await import('./chat.mjs');
 const { loadFlow } = await import('./flows.mjs');
 const LAB = path.resolve(import.meta.dirname, '../../..');
 
@@ -38,10 +38,21 @@ test('sessionUsage: cộng usage mỗi message 1 lần (stream ghi lặp cùng i
   assert.deepStrictEqual(sessionUsage(file), { tokens: 440, ms: 5 * 60_000 });
 });
 
-test('chatCwd: run chưa có worktree (chưa isolate) thì mở ở agent-auto-lab, không phải repo gốc', () => {
-  assert.strictEqual(chatCwd({ repo: '/x/repo', worktrees: {} }), LAB);
+test('R19 chatCwd: run mới mở thẳng ở repo gốc; run chưa có repo → agent-auto-lab; run cũ có worktree → worktree', () => {
+  assert.strictEqual(chatCwd({ repo: '/x/repo', worktrees: {} }), '/x/repo');
   assert.strictEqual(chatCwd({ repo: null, worktrees: {} }), LAB);
   assert.strictEqual(chatCwd({ repo: '/x/repo', worktrees: { '/x/repo': '/w/repo' } }), '/w/repo');
+});
+
+test('R19 chatLaunch: sandbox mở ghi đúng repo của run; brief nói làm thẳng trên nhánh, cấm checkout/reset/stash/clean', () => {
+  const run = { key: 'GW-51', runId: 'r1', flow: 'landing-fix', status: 'chat', stage: 'plan', receipts: [], worktrees: {}, repo: '/x/repo', workBranch: { '/x/repo': 'tont' } };
+  const launch = chatLaunch(run);
+  assert.strictEqual(launch.cwd, '/x/repo');
+  assert.ok(launch.args.some((a) => a.includes('sandbox-hook.mjs\\" \\"/x/repo')), launch.args.join(' '));
+  const brief = briefOf(run, loadFlow('landing-fix'));
+  assert.match(brief, /repo gốc `\/x\/repo`, nhánh `tont`/);
+  assert.match(brief, /không checkout\/reset\/stash\/clean/);
+  assert.doesNotMatch(brief, /worktree|chặn ghi/i);
 });
 
 test('attachBriefOf run tự động đang chạy: dặn pause trước khi sửa file, chỉ có lệnh pause', () => {

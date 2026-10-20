@@ -1,4 +1,4 @@
-// Chế độ chat: mỗi task một tab claude tương tác, máy chỉ giữ worktree, board và cổng cơ học
+// Chế độ chat: mỗi task một tab claude tương tác, máy chỉ giữ khoá repo, board và cổng cơ học
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,15 +15,20 @@ const BRIEF_VARS = ['repo', 'campaignDir', 'campaignDirs', 'handoffDir', 'cloneS
 
 const projectsDir = () => process.env.AUTOPILOT_CLAUDE_PROJECTS || path.join(os.homedir(), '.claude', 'projects');
 
-// Chưa isolate thì toWorktree trả lại chính repo gốc — không được mở claude ở đó
-export function chatCwd(run) {
-  const cwd = toWorktree(run.worktrees, run.repo);
-  return cwd && cwd !== run.repo ? cwd : REPO_ROOT;
+const isLegacy = (run) => Object.keys(run.worktrees ?? {}).length > 0;
+
+// Run cũ (trước R19) vẫn mở trong worktree của nó; run mới làm thẳng trên repo gốc
+export const chatCwd = (run) => (isLegacy(run) ? toWorktree(run.worktrees, run.repo) : run.repo) ?? REPO_ROOT;
+
+function placeOf(run) {
+  if (isLegacy(run)) return `Worktree riêng (run cũ): \`${chatCwd(run)}\`. Không push.`;
+  const branch = run.workBranch?.[run.repo] ?? Object.values(run.workBranch ?? {})[0] ?? '(đang checkout)';
+  return `Làm thẳng trên repo gốc \`${chatCwd(run)}\`, nhánh \`${branch}\` — không checkout/reset/stash/clean, không đổi nhánh; file dở của phiên khác để nguyên. Không push.`;
 }
 export const briefFile = (run) => path.join(runDir(run.key, run.runId), 'brief.md');
 export const attachFile = (run) => path.join(runDir(run.key, run.runId), 'attach.md');
 
-const SOURCE_RULE = 'KHÔNG tự cherry-pick/commit/push vào repo gốc (`~/VNG/git-vng/*`). User bảo "đưa vào source" thì chỉ in lệnh `git -C <repo gốc> cherry-pick <sha…>` cho user tự chạy.';
+const SOURCE_RULE = 'KHÔNG push. Commit chỉ qua cổng `gates <KEY> commit` (add đúng file run đổi, cdn-source tự pull master sau commit) — không tự `git add -A`/commit tay.';
 
 // Claude Code lưu phiên ở ~/.claude/projects/<cwd, mọi ký tự ngoài chữ-số thành '-'>
 export function latestSession(cwd) {
@@ -72,7 +77,7 @@ export function briefOf(run, flow, input) {
   const steps = flow.stages.map((s, i) => `${i + 1}. **${s.id}**${s.when ? ` _(chỉ khi ${s.when})_` : ''}: ${goalOf(s, run, input)}`);
   return `# ${run.key} · ${flow.label}: làm cùng user trong tab này
 
-Worktree riêng: \`${chatCwd(run)}\`. Repo gốc bị sandbox chặn ghi; mọi sửa nằm trong worktree. Không push.
+${placeOf(run)}
 
 ## Biến
 ${BRIEF_VARS.filter((name) => vars[name]).map((name) => `- ${name}: \`${vars[name]}\``).join('\n')}
@@ -94,7 +99,7 @@ Xong hết và user đồng ý thì chạy \`node ${CLI} done ${run.key}\`.
 `;
 }
 
-const launchOf = (run, start) => ({ key: run.key, runId: run.runId, cwd: chatCwd(run), args: [...start, ...sandboxArgs()], env: { AUTOPILOT_RUN: `${run.key}/${run.runId}` } });
+const launchOf = (run, start) => ({ key: run.key, runId: run.runId, cwd: chatCwd(run), args: [...start, ...sandboxArgs(Object.keys(run.workBranch ?? {}))], env: { AUTOPILOT_RUN: `${run.key}/${run.runId}` } });
 
 export function chatLaunch(run, { resume = false } = {}) {
   const session = resume ? latestSession(chatCwd(run)) : null;
@@ -107,10 +112,10 @@ const COMMAND_HELP = {
   pause: ['pause {key}', 'dừng ngay bước claude đang chạy (resume nối tiếp đúng phiên)'],
   resume: ['resume {key} [--note "…"]', 'chạy tiếp run đã dừng/bị ngắt; note nhắn vào bước bị dừng'],
   approve: ['approve {key} [--note "…"]', 'duyệt mốc đang chờ, máy chạy tiếp'],
-  reject: ['reject {key} --note "…"', 'trả về cho máy tự sửa lại theo note (run xong: chạy lại fix → cổng → commit chồng nhánh)'],
+  reject: ['reject {key} --note "…"', 'trả về cho máy tự sửa lại theo note (run xong: chạy lại fix → cổng → commit chồng lên)'],
   reviewed: ['reviewed {key}', 'đánh dấu user đã review code'],
   followup: ['open {key} --followup --note "…"', 'chuyển run sang chat để sửa tay ngay trong tab này; sau đó dùng `gates`, `gates commit`, `mark`, `done` như brief.md mới ghi'],
-  abort: ['abort {key}', 'huỷ run: xoá worktree, nhánh, thư mục run — chỉ khi user bảo rõ'],
+  abort: ['abort {key}', 'huỷ run: tắt tiến trình, xoá thư mục run, in file run đã đổi chưa commit (không đụng repo) — chỉ khi user bảo rõ'],
   status: ['status {key}', 'xem trạng thái run'],
 };
 const COMMANDS_BY_STATUS = {
@@ -122,11 +127,11 @@ const COMMANDS_BY_STATUS = {
 };
 
 const STATUS_NOTE = {
-  running: 'Máy đang tự chạy trong worktree này: phải `pause` trước khi sửa file, nếu không sẽ giẫm lên bước đang chạy.',
+  running: 'Máy đang tự chạy trên repo này: phải `pause` trước khi sửa file, nếu không sẽ giẫm lên bước đang chạy.',
   paused: 'Run đang chờ user duyệt ở bước hiện tại.',
   attached: 'Run chờ user chạy lệnh của bước hiện tại trong một phiên claude rồi duyệt.',
   stopped: 'Run đã dừng; sửa xong thì `resume` để máy chạy tiếp.',
-  done: 'Run đã xong, code đã commit trên nhánh riêng; user đang review.',
+  done: 'Run đã xong, code đã commit; user đang review.',
 };
 
 export function attachBriefOf(run, flow, changes) {
@@ -140,7 +145,7 @@ ${c.commits.map((x) => `- commit ${x.sha.slice(0, 9)} ${x.subject}`).join('\n') 
 ${c.files.map((f) => `- ${f.status} \`${f.path}\``).join('\n')}${c.cherryPick ? `\n- đưa vào source (user tự chạy): \`${c.cherryPick}\`` : ''}`);
   return `# ${run.key} · ${flow.label}
 
-Tab này mở từ board Autopilot để user làm mọi việc với run qua bạn. Worktree: \`${chatCwd(run)}\`. Repo gốc bị sandbox chặn ghi. Không push.
+Tab này mở từ board Autopilot để user làm mọi việc với run qua bạn. ${placeOf(run)}
 
 ## Trạng thái
 - ${run.status}${run.stage ? ` · bước \`${run.stage}\`` : ''}${run.stopReason ? ` · lý do dừng: ${run.stopReason}` : ''}
@@ -150,7 +155,7 @@ ${run.rejectNote ? `- lần trả về trước: ${run.rejectNote}\n` : ''}
 ${run.receipts.map((r) => `- ${r.stage} · vòng ${r.round} · ${r.verdict}${r.note ? ` · ${r.note}` : ''}`).join('\n') || '- chưa có'}
 
 ## Thay đổi
-${repoBlocks.join('\n\n') || '_chưa có worktree_'}
+${repoBlocks.join('\n\n') || '_chưa có thay đổi_'}
 
 ## Artifact (trong \`${runDir(run.key, run.runId)}\`)
 ${artifacts.map((f) => `- \`${f}\``).join('\n') || '- chưa có'}
@@ -172,7 +177,7 @@ ${c.commits.map((x) => `- commit ${x.sha.slice(0, 9)} ${x.subject}`).join('\n') 
 ${c.files.map((f) => `- ${f.status} \`${f.path}\``).join('\n')}`);
   return `# ${run.key} · sửa tiếp sau review
 
-Run đã xong và commit trên nhánh riêng; user review rồi muốn sửa thêm. Sửa tiếp ngay trên worktree \`${chatCwd(run)}\`, commit chồng lên cùng nhánh. Repo gốc bị sandbox chặn ghi. Không push.
+Run đã xong và đã commit; user review rồi muốn sửa thêm. ${placeOf(run)}
 
 ## Lời nhắn của user
 ${note?.trim() || '_(chưa ghi — hỏi user cần sửa gì)_'}
@@ -181,7 +186,7 @@ ${note?.trim() || '_(chưa ghi — hỏi user cần sửa gì)_'}
 ${repoBlocks.join('\n\n')}
 
 ## Cổng + commit
-Sửa xong: \`node ${CLI} gates ${run.key}\`, đạt thì commit chồng lên nhánh: \`node ${CLI} gates ${run.key} commit\`.
+Sửa xong: \`node ${CLI} gates ${run.key}\`, đạt thì commit chồng lên: \`node ${CLI} gates ${run.key} commit\`.
 Báo tiến độ: \`node ${CLI} mark ${run.key} ${run.stage} <doing|pass|fail|ask> --note "…"\`.
 
 ${SOURCE_RULE}

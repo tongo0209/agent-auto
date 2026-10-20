@@ -20,6 +20,19 @@ function linkNodeModules(top, dir, campaignDir) {
   }
 }
 
+// Repo gốc mà run làm thẳng trên đó: giữ đường dẫn như người gọi đưa khi nó chính là gốc repo
+export function repoState(dir) {
+  const real = git(['-C', dir, 'rev-parse', '--show-toplevel']);
+  const top = fs.realpathSync(dir) === real ? dir : real;
+  const status = spawnSync('git', ['-C', top, 'status', '--porcelain', '-z', '-uall'], { encoding: 'utf8' }).stdout;
+  return {
+    top,
+    branch: git(['-C', top, 'rev-parse', '--abbrev-ref', 'HEAD']),
+    head: git(['-C', top, 'rev-parse', 'HEAD']),
+    dirty: status.split('\0').filter(Boolean).map((line) => line.slice(3)),
+  };
+}
+
 export const branchOf = (run) => `autopilot/${run.key}-${run.runId}`;
 
 export function addWorktree({ repo, parentDir, branch, linkDirs = [] }) {

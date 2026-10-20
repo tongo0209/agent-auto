@@ -79,3 +79,26 @@ test('Bash chỉ đọc source gốc, hoặc ghi trong worktree → cho qua', ()
 test('tool khác (Read, Grep) không bị chặn kể cả đọc repo gốc', () => {
   assert.strictEqual(deny('Read', { file_path: `${HOME}/VNG/git-vng/cdn-source/a.html` }), null);
 });
+
+test('R19: repo của run được ghi thẳng (file + git); repo khác, agent-auto, ~/.claude vẫn chặn', () => {
+  const CDN = `${HOME}/VNG/git-vng/cdn-source`;
+  const own = (tool_name, tool_input) => sandboxDenial({ tool_name, tool_input, cwd: CDN }, HOME, [CDN]);
+  assert.strictEqual(own('Edit', { file_path: `${CDN}/products/a/index.html` }), null);
+  assert.strictEqual(own('Write', { file_path: 'products/a/x.scss' }), null);
+  assert.strictEqual(own('Bash', { command: 'sed -i "" s/a/b/ products/a/index.html && git status && git diff' }), null);
+  assert.match(own('Edit', { file_path: `${HOME}/VNG/git-vng/gt-promotion-template/a.html` }), /git-vng/);
+  assert.match(own('Write', { file_path: `${HOME}/VNG/agent-auto/state.json` }), /agent-auto/);
+  assert.match(own('Bash', { command: 'rm -rf ~/.claude/x' }), /\.claude/);
+  assert.match(own('Edit', { file_path: `${HOME}/VNG/git-vng/cdn-source-old/a.html` }), /git-vng/);
+});
+
+test('R19: trên repo gốc của run agent không được chạy git ghi (checkout/reset/stash/clean/commit/add/push…) — commit chỉ qua cổng', () => {
+  const CDN = `${HOME}/VNG/git-vng/cdn-source`;
+  const own = (command, cwd = CDN) => sandboxDenial({ tool_name: 'Bash', tool_input: { command }, cwd }, HOME, [CDN]);
+  for (const cmd of ['git checkout -- a.html', 'git reset --hard', 'git stash', 'git clean -fd', 'git add -A', 'git commit -m x', 'git push', 'git switch master', 'git branch -D tont']) {
+    assert.match(own(cmd) ?? '', /git .*repo gốc.*cổng commit/, cmd);
+  }
+  assert.match(own(`git -C ${CDN} restore .`, '/tmp') ?? '', /repo gốc/);
+  assert.match(own('cd products/a && git checkout .') ?? '', /repo gốc/);
+  assert.strictEqual(own('git log -3 && git show HEAD --stat'), null);
+});

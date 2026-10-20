@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRun, applyEvent, resumeRun, reopenRun, finalApproval, stageOf, roundOf, isGateLike, chooseAction, checkRunPlan } from './lib/autopilot/engine.mjs';
-import { drive, isolate, runGateStage, WHEN } from './lib/autopilot/driver.mjs';
+import { drive, claimRepos, runGateStage, WHEN } from './lib/autopilot/driver.mjs';
 import { runGates } from './lib/autopilot/gates.mjs';
 import { briefOf, briefFile, chatLaunch, followupBriefOf, attachBriefOf, attachFile, attachLaunch } from './lib/autopilot/chat.mjs';
 import { runChanges } from './lib/autopilot/review.mjs';
@@ -13,8 +13,8 @@ import { loadFlow, listFlows, validateFlow, PROMPTS_DIR } from './lib/autopilot/
 import { gatherSignals } from './lib/autopilot/signals.mjs';
 import { route, loadRules } from './lib/autopilot/router.mjs';
 import { newRunId, loadRun, listRuns, saveRun, runsDir, runDir, pauseFile, childFile, writeArtifact, planOptions } from './lib/autopilot/store.mjs';
-import { addWorktree, removeWorktree, branchOf } from './lib/autopilot/worktree.mjs';
-import { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted } from './lib/autopilot/lock.mjs';
+import { repoState, removeWorktree, branchOf } from './lib/autopilot/worktree.mjs';
+import { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted, releaseRepos } from './lib/autopilot/lock.mjs';
 import { formatStatus } from './lib/autopilot/format.mjs';
 
 const AGENT_ROOT = path.resolve(import.meta.dirname, '..');
@@ -24,16 +24,16 @@ const DATA_ROOT = process.env.AUTOPILOT_DATA_ROOT || (fs.existsSync(path.join(AG
 const USAGE = `Dùng:
   autopilot run <KEY|link> [--flow id] [--campaign dir] [--budget-usd n] [--bg] [--skip a,b] [--skip-reason "…"] [--break c,d]
                                    (--skip tắt stage từ đầu, cổng cần --skip-reason; --break dừng sau stage đó)
-  autopilot open <KEY|link> [--flow id] [--campaign dir]   (run chat: worktree + brief.md, in JSON để mở tab claude)
+  autopilot open <KEY|link> [--flow id] [--campaign dir]   (run chat: làm thẳng repo gốc + brief.md, in JSON để mở tab claude)
   autopilot open <KEY> --attach                             (tab claude cho run bất kỳ: run chat nối phiên mới nhất, run khác phiên mới với attach.md)
   autopilot mark <KEY> <bước> <doing|pass|fail|ask> [--note "…"]
   autopilot gates <KEY> [check…]   (mặc định mọi cổng của luồng trừ commit)
-  autopilot open <KEY> --followup [--note "…"]             (run đã xong: mở tab chat sửa tiếp trên chính worktree đó)
-  autopilot done <KEY>             (run chat xong, giữ worktree + nhánh để review)
+  autopilot open <KEY> --followup [--note "…"]             (run đã xong: mở tab chat sửa tiếp trên repo của run)
+  autopilot done <KEY>             (run chat xong, nhả repo + campaign, chờ review)
   autopilot reviewed <KEY>         (run đã xong: đánh dấu đã review code)
   autopilot status [KEY]
   autopilot approve <KEY> [--note "…"]
-  autopilot reject <KEY> --note "…"   (run đã xong: trả về sửa, chạy lại fix → cổng → commit chồng lên nhánh)
+  autopilot reject <KEY> --note "…"   (run đã xong: trả về sửa, chạy lại fix → cổng → commit chồng lên)
   autopilot pause <KEY>    (dừng ngay bước claude đang chạy; resume nối tiếp đúng phiên)
   autopilot resume <KEY> [--note "…"] [--budget-usd n] [--budget-minutes n]   (--note: nhắn vào bước bị dừng giữa chừng)
   autopilot abort <KEY>
@@ -78,7 +78,7 @@ function driveDeps(input) {
   return { repoOf, input, ...(process.env.AUTOPILOT_FAKE_GATES ? { runGates: fakeGates } : {}) };
 }
 
-// Chạy tiếp một run dưới lock 'run'; xong/dừng thì nhả campaign
+// Chạy tiếp một run dưới lock 'run'; xong/dừng thì nhả campaign, xong thì nhả repo
 async function continueRun(start, input) {
   const owner = { key: start.key, runId: start.runId };
   const lock = acquire('run', owner);
@@ -89,6 +89,7 @@ async function continueRun(start, input) {
     const flow = loadFlow(run.flow);
     const after = await drive(run, flow, driveDeps(input));
     if (['done', 'stopped'].includes(after.status)) releaseCampaign(owner);
+    if (after.status === 'done') releaseRepos(owner);
     console.log(formatStatus(after, flow));
     return after;
   } finally {
@@ -159,8 +160,9 @@ function cmdOpen(opts) {
   if (opts.attach) return openAttach(mustLoad(input));
   if (opts.followup) return openFollowup(mustLoadDone(input), opts.note);
   const { run: created, flow } = newRun(opts, input);
+  const claimed = claimOrDie(created);
   if (created.campaignDir) holdCampaign(created.campaignDir, { key: created.key, runId: created.runId });
-  const run = { ...isolate(created, { addWorktree }), mode: 'chat', status: 'chat', chatState: null };
+  const run = { ...claimed, mode: 'chat', status: 'chat', chatState: null };
   saveRun(run);
   fs.writeFileSync(briefFile(run), briefOf(run, flow, input));
   console.log(JSON.stringify(chatLaunch(run)));
@@ -173,9 +175,17 @@ function openAttach(run) {
   console.log(JSON.stringify(attachLaunch(run)));
 }
 
+function claimOrDie(run) {
+  try {
+    return claimRepos(run, { repoState });
+  } catch (e) {
+    return die(`${run.key}: ${e.message}`);
+  }
+}
+
 function openFollowup(done, note) {
   holdAgain(done);
-  const run = { ...done, mode: 'chat', status: 'chat', stage: finalApproval(loadFlow(done.flow)).onReject, chatState: null, reviewedAt: null };
+  const run = { ...claimOrDie(done), mode: 'chat', status: 'chat', stage: finalApproval(loadFlow(done.flow)).onReject, chatState: null, reviewedAt: null };
   saveRun(run);
   fs.writeFileSync(briefFile(run), followupBriefOf(run, runChanges(run), note));
   console.log(JSON.stringify(chatLaunch(run)));
@@ -241,7 +251,9 @@ function cmdDone(opts) {
   const run = mustLoadChat(opts._[1] ?? die(USAGE));
   saveRun({ ...run, status: 'done', stage: null, chatState: null });
   releaseCampaign(run);
-  console.log(`${run.key} xong — worktree giữ ở ${Object.values(run.worktrees).join(', ') || '—'} để review/commit.`);
+  releaseRepos(run);
+  const commits = (run.commits ?? []).map((c) => c.sha.slice(0, 9)).join(', ');
+  console.log(`${run.key} xong — ${commits ? `commit ${commits}` : 'chưa commit gì'}; review rồi tự push khi muốn.`);
 }
 
 function mustLoad(key) {
@@ -366,11 +378,17 @@ function cmdAbort(opts) {
   saveRun({ ...run, status: 'stopped', stopReason: 'aborted' });
   killStage(run);
   releaseCampaign(run);
+  releaseRepos(run);
   for (const [top, dir] of Object.entries(run.worktrees ?? {})) removeWorktree({ top, dir, branch: branchOf(run) });
   fs.rmSync(runDir(run.key, run.runId), { recursive: true, force: true });
   const keyDir = path.dirname(runDir(run.key, run.runId));
   if (!fs.readdirSync(keyDir).length) fs.rmdirSync(keyDir);
-  console.log(`${run.key} đã huỷ và dọn sạch worktree, nhánh, thư mục run.`);
+  console.log(`${run.key} đã huỷ: tắt tiến trình, xoá thư mục run — repo không bị reset/checkout/clean.`);
+  for (const top of Object.keys(run.workBranch ?? {})) {
+    const before = new Set(run.dirtyAtStart?.[top] ?? []);
+    const left = repoState(top).dirty.filter((f) => !before.has(f));
+    if (left.length) console.log(`File đổi từ lúc run bắt đầu mà chưa commit ở ${top} (tự xử lý, có thể lẫn của phiên khác):\n${left.map((f) => `  ${f}`).join('\n')}`);
+  }
 }
 
 function cmdStatus(opts) {

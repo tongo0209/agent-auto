@@ -1,4 +1,4 @@
-// Hook PreToolUse cho claude của autopilot khi chưa bật AUTOPILOT_LAB_WRITES: chỉ được ghi trong worktree của run
+// Hook PreToolUse cho claude của autopilot khi chưa bật AUTOPILOT_LAB_WRITES: chỉ được ghi trong repo của run (writable)
 import path from 'node:path';
 
 const PROTECTED = ['VNG/git-vng', 'VNG/agent-auto', '.claude'];
@@ -12,8 +12,9 @@ const INLINE_WRITE_SIGN = /['"][wa]\+?['"]|writeFile|appendFile|rmSync|unlink|re
 
 const expandHome = (text, home) => text.replace(/\$\{HOME\}|\$HOME|(^|[\s'"=:(>])~(?=\/)/g, (m, lead = '') => (m.startsWith('$') ? home : `${lead}${home}`));
 
-const protectedRootOf = (target, home) =>
-  PROTECTED.map((p) => path.join(home, p)).find((root) => target === root || target.startsWith(`${root}/`));
+const isInside = (target, root) => target === root || target.startsWith(`${root}/`);
+const protectedRootOf = (target, home, writable = []) =>
+  writable.some((root) => isInside(target, root)) ? undefined : PROTECTED.map((p) => path.join(home, p)).find((root) => isInside(target, root));
 
 // Tách theo ; && || | xuống dòng (ngoài nháy), mỗi đoạn là mảng token đã bỏ nháy
 function splitSegments(command) {
@@ -74,7 +75,7 @@ function nodeToolIsReadOnly(args, toolsDir) {
   return path.basename(script) === 'project-note.mjs' && PROJECT_NOTE_READS.includes(args[scriptIndex + 1]);
 }
 
-function segmentWriteTargets([program, ...args], cwd, home) {
+function segmentWriteTargets([program, ...args], cwd, home, writable) {
   const writeTargets = redirectTargets(args);
   if (WRITES_EVERY_ARG.has(program)) writeTargets.push(...args);
   if (WRITES_LAST_ARG.has(program)) writeTargets.push(args.at(-1));
@@ -88,12 +89,18 @@ function segmentWriteTargets([program, ...args], cwd, home) {
     if (mentionedPath && INLINE_WRITE_SIGN.test(inlineScript)) writeTargets.push(mentionedPath);
     const toolsDir = path.join(home, 'VNG/agent-auto/tools');
     const script = args.find((a) => !a.startsWith('-'));
-    if (!inlineScript && script && protectedRootOf(path.resolve(cwd, script), home) && !nodeToolIsReadOnly(args, toolsDir)) writeTargets.push(script);
+    if (!inlineScript && script && protectedRootOf(path.resolve(cwd, script), home, writable) && !nodeToolIsReadOnly(args, toolsDir)) writeTargets.push(script);
   }
   return writeTargets.filter(Boolean).map((t) => path.resolve(cwd, t));
 }
 
-function bashDenial(command, cwd, home) {
+// Repo gốc có file dở của phiên khác: git ghi (checkout/reset/stash/clean/commit…) chỉ cổng commit được làm
+function ownRepoGit(tokens, cwd, writable) {
+  const dir = tokens[0] === 'git' && gitWriteDir(tokens.slice(1), cwd);
+  return dir && writable.some((root) => isInside(dir, root)) ? tokens.join(' ') : null;
+}
+
+function bashDenial(command, cwd, home, writable) {
   const vars = {};
   for (const rawTokens of splitSegments(expandHome(command, home))) {
     const tokens = rawTokens.map((t) => t.replace(/\$\{?(\w+)\}?/g, (m, name) => vars[name] ?? m));
@@ -101,21 +108,23 @@ function bashDenial(command, cwd, home) {
     if (assignment) vars[assignment[1]] = assignment[2];
     else if (tokens[0] === 'cd') cwd = path.resolve(cwd, tokens[1] ?? home);
     else {
-      const root = segmentWriteTargets(tokens, cwd, home).map((t) => protectedRootOf(t, home)).find(Boolean);
-      if (root) return root;
+      const git = ownRepoGit(tokens, cwd, writable);
+      if (git) return `autopilot: không chạy \`${git}\` trên repo gốc — commit chỉ qua cổng commit của autopilot, không checkout/reset/stash/clean`;
+      const root = segmentWriteTargets(tokens, cwd, home, writable).map((t) => protectedRootOf(t, home, writable)).find(Boolean);
+      if (root) return `autopilot: lệnh ghi vào ${root} — chỉ đọc được, mọi thay đổi làm trong ${writable.length ? writable.join(', ') : cwd}`;
     }
   }
   return null;
 }
 
-export function sandboxDenial({ tool_name, tool_input = {}, cwd }, home) {
+export function sandboxDenial({ tool_name, tool_input = {}, cwd }, home, writable = []) {
+  const allowed = writable.length ? writable.join(', ') : cwd;
   const field = WRITE_TOOLS[tool_name];
   if (field) {
     const target = path.resolve(cwd, expandHome(tool_input[field] ?? '', home));
-    const root = protectedRootOf(target, home);
-    return root ? `autopilot chạy thử: không được ghi vào ${root} — chỉ sửa trong worktree ${cwd}` : null;
+    const root = protectedRootOf(target, home, writable);
+    return root ? `autopilot: không được ghi vào ${root} — chỉ sửa trong ${allowed}` : null;
   }
   if (tool_name !== 'Bash') return null;
-  const root = bashDenial(tool_input.command ?? '', cwd, home);
-  return root ? `autopilot chạy thử: lệnh ghi vào ${root} (source gốc) — chỉ đọc được, mọi thay đổi làm trong worktree ${cwd}` : null;
+  return bashDenial(tool_input.command ?? '', cwd, home, writable);
 }

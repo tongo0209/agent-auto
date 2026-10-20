@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-lock-'));
-const { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted } = await import('./lock.mjs');
+const { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted, holdRepo, releaseRepos } = await import('./lock.mjs');
+const { saveRun } = await import('./store.mjs');
 
 const A = { key: 'GW-1', runId: 'r1' };
 const B = { key: 'GW-2', runId: 'r2' };
@@ -82,4 +83,20 @@ test('nhiều process cùng acquire một lúc → đúng 1 process được', a
     const results = await Promise.all(Array.from({ length: 8 }, one));
     assert.strictEqual(results.filter((r) => r === 'true').length, 1, `vòng ${round}: ${results}`);
   }
+});
+
+test('holdRepo: 1 repo chỉ 1 run; run khác bị từ chối kèm holder; chủ cũ xong/bị xoá hoặc nhả thì nhường', () => {
+  saveRun({ ...A, status: 'paused' });
+  assert.deepStrictEqual(holdRepo('/repo', A), { ok: true });
+  assert.deepStrictEqual(holdRepo('/repo', A), { ok: true });
+  const refused = holdRepo('/repo', B);
+  assert.deepStrictEqual([refused.ok, refused.holder.key], [false, 'GW-1']);
+  assert.deepStrictEqual(holdRepo('/other', B), { ok: true });
+  saveRun({ ...A, status: 'done' });
+  assert.deepStrictEqual(holdRepo('/repo', B), { ok: true });
+  releaseRepos(B);
+  saveRun({ ...A, status: 'paused' });
+  assert.deepStrictEqual(holdRepo('/repo', A), { ok: true });
+  fs.rmSync(path.join(dir, 'GW-1'), { recursive: true });
+  assert.deepStrictEqual(holdRepo('/repo', B), { ok: true });
 });

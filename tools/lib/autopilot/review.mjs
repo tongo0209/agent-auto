@@ -1,4 +1,4 @@
-// Thay đổi của run để review: commit trên nhánh autopilot so với điểm tách khỏi repo gốc, chỉ đọc git
+// Thay đổi của run để review: commit run đã tạo (run cũ: nhánh autopilot so với điểm tách), chỉ đọc git
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { branchOf } from './worktree.mjs';
@@ -20,7 +20,19 @@ function fileDiffs(top, base, branch) {
   return files.map((f, i) => ({ ...f, diff: chunks[i].slice(0, MAX_DIFF_CHARS), truncated: chunks[i].length > MAX_DIFF_CHARS }));
 }
 
+// Repo gốc có commit của phiên khác chen giữa: chỉ lấy đúng commit run ghi lại, file trùng thì nối diff
+function commitChanges(run, top) {
+  const commits = (run.commits ?? []).filter((c) => c.repo === top).map(({ sha }) => ({ sha, subject: git(top, ['log', '-1', '--format=%s', sha]) }));
+  const byPath = new Map();
+  for (const file of commits.flatMap(({ sha }) => fileDiffs(top, `${sha}^`, sha))) {
+    const seen = byPath.get(file.path);
+    byPath.set(file.path, seen ? { ...seen, diff: `${seen.diff}\n${file.diff}`, truncated: seen.truncated || file.truncated } : file);
+  }
+  return { repo: top, name: path.basename(top), worktree: top, branch: run.workBranch[top], commits, files: [...byPath.values()], cherryPick: null };
+}
+
 export function runChanges(run) {
+  if (!Object.keys(run.worktrees ?? {}).length) return Object.keys(run.workBranch ?? {}).map((top) => commitChanges(run, top));
   const branch = branchOf(run);
   return Object.entries(run.worktrees ?? {}).map(([top, worktree]) => {
     // run tạo trước khi lưu base: điểm tách = merge-base với HEAD hiện tại của repo gốc

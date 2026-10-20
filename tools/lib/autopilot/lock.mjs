@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { runsDir, writeJsonAtomic } from './store.mjs';
+import { runsDir, writeJsonAtomic, loadRun } from './store.mjs';
 
 const lockFile = (name) => path.join(runsDir(), `.lock-${name}`);
 const heldFile = () => path.join(runsDir(), '.held.json');
+const reposFile = () => path.join(runsDir(), '.repos.json');
 const sameOwner = (a, b) => a.key === b.key && a.runId === b.runId;
 
 function isAlive(pid) {
@@ -76,4 +77,27 @@ export function holdCampaign(campaignDir, owner) {
 export function releaseCampaign(owner) {
   const kept = Object.entries(heldCampaigns()).filter(([, o]) => !sameOwner(o, owner));
   writeJsonAtomic(heldFile(), Object.fromEntries(kept));
+}
+
+// Run làm thẳng trên repo gốc nên mỗi repo chỉ 1 run; giữ tới khi run xong/abort (qua cả lúc chờ duyệt, không theo pid)
+const isOver = (owner) => {
+  const run = loadRun(owner.key, owner.runId);
+  return !run || run.status === 'done';
+};
+
+export function holdRepo(top, owner) {
+  return withMutex('repos', () => {
+    const held = readJson(reposFile(), {});
+    const holder = held[top];
+    if (holder && !sameOwner(holder, owner) && !isOver(holder)) return { ok: false, holder };
+    writeJsonAtomic(reposFile(), { ...held, [top]: { key: owner.key, runId: owner.runId } });
+    return { ok: true };
+  });
+}
+
+export function releaseRepos(owner) {
+  withMutex('repos', () => {
+    const kept = Object.entries(readJson(reposFile(), {})).filter(([, o]) => !sameOwner(o, owner));
+    writeJsonAtomic(reposFile(), Object.fromEntries(kept));
+  });
 }

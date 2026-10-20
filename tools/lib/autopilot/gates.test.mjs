@@ -27,7 +27,7 @@ function fakeExec(codes = {}, porcelain = '') {
   return { exec, calls };
 }
 
-const ctx = (f, exec, extra = {}) => ({ ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa tab quà.', exec, isolated: true, ...extra });
+const ctx = (f, exec, extra = {}) => ({ ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa tab quà.', exec, ...extra });
 
 test('landing chỉ có build-dev + build-pro → chạy build-pro (bản dev sinh sprite sau dist ⇒ dist-stale)', async () => {
   const f = fixture({ scripts: { 'build-dev': 'x', 'build-pro': 'y' } });
@@ -106,7 +106,7 @@ test('commit chỉ lấy giao files verdict với git status', async () => {
   assert.strictEqual(add.line, 'git add -- products/x/landing/a/index.html');
 });
 
-test('commit message đúng format + trailer, cdn-source chỉ pull khi AUTOPILOT_LAB_WRITES=1', async () => {
+test('commit message đúng format + trailer, cdn-source luôn pull --no-rebase --no-edit sau commit', async () => {
   const repo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ap-cdn-')), 'cdn-source');
   const campaignDir = path.join(repo, 'products/x/landing/a');
   fs.mkdirSync(campaignDir, { recursive: true });
@@ -114,20 +114,19 @@ test('commit message đúng format + trailer, cdn-source chỉ pull khi AUTOPILO
   await runGates(['commit'], ctx({ repo, campaignDir }, exec, { files: ['products/x/landing/a/index.html'] }));
   const commit = calls.find((c) => c.line.startsWith('git commit'));
   assert.match(commit.line, /--only products\/x\/landing\/a\/index.html -m \(fix\): sửa tab quà\n\nCo-Authored-By: Claude Code <noreply@anthropic.com>$/);
-  assert.ok(!calls.some((c) => c.line.startsWith('git pull')));
-  process.env.AUTOPILOT_LAB_WRITES = '1';
-  const withWrites = fakeExec({}, ' M products/x/landing/a/index.html\0');
-  await runGates(['commit'], ctx({ repo, campaignDir }, withWrites.exec, { files: ['products/x/landing/a/index.html'] }));
-  delete process.env.AUTOPILOT_LAB_WRITES;
-  assert.ok(withWrites.calls.some((c) => c.line === 'git pull --no-rebase --no-edit origin master'));
+  assert.strictEqual(calls.at(-1).line, 'git pull --no-rebase --no-edit origin master');
+  assert.ok(!calls.some((c) => /--autostash|--amend/.test(c.line)));
 });
 
-test('G0: commit thẳng repo thật (không phải worktree) bị tắt khi chưa có AUTOPILOT_LAB_WRITES', async () => {
-  const f = fixture();
-  const { exec, calls } = fakeExec({}, ' M products/x/landing/a/index.html\0');
-  const r = await runGates(['commit'], ctx(f, exec, { isolated: false, files: ['products/x/landing/a/index.html'] }));
-  assert.strictEqual(r.results[0].status, 'skipped');
-  assert.ok(!calls.some((c) => c.line.startsWith('git commit')));
+test('R19: commit thẳng repo gốc (không cần AUTOPILOT_LAB_WRITES), bỏ file dở có sẵn lúc bắt đầu, trả hash commit', async () => {
+  const f = gitRepo();
+  fs.writeFileSync(path.join(f.campaignDir, 'dang-do.css'), 'của phiên khác');
+  const files = ['products/x/landing/a/index.html', 'products/x/landing/a/dang-do.css'];
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files, planTitle: 'Sửa tab', dirty: ['products/x/landing/a/dang-do.css'] });
+  assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
+  assert.strictEqual(r.results[0].commit, f.git('rev-parse', 'HEAD').stdout.trim());
+  assert.deepStrictEqual(f.git('show', '--name-only', '--format=', 'HEAD').stdout.trim().split('\n'), ['products/x/landing/a/index.html']);
+  assert.match(f.git('status', '--porcelain').stdout, /dang-do\.css/);
 });
 
 test('commit không có file giao → skipped', async () => {
@@ -150,7 +149,7 @@ test('commit: campaign mới chưa track (landing-new) vẫn commit đúng file 
   fs.writeFileSync(path.join(f.campaignDir, 'mới', 'ảnh.txt'), 'x');
   fs.writeFileSync(path.join(f.repo, 'khac.txt'), 'của phiên khác');
   const files = ['products/x/landing/a/index.html', 'products/x/landing/a/mới/ảnh.txt'];
-  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-new', files, planTitle: 'Dựng landing', isolated: true });
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-new', files, planTitle: 'Dựng landing' });
   assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
   const committed = f.git('-c', 'core.quotepath=off', 'show', '--name-only', '--format=', 'HEAD').stdout.trim().split('\n').sort();
   assert.deepStrictEqual(committed, files.sort());

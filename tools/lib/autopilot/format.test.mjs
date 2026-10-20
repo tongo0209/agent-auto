@@ -88,3 +88,8 @@ test('stageCells: breakpoint đánh dấu đúng ô', () => {
   assert.deepStrictEqual(stageCells(bp, flow).map((c) => c.breakpoint), [false, true, false, false]);
   assert.ok(stageCells(run, flow).every((c) => c.breakpoint === false));
 });
+
+test('parseOptions: heading thụt tới 3 khoảng trắng vẫn nhận', () => {
+  const out = parseOptions('   ## Phương án\n   ### A · Một\n   x\n   ### B · Hai\n');
+  assert.deepStrictEqual(out.map((o) => o.id), ['A', 'B']);
+});

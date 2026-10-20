@@ -27,8 +27,8 @@ export function stageCells(run, flow) {
 }
 
 export function parseOptions(planMd) {
-  const section = planMd.match(/^## Phương án[^\n]*\n([\s\S]*?)(?=^## |(?![\s\S]))/m)?.[1] ?? '';
-  return [...section.matchAll(/^### ([A-C]) · (.+)\n([\s\S]*?)(?=^#{1,3} |(?![\s\S]))/gm)]
+  const section = planMd.match(/^ {0,3}## Phương án[^\n]*\n([\s\S]*?)(?=^ {0,3}## |(?![\s\S]))/m)?.[1] ?? '';
+  return [...section.matchAll(/^ {0,3}### ([A-C]) · (.+)\n([\s\S]*?)(?=^ {0,3}#{1,3} |(?![\s\S]))/gm)]
     .map(([, id, title, body]) => ({ id, title: title.trim(), body: body.trim() }));
 }
 

@@ -66,7 +66,7 @@ function toolLabel({ name, input = {} }) {
 }
 
 function eventLines(event) {
-  if (event.type === 'system') return [{ kind: 'init', text: `phiên ${event.model ?? ''}`.trim() }];
+  if (event.type === 'system') return event.subtype === 'init' ? [{ kind: 'init', text: `phiên ${event.model ?? ''}`.trim() }] : [];
   if (event.type === 'result') return [{ kind: 'done', text: `xong · ${event.num_turns ?? 0} lượt · $${(event.total_cost_usd ?? 0).toFixed(2)}` }];
   return (event.message?.content ?? []).flatMap((part) => {
     if (part.type === 'text' && part.text.trim()) return [{ kind: 'text', text: clip(part.text.trim(), 600) }];

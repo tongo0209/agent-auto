@@ -50,6 +50,8 @@ test('actionArgs: dựng đúng lệnh CLI, chặn đầu vào xấu', () => {
 test('liveLog: đọc .log mới nhất của run, đổi stream-json thành dòng dễ đọc', () => {
   const events = [
     { type: 'system', subtype: 'init', model: 'opus' },
+    { type: 'system', subtype: 'hook_response' },
+    { type: 'rate_limit_event' },
     { type: 'assistant', message: { content: [{ type: 'text', text: 'Đọc plan' }, { type: 'tool_use', name: 'Read', input: { file_path: '/a/b.scss' } }] } },
     { type: 'user', message: { content: [{ type: 'tool_result', content: 'x'.repeat(500) }] } },
   ];

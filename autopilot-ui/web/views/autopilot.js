@@ -42,7 +42,7 @@ let previewSeq = 0;
 let previewBusy = false;
 let runFiles = [];
 let stageMenu = null;
-const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp', reviewed: 'đã review' };
+const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp', reviewed: 'đã review', retry: 'chạy lại', skip: 'bỏ qua', goto: 'quay về', pick: 'chọn phương án' };
 const ABORT_BTN = '<button class="btn ghost" data-act="abort">Huỷ run</button>';
 const FLOW_LEGEND = '<div class="flow-legend"><span class="done">xong</span><span class="running">đang chạy</span><span class="waiting">chờ bạn</span><span class="stopped">dừng</span><span class="user-skipped">bỏ qua</span></div>';
 const CLAUDE_BTN = '<button class="btn claude" data-claude><i class="ph-bold ph-terminal-window"></i>Mở trong Claude</button>';
@@ -314,6 +314,45 @@ function placeSideLane(run, lane) {
   if (Number.isFinite(callerIdx)) sideLane.style.paddingLeft = `${callerIdx * (92 + 44)}px`;
 }
 
+const STOP_REASON = {
+  'loop-exhausted': (s) => `hết vòng sửa ở ${s}`,
+  breakpoint: (s) => `dừng theo 📍 sau ${s}`,
+  fail: (s) => `${s} trượt`,
+  budget: () => 'hết ngân sách',
+  paused: () => 'bạn đã dừng',
+  runner: (s) => `${s} lỗi khi chạy claude`,
+};
+const BROKEN_CODES = ['loop-exhausted', 'fail', 'runner'];
+const DOCK_ASK = {
+  goto: { placeholder: 'Vì sao quay về bước đó (bắt buộc)', missing: 'Quay về cần ghi chú để bước sau biết sửa gì.' },
+  skip: { placeholder: 'Lý do bỏ qua cổng (bắt buộc)', missing: 'Bỏ qua cổng cần ghi lý do.' },
+};
+let dockAsk = null;
+
+const stopCode = (run) => run.stopReason?.split(':')[0];
+const stopStage = (run) => run.stopReason?.split(':')[1];
+const reasonText = (stopReason) => {
+  const [code, stage] = stopReason.split(':');
+  return Object.hasOwn(STOP_REASON, code) ? STOP_REASON[code](stage) : stopReason;
+};
+const isBroken = (run) => run.status === 'stopped' && BROKEN_CODES.includes(stopCode(run)) && Boolean(actionOf(run, 'retry'));
+const isBreakpointStop = (run) => run.status === 'stopped' && stopCode(run) === 'breakpoint';
+const hasPlanOptions = (run) => run.status === 'paused' && run.options.length >= 2 && Boolean(actionOf(run, 'pick'));
+const askingNow = (run) => (dockAsk?.key === run.key && dockAsk.stage === run.stage ? dockAsk.type : null);
+
+function stopMessage(run) {
+  const text = reasonText(run.stopReason);
+  if (isBreakpointStop(run)) return `${text[0].toUpperCase()}${text.slice(1)}.`;
+  const max = run.cells.find((c) => c.id === stopStage(run))?.max;
+  const count = stopCode(run) === 'loop-exhausted' && max ? ` (${run.loops[stopStage(run)]}/${max})` : '';
+  return `Run dừng: <b>${esc(text)}${count}</b>.`;
+}
+
+function gateStrip(run) {
+  if (run.stage !== 'approve-result' || !run.gateSkipped.length) return '';
+  return `<span class="gate-strip"><b>Đã bỏ ${run.gateSkipped.length} cổng:</b> ${run.gateSkipped.map((g) => `${esc(g.stage)} (${esc(g.reason)})`).join(' · ')}</span>`;
+}
+
 function dockMessage(run) {
   const stage = `<b>${esc(run.stage ?? '')}</b>`;
   if (run.awaitingReview) return 'Run xong, <b>chờ bạn review</b> code ở tab Thay đổi. Ổn thì bấm Đã review.';
@@ -323,31 +362,69 @@ function dockMessage(run) {
   if (run.status === 'chat') return `Run chat đang ở ${stage}, claude tự báo tiến độ lên board.`;
   if (run.interrupted) return `Run bị ngắt ở ${stage} (không còn process chạy). Chạy tiếp để làm lại bước này.`;
   if (run.status === 'running') return `Máy đang chạy ${stage}. Muốn sửa file thì bảo claude dừng (pause) trước.`;
-  if (run.status === 'paused') return `Chờ bạn ở ${stage}. Duyệt để chạy tiếp, hoặc ghi chú rồi trả về.`;
+  if (hasPlanOptions(run)) return `Chờ bạn chọn phương án ở ${stage}: bấm <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> hoặc nút Chọn, hay ghi chú rồi trả về.`;
+  if (run.status === 'paused') return `${gateStrip(run)}Chờ bạn ở ${stage}. Duyệt để chạy tiếp, hoặc ghi chú rồi trả về.`;
   if (run.status === 'attached') return `Chờ bạn ở ${stage}: chạy <code>${esc(run.command)}</code> trong phiên Claude.`;
   if (isUserPaused(run) && run.cutSession) return `Đã dừng giữa ${stage}. Nhắn thêm cho claude (tuỳ chọn) rồi Chạy tiếp, claude nối đúng phiên đang dở.`;
   if (isUserPaused(run)) return `Đã tạm dừng trước ${stage}. Chạy tiếp khi bạn sẵn sàng.`;
-  return `Run đã dừng <b>(${esc(run.stopReason)})</b>.`;
+  return stopMessage(run);
+}
+
+const dockBtn = (act, cls, icon, label) => `<button class="btn ${cls}" data-act="${act}"><i class="ph-bold ph-${icon}"></i>${label}</button>`;
+
+function askButtons(run, asking) {
+  const stages = actionOf(run, 'goto')?.stages ?? [];
+  const picker = asking === 'goto' ? `<select id="gotoStage" aria-label="Quay về bước">${stages.map((id, i) => `<option value="${esc(id)}"${i === stages.length - 1 ? ' selected' : ''}>${esc(id)}</option>`).join('')}</select>` : '';
+  const submit = asking === 'goto' ? dockBtn('goto', 'go', 'arrow-bend-up-left', 'Quay về') : dockBtn('skip', 'go', 'skip-forward', 'Bỏ qua');
+  return `${picker}${dockBtn('cancel-ask', 'ghost', 'x', 'Quay lại')}${submit}`;
 }
 
 function oneClickAction(run) {
-  if (run.status === 'paused') return '<button class="btn back" data-act="reject"><i class="ph-bold ph-arrow-u-up-left"></i>Trả về <kbd>R</kbd></button><button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Duyệt <kbd>A</kbd></button>';
-  if (run.status === 'attached') return '<button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Đã xong, chạy tiếp</button>';
-  if (run.status === 'stopped' || run.interrupted) return '<button class="btn go" data-act="resume"><i class="ph-bold ph-play"></i>Chạy tiếp</button>';
-  if (run.awaitingReview) return '<button class="btn go" data-act="reviewed"><i class="ph-bold ph-check"></i>Đã review</button>';
+  const asking = askingNow(run);
+  if (asking) return askButtons(run, asking);
+  if (run.status === 'paused') {
+    const skipped = run.stage === 'approve-result' ? run.gateSkipped.length : 0;
+    const approve = dockBtn('approve', 'go', 'check', skipped ? `Duyệt dù đã bỏ ${skipped} cổng` : 'Duyệt <kbd>A</kbd>');
+    return dockBtn('reject', 'back', 'arrow-u-up-left', 'Trả về <kbd>R</kbd>') + (hasPlanOptions(run) ? '' : approve);
+  }
+  if (run.status === 'attached') return dockBtn('approve', 'go', 'check', 'Đã xong, chạy tiếp');
+  const goto = actionOf(run, 'goto');
+  const backBtn = goto ? dockBtn('ask-goto', 'ghost', 'arrow-bend-up-left', 'Quay về…') : '';
+  if (isBroken(run)) return backBtn + (actionOf(run, 'skip') ? dockBtn('skip', 'ghost', 'skip-forward', 'Bỏ qua') : '') + dockBtn('retry', 'go', 'arrow-clockwise', 'Chạy lại');
+  if (isBreakpointStop(run)) {
+    const rerun = goto?.stages.includes(stopStage(run)) ? dockBtn('rerun', 'ghost', 'arrow-clockwise', `Chạy lại ${esc(stopStage(run))}`) : '';
+    return backBtn + rerun + dockBtn('resume', 'go', 'play', 'Chạy tiếp');
+  }
+  if (run.status === 'stopped' || run.interrupted) return dockBtn('resume', 'go', 'play', 'Chạy tiếp');
+  if (run.awaitingReview) return dockBtn('reviewed', 'go', 'check', 'Đã review');
   return '';
+}
+
+function optionCards(run) {
+  if (!hasPlanOptions(run)) return '';
+  return run.options.map((o, i) => `
+    <div class="opt-card">
+      <b>${esc(o.id)} · ${esc(o.title)}</b>
+      <p>${esc(o.body)}</p>
+      <button class="btn go sm" data-pick="${esc(o.id)}">Chọn ${esc(o.id)} <kbd>${i + 1}</kbd></button>
+    </div>`).join('');
 }
 
 function renderDock(run) {
   const show = !isAborted(run);
   $('#dock').classList.toggle('show', show);
   if (!show) return;
-  $('#dockMessage').innerHTML = `${dockMessage(run)}<span class="dock-hint">Nói với claude trong panel: sửa gì, chạy lại cổng, đưa vào source, xong…</span>`;
+  const keptStage = $('#gotoStage')?.value;
+  const asking = askingNow(run);
+  $('#dockMessage').innerHTML = `${asking ? 'Ghi chú rồi bấm gửi.' : dockMessage(run)}<span class="dock-hint">Nói với claude trong panel: sửa gì, chạy lại cổng, đưa vào source, xong…</span>`;
+  $('#dockOptions').innerHTML = asking ? '' : optionCards(run);
+  $('.dock-card').classList.toggle('stack', Boolean($('#dockOptions').innerHTML || run.status === 'stopped' || $('.gate-strip')));
   const cut = isUserPaused(run) && run.cutSession;
-  $('#note').style.display = run.status === 'paused' || cut ? '' : 'none';
-  $('#note').placeholder = cut ? 'Nhắn claude khi chạy tiếp: đổi hướng, bổ sung gì...' : 'Ghi chú khi trả về: cần sửa gì...';
+  $('#note').style.display = run.status === 'paused' || cut || asking ? '' : 'none';
+  $('#note').placeholder = asking ? DOCK_ASK[asking].placeholder : cut ? 'Nhắn claude khi chạy tiếp: đổi hướng, bổ sung gì...' : 'Ghi chú khi trả về: cần sửa gì...';
   $('#prevNote').textContent = run.rejectNote ? `Lần trả về trước: ${run.rejectNote}` : '';
   $('#actions').innerHTML = ABORT_BTN + CLAUDE_BTN + oneClickAction(run);
+  if (keptStage && $('#gotoStage')) $('#gotoStage').value = keptStage;
 }
 
 async function refresh() {
@@ -371,20 +448,43 @@ function armAbort(btn) {
   return false;
 }
 
-async function act(action) {
+async function act(action, extra = {}) {
   const run = data.runs.find((r) => r.key === selectedKey);
   if (!run) return;
   const note = $('#note').value.trim();
-  if (action === 'reject' && !note) {
+  const missing = { reject: 'Trả về cần ghi chú để bước sau biết sửa gì.', ...(askingNow(run) && { [askingNow(run)]: DOCK_ASK[askingNow(run)].missing }) }[action];
+  if (missing && !note && !extra.note) {
     $('#note').focus();
-    return toast('Trả về cần ghi chú để bước sau biết sửa gì.', true);
+    return toast(missing, true);
   }
-  document.querySelectorAll('#actions .btn').forEach((b) => (b.disabled = true));
-  if (!(await post(action, { key: run.key, note }))) return renderDock(run);
+  document.querySelectorAll('#dock .btn').forEach((b) => (b.disabled = true));
+  if (!(await post(action, { key: run.key, note, ...extra }))) return renderDock(run);
+  dockAsk = null;
+  $('#dockOptions').innerHTML = '';
   $('#note').value = '';
   $('#actions').innerHTML = `<span class="sending"><i class="ph-bold ph-circle-notch spin"></i>Đã gửi lệnh ${ACTION_LABEL[action]}, chờ autopilot nhận…</span>`;
   lastSig = '';
   setTimeout(refresh, 1500);
+}
+
+function onDockClick(e) {
+  const run = currentRun();
+  const pick = e.target.closest('[data-pick]');
+  if (pick) return act('pick', { option: pick.dataset.pick });
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const type = b.dataset.act;
+  if (type === 'abort' && !armAbort(b)) return;
+  if (['ask-goto', 'cancel-ask'].includes(type) || (type === 'skip' && !askingNow(run) && actionOf(run, 'skip').needsReason)) {
+    dockAsk = type === 'cancel-ask' ? null : { type: type === 'skip' ? 'skip' : 'goto', key: run.key, stage: run.stage };
+    return renderDock(run);
+  }
+  const extras = {
+    rerun: ['goto', { stage: stopStage(run), note: `chạy lại ${stopStage(run)}` }],
+    goto: ['goto', { stage: $('#gotoStage')?.value }],
+    skip: ['skip', { reason: $('#note').value.trim() }],
+  };
+  act(...(extras[type] ?? [type]));
 }
 
 async function pauseRun(btn) {
@@ -624,6 +724,7 @@ const MARKUP = `
   <div class="dock-card">
     <div>
       <label for="note" id="dockMessage"></label>
+      <div class="opt-cards" id="dockOptions"></div>
       <textarea id="note" placeholder="Ghi chú khi trả về: cần sửa gì..."></textarea>
       <div class="prev" id="prevNote"></div>
     </div>
@@ -678,10 +779,9 @@ export function mount(el) {
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t === tab));
     renderArtifact(data.runs.find((r) => r.key === selectedKey));
   });
-  $('#actions').addEventListener('click', (e) => {
-    if (e.target.closest('[data-claude]')) return openInClaude(data.runs.find((r) => r.key === selectedKey));
-    const b = e.target.closest('[data-act]');
-    if (b && (b.dataset.act !== 'abort' || armAbort(b))) act(b.dataset.act);
+  $('#dock').addEventListener('click', (e) => {
+    if (e.target.closest('[data-claude]')) return openInClaude(currentRun());
+    onDockClick(e);
   });
   $('#stageMenu').addEventListener('click', onStageMenuClick);
   $('#stageMenu').addEventListener('input', syncStageMenu);
@@ -714,7 +814,7 @@ export function mount(el) {
     $('[data-pv="run"]').disabled = !canRunPreview();
   });
   const onKey = (e) => {
-    const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+    const typing = document.activeElement?.closest('input, textarea, select, .xterm, [contenteditable]');
     if (e.key === 'Escape' && stageMenu) return closeStageMenu();
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette(); }
     if ($('#veil').classList.contains('show')) {
@@ -732,6 +832,8 @@ export function mount(el) {
     if (typing || !$('#dock').classList.contains('show')) return;
     if (e.key === 'a' && $('#actions [data-act="approve"]')) act('approve');
     if (e.key === 'r') $('#note').focus();
+    const pickBtn = !(e.metaKey || e.ctrlKey || e.altKey) && '123'.includes(e.key) && document.querySelectorAll('#dock [data-pick]')[Number(e.key) - 1];
+    if (pickBtn) act('pick', { option: pickBtn.dataset.pick });
   };
   $('#note').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) act('reject');

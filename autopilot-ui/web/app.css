@@ -14,15 +14,15 @@ body { display: grid; grid-template-columns: var(--nav-w) minmax(0, 1fr) var(--t
 body.dragging { cursor: col-resize; user-select: none; }
 
 .nav { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 0; border-right: 1px solid var(--line); background: var(--bg); z-index: 6; }
-.nav .logo { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--ok) 18%, var(--bg)); color: var(--ok); font-size: 19px; margin-bottom: 12px; }
 .nav a { position: relative; width: 60px; padding: 8px 0 6px; border-radius: var(--r); display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-3); text-decoration: none; font-size: 10.5px; transition: color .2s, background .2s; }
 .nav a i { font-size: 20px; }
 .nav a:hover { color: var(--text); background: var(--bg-2); }
 .nav a.on { color: var(--text); background: var(--bg-3); }
 .nav a.on::before { content: ""; position: absolute; left: -8px; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--ok); animation: grow .4s var(--ease); }
 .nav .count { position: absolute; top: 3px; right: 9px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--wait); color: #241a02; font: 600 10px/16px var(--mono); }
-.nav .spacer { flex: 1; }
-.nav .term-btn.on { color: var(--ok); }
+.nav .term-btn { margin-bottom: 10px; color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 35%, transparent); font-weight: 600; }
+.nav .term-btn:hover { color: var(--ok); background: color-mix(in srgb, var(--ok) 20%, transparent); }
+.nav .term-btn.on { color: #052e1f; background: var(--ok); box-shadow: none; }
 #view { min-width: 0; position: relative; }
 #view > .page { animation: page-in .45s var(--ease); }
 .page-pad { padding: 28px 36px 60px; }
@@ -41,6 +41,7 @@ body.dragging { cursor: col-resize; user-select: none; }
 .term-body { position: relative; flex: 1; min-height: 0; }
 .term-pane { position: absolute; inset: 8px 4px 4px 10px; display: none; }
 .term-pane.on { display: block; }
+.term-pane .xterm-viewport { scrollbar-color: var(--line-2) transparent; }
 
 @keyframes page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes grow { from { transform: scaleY(0); } to { transform: none; } }

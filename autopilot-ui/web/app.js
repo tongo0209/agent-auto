@@ -15,10 +15,8 @@ const ctx = { api, toast, openTerminal, go: (id, param) => (location.hash = `#/$
 let cleanup = null;
 
 function renderNav(active) {
-  $('#nav').innerHTML = `<div class="logo"><i class="ph-bold ph-terminal-window"></i></div>
-    ${VIEWS.map((v) => `<a href="#/${v.id}" class="${v.id === active ? 'on' : ''}" data-view="${v.id}"><i class="ph${v.id === active ? '-fill' : ''} ${v.icon}"></i>${v.label}</a>`).join('')}
-    <div class="spacer"></div>
-    <a href="#" class="term-btn" id="termBtn" title="Terminal (Ctrl+\`)"><i class="ph ph-terminal"></i>CLI</a>`;
+  $('#nav').innerHTML = `<a href="#" class="term-btn" id="termBtn" title="Mở/đóng Claude CLI (Ctrl+\`)"><i class="ph-bold ph-terminal-window"></i>Claude</a>
+    ${VIEWS.map((v) => `<a href="#/${v.id}" class="${v.id === active ? 'on' : ''}" data-view="${v.id}"><i class="ph${v.id === active ? '-fill' : ''} ${v.icon}"></i>${v.label}</a>`).join('')}`;
 }
 
 async function route() {

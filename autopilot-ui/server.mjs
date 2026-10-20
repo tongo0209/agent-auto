@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { listView, listArtifacts, artifactFile, actionArgs, liveLog } from './api.mjs';
 import { runsDir } from '../tools/lib/autopilot/store.mjs';
+import { attachTerminal } from './terminal.mjs';
 
 const PORT = Number(process.env.AUTOPILOT_UI_PORT) || 4800;
 const WEB = path.join(import.meta.dirname, 'web');
@@ -87,7 +88,7 @@ export function createServer({ spawnCli = spawnDetached } = {}) {
 if (import.meta.filename === process.argv[1]) {
   const server = createServer();
   server.listen(PORT, '127.0.0.1', () => {
-    consoleRequire('./ws/terminal').attachTerminal(server, '/term');
+    attachTerminal(server, '/term');
     console.log(`Console mới  http://127.0.0.1:${PORT}`);
   });
 }

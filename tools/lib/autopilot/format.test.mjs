@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { formatStatus, stageCells, totals } from './format.mjs';
+import { formatStatus, parseOptions, stageCells, totals } from './format.mjs';
 
 const flow = { id: 'f', stages: [
   { id: 'plan', kind: 'claude', next: 'review' },
@@ -58,4 +58,33 @@ test('stageCells: run chat lấy trạng thái bước hiện tại từ mark (a
 test('stageCells: bước bị bỏ qua (bước sau đã chạy hoặc run xong) → skipped, không xám như chưa chạy', () => {
   const doneRun = { ...run, status: 'done', stage: null, receipts: [run.receipts[0], { stage: 'commit', round: 1, verdict: 'pass', blocking: 0, advisory: 0, turns: 0, costUsd: 0, ms: 1000 }] };
   assert.deepStrictEqual(stageCells(doneRun, flow).map((c) => c.state), ['done', 'skipped', 'done', 'done']);
+});
+
+const planMd = (opts) => `# Plan\n\n## Bối cảnh\nx\n\n## Phương án\n${opts}\n## Việc cần làm\n- a\n`;
+
+test('parseOptions: 3 phương án → id [A,B,C], title đúng, body không chứa heading kế', () => {
+  const out = parseOptions(planMd('### A · Sửa CSS\nđổi grid\n\n### B · Viết lại\nlàm mới\n\n### C · Giữ nguyên\nkhông đổi\n'));
+  assert.deepStrictEqual(out.map((o) => [o.id, o.title]), [['A', 'Sửa CSS'], ['B', 'Viết lại'], ['C', 'Giữ nguyên']]);
+  assert.strictEqual(out[0].body, 'đổi grid');
+  assert.ok(!out[2].body.includes('##'));
+});
+
+test('parseOptions: 1 phương án → 1 phần tử', () => {
+  assert.strictEqual(parseOptions(planMd('### A · Duy nhất\nbody\n')).length, 1);
+});
+
+test('parseOptions: không có mục → []', () => {
+  assert.deepStrictEqual(parseOptions('# Plan\n\n## Bối cảnh\nx\n'), []);
+});
+
+test('stageCells: stage bị user bỏ → state skipped, skippedReason "QC chưa cần"', () => {
+  const skipped = { ...run, status: 'running', stage: 'commit', receipts: [...run.receipts, { stage: 'ok', verdict: 'skipped-by-user', note: 'QC chưa cần', blocking: 0, advisory: 0, turns: 0, costUsd: 0, ms: 0 }] };
+  const cells = stageCells(skipped, flow);
+  assert.deepStrictEqual([cells[2].state, cells[2].skippedReason, cells[1].skippedReason], ['skipped', 'QC chưa cần', null]);
+});
+
+test('stageCells: breakpoint đánh dấu đúng ô', () => {
+  const bp = { ...run, plan: { breakpoints: ['review'] } };
+  assert.deepStrictEqual(stageCells(bp, flow).map((c) => c.breakpoint), [false, true, false, false]);
+  assert.ok(stageCells(run, flow).every((c) => c.breakpoint === false));
 });

@@ -12,15 +12,24 @@ export function stageCells(run, flow) {
     const receipts = run.receipts.filter((r) => r.stage === s.id);
     const last = receipts.at(-1);
     const passed = run.status === 'done' || ranLater(i);
-    const state = s.id === run.stage ? currentState(run) : receipts.length || (passed && s.kind === 'pause') ? 'done' : passed ? 'skipped' : 'pending';
+    const skippedByUser = last?.verdict === 'skipped-by-user';
+    const state = s.id === run.stage ? currentState(run) : skippedByUser ? 'skipped' : receipts.length || (passed && s.kind === 'pause') ? 'done' : passed ? 'skipped' : 'pending';
     return {
       id: s.id, kind: s.kind, state, rounds: receipts.length,
+      breakpoint: (run.plan?.breakpoints ?? []).includes(s.id),
+      skippedReason: skippedByUser ? last.note : null,
       max: s.loop?.max ?? null,
       verdict: last?.verdict ?? null,
       usd: usd(receipts.reduce((n, r) => n + r.costUsd, 0)),
       minutes: minutes(receipts.reduce((n, r) => n + r.ms, 0)),
     };
   });
+}
+
+export function parseOptions(planMd) {
+  const section = planMd.match(/^## Phương án[^\n]*\n([\s\S]*?)(?=^## |(?![\s\S]))/m)?.[1] ?? '';
+  return [...section.matchAll(/^### ([A-C]) · (.+)\n([\s\S]*?)(?=^#{1,3} |(?![\s\S]))/gm)]
+    .map(([, id, title, body]) => ({ id, title: title.trim(), body: body.trim() }));
 }
 
 export function totals(run) {

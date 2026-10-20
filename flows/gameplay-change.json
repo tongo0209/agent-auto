@@ -1,0 +1,152 @@
+{
+  "id": "gameplay-change",
+  "label": "Đổi cơ chế gameplay giữa chừng (khoá lại → diff kit → sửa)",
+  "budget": {
+    "usd": 30,
+    "minutes": 150
+  },
+  "ask": [
+    {
+      "need": [
+        "campaignDir"
+      ],
+      "question": "Campaign nào đổi cơ chế (kế thừa paths của task cha có đúng không)?"
+    },
+    {
+      "need": [
+        "gameplayLocked"
+      ],
+      "question": "Gameplay CŨ đang khoá theo cặp AI-RULES nào (để diff kit)?"
+    }
+  ],
+  "stages": [
+    {
+      "id": "relock",
+      "kind": "claude",
+      "prompt": "relock.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "plan"
+    },
+    {
+      "id": "plan",
+      "kind": "claude",
+      "prompt": "plan.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "plan-review"
+    },
+    {
+      "id": "plan-review",
+      "kind": "claude",
+      "prompt": "plan-review.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "approve-plan",
+      "loop": {
+        "back": "plan",
+        "max": 3
+      }
+    },
+    {
+      "id": "approve-plan",
+      "kind": "pause",
+      "show": [
+        "relock.md",
+        "plan.md",
+        "plan-review-r*.json"
+      ],
+      "onReject": "relock",
+      "next": "implement"
+    },
+    {
+      "id": "implement",
+      "kind": "claude",
+      "prompt": "implement.md",
+      "toolset": "implement",
+      "model": "opus",
+      "next": "code-review",
+      "keepSession": true
+    },
+    {
+      "id": "code-review",
+      "kind": "claude",
+      "prompt": "code-review.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "gates",
+      "loop": {
+        "back": "fix",
+        "max": 3
+      }
+    },
+    {
+      "id": "gates",
+      "kind": "gate",
+      "checks": [
+        "build",
+        "pm-gate",
+        "check-promotion",
+        "fe-gate",
+        "layout-gate"
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 3
+      },
+      "next": "handoff"
+    },
+    {
+      "id": "handoff",
+      "kind": "claude",
+      "prompt": "handoff.md",
+      "toolset": "implement",
+      "model": "sonnet",
+      "when": "hasHandoff",
+      "next": "handoff-gates"
+    },
+    {
+      "id": "handoff-gates",
+      "kind": "gate",
+      "scope": "handoff",
+      "when": "hasHandoff",
+      "checks": [
+        "pm-gate-handoff",
+        "check-promotion"
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 2
+      },
+      "next": "approve-result"
+    },
+    {
+      "id": "fix",
+      "kind": "claude",
+      "prompt": "fix.md",
+      "toolset": "implement",
+      "model": "opus",
+      "resume": "implement",
+      "returnTo": "caller"
+    },
+    {
+      "id": "approve-result",
+      "kind": "pause",
+      "show": [
+        "diff",
+        "receipts"
+      ],
+      "onReject": "fix",
+      "rejectReturnTo": "gates",
+      "next": "commit"
+    },
+    {
+      "id": "commit",
+      "kind": "gate",
+      "checks": [
+        "commit"
+      ],
+      "next": null
+    }
+  ]
+}

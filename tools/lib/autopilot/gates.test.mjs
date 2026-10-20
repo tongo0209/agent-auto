@@ -159,3 +159,12 @@ test('G2: chưa có mainsite/*.html → handoff checks skipped', async () => {
   const r = await runGates(['pm-gate-handoff', 'check-promotion'], ctx(handoffFixture(null), fakeExec().exec));
   assert.deepStrictEqual(r.results.map((x) => x.status), ['skipped', 'skipped']);
 });
+
+test('G6: check-promotion trên campaign chưa bàn giao đọc dist/*.html', async () => {
+  const f = fixture();
+  fs.mkdirSync(path.join(f.campaignDir, 'dist'));
+  fs.writeFileSync(path.join(f.campaignDir, 'dist/index.html'), '<div class="pm__login"></div>');
+  const { exec, calls } = fakeExec();
+  await runGates(['check-promotion'], ctx(f, exec));
+  assert.match(calls[0].line, /check-promotion\.mjs .*dist\/index\.html$/);
+});

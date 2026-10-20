@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { campaignOf, readLock } from '../project-lock.mjs';
 
 const HANDOFF_REPO = 'gt-promotion-template';
 const SHEET_INPUT = /docs\.google\.com\/spreadsheets|sharepoint\.com|\.xlsx(\?|$)/i;
 const GOOGLE_SHEET = /docs\.google\.com\/spreadsheets/i;
 const NO_BUG_ID_NOTE = /không có cột BugID/i;
 const DESIGN_DOWNLOADED = /^đã-giao-(đã-tải|tải-một-phần)$/;
+const GAMEPLAY_CHANGE_NOTE = /đổi cơ chế|đổi gameplay/i;
 const RAW_DESIGN = /\.(psd|psb)$/i;
 const IMAGE = /\.(png|jpe?g|webp)$/i;
 
@@ -39,6 +41,9 @@ export function gatherSignals({ input, agentRoot, campaign }) {
   const repo = campaign ? Object.values(repos).find((r) => campaign.startsWith(r)) ?? null : target ? repos[target.repo] : null;
   const campaignDir = campaign ?? (target ? path.join(repos[target.repo], target.path) : null);
 
+  const project = campaignDir ? campaignOf(campaignDir) : null;
+  const lock = project ? readLock(path.join(agentRoot, 'projects', project.game, `${project.slug}.md`)) : null;
+
   const designDir = key ? path.join(agentRoot, 'designs', key) : null;
   const designFiles = designDir ? listFiles(designDir) : [];
   const briefText = key ? readText(path.join(agentRoot, 'tasks', key, 'brief.md')) : '';
@@ -62,6 +67,8 @@ export function gatherSignals({ input, agentRoot, campaign }) {
     repos: [...new Set([target, ...known].filter(Boolean).map((p) => repos[p.repo]))],
     designDir,
     hasRawDesign,
+    gameplayLocked: Boolean(lock || issue.gameplay),
+    gameplayChanged: GAMEPLAY_CHANGE_NOTE.test(issue.note ?? '') || Boolean(lock && issue.gameplay && issue.gameplay !== lock.gameplay),
     designLinkPending: Boolean(issue.designLink) && !DESIGN_DOWNLOADED.test(issue.design?.status ?? ''),
     hasDesign: hasRawDesign || designFiles.some((f) => IMAGE.test(f)),
     hasCutAssets: designFiles.some((f) => f.split(path.sep).includes('_auto-export')),

@@ -161,3 +161,25 @@ test('G5: designLinkPending = có link design mà status chưa tải xong', () =
   assert.strictEqual(gatherSignals({ input: 'GW-1', agentRoot: root }).designLinkPending, true);
   assert.strictEqual(gatherSignals({ input: 'GW-2', agentRoot: root }).designLinkPending, false);
 });
+
+test('G6: đổi cơ chế gameplay → gameplay-change, thắng luật task con chưa có buglist', () => {
+  const r = route({ ...base, gameplayChanged: true, gameplayLocked: true, parentKey: 'GW-890' }, RULES);
+  assert.strictEqual(r.flow, 'gameplay-change');
+});
+
+test('G6: gameplayChanged từ note + gameplayLocked đọc mục Khoá của file dự án', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-sig-'));
+  const repo = path.join(root, 'cdn-source');
+  fs.mkdirSync(path.join(repo, 'products/tlbb/landing/hb'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'projects/tlbb'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'projects/tlbb/hb.md'), '# x\n## 1. Khoá\n- gameplay: luckydraw-gift-exchange\n## 2. Nơi code\n');
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ repos: { 'cdn-source': repo } }));
+  const issues = {
+    'GW-890': { paths: [{ repo: 'cdn-source', path: 'products/tlbb/landing/hb' }] },
+    'GW-963': { parent: 'GW-890', note: 'Chat TLBB: đổi cơ chế sang khuyến mãi nạp' },
+  };
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues }));
+  const s = gatherSignals({ input: 'GW-963', agentRoot: root });
+  assert.deepStrictEqual([s.gameplayChanged, s.gameplayLocked], [true, true]);
+  assert.strictEqual(gatherSignals({ input: 'GW-890', agentRoot: root }).gameplayChanged, false);
+});

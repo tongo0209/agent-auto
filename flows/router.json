@@ -1,6 +1,7 @@
 {
   "rules": [
     { "flow": "buglist", "all": ["inputIsSheet"], "needsCampaign": false },
+    { "flow": "gameplay-change", "all": ["gameplayChanged"] },
     { "flow": "buglist", "all": ["parentKey", "hasBugSheet"] },
     {
       "flow": "ask", "all": ["parentKey", "!hasBugSheet"],

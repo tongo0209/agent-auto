@@ -293,3 +293,11 @@ test('G5: design-intake dừng ở block hỏi PM, approve là xong — không c
   assert.strictEqual(run.status, 'done');
   assert.strictEqual(gates.calls.length, 0);
 });
+
+test('G6: gameplay-change luôn dừng ở approve-plan sau relock + plan-review', async () => {
+  const flow = loadFlow('gameplay-change');
+  const { runClaude, calls } = fakeClaude({});
+  const run = await drive(newRun('gameplay-change'), flow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-plan']);
+  assert.deepStrictEqual(calls.map((c) => c.stageId), ['relock', 'plan', 'plan-review']);
+});

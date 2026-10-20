@@ -41,8 +41,10 @@ let preview = null;
 let previewSeq = 0;
 let previewBusy = false;
 let runFiles = [];
+let stageMenu = null;
 const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp', reviewed: 'đã review' };
 const ABORT_BTN = '<button class="btn ghost" data-act="abort">Huỷ run</button>';
+const FLOW_LEGEND = '<div class="flow-legend"><span class="done">xong</span><span class="running">đang chạy</span><span class="waiting">chờ bạn</span><span class="stopped">dừng</span><span class="user-skipped">bỏ qua</span></div>';
 const CLAUDE_BTN = '<button class="btn claude" data-claude><i class="ph-bold ph-terminal-window"></i>Mở trong Claude</button>';
 
 
@@ -101,10 +103,13 @@ function nodeHtml(c) {
   const note = c.state === 'waiting' ? 'chờ' : c.usd ? money(c.usd) : c.state === 'skipped' ? 'bỏ qua' : '';
   const kind = c.kind === 'pause' || c.kind === 'attached' ? 'pause' : c.kind === 'gate' ? 'gate' : '';
   const changed = lastStates[c.id] && lastStates[c.id] !== c.state ? 'pop' : '';
-  return `<div class="node ${c.state} ${kind} ${changed}" id="n-${esc(c.id)}">
-    ${c.rounds > 1 ? `<span class="badge-round">×${c.rounds}</span>` : ''}
+  const userSkipped = c.state === 'skipped' && c.skippedReason !== null;
+  const skipText = `bỏ qua${c.skippedReason ? ` · ${c.skippedReason}` : ''}`;
+  return `<div class="node ${c.state} ${kind} ${changed} ${userSkipped ? 'user-skipped' : ''}" id="n-${esc(c.id)}">
+    ${c.rounds > 1 ? `<span class="badge-round">${c.max ? `vòng ${c.rounds}/${c.max}` : `×${c.rounds}`}</span>` : ''}
+    ${c.breakpoint ? '<span class="pin" title="Dừng sau bước này"><i class="ph-bold ph-map-pin"></i></span>' : ''}
     <div class="dot"><i class="ph-bold ${icon}"></i></div>
-    <div class="name">${esc(c.id)}</div><div class="note">${note}</div></div>`;
+    <div class="name">${esc(c.id)}</div>${userSkipped ? `<div class="note why" title="${esc(skipText)}">${esc(skipText)}</div>` : `<div class="note">${note}</div>`}</div>`;
 }
 
 function curve(a, b, below) {
@@ -264,6 +269,7 @@ async function renderMain() {
 
   const { lane, side } = mainLane(run.cells);
   const tokens = run.totals.tokens ?? 0;
+  closeStageMenu();
   $('#apMain').innerHTML = `
     <div class="top">
       <div>
@@ -278,6 +284,7 @@ async function renderMain() {
       <div class="lane">${lane.map(nodeHtml).join('')}</div>
       ${side.length ? `<div class="lane side" id="sideLane">${side.map(nodeHtml).join('')}</div>` : ''}
     </div></div>
+    ${FLOW_LEGEND}
     <div class="panes">
       <section>
         <div class="tabs">${tabs.map((f) => `<button class="tab ${f === artifact ? 'on' : ''}" data-file="${esc(f)}">${f === LIVE ? '<span class="pulse"></span>' : starred.includes(f) ? '<span class="star">★</span>' : ''}${esc(TAB_LABEL(f))}</button>`).join('')}</div>
@@ -351,7 +358,7 @@ async function refresh() {
   if (sig === lastSig) return;
   lastSig = sig;
   renderQueue();
-  if (document.activeElement?.id !== 'note') await renderMain();
+  if (!['note', 'smText'].includes(document.activeElement?.id)) await renderMain();
 }
 
 // Huỷ xoá hẳn worktree + nhánh + thư mục run nên phải bấm 2 lần
@@ -385,6 +392,114 @@ async function pauseRun(btn) {
   btn.disabled = true;
   if (await post('pause', { key: run.key }, `Đã dừng ngay bước ${run.stage}.`)) btn.innerHTML = '<i class="ph-bold ph-circle-notch spin"></i>Đang dừng…';
   else btn.disabled = false;
+}
+
+const currentRun = () => data.runs.find((r) => r.key === selectedKey);
+const actionOf = (run, type) => run.actions.find((a) => a.type === type);
+const ASK_PLACEHOLDER = { note: 'Ghi chú cho bước sau (bắt buộc)', reason: 'Lý do bỏ qua cổng (bắt buộc)' };
+
+function stageFile(id) {
+  const rounds = runFiles.filter((f) => f.startsWith(`${id}-r`) && f.endsWith('.json')).sort();
+  return id === 'plan' && runFiles.includes('plan.md') ? 'plan.md' : rounds.at(-1);
+}
+
+function showStage(id) {
+  const file = stageFile(id);
+  if (!file) return toast(`Bước ${id} chưa chạy, chưa có kết quả để xem.`);
+  artifact = file;
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.file === file));
+  renderArtifact(currentRun());
+  $('.panes').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function stageMenuItems(run, cell) {
+  const [goto, retry, skip, brk] = ['goto', 'retry', 'skip', 'break'].map((type) => actionOf(run, type));
+  const items = [];
+  if (goto?.stages.includes(cell.id)) items.push({ type: 'goto', label: 'Quay về đây…', ask: 'note' });
+  if (cell.id === run.stage) {
+    if (retry) items.push({ type: 'retry', label: 'Chạy lại' });
+    if (skip) items.push({ type: 'skip', label: 'Bỏ qua', ask: skip.needsReason ? 'reason' : null });
+    if (!isAborted(run)) items.push({ type: 'claude', label: 'Mở trong Claude' });
+  }
+  if (brk && (brk.stages.includes(cell.id) || cell.breakpoint)) items.push({ type: 'break', off: cell.breakpoint, label: cell.breakpoint ? 'Gỡ điểm dừng 📍' : 'Dừng sau bước này 📍' });
+  return items;
+}
+
+const spotOf = (node) => {
+  const { left, bottom } = node.getBoundingClientRect();
+  return `${left},${bottom}`;
+};
+
+function closeStageMenu() {
+  stageMenu = null;
+  $('#stageMenu').hidden = true;
+}
+
+function syncStageMenu() {
+  const box = $('#stageMenu');
+  box.querySelectorAll('button, input').forEach((el) => (el.disabled = stageMenu.busy));
+  const send = $('[data-sm="send"]', box);
+  if (send) send.disabled = stageMenu.busy || !$('#smText').value.trim();
+}
+
+function renderStageMenu() {
+  const box = $('#stageMenu');
+  const { items, ask, anchor } = stageMenu;
+  box.innerHTML = ask
+    ? `<input id="smText" placeholder="${ASK_PLACEHOLDER[ask.ask]}" autocomplete="off" aria-label="${esc(ask.label)}">
+       <div class="sm-row"><button class="btn ghost" data-sm="back">Quay lại</button><button class="btn go" data-sm="send">Gửi</button></div>`
+    : items.map((item, i) => `<button role="menuitem" data-i="${i}" class="${item.type === 'break' && item.off ? 'warn' : ''}">${esc(item.label)}</button>`).join('');
+  box.hidden = false;
+  stageMenu.spot = spotOf(anchor);
+  const at = anchor.getBoundingClientRect();
+  const main = $('#apMain').getBoundingClientRect();
+  const left = Math.min(Math.max(at.left + at.width / 2 - box.offsetWidth / 2, main.left + 8), main.right - box.offsetWidth - 8);
+  box.style.left = `${left}px`;
+  box.style.top = `${at.bottom + 6}px`;
+  if (ask) { syncStageMenu(); $('#smText').focus(); }
+}
+
+function onNodeClick(node) {
+  const run = currentRun();
+  const stage = node.id.slice(2);
+  const items = stageMenuItems(run, run.cells.find((c) => c.id === stage));
+  if (!items.length) return showStage(stage);
+  if (stageMenu?.anchor === node) return closeStageMenu();
+  stageMenu = { key: run.key, stage, items: [...items, ...(stageFile(stage) ? [{ type: 'view', label: 'Xem kết quả' }] : [])], ask: null, busy: false, anchor: node };
+  renderStageMenu();
+}
+
+async function submitStageMenu(item, text = '') {
+  const menu = stageMenu;
+  const { key, stage } = menu;
+  const body = { goto: { key, stage, note: text }, retry: { key }, skip: { key, reason: text }, break: { key, stage, off: item.off } }[item.type];
+  menu.busy = true;
+  syncStageMenu();
+  const out = await post(item.type, body, item.type === 'break' ? 'Đã đổi điểm dừng.' : undefined);
+  if (out) setTimeout(refresh, 1500);
+  if (menu !== stageMenu) return;
+  if (out) return closeStageMenu();
+  menu.busy = false;
+  syncStageMenu();
+}
+
+function onStageMenuClick(e) {
+  const button = e.target.closest('button');
+  if (!button || stageMenu.busy) return;
+  if (button.dataset.sm === 'back') {
+    stageMenu.ask = null;
+    return renderStageMenu();
+  }
+  if (button.dataset.sm === 'send') return submitStageMenu(stageMenu.ask, $('#smText').value.trim());
+  const item = stageMenu.items[Number(button.dataset.i)];
+  const { stage } = stageMenu;
+  if (item.ask) {
+    stageMenu.ask = item;
+    return renderStageMenu();
+  }
+  if (item.type === 'claude') { closeStageMenu(); return openInClaude(currentRun()); }
+  if (item.type === 'view') { closeStageMenu(); return showStage(stage); }
+  submitStageMenu(item);
 }
 
 function renderFlows() {
@@ -516,6 +631,8 @@ const MARKUP = `
   </div>
 </div>
 
+<div class="stage-menu" id="stageMenu" role="menu" hidden></div>
+
 <div class="veil" id="veil">
   <div class="palette" id="palette" role="dialog" aria-label="Chạy ticket mới">
     <input id="ticket" placeholder="GW-123 hoặc link sheet / Jira" autocomplete="off">
@@ -529,6 +646,7 @@ export function mount(el) {
   el.innerHTML = `<div class="ap">${MARKUP}</div>`;
   lastSig = '';
   lastStates = {};
+  stageMenu = null;
   $('#apQueue').addEventListener('click', (e) => {
     if (e.target.closest('[data-fold]')) {
       abortedOpen = !abortedOpen;
@@ -543,23 +661,12 @@ export function mount(el) {
     renderQueue();
     renderMain();
   });
-  function stageFile(id) {
-    const rounds = runFiles.filter((f) => f.startsWith(`${id}-r`) && f.endsWith('.json')).sort();
-    return id === 'plan' && runFiles.includes('plan.md') ? 'plan.md' : rounds.at(-1);
-  }
   $('#apMain').addEventListener('click', (e) => {
     const pauseBtn = e.target.closest('[data-pause]');
     if (pauseBtn) return pauseRun(pauseBtn);
     if (e.target.closest('[data-claude]')) return openInClaude(data.runs.find((r) => r.key === selectedKey));
     const node = e.target.closest('.node');
-    if (node) {
-      const file = stageFile(node.id.slice(2));
-      if (!file) return toast(`Bước ${node.id.slice(2)} chưa chạy, chưa có kết quả để xem.`);
-      artifact = file;
-      document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.file === file));
-      renderArtifact(data.runs.find((r) => r.key === selectedKey));
-      return $('.panes').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (node) return onNodeClick(node);
     const codeBtn = e.target.closest('[data-code]');
     if (codeBtn) {
       const run = data.runs.find((r) => r.key === selectedKey);
@@ -576,6 +683,18 @@ export function mount(el) {
     const b = e.target.closest('[data-act]');
     if (b && (b.dataset.act !== 'abort' || armAbort(b))) act(b.dataset.act);
   });
+  $('#stageMenu').addEventListener('click', onStageMenuClick);
+  $('#stageMenu').addEventListener('input', syncStageMenu);
+  $('#stageMenu').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.id === 'smText' && !stageMenu.busy) $('[data-sm="send"]').click();
+  });
+  const onDocClick = (e) => {
+    const inside = e.composedPath().some((el) => el.id === 'stageMenu' || el.classList?.contains('node'));
+    if (stageMenu && !inside) closeStageMenu();
+  };
+  const onDocScroll = (e) => {
+    if (stageMenu && (e.target === document || e.target.classList?.contains('flow')) && spotOf(stageMenu.anchor) !== stageMenu.spot) closeStageMenu();
+  };
   $('#openPalette').addEventListener('click', openPalette);
   $('#veil').addEventListener('click', (e) => {
     if (e.target.id === 'veil') return closePalette();
@@ -596,6 +715,7 @@ export function mount(el) {
   });
   const onKey = (e) => {
     const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+    if (e.key === 'Escape' && stageMenu) return closeStageMenu();
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette(); }
     if ($('#veil').classList.contains('show')) {
       const total = data.flows.length + 1;
@@ -619,8 +739,11 @@ export function mount(el) {
   const onResize = () => {
     const run = data.runs.find((r) => r.key === selectedKey);
     if (run) drawWires(run);
+    if (stageMenu) closeStageMenu();
   };
   document.addEventListener('keydown', onKey);
+  document.addEventListener('click', onDocClick);
+  document.addEventListener('scroll', onDocScroll, true);
   window.addEventListener('resize', onResize);
   refresh();
   const timer = setInterval(() => refresh().catch(() => {}), 4000);
@@ -632,6 +755,8 @@ export function mount(el) {
     clearInterval(timer);
     clearInterval(liveTimer);
     document.removeEventListener('keydown', onKey);
+    document.removeEventListener('click', onDocClick);
+    document.removeEventListener('scroll', onDocScroll, true);
     window.removeEventListener('resize', onResize);
   };
 }

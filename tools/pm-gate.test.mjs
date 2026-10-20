@@ -76,8 +76,8 @@ function writeCase(text, name = 'case.html') {
   return file;
 }
 
-function run(args, env = {}) {
-  const r = spawnSync('node', [GATE, ...args, '--json'], { encoding: 'utf8', env: { ...process.env, PM_PROJECTS_DIR: noProjects, ...env } });
+function run(args, env = {}, cwd = undefined) {
+  const r = spawnSync('node', [GATE, ...args, '--json'], { encoding: 'utf8', timeout: 20000, cwd, env: { ...process.env, PM_PROJECTS_DIR: noProjects, ...env } });
   const json = r.stdout.trim() ? JSON.parse(r.stdout) : null;
   return { exit: r.status, json, stderr: r.stderr };
 }
@@ -520,8 +520,9 @@ const CASES = [
       (r) => onlyWarn('PG-DRAW')(r) && r.json.warns.some((f) => f.code === 'PG-DRAW' && f.token === 'data-item')],
   ]],
   ['77 draw-no-item: không ô data-item nào → 🟡', () => [['L', gate(L, once(base(L), GIFTS, '')), onlyWarn('PG-DRAW')]]],
-  ['78 draw-vm-fail: khối gọi biến ngoài ($) → 🟡 soát tay', () => [
-    ['L', gate(L, once(base(L), 'fnPromotion: function () {}', 'fnPromotion: $.noop')), onlyWarn('PG-DRAW')],
+  ['78 draw-jquery: khối gọi `$.noop` (48/109 file pm__rut có `$`) vẫn soát tiếp', () => [
+    ['sạch', gate(L, once(base(L), 'fnPromotion: function () {}', 'fnPromotion: $.noop')), (r) => noRed(r) && !hasDraw(r)],
+    ['vẫn bắt names.en', gate(L, once(once(base(L), 'fnPromotion: function () {}', 'fnPromotion: $.noop'), 'en: {}, ', '')), redOn('PG-DRAW', 'names.en')],
   ]],
   ['79 draw-backend-far: thẻ chen giữa comment BACKEND: và khối → 🔴', () => [
     ['L', gate(L, once(base(L), `${BACKEND_COMMENT}\n${DRAW_SCRIPT}`, `${BACKEND_COMMENT}<div></div>${DRAW_SCRIPT}`)), redOn('PG-DRAW', 'BACKEND:')],
@@ -553,6 +554,65 @@ const CASES = [
   ['87 draw-empty: `prodTemplate = {}` (TLBBVNG 62834) → 1 lỗi khối rỗng, không tách names/items', () => [
     ['L', gate(L, base(L).replace(/const prodTemplate = \{[\s\S]*?\};<\/script>/, 'const prodTemplate = {};</script>')),
       (r) => redOn('PG-DRAW', 'prodTemplate')(r) && r.json.fails.filter((f) => f.code === 'PG-DRAW' && f.token !== 'BACKEND:').length === 1],
+  ]],
+  ['88 draw-escape: khối thoát vm (constructor.constructor) không ghi được file', () => {
+    const marker = join(root, 'escaped.txt');
+    const escape = `this.constructor.constructor('return process')().getBuiltinModule('fs').writeFileSync(${JSON.stringify(marker)}, 'x');`;
+    return [['L', gate(L, once(base(L), '};</script>', `}; ${escape}</script>`)), (r) => onlyWarn('PG-DRAW')(r) && !existsSync(marker)]];
+  }],
+  ['89 draw-microtask-hang: vòng lặp vô tận trong Promise không treo gate', () => [
+    ['L', gate(L, once(base(L), '};</script>', '}; Promise.resolve().then(() => { while (true) {} });</script>')), onlyWarn('PG-DRAW')],
+  ]],
+  ['90 draw-gt-promotion: chỉ soát mainsite/ — promotion/ thường, Promotion_v2/ im; PromotionMoi_…/mainsite/ vẫn soát', () => [
+    ['promotion/', gate(L, withoutDraw(base(L)), 'gt-promotion-template/G/promotion/index.html'), (r) => Boolean(r.json) && !hasDraw(r)],
+    ['Promotion_v2/', gate(L, withoutDraw(base(L)), 'gt-promotion-template/G/Promotion_v2/index.html'), (r) => Boolean(r.json) && !hasDraw(r)],
+    ['PromotionMoi/mainsite/', gate(L, withoutDraw(base(L)), 'gt-promotion-template/G/PromotionMoi_1/mainsite/index.html'), redOn('PG-DRAW', 'prodTemplate')],
+    ['Mainsite/ hoa (658-KTO)', gate(L, withoutDraw(base(L)), 'gt-promotion-template/G/Promotion-H5/Mainsite/index.html'), redOn('PG-DRAW', 'prodTemplate')],
+    ['đường dẫn tương đối từ gốc gt-promotion', (() => {
+      const file = writeCase(withoutDraw(base(L)), 'gt-promotion-template/G/promotion/index.html');
+      const repo = file.slice(0, file.indexOf('gt-promotion-template/') + 'gt-promotion-template'.length);
+      return run([file.slice(repo.length + 1), '--gameplay', L, '--baseline', 'none'], {}, repo);
+    })(), (r) => Boolean(r.json) && !hasDraw(r)],
+  ]],
+  ['91 draw-twig-comment: khối trong {# #} không tính', () => [
+    ['comment trước khối thật', gate(L, once(base(L), '<body class="vn">', '<body class="vn">{# <script>var prodTemplate = {}</script> #}')), (r) => noRed(r) && !hasDraw(r)],
+    ['chỉ có trong comment', gate(L, once(base(L), DRAW_SCRIPT, `{# ${DRAW_SCRIPT} #}`)), redOn('PG-DRAW', 'prodTemplate')],
+  ]],
+  ["92 draw-js-string: chuỗi '<!--' trong script khác không nuốt comment BACKEND:", () => [
+    ['L', gate(L, once(base(L), DRAW_BLOCK, `<script>var s = '<!--';</script>\n${DRAW_BLOCK}`)), (r) => noRed(r) && !hasDraw(r)],
+  ]],
+  ['93 draw-attr-gt: thuộc tính script chứa `>`', () => [
+    ['L', gate(L, once(base(L), '<script>const prodTemplate', '<script data-x="a>b">const prodTemplate')), (r) => noRed(r) && !hasDraw(r)],
+  ]],
+  ['94 draw-template-type: khối trong type="text/template" trình duyệt không chạy → 🔴', () => [
+    ['L', gate(L, once(base(L), '<script>const prodTemplate', '<script type="text/template">const prodTemplate')), redOn('PG-DRAW', 'prodTemplate')],
+  ]],
+  ['95 draw-lib-defer: lib defer đứng trước vẫn chạy sau khối → không 🔴', () => [
+    ['L', gate(L, once(base(L), DRAW_BLOCK, `${LIB_SCRIPT.replace('<script ', '<script defer ')}\n${BACKEND_COMMENT}\n${DRAW_SCRIPT}`)), (r) => noRed(r) && !hasDraw(r)],
+  ]],
+  ['97 draw-external-value: names/items lấy từ biến ngoài (lang.en, $.extend) → 🟡 soát tay, không im', () => [
+    ['names', gate(L, once(base(L), 'en: {}, ', 'en: lang.en, ')), (r) => onlyWarn('PG-DRAW')(r) && r.json.warns.some((f) => f.code === 'PG-DRAW' && f.msg.includes('lang'))],
+    ['items', gate(L, once(base(L), "items: { A: 'gift-1', B: 'gift-2', length: 2, type: 'png' }", "items: $.extend({}, { A: 'gift-1', B: 'gift-2', length: 2, type: 'png' })")), onlyWarn('PG-DRAW')],
+  ]],
+  ['98 draw-kill: khối gọi process.kill(ppid) không giết được gate', () => [
+    ['L', gate(L, once(base(L), '};</script>', "}; this.constructor.constructor('return process')().kill(this.constructor.constructor('return process')().ppid, 'SIGKILL');</script>")), (r) => Boolean(r.json)],
+  ]],
+  ['99 draw-silent-exit: khối tự exit không in gì → 🟡 nói rõ tiến trình dừng, không báo nhầm "rỗng"', () => [
+    ['L', gate(L, once(base(L), '};</script>', "}; this.constructor.constructor('return process')().exit(0);</script>")),
+      (r) => onlyWarn('PG-DRAW')(r) && r.json.warns.some((f) => f.code === 'PG-DRAW' && f.msg.includes('dừng'))],
+  ]],
+  ['100 draw-twig-between: {# #} giữa BACKEND: và khối (render xong vẫn sát) → không 🔴', () => [
+    ['L', gate(L, once(base(L), `${BACKEND_COMMENT}\n${DRAW_SCRIPT}`, `${BACKEND_COMMENT}\n{# ghi chú #}\n${DRAW_SCRIPT}`)), (r) => noRed(r) && !hasDraw(r)],
+  ]],
+  ['101 draw-not-run: thân <script src> / nomodule trình duyệt không chạy → 🔴', () => [
+    ['src', gate(L, once(base(L), '<script>const prodTemplate', '<script src="x.js">const prodTemplate')), redOn('PG-DRAW', 'prodTemplate')],
+    ['nomodule', gate(L, once(base(L), '<script>const prodTemplate', '<script nomodule>const prodTemplate')), redOn('PG-DRAW', 'prodTemplate')],
+  ]],
+  ['102 draw-concat-global: cộng chuỗi biến platform (`mainProgramUrl + \'…\'`, gno 4 tuổi) vẫn soát tiếp', () => [
+    ['L', gate(L, once(base(L), "url: typeof baseURL !== 'undefined' ? baseURL : ''", "url: mainProgramUrl + 'assets/'")), (r) => noRed(r) && !hasDraw(r)],
+  ]],
+  ['96 comment Twig nhắc `<script>` không nuốt phần tử phía sau', () => [
+    ['L', gate(L, once(base(L), '<body class="vn">', '<body class="vn">\n{# dán khối trước <script> lib #}')), noRed],
   ]],
 ];
 

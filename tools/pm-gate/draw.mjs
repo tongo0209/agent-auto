@@ -1,52 +1,104 @@
 // PG-DRAW (kit luật 6): trang có pm__rut phải khai prodTemplate trước lib — đọc HTML thô vì scan.mjs làm trống ruột <script>.
-import vm from 'node:vm';
+import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
 
-const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+// Khớp comment trước: `<script>` nằm trong comment (MASTER Lucky dòng 511) không mở khối; `<!--` trong chuỗi JS không thành comment.
+const TAGS = /<!--[\s\S]*?-->|{#[\s\S]*?#}|<script\b((?:"[^"]*"|'[^']*'|[^>"'])*)>([\s\S]*?)<\/script\s*>/gi;
 const DECLARES_PROD_TEMPLATE = /\b(var|let|const)\s+prodTemplate\s*=/;
-const MODULE_TYPE = /\btype\s*=\s*["']?module\b/;
-const LIB_SRC = /\bsrc\s*=\s*["'][^"']*libraryMainsite-[^"']*\.js/;
-const HTML_COMMENT = /<!--[\s\S]*?-->/g;
-const LAST_COMMENT = /<!--((?:(?!-->)[\s\S])*)-->\s*$/;
-const IN_PROMOTION_DIR = /(^|\/)Promotion\//;
+const TYPE = /(?:^|\s)type\s*=\s*["']?([^"'\s>]*)/i;
+const CLASSIC_TYPE = /^((text|application)\/(java|ecma)script)?$/i;
+const DEFER = /(?:^|\s)defer\b/i;
+// Thân <script src> và <script nomodule> trình duyệt không chạy.
+const BODY_SKIPPED = /(?:^|\s)(?:src\s*=|nomodule\b)/i;
+const LIB_SRC = /(?:^|\s)src\s*=\s*["'][^"']*libraryMainsite-[^"']*\.js/;
+const GT_PROMOTION_DIR = /(^|\/)gt-promotion-template\//;
+const MAINSITE_DIR = /(^|\/)mainsite\//i;
+const PROMOTION_DIR = /(^|\/)Promotion\//;
 const ITEMS_META = new Set(['length', 'type']);
+const CHILD_TIMEOUT_MS = 5000;
+const MIN_NODE_WITH_PERMISSION = 22;
+const EXTERNAL = '__pm_gate_external__:';
+const EXTERNAL_NAMES = new RegExp(`${EXTERNAL}([\\w$]+)`, 'g');
 
-const UNDECLARED = /^(\w+) is not defined$/;
-const MAX_PLATFORM_GLOBALS = 10;
+// User chốt 20/10: gt-promotion chỉ soát mainsite/; ngoài đó (cdn-source) promotion/ là source nên vẫn soát.
+const outOfScope = (file) => {
+  const path = resolve(file);
+  return GT_PROMOTION_DIR.test(path) ? !MAINSITE_DIR.test(path) : PROMOTION_DIR.test(path);
+};
 
-// const cấp trên cùng không thành thuộc tính của context vm ⇒ gán qua globalThis để đọc ra.
-// Biến platform chèn lúc chạy (mainProgramUrl) ⇒ gán undefined, chạy lại trên context mới vì context cũ đã khai dở `const`.
-function evaluate(body) {
+// Chạy trong node --permission (vm không phải sandbox): khối HTML không đọc/ghi file, không mạng, không treo gate.
+function evaluateInChild(external) {
+  process.kill = () => {
+    throw new Error('process.kill bị chặn');
+  };
+  const vm = require('node:vm');
+  const body = require('node:fs').readFileSync(0, 'utf8');
+  const UNDECLARED = /^([\w$]+) is not defined$/;
+  // Biến platform chèn lúc chạy (mainProgramUrl, $): stub gọi/đọc gì cũng ra chính nó, ghi ra tên biến để gate không coi là giá trị thật.
+  const stubNames = new Map();
+  const stubFor = (name) => {
+    const asText = () => external + name;
+    const stub = new Proxy(function () {}, { get: (target, key) => (key === Symbol.toPrimitive ? asText : stub), apply: () => stub, construct: () => stub });
+    stubNames.set(stub, name);
+    return stub;
+  };
   const platformGlobals = {};
-  for (let attempt = 0; attempt <= MAX_PLATFORM_GLOBALS; attempt++) {
+  const serialize = (key, value) => (stubNames.has(value) ? external + stubNames.get(value) : typeof value === 'function' ? '[fn]' : value);
+  const answer = (result) => process.stdout.write(JSON.stringify(result, serialize));
+  for (let attempt = 0; attempt <= 10; attempt++) {
+    // const cấp trên cùng không thành thuộc tính của context ⇒ gán qua globalThis; context mới mỗi lần vì context cũ đã khai dở `const`.
     const context = { window: {}, ...platformGlobals };
     try {
-      vm.runInNewContext(`${body}\n;globalThis.__prodTemplate = prodTemplate;`, context, { timeout: 100 });
-      return { config: context.__prodTemplate };
+      vm.runInNewContext(`${body}\n;globalThis.__prodTemplate = prodTemplate;`, context, { timeout: 100, microtaskMode: 'afterEvaluate' });
+      return answer({ config: context.__prodTemplate ?? null });
     } catch (error) {
       const missing = UNDECLARED.exec(error.message)?.[1];
-      if (!missing || missing === 'prodTemplate') return { error };
-      platformGlobals[missing] = undefined;
+      if (!missing || missing === 'prodTemplate') return answer({ error: error.message });
+      platformGlobals[missing] = stubFor(missing);
     }
   }
-  return { error: new Error(`quá ${MAX_PLATFORM_GLOBALS} biến chưa khai`) };
+  answer({ error: 'quá 10 biến chưa khai' });
+}
+
+function childFailure(child) {
+  if (child.error?.code === 'ETIMEDOUT') return `chạy quá ${CHILD_TIMEOUT_MS}ms`;
+  if (child.error?.code === 'ENOBUFS') return 'khối in ra quá nhiều';
+  return child.stderr.trim().split('\n').at(-1) || `tiến trình dừng (exit ${child.status ?? child.signal}) trước khi trả kết quả`;
+}
+
+function evaluate(body) {
+  if (Number(process.versions.node.split('.')[0]) < MIN_NODE_WITH_PERMISSION) {
+    return { error: `node ${process.versions.node} chưa có --permission — PG-DRAW chưa soát names/items/data-item, nâng node ≥ ${MIN_NODE_WITH_PERMISSION} rồi chạy lại` };
+  }
+  const child = spawnSync(process.execPath, ['--permission', '-e', `(${evaluateInChild})(${JSON.stringify(EXTERNAL)})`], { input: body, encoding: 'utf8', timeout: CHILD_TIMEOUT_MS, env: {} });
+  try {
+    return JSON.parse(child.stdout);
+  } catch {
+    return { error: childFailure(child) };
+  }
 }
 
 const indexesWith = (els, has) => els.flatMap((el, i) => (has(el) ? [i] : []));
 
 export function checkDraw({ els, contract, fullDocument, raw, file, add }) {
-  if (!fullDocument || contract.gameplay === 'payment' || IN_PROMOTION_DIR.test(file)) return;
+  if (!fullDocument || contract.gameplay === 'payment' || outOfScope(file)) return;
   if (!els.some((el) => el.classes.includes('pm__rut'))) return;
 
-  // Kit có comment nhắc `<script> libraryMainsite`: xoá comment giữ nguyên độ dài để index khớp raw.
-  const code = raw.replace(HTML_COMMENT, (comment) => ' '.repeat(comment.length));
-  const scripts = [...code.matchAll(SCRIPT)];
-  const block = scripts.find(([, , body]) => DECLARES_PROD_TEMPLATE.test(body));
-  if (!block) return add('PG-DRAW', 'prodTemplate', 'trang có pm__rut thiếu khối `prodTemplate` — dán từ components/fe-draw/config-production.html (kit luật 6)');
-  const [, attrs, body] = block;
-  if (MODULE_TYPE.test(attrs)) return add('PG-DRAW', 'prodTemplate', '`prodTemplate` khai trong <script type="module"> — lib đọc tên trần `typeof prodTemplate` nên không thấy');
-  const lib = scripts.find(([, libAttrs]) => LIB_SRC.test(libAttrs));
-  if (lib && lib.index < block.index) add('PG-DRAW', 'prodTemplate', 'khối `prodTemplate` đứng sau <script libraryMainsite-*.js> — phải khai trước khi lib nạp');
-  if (!LAST_COMMENT.exec(raw.slice(0, block.index))?.[1].includes('BACKEND:')) {
+  const tags = [...raw.matchAll(TAGS)];
+  const scripts = tags.filter(([, attrs]) => attrs !== undefined).map((tag) => ({ tag, attrs: tag[1], body: tag[2], type: TYPE.exec(tag[1])?.[1] ?? '' }));
+  const declaring = scripts.filter(({ body }) => DECLARES_PROD_TEMPLATE.test(body));
+  const block = declaring.find(({ type, attrs }) => CLASSIC_TYPE.test(type) && !BODY_SKIPPED.test(attrs));
+  if (!block) {
+    if (declaring.some(({ type }) => type.toLowerCase() === 'module')) return add('PG-DRAW', 'prodTemplate', '`prodTemplate` khai trong <script type="module"> — lib đọc tên trần `typeof prodTemplate` nên không thấy');
+    return add('PG-DRAW', 'prodTemplate', 'trang có pm__rut thiếu khối `prodTemplate` — dán từ components/fe-draw/config-production.html (kit luật 6)');
+  }
+  const lib = scripts.find(({ attrs }) => LIB_SRC.test(attrs) && !DEFER.test(attrs));
+  if (lib && lib.tag.index < block.tag.index) add('PG-DRAW', 'prodTemplate', 'khối `prodTemplate` đứng sau <script libraryMainsite-*.js> — phải khai trước khi lib nạp');
+  // {# #} biến mất khi render ⇒ không tính là chen giữa.
+  const before = tags.slice(0, tags.indexOf(block.tag)).filter(([text]) => !text.startsWith('{#')).at(-1);
+  const gap = before ? raw.slice(before.index + before[0].length, block.tag.index).replace(/{#[\s\S]*?#}/g, '') : '';
+  const adjacent = before && !gap.trim();
+  if (!adjacent || !before[0].startsWith('<!--') || !before[0].includes('BACKEND:')) {
     add('PG-DRAW', 'BACKEND:', 'thiếu comment `<!-- BACKEND: … -->` ngay trước khối `prodTemplate` (chỉ khoảng trắng xen giữa)');
   }
 
@@ -56,9 +108,13 @@ export function checkDraw({ els, contract, fullDocument, raw, file, add }) {
     add('PG-DRAW', 'spoint', '`spoint` và `pm__point` nằm khác thẻ — kit đòi cùng thẻ `class="pm__point spoint"`', spoints, { soft: true });
   }
 
-  const { config, error } = evaluate(body);
-  if (error?.message === 'prodTemplate is not defined') return add('PG-DRAW', 'prodTemplate', '`prodTemplate` không khai ở cấp trên cùng của <script> — lib không đọc được');
-  if (error) return add('PG-DRAW', 'prodTemplate', `không đọc được khối \`prodTemplate\` (${error.message}) — soát tay names/items/data-item`, [], { soft: true });
+  const { config, error } = evaluate(block.body);
+  if (error === 'prodTemplate is not defined') return add('PG-DRAW', 'prodTemplate', '`prodTemplate` không khai ở cấp trên cùng của <script> — lib không đọc được');
+  if (error) return add('PG-DRAW', 'prodTemplate', `không đọc được khối \`prodTemplate\` (${error}) — soát tay names/items/data-item`, [], { soft: true });
+  const external = [...new Set([...JSON.stringify(typeof config === 'string' ? config : [config?.names, config?.items]).matchAll(EXTERNAL_NAMES)].map(([, name]) => name))];
+  if (external.length) {
+    return add('PG-DRAW', 'prodTemplate', `names/items lấy từ biến ngoài khối (${external.join(', ')}) — gate không đọc được giá trị, soát tay names/items/data-item`, [], { soft: true });
+  }
   if (!Object.keys(config ?? {}).length) {
     return add('PG-DRAW', 'prodTemplate', 'khối `prodTemplate` rỗng — kit luật 6 đòi FE điền items/names theo components/fe-draw/config-production.html');
   }

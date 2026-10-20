@@ -3,8 +3,8 @@ const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input'
 const TAG_OR_TWIG_BRANCH = /<(\/?)([a-zA-Z][\w:-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>|{%-?\s*(if|elseif|else|endif)\b[\s\S]*?%}/g;
 const ATTR = /([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
 // Nội dung không thành phần tử DOM: <template> trơ, <noscript> là chữ khi trình duyệt bật JS.
-// Khớp comment trước để `<script>` nằm trong comment (MASTER Lucky dòng 511) không mở khối raw.
-const RAW_TEXT = /<!--[\s\S]*?-->|(<(script|style|template|noscript)\b[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi;
+// Khớp comment (HTML, Twig) trước để `<script>` nằm trong comment (MASTER Lucky dòng 511) không mở khối raw.
+const RAW_TEXT = /<!--[\s\S]*?-->|{#[\s\S]*?#}|(<(script|style|template|noscript)\b[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi;
 const COMMENTS = [/<!--[\s\S]*?-->/g, /{#[\s\S]*?#}/g];
 
 const blank = (text) => text.replace(/[^\n]/g, ' ');

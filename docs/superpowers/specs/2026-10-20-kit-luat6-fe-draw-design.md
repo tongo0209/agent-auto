@@ -115,3 +115,17 @@ gameplay Lucky có `pm__rut` ⇒ trước khi code, thêm vào mục *5. Quyết
 - Không soát, không sửa folder `Promotion/` (user chốt 20/10/2026).
 - Không sửa kit (của team promotion; lệch ghi vào note báo team).
 - Không đụng `/check-promotion`, `handoff-drift`, code `project-note`.
+
+## 6. Hai vòng review độc lập (20/10, sau commit d0eabfe)
+
+Mỗi phát hiện có ca test riêng trong `tools/pm-gate.test.mjs` (78, 88–102), viết đỏ trước rồi mới sửa.
+
+| Phát hiện | Sửa |
+|---|---|
+| `node:vm` không phải sandbox: khối thoát ra ghi được file; Promise lặp vô tận làm treo gate (và hook guard-pm) | Khối chạy trong `node --permission` con (chặn file, mạng, tiến trình con), `env: {}`, chặn `process.kill`, vm `microtaskMode: 'afterEvaluate'`, spawn timeout 5s. node < 22 → 🟡 nói rõ chưa soát nội dung |
+| Bỏ qua `Promotion/` phân biệt hoa thường, gõ đường dẫn tương đối thì lọt | Trong gt-promotion-template chỉ soát file dưới `mainsite/` (không phân biệt hoa thường, đường dẫn resolve); ngoài đó giữ bỏ qua `Promotion/` vì `promotion/` của cdn-source là source |
+| Comment Twig `{# #}`, chuỗi `<!--` trong JS, thuộc tính có `>`, `type="text/template"`, `<script src>`/`nomodule`, lib `defer` | Một regex tách comment HTML/Twig và `<script>` theo thứ tự; chỉ khối thân chạy được mới tính; lib `defer` không tính thứ tự; `{# #}` giữa `BACKEND:` và khối không tính là chen |
+| Biến ngoài (`$`, `mainProgramUrl`) | Stub mang tên biến; `names`/`items` dính stub → 🟡 "lấy từ biến ngoài", không lọt im; stub cộng chuỗi được (gno 4 tuổi) |
+| `scan.mjs`: `{# … <template> … #}` nuốt phần tử phía sau (có từ trước) | `RAW_TEXT` khớp `{# #}` trước. So 2113 file thật: khác 3 file, cả 3 là sửa đúng |
+
+Đối chứng sau sửa: 107 file `pm__rut` gt-promotion (63 mainsite, thêm `658-KTO/…/Mainsite/` viết hoa mà phép đo cũ sót) — 0 file ngoài mainsite bị PG-DRAW; 325 trang cdn-source — PG-DRAW giống hệt bản HEAD (844/844 dòng).

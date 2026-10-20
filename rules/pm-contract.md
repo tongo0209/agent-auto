@@ -56,7 +56,7 @@ Báo lỗi thì trích mã gate kèm luật gốc (`PG-CLAIM → R-PM-3 MUST`). 
 | `PG-TYPO` | 🔴 | hook gần trùng hook đã biết (lệch 1 ký tự, `-`↔`_`, hoa/thường) — nút chết | R-PM-1 |
 | `PG-ANY` | 🔴 | còn `<any>` (đếm theo phần tử) | R-PM-4 |
 | `PG-REF` | 🔴 · 🟡 | `gameplay: none`: hook/id popup mà landing mẫu (`ref`) có, trang thiếu. Hạ 🟡 cùng điều kiện với `PG-REQ` | R-PM-7, R-PM-11 |
-| `PG-DRAW` | 🔴 · 🟡 | trang có `pm__rut` (trừ `Promotion/`, payment): thiếu/sai khối `prodTemplate`, `names.en`/`names.<class body>`, `items.length`, `spoint`, khối rỗng, comment `BACKEND:` (🟡 trong cdn-source khi `hooks-at: handoff`); 🟡 riêng: `vm` không đọc được khối, `spoint` khác thẻ `pm__point`, thiếu/lệch `data-item` | R-PM-7 |
+| `PG-DRAW` | 🔴 · 🟡 | trang có `pm__rut` (gt-promotion chỉ `mainsite/` không phân biệt hoa thường; ngoài gt-promotion trừ `Promotion/`; trừ payment): thiếu/sai khối `prodTemplate`, `names.en`/`names.<class body>`, `items.length`, `spoint`, khối rỗng, comment `BACKEND:` (🟡 trong cdn-source khi `hooks-at: handoff`); 🟡 riêng: `vm` không đọc được khối, `spoint` khác thẻ `pm__point`, thiếu/lệch `data-item` | R-PM-7 |
 | `PG-TEXT` | 🟡 | text động không ở element con cuối (§3.2) | R-PM-8 |
 | `PG-MODULE` | 🟡 | `pm__module` đi lệch module (§3.4) | R-PM-8 |
 | `PG-UNKNOWN` | 🟡 | hook lạ hẳn (không có trong MASTER, 🔸, override, `ref`) — production có thể dùng; kiểm lại, đừng tự xoá | R-PM-7 |

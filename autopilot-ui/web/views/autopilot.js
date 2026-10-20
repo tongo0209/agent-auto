@@ -9,15 +9,16 @@ const STATUS = { paused: 'Chờ bạn duyệt', attached: 'Chờ chạy trong ph
 const isAborted = (r) => r.stopReason === 'aborted';
 const isUserPaused = (r) => r.stopReason === 'paused';
 const isAsking = (r) => r.status === 'chat' && r.chatState === 'ask';
-const statusClass = (r) => (r.interrupted ? 'interrupted' : isAsking(r) ? 'paused' : r.status);
-const statusLabel = (r) => (r.interrupted ? 'Bị ngắt' : isUserPaused(r) ? 'Tạm dừng' : isAsking(r) ? 'Chờ bạn' : STATUS[r.status]);
+const statusClass = (r) => (r.interrupted ? 'interrupted' : isAsking(r) || r.awaitingReview ? 'paused' : r.status);
+const statusLabel = (r) => (r.interrupted ? 'Bị ngắt' : isUserPaused(r) ? 'Tạm dừng' : isAsking(r) ? 'Chờ bạn' : r.awaitingReview ? 'Chờ review' : STATUS[r.status]);
 const GROUPS = [
   ['need', 'Cần bạn', (r) => ['paused', 'attached'].includes(r.status) || isAsking(r)],
+  ['review', 'Chờ review', (r) => r.awaitingReview],
   ['chat', 'Đang chat', (r) => r.status === 'chat' && !isAsking(r)],
   ['broken', 'Bị ngắt', (r) => r.interrupted],
   ['run', 'Đang chạy', (r) => r.status === 'running' && !r.interrupted],
   ['stop', 'Đã dừng', (r) => r.status === 'stopped' && !isAborted(r)],
-  ['done', 'Xong', (r) => r.status === 'done'],
+  ['done', 'Xong', (r) => r.status === 'done' && !r.awaitingReview],
   ['aborted', 'Đã huỷ', isAborted],
 ];
 const FOLD_KEY = 'console2.apAbortedOpen';
@@ -26,7 +27,8 @@ try { abortedOpen = localStorage.getItem(FOLD_KEY) === '1'; } catch {}
 const ICON_BY_STATE = { done: 'ph-check', running: 'ph-circle-notch spin', waiting: 'ph-hand', stopped: 'ph-x' };
 const ICON_BY_ID = { plan: 'ph-map-trifold', 'plan-review': 'ph-magnifying-glass', implement: 'ph-code', 'code-review': 'ph-git-diff', gates: 'ph-shield-check', 'gates-final': 'ph-shield-check', 'ui-check': 'ph-browser', fix: 'ph-wrench', commit: 'ph-git-commit', cut: 'ph-scissors', 'check-design': 'ph-ruler', spec: 'ph-list-checks', 'clean-code': 'ph-broom', 'intake-triage': 'ph-tray', lanes: 'ph-git-fork', verify: 'ph-check-square', 'write-sheet': 'ph-table' };
 const LIVE = 'live';
-const TAB_LABEL = (f) => f === LIVE ? 'Trực tiếp' : f === 'plan.md' ? 'Plan' : `${f.endsWith('.log') ? 'Log ' : ''}${f.replace(/\.(json|log|md)$/, '').replace(/-r(\d+)$/, ' · vòng $1')}`;
+const CHANGES = 'changes';
+const TAB_LABEL = (f) => f === LIVE ? 'Trực tiếp' : f === CHANGES ? 'Thay đổi' : f === 'plan.md' ? 'Plan' : `${f.endsWith('.log') ? 'Log ' : ''}${f.replace(/\.(json|log|md)$/, '').replace(/-r(\d+)$/, ' · vòng $1')}`;
 
 let data = { runs: [], flows: [] };
 let selectedKey = null;
@@ -35,7 +37,7 @@ let lastStates = {};
 let lastSig = '';
 let flowChoice = 0;
 let runFiles = [];
-const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp', done: 'xong' };
+const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp', done: 'xong', reviewed: 'đã review' };
 const ABORT_BTN = '<button class="btn ghost" data-act="abort">Huỷ run</button>';
 
 
@@ -81,7 +83,7 @@ function renderQueue() {
     return `<div class="group ${cls}">${head}${folded ? '' : runs.map((r) => `
       <button class="item ${r.key === selectedKey ? 'on' : ''}" data-key="${esc(r.key)}">
         <span class="key">${esc(r.key)}</span><span class="cost mono">${r.mode === 'chat' ? `${compact(r.totals.tokens)} tok` : money(r.totals.usd)}</span>
-        <span class="sub">${esc(r.flowLabel)} · ${esc(r.stage ?? 'hoàn tất')}</span>
+        <span class="sub">${esc(r.flowLabel)} · ${esc(r.stage ?? (r.awaitingReview ? 'chờ review' : 'hoàn tất'))}</span>
         <span class="mini">${r.cells.filter((c) => !c.side).map((c) => `<i class="${c.state}"></i>`).join('')}</span>
       </button>`).join('')}</div>`;
   }).join('');
@@ -212,9 +214,31 @@ async function renderLog(run) {
   if (stick) pane.scrollTop = pane.scrollHeight;
 }
 
+const fetchChanges = async (run) => (await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/changes`)).json();
+
+const DIFF_LINE = { '+': 'add', '-': 'del', '@': 'hunk' };
+// Bỏ phần đầu (diff --git, index, ---/+++) để dấu +/- chỉ còn là dòng thêm/bớt
+function diffHtml(diff) {
+  const hunks = diff.indexOf('\n@@');
+  const body = hunks < 0 ? diff : diff.slice(hunks + 1);
+  return body.split('\n').map((line) => `<span class="${DIFF_LINE[line[0]] ?? ''}">${esc(line)}</span>`).join('\n');
+}
+
+const repoChangesHtml = (c) => `<div class="repo-changes">
+  <div class="rc-head"><b>${esc(c.name)}</b><code>${esc(c.branch)}</code><button class="btn ghost sm" data-code="${esc(c.worktree)}"><i class="ph-bold ph-code"></i>Mở trong VS Code</button></div>
+  ${c.commits.length ? `<ul class="commits">${c.commits.map((x) => `<li><code>${x.sha.slice(0, 9)}</code>${esc(x.subject)}</li>`).join('')}</ul>` : '<p class="rc-empty">Không có commit mới trên nhánh này.</p>'}
+  ${c.files.map((f) => `<details class="file-diff"><summary><span class="fs ${f.status}">${f.status}</span><code>${esc(f.path)}</code></summary><pre class="diff">${diffHtml(f.diff)}${f.truncated ? '\n<span class="hunk">… diff quá dài, mở VS Code để xem hết</span>' : ''}</pre></details>`).join('')}
+</div>`;
+
+async function renderChanges(run) {
+  const repos = await fetchChanges(run);
+  $('#doc').innerHTML = `<div class="doc">${repos.map(repoChangesHtml).join('')}</div>`;
+}
+
 async function renderArtifact(run) {
   const pane = $('#doc');
   if (!artifact) return (pane.innerHTML = '<p style="color:var(--text-3)">Chưa có kết quả nào.</p>');
+  if (artifact === CHANGES) return renderChanges(run);
   if (artifact === LIVE || artifact.endsWith('.log')) return renderLog(run);
   const text = await (await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/artifacts/${encodeURIComponent(artifact)}`)).text();
   let html;
@@ -235,8 +259,9 @@ async function renderMain() {
   const files = await (await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/artifacts`)).json();
   runFiles = files;
   const starred = files.filter((f) => run.show.some((g) => globRe(g).test(f)));
-  const tabs = [...(run.status === 'running' ? [LIVE] : []), ...starred, ...files.filter((f) => !starred.includes(f) && !f.endsWith('.log')), ...files.filter((f) => f.endsWith('.log'))];
+  const tabs = [...(run.status === 'running' ? [LIVE] : []), ...(run.status === 'done' ? [CHANGES] : []), ...starred, ...files.filter((f) => !starred.includes(f) && !f.endsWith('.log')), ...files.filter((f) => f.endsWith('.log'))];
   if (run.status === 'running' && artifact !== LIVE && !files.includes(artifact)) artifact = LIVE;
+  if (run.status === 'done' && !tabs.includes(artifact)) artifact = CHANGES;
   if (!artifact || !tabs.includes(artifact)) artifact = starred.find((f) => f === 'plan.md') ?? starred.at(-1) ?? tabs[0] ?? null;
 
   const { lane, side } = mainLane(run.cells);
@@ -286,6 +311,7 @@ function placeSideLane(run, lane) {
 
 function dockMessage(run) {
   const stage = `<b>${esc(run.stage ?? '')}</b>`;
+  if (run.awaitingReview) return 'Run xong, <b>chờ bạn review</b> code ở tab Thay đổi. Cần sửa thì ghi chú rồi Trả về sửa hoặc Sửa tiếp bằng chat.';
   if (isAsking(run)) return `Claude đang chờ bạn ở ${stage}${run.chatNote ? `: ${esc(run.chatNote)}` : ''} — trả lời trong tab Claude.`;
   if (run.status === 'chat') return `Run chat đang ở ${stage}. Làm việc trong tab Claude, claude tự báo tiến độ lên board.`;
   if (run.interrupted) return `Run bị ngắt ở ${stage} (không còn process chạy). Chạy tiếp để làm lại bước này.`;
@@ -296,23 +322,49 @@ function dockMessage(run) {
   return `Run đã dừng <b>(${esc(run.stopReason)})</b>.`;
 }
 
+const REVIEW_ACTIONS = `${ABORT_BTN}<button class="btn ghost" data-pick><i class="ph-bold ph-git-merge"></i>Đưa vào source</button><button class="btn ghost" data-act="followup"><i class="ph-bold ph-terminal-window"></i>Sửa tiếp bằng chat</button><button class="btn back" data-act="reject"><i class="ph-bold ph-arrow-u-up-left"></i>Trả về sửa</button><button class="btn go" data-act="reviewed"><i class="ph-bold ph-check"></i>Đã review</button>`;
+
 function renderDock(run) {
-  const show = ['paused', 'attached', 'stopped', 'chat'].includes(run.status) || run.interrupted;
+  const show = ['paused', 'attached', 'stopped', 'chat'].includes(run.status) || run.interrupted || run.awaitingReview;
   $('#dock').classList.toggle('show', show);
+  $('#pickBox').innerHTML = '';
   if (!show) return;
   const paused = run.status === 'paused';
   $('#dockMessage').innerHTML = dockMessage(run);
   const cut = isUserPaused(run) && run.cutSession;
-  $('#note').style.display = paused || cut ? '' : 'none';
-  $('#note').placeholder = cut ? 'Nhắn claude khi chạy tiếp: đổi hướng, bổ sung gì...' : 'Ghi chú khi trả về: cần sửa gì...';
+  $('#note').style.display = paused || cut || run.awaitingReview ? '' : 'none';
+  $('#note').placeholder = cut ? 'Nhắn claude khi chạy tiếp: đổi hướng, bổ sung gì...' : run.awaitingReview ? 'Cần sửa gì (cho Trả về sửa hoặc Sửa tiếp bằng chat)...' : 'Ghi chú khi trả về: cần sửa gì...';
   $('#prevNote').textContent = run.rejectNote ? `Lần trả về trước: ${run.rejectNote}` : '';
-  $('#actions').innerHTML = run.status === 'chat'
+  $('#actions').innerHTML = run.awaitingReview ? REVIEW_ACTIONS : run.status === 'chat'
     ? `${ABORT_BTN}<button class="btn ghost" data-act="reopen"><i class="ph-bold ph-terminal-window"></i>Mở lại tab</button><button class="btn go" data-act="done"><i class="ph-bold ph-check"></i>Xong</button>`
     : paused
     ? `${ABORT_BTN}<button class="btn back" data-act="reject"><i class="ph-bold ph-arrow-u-up-left"></i>Trả về <kbd>R</kbd></button><button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Duyệt <kbd>A</kbd></button>`
     : run.status === 'attached'
       ? `${ABORT_BTN}<button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Đã xong, chạy tiếp</button>`
       : run.stopReason === 'aborted' ? '' : `${ABORT_BTN}<button class="btn go" data-act="resume"><i class="ph-bold ph-play"></i>Chạy tiếp</button>`;
+}
+
+async function togglePickBox(run) {
+  if ($('#pickBox').innerHTML) return ($('#pickBox').innerHTML = '');
+  const picks = (await fetchChanges(run)).filter((c) => c.cherryPick);
+  $('#pickBox').innerHTML = picks.length
+    ? `<p>Chạy trong terminal để đưa commit vào repo gốc (autopilot không tự chạy):</p>${picks.map((c) => `<div class="pick"><code>${esc(c.cherryPick)}</code><button class="btn ghost sm" data-copy="${esc(c.cherryPick)}"><i class="ph-bold ph-copy"></i>Chép</button></div>`).join('')}`
+    : '<p>Nhánh không có commit mới, không có gì để đưa vào source.</p>';
+}
+
+async function copyCommand(btn) {
+  await navigator.clipboard.writeText(btn.dataset.copy);
+  toast('Đã chép lệnh cherry-pick.');
+}
+
+// Chat sửa tiếp chạy trên chính worktree của run đã xong, lời nhắn vào brief
+async function followupChat(run) {
+  const launch = await post('open', { key: run.key, followup: true, note: $('#note').value.trim() }, 'Đã mở tab Claude trên worktree của run.');
+  if (!launch) return;
+  $('#note').value = '';
+  openChatTab(launch);
+  lastSig = '';
+  refresh();
 }
 
 async function refresh() {
@@ -402,6 +454,7 @@ const MARKUP = `
       <label for="note" id="dockMessage"></label>
       <textarea id="note" placeholder="Ghi chú khi trả về: cần sửa gì..."></textarea>
       <div class="prev" id="prevNote"></div>
+      <div class="pick-box" id="pickBox"></div>
     </div>
     <div class="actions" id="actions"></div>
   </div>
@@ -451,15 +504,27 @@ export function mount(el) {
       renderArtifact(data.runs.find((r) => r.key === selectedKey));
       return $('.panes').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    const codeBtn = e.target.closest('[data-code]');
+    if (codeBtn) {
+      const run = data.runs.find((r) => r.key === selectedKey);
+      return post('code', { key: run.key, runId: run.runId, dir: codeBtn.dataset.code }, 'Đã mở worktree trong VS Code.');
+    }
     const tab = e.target.closest('.tab');
     if (!tab) return;
     artifact = tab.dataset.file;
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t === tab));
     renderArtifact(data.runs.find((r) => r.key === selectedKey));
   });
+  $('#dock').addEventListener('click', (e) => {
+    const run = data.runs.find((r) => r.key === selectedKey);
+    if (e.target.closest('[data-pick]')) return togglePickBox(run);
+    const copyBtn = e.target.closest('[data-copy]');
+    if (copyBtn) copyCommand(copyBtn);
+  });
   $('#actions').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (b?.dataset.act === 'reopen') return reopenChat(data.runs.find((r) => r.key === selectedKey));
+    if (b?.dataset.act === 'followup') return followupChat(data.runs.find((r) => r.key === selectedKey));
     if (b && (b.dataset.act !== 'abort' || armAbort(b))) act(b.dataset.act);
   });
   $('#openPalette').addEventListener('click', openPalette);

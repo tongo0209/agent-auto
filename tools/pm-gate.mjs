@@ -21,6 +21,8 @@ const IS_H5 = /\bH5\s*:\s*true\b/;
 const TWIG_COMPOSED = /{%-?\s*(include|embed|extends)\b|{{\s*include\(/;
 // hooks-at: handoff — dist cdn-source chưa gắn hook là đúng quy trình; hook đã gắn thì vẫn phải đúng.
 const DEFERRED_TO_HANDOFF = new Set(['PG-REQ', 'PG-REF']);
+// Comment BACKEND: trước prodTemplate cũng gắn ở bước bàn giao như hook.
+const BACKEND_TOKEN = 'BACKEND:';
 const HANDOFF_NOTE = 'campaign gắn hook ở bước bàn giao (hooks-at: handoff); file bàn giao gt-promotion sẽ bị chặn đủ';
 
 function usageError(msg) {
@@ -74,10 +76,11 @@ function gateFile(file, contract, lock, opts, elsewhere) {
   const mode = opts.page ? 'page' : 'file';
   const hasBody = mode === 'page' || scanHtml(text).elements.some((el) => el.tag === 'body');
   const fullDocument = hasBody && (mode === 'page' || !TWIG_COMPOSED.test(text));
-  const check = (html) => runChecks(scanHtml(html), contract, { fullDocument, hasBody, h5: IS_H5.test(html), elsewhere });
-  const deferred = lock.hooksAt === 'handoff' && campaignOf(file) ? DEFERRED_TO_HANDOFF : new Set();
+  const check = (html) => runChecks(scanHtml(html), contract, { fullDocument, hasBody, h5: IS_H5.test(html), elsewhere, raw: html, file });
+  const deferredActive = lock.hooksAt === 'handoff' && Boolean(campaignOf(file));
+  const deferred = deferredActive ? DEFERRED_TO_HANDOFF : new Set();
   const findings = check(text).map((f) => (deferred.has(f.code) ? { ...f, msg: `thiếu hook bắt buộc \`${f.token}\` — ${HANDOFF_NOTE}` } : f));
-  const isWarn = (f) => WARN_CODES.has(f.code) || deferred.has(f.code);
+  const isWarn = (f) => WARN_CODES.has(f.code) || f.soft || deferred.has(f.code) || (deferredActive && f.token === BACKEND_TOKEN);
   const base = opts.baseline === 'none' ? null : baselineText(file, opts.baseline || 'HEAD');
   const blocking = findings.filter((f) => !isWarn(f));
   const { fresh, preexisting } = base === null ? { fresh: blocking, preexisting: [] } : splitNew(blocking, check(base));

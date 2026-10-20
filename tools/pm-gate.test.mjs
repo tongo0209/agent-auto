@@ -26,7 +26,7 @@ function rawMaster(g) {
   return readFileSync(join(KIT, 'gameplays', g, `MASTER-${g}.html`), 'utf8').replaceAll('<any', '<div').replaceAll('</any>', '</div>');
 }
 
-function base(g) {
+function masterWithProductionValues(g) {
   let text = rawMaster(g);
   for (const [kit, production] of ALIASES) text = text.replaceAll(kit, production);
   let group = 0;
@@ -34,6 +34,20 @@ function base(g) {
     .replaceAll('pm__option-N', 'pm__option-1')
     .replaceAll('pm__remain-*', 'pm__remain-canhen')
     .replaceAll('data-milestone=""', `data-milestone="${MILESTONE_VALUE}"`);
+}
+
+const LIB_SCRIPT = '<script src="https://cdn-mainsite-aka.vnggames.com/products/libraryMainsite/prod-source/1.3.2/dist/libraryMainsite-1.3.2.js"></script>';
+const DRAW_SCRIPT = "<script>const prodTemplate = { debug: { status: true, action: 'x5' }, url: typeof baseURL !== 'undefined' ? baseURL : '', directory: '', wordNumber: 1, items: { A: 'gift-1', B: 'gift-2', length: 2, type: 'png' }, names: { en: {}, vn: { A: 'Quà 1', B: 'Quà 2' } }, fnPromotion: function () {} };</script>";
+const BACKEND_COMMENT = '<!-- BACKEND: cấu hình rút thăm -->';
+const DRAW_BLOCK = `${BACKEND_COMMENT}\n${DRAW_SCRIPT}\n${LIB_SCRIPT}`;
+const GIFTS = '<div class="gifts"><div data-item="gift-1"></div><div data-item="gift-2"></div></div>';
+
+// Lucky có pm__rut ⇒ kit luật 6: ô lượt mang spoint, ô quà data-item, khối prodTemplate trước lib.
+function base(g) {
+  const text = masterWithProductionValues(g);
+  if (g !== L) return text;
+  // Ô quà đặt đầu body: comment cuối MASTER nhắc `<script>` khiến scan.mjs nuốt chữ tới </script> kế tiếp.
+  return once(once(once(text, '<body>', `<body class="vn">\n${GIFTS}`), 'class="pm__point"', 'class="pm__point spoint"'), '</body>', `${DRAW_BLOCK}\n</body>`);
 }
 
 function once(text, from, to) {
@@ -57,6 +71,7 @@ function moveClassToFirstChild(text, id, cls) {
 function writeCase(text, name = 'case.html') {
   const dir = mkdtempSync(join(root, 'c-'));
   const file = join(dir, name);
+  mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, text);
   return file;
 }
@@ -131,7 +146,7 @@ function refDistCase(targetBody) {
 }
 
 const HOOKS_PROJECTS = join(root, 'hooks-at-projects');
-const missingPoint = () => once(base(L), 'class="pm__point"', 'class="counter"');
+const missingPoint = () => once(base(L), 'class="pm__point spoint">', 'class="counter spoint">');
 const HISTORY_ONLY = '<body><div id="popup_history" class="pm__history-module"></div></body>';
 
 // Note khoá Lucky + dòng hooks-at; file đặt trong campaign cdn-source hoặc ở thư mục bàn giao gt-promotion (mục 2).
@@ -187,7 +202,9 @@ const popupsIncluded = (text) => once(withoutPopups(text), '<!-- Popup kết qu�
   "{% include './libraryMainsite-t-popup/libraryMainsite-t-popup.html.twig' %}\n<!-- Popup kết quả quay");
 const withoutConditionAndHistory =(text) => between(between(text, '<!-- ═══════════ ② KHUNG', '<!-- Popup lịch sử -->'), '<!-- Popup lịch sử -->', '<!-- Popup thông báo -->');
 const H5_FLAG = '<script>var varMS = { H5: true, onlyPC: false };</script>\n</body>';
-const noRut = (text) => text.replace(/ class="pm__rut" data-value="\d+"/g, ' class="spin"').replace('class="pm__point"', 'class="counter"');
+const noRut = (text) => text.replace(/ class="pm__rut" data-value="\d+"/g, ' class="spin"').replace('class="pm__point spoint">', 'class="counter">');
+const withoutDraw = (text) => once(text, DRAW_BLOCK, '');
+const hasDraw = (r) => [...r.json.fails, ...r.json.warns].some((f) => f.code === 'PG-DRAW');
 const noClaim = (text) => text.replaceAll('class="pm__btn-claim"', 'class="gift"');
 
 function popupConditionPartial() {
@@ -195,7 +212,7 @@ function popupConditionPartial() {
   return text.slice(text.indexOf('<div id="popup_condition"'), text.indexOf('<!-- Popup lịch sử -->'));
 }
 
-const POINT = '<div class="pm__point">0</div>';
+const POINT = '<div class="pm__point spoint">0</div>';
 const PARTIAL_WITH_BODY_IN_SCRIPT = '<div id="popup_history" class="pm__history-module"><div class="pm__form-history"></div></div>\n<script>\n  // tên quà theo class của <body class="vn">\n</script>';
 
 const TWIG_PARTIAL = '{% if a %}<form id="sso-login-form"><input type="text" name="u"></form>{% else %}<form id="sso-login-form"><input type="text" name="u"></form>{% endif %}';
@@ -224,7 +241,7 @@ const CASES = [
     ['P', gate(P, once(base(P), 'class="pm__btn-claim">Đồng ý', 'class="pm__btn_claim">Đồng ý')), red('PG-CLAIM')],
   ]],
   ['6 sót đúng 1 <any> → PG-ANY "1 thẻ"', () => [
-    ['L', gate(L, once(base(L), '<div class="pm__point">0</div>', '<any class="pm__point">0</any>')),
+    ['L', gate(L, once(base(L), POINT, '<any class="pm__point spoint">0</any>')),
       (r) => r.json?.fails.some((f) => f.code === 'PG-ANY' && f.msg.includes('1 thẻ'))],
     ['P', gate(P, once(base(P), '<div class="pm__totalCash" data-rate="1">0</div>', '<any class="pm__totalCash" data-rate="1">0</any>')),
       (r) => r.json?.fails.some((f) => f.code === 'PG-ANY' && f.msg.includes('1 thẻ'))],
@@ -235,7 +252,7 @@ const CASES = [
     ['login', gate(P, moveClassToFirstChild(base(P), 'popup_login', 'pm__module pm__login-module')), red('PG-OPEN')],
   ]],
   ['8 xoá hook bắt buộc → PG-REQ', () => [
-    ['pm__point', gate(L, once(base(L), 'class="pm__point"', 'class="counter"')), red('PG-REQ')],
+    ['pm__point', gate(L, once(base(L), 'class="pm__point spoint">', 'class="counter spoint">')), red('PG-REQ')],
     ['popup_login', gate(L, once(base(L), 'id="popup_login" ', '')), red('PG-REQ')],
     ['popupCondition', gate(P, once(base(P), 'id="popupCondition" ', '')), red('PG-REQ')],
   ]],
@@ -270,13 +287,13 @@ const CASES = [
       '<div class="pm__login_popup_title"></div>', '<div class="pm__login_popup_title"></div><a href="#" class="pm__login pm__anchor"></a>')), red('PG-NEST')],
   ]],
   ['19 bịa data-foo → chỉ 🟡 PG-UNKNOWN', () => [
-    ['L', gate(L, once(base(L), 'class="pm__point"', 'class="pm__point" data-foo="1"')), onlyWarn('PG-UNKNOWN')],
+    ['L', gate(L, once(base(L), 'class="pm__point spoint">', 'class="pm__point spoint" data-foo="1">')), onlyWarn('PG-UNKNOWN')],
   ]],
   ['20 hook production ngoài kit → chỉ 🟡 PG-UNKNOWN', () => [
     ['L', gate(L, once(base(L), '<a href="#" class="pm__menu-selectrole"></a>', '<a href="#" class="pm__menu-selectrole"></a>\n  <span class="pm__rankchar-Rank"></span>')), onlyWarn('PG-UNKNOWN')],
   ]],
   ['21 pm__point → pm__pointt → PG-TYPO', () => [
-    ['L', gate(L, once(base(L), 'class="pm__point"', 'class="pm__pointt"')), red('PG-TYPO')],
+    ['L', gate(L, once(base(L), 'class="pm__point spoint">', 'class="pm__pointt spoint">')), red('PG-TYPO')],
   ]],
   ['22 bản trùng nằm trong <!-- --> → không 🔴', () => [
     ['L', gate(L, once(base(L), '<div id="sso-login-form">', '<!-- <div id="sso-login-form"></div> -->\n<div id="sso-login-form">')), noRed],
@@ -313,9 +330,9 @@ const CASES = [
     ['main/', pageCase(L, { 'main/index.html': base(L) }), (r) => r.exit === 0 && r.json?.length === 1 && r.json[0].fails.length === 0],
   ]],
   ['32 --page: hook bắt buộc ở trang khác cùng bộ → không PG-REQ; bản ngôn ngữ thiếu → PG-REQ', () => [
-    ['2 trang', pageCase(L, { 'index.html': once(base(L), 'class="pm__point"', 'class="counter"'), 'quayso.html': '<body><span class="pm__point">0</span></body>' }),
+    ['2 trang', pageCase(L, { 'index.html': once(base(L), 'class="pm__point spoint">', 'class="counter spoint">'), 'quayso.html': '<body><span class="pm__point">0</span></body>' }),
       (r) => r.json?.length === 2 && r.json.every((page) => lacks({ json: page }, 'PG-REQ', 'pm__point'))],
-    ['index-en', pageCase(L, { 'index.html': base(L), 'index-en.html': once(base(L), 'class="pm__point"', 'class="counter"') }),
+    ['index-en', pageCase(L, { 'index.html': base(L), 'index-en.html': once(base(L), 'class="pm__point spoint">', 'class="counter spoint">') }),
       (r) => lacks({ json: pageOf(r, 'index.html') }, 'PG-REQ', 'pm__point') && redOn('PG-REQ', 'pm__point')({ json: pageOf(r, 'index-en.html') })],
   ]],
   ['33 L: chỉ quay hoặc chỉ đổi quà (production) → không PG-REQ; không cả hai → PG-REQ', () => [
@@ -416,7 +433,7 @@ const CASES = [
   ['49 pm__charactername ×2 (PC + MB, production) → không PG-ONCE; pm__point ×2 vẫn PG-ONCE', () => [
     ['charactername', gate(L, once(base(L), '<a href="#" class="pm__menu-selectrole"></a>', '<a href="#" class="pm__menu-selectrole"></a><span class="MS__pc"><span class="pm__charactername"></span></span><span class="MS__mb"><span class="pm__charactername"></span></span>')),
       (r) => lacks(r, 'PG-ONCE', 'pm__charactername')],
-    ['point', gate(L, once(base(L), '<div class="pm__point">0</div>', '<div class="pm__point">0</div><span class="pm__point">0</span>')), redOn('PG-ONCE', 'pm__point')],
+    ['point', gate(L, once(base(L), POINT, `${POINT}<span class="pm__point">0</span>`)), redOn('PG-ONCE', 'pm__point')],
   ]],
   ['54 hook chỉ nằm trong <template>/<noscript> (không vào DOM) → PG-REQ', () => ['template', 'noscript'].map((tag) => [tag,
     gate(L, once(base(L), POINT, `<${tag}>${POINT}</${tag}>`)), redOn('PG-REQ', 'pm__point')])],
@@ -476,6 +493,66 @@ const CASES = [
   ['64 data-src lazyload trên captcha-image khai kind=known → không PG-UNKNOWN', () => [
     ['L', gate(L, base(L).replace(/<img([^>]*)id="captcha-image"/, '<img$1id="captcha-image" data-src="a.png"')),
       (r) => noRed(r) && !r.json.warns.some((w) => w.code === 'PG-UNKNOWN' && w.token === 'data-src')],
+  ]],
+  ['65 draw-ok: Lucky có pm__rut + prodTemplate đủ → không PG-DRAW', () => [['L', gate(L, base(L)), (r) => noRed(r) && !hasDraw(r)]]],
+  ['66 draw-missing → 🔴 PG-DRAW prodTemplate', () => [['L', gate(L, withoutDraw(base(L))), redOn('PG-DRAW', 'prodTemplate')]]],
+  ['67 draw-module: khai trong type="module" → 🔴', () => [
+    ['L', gate(L, once(base(L), '<script>const prodTemplate', '<script type="module">const prodTemplate')), redOn('PG-DRAW', 'prodTemplate')],
+  ]],
+  ['68 draw-in-function: không ở cấp trên cùng → 🔴', () => [
+    ['L', gate(L, once(base(L), DRAW_SCRIPT, `<script>(function(){ ${DRAW_SCRIPT.slice('<script>'.length, -'</script>'.length)} })();</script>`)), redOn('PG-DRAW', 'prodTemplate')],
+  ]],
+  ['69 draw-order: lib nạp trước prodTemplate → 🔴', () => [
+    ['L', gate(L, once(base(L), DRAW_BLOCK, `${LIB_SCRIPT}\n${BACKEND_COMMENT}\n${DRAW_SCRIPT}`)), redOn('PG-DRAW', 'prodTemplate')],
+  ]],
+  ['70 draw-var: var cũng hợp lệ', () => [['L', gate(L, once(base(L), 'const prodTemplate', 'var prodTemplate')), noRed]]],
+  ['71 draw-no-en → 🔴 names.en', () => [['L', gate(L, once(base(L), 'en: {}, ', '')), redOn('PG-DRAW', 'names.en')]]],
+  ['72 draw-body-multi: lib tra names theo nguyên class body → 🔴', () => [
+    ['L', gate(L, once(base(L), '<body class="vn">', '<body class="vn MS__pc">')), redOn('PG-DRAW', 'names.vn MS__pc')],
+  ]],
+  ['73 draw-length: items.length ≠ số mã quà → 🔴', () => [['L', gate(L, once(base(L), 'length: 2', 'length: 3')), redOn('PG-DRAW', 'items')]]],
+  ['74 draw-no-spoint → 🔴 spoint', () => [['L', gate(L, once(base(L), 'pm__point spoint">', 'pm__point">')), redOn('PG-DRAW', 'spoint')]]],
+  ['75 draw-spoint-split: spoint khác thẻ pm__point → 🟡', () => [
+    ['L', gate(L, once(once(base(L), 'pm__point spoint">', 'pm__point">'), '</body>', '<span class="spoint">0</span></body>')), onlyWarn('PG-DRAW')],
+  ]],
+  ['76 draw-item-mismatch: data-item ngoài items → 🟡 (JX1M 59399 dùng data-item theo nghĩa riêng, production thắng kit)', () => [
+    ['L', gate(L, once(base(L), 'data-item="gift-2"', 'data-item="gift-9"')),
+      (r) => onlyWarn('PG-DRAW')(r) && r.json.warns.some((f) => f.code === 'PG-DRAW' && f.token === 'data-item')],
+  ]],
+  ['77 draw-no-item: không ô data-item nào → 🟡', () => [['L', gate(L, once(base(L), GIFTS, '')), onlyWarn('PG-DRAW')]]],
+  ['78 draw-vm-fail: khối gọi biến ngoài ($) → 🟡 soát tay', () => [
+    ['L', gate(L, once(base(L), 'fnPromotion: function () {}', 'fnPromotion: $.noop')), onlyWarn('PG-DRAW')],
+  ]],
+  ['79 draw-backend-far: thẻ chen giữa comment BACKEND: và khối → 🔴', () => [
+    ['L', gate(L, once(base(L), `${BACKEND_COMMENT}\n${DRAW_SCRIPT}`, `${BACKEND_COMMENT}<div></div>${DRAW_SCRIPT}`)), redOn('PG-DRAW', 'BACKEND:')],
+  ]],
+  ['80 draw-no-rut: chỉ đổi quà → PG-DRAW im', () => [['L', gate(L, withoutDraw(noRut(base(L)))), (r) => Boolean(r.json) && !hasDraw(r)]]],
+  ['81 draw-promotion-dir: file trong Promotion/ → PG-DRAW im', () => [
+    ['L', gate(L, withoutDraw(base(L)), 'Promotion/index.html'), (r) => Boolean(r.json) && !hasDraw(r)],
+  ]],
+  ['82 draw-payment: payment có pm__rut → PG-DRAW im', () => [
+    ['P', gate(P, once(base(P), '</body>', '<a class="pm__rut" data-value="1"></a></body>')), (r) => Boolean(r.json) && !hasDraw(r)],
+  ]],
+  ['83 draw-backend-handoff: thiếu BACKEND: trong campaign cdn-source hooks-at handoff → 🟡', () => [
+    ['L', hooksAtCase('h-draw', '- hooks-at: handoff', once(base(L), BACKEND_COMMENT, '')),
+      (r) => onlyWarn('PG-DRAW')(r) && r.json.warns.some((f) => f.code === 'PG-DRAW' && f.token === 'BACKEND:')],
+  ]],
+  ['84 comment nhắc `<script>` đầu body không nuốt phần tử phía sau (MASTER Lucky dòng 511)', () => [
+    ['L', gate(L, once(base(L), '<body class="vn">', '<body class="vn">\n<!-- dán khối cấu hình trước <script> libraryMainsite -->')), noRed],
+  ]],
+  ['85 draw-platform-global: `url: mainProgramUrl` (biến platform chèn lúc chạy, 15/62 mainsite) vẫn soát tiếp nội dung', () => [
+    ['sạch', gate(L, once(base(L), "url: typeof baseURL !== 'undefined' ? baseURL : ''", 'url: mainProgramUrl')),
+      (r) => noRed(r) && !r.json.warns.some((f) => f.code === 'PG-DRAW')],
+    ['vẫn bắt names.en', gate(L, once(once(base(L), "url: typeof baseURL !== 'undefined' ? baseURL : ''", 'url: mainProgramUrl'), 'en: {}, ', '')),
+      redOn('PG-DRAW', 'names.en')],
+  ]],
+  ['86 draw-numeric-items: items số (ZSM 58018) khớp data-item chuỗi', () => [
+    ['L', gate(L, once(once(base(L), "items: { A: 'gift-1', B: 'gift-2'", 'items: { A: 1, B: 2'), 'data-item="gift-1"></div><div data-item="gift-2"', 'data-item="1"></div><div data-item="2"')),
+      (r) => noRed(r) && !r.json.warns.some((f) => f.code === 'PG-DRAW')],
+  ]],
+  ['87 draw-empty: `prodTemplate = {}` (TLBBVNG 62834) → 1 lỗi khối rỗng, không tách names/items', () => [
+    ['L', gate(L, base(L).replace(/const prodTemplate = \{[\s\S]*?\};<\/script>/, 'const prodTemplate = {};</script>')),
+      (r) => redOn('PG-DRAW', 'prodTemplate')(r) && r.json.fails.filter((f) => f.code === 'PG-DRAW' && f.token !== 'BACKEND:').length === 1],
   ]],
 ];
 

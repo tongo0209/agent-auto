@@ -3,13 +3,14 @@ const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input'
 const TAG_OR_TWIG_BRANCH = /<(\/?)([a-zA-Z][\w:-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>|{%-?\s*(if|elseif|else|endif)\b[\s\S]*?%}/g;
 const ATTR = /([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
 // Nội dung không thành phần tử DOM: <template> trơ, <noscript> là chữ khi trình duyệt bật JS.
-const RAW_TEXT = /(<(script|style|template|noscript)\b[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi;
+// Khớp comment trước để `<script>` nằm trong comment (MASTER Lucky dòng 511) không mở khối raw.
+const RAW_TEXT = /<!--[\s\S]*?-->|(<(script|style|template|noscript)\b[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi;
 const COMMENTS = [/<!--[\s\S]*?-->/g, /{#[\s\S]*?#}/g];
 
 const blank = (text) => text.replace(/[^\n]/g, ' ');
 
 export function scanHtml(text) {
-  const withoutRawText = text.replace(RAW_TEXT, (_, open, _tag, body, close) => open + blank(body) + close);
+  const withoutRawText = text.replace(RAW_TEXT, (match, open, _tag, body, close) => (open ? open + blank(body) + close : match));
   const source = COMMENTS.reduce((t, re) => t.replace(re, blank), withoutRawText);
   const elements = [];
   const open = [];

@@ -1,5 +1,6 @@
 // Luật của pm-gate: mỗi mã PG-* một hàm, soi phần tử đã quét theo hợp đồng từ contract.mjs.
 import { ancestorsOf, tokensOf, matcherFor, isPattern } from './scan.mjs';
+import { checkDraw } from './draw.mjs';
 
 export const WARN_CODES = new Set(['PG-TEXT', 'PG-MODULE', 'PG-UNKNOWN', 'PG-NAME']);
 export const MODULE_MARKER = 'pm__module';
@@ -41,10 +42,11 @@ export function placementViolations(els, token, placement, openers, idHooks = ne
 
 // elsewhere = token của các trang cùng bộ (--page): hook bắt buộc chỉ cần có ở một trang.
 // hasBody = file là gốc cây DOM (tổ tiên mọi hook ở đây); fullDocument = thêm cả mọi hook của trang ở đây.
-export function runChecks(scan, contract, { fullDocument, hasBody, h5 = false, elsewhere = [] }) {
+// raw = HTML gốc cho PG-DRAW (scan đã làm trống ruột <script>).
+export function runChecks(scan, contract, { fullDocument, hasBody, h5 = false, elsewhere = [], raw = '', file = '' }) {
   const findings = [];
-  const ctx = { els: scan.elements, anyCount: scan.anyCount, contract, fullDocument, hasBody, h5, elsewhere, explained: new Set() };
-  ctx.add = (code, token, msg, indexes = []) => findings.push({ code, msg, token, lines: indexes.map((i) => scan.elements[i].line) });
+  const ctx = { els: scan.elements, anyCount: scan.anyCount, contract, fullDocument, hasBody, h5, elsewhere, raw, file, explained: new Set() };
+  ctx.add = (code, token, msg, indexes = [], extra = {}) => findings.push({ code, msg, token, lines: indexes.map((i) => scan.elements[i].line), ...extra });
   for (const check of CHECKS) check(ctx);
   return findings;
 }
@@ -302,4 +304,4 @@ function checkRef({ els, contract, fullDocument, h5, elsewhere, add }) {
 
 // Thứ tự có nghĩa: lỗi gốc ghi explained trước để PG-REQ/PG-UNKNOWN không báo trùng.
 const CHECKS = [checkAny, checkOverrides, checkLoginButtons, checkClaim, checkForeign, checkDont, checkFormIds, checkNames, checkRequired,
-  checkOnce, checkNesting, checkOpen, checkInputs, checkPairs, checkTextLeaf, checkModuleWith, checkRef];
+  checkOnce, checkNesting, checkOpen, checkInputs, checkPairs, checkTextLeaf, checkModuleWith, checkRef, checkDraw];

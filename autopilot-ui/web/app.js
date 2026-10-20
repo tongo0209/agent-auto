@@ -60,7 +60,7 @@ async function route() {
 
 async function updateBadge() {
   const { runs } = await api('autopilot/runs').catch(() => ({ runs: [] }));
-  const need = runs.filter((r) => r.status === 'paused' || r.status === 'attached').length;
+  const need = runs.filter((r) => r.status === 'paused' || r.status === 'attached' || (r.status === 'chat' && r.chatState === 'ask')).length;
   const link = $('[data-view="autopilot"]');
   link?.querySelector('.count')?.remove();
   if (need) link?.insertAdjacentHTML('beforeend', `<span class="count">${need}</span>`);

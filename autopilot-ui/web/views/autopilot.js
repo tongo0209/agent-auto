@@ -1,16 +1,19 @@
 import { $, esc, toast } from '../lib.js';
+import { openTerminal, hasTab } from '../terminal.js';
 
 const money = (n) => `$${(n ?? 0).toFixed(2)}`;
 const mins = (ms) => Math.round((ms ?? 0) / 60000);
 const globRe = (g) => new RegExp('^' + g.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$');
 
-const STATUS = { paused: 'Chờ bạn duyệt', attached: 'Chờ chạy trong phiên', running: 'Đang chạy', stopped: 'Đã dừng', done: 'Xong' };
+const STATUS = { paused: 'Chờ bạn duyệt', attached: 'Chờ chạy trong phiên', chat: 'Đang chat', running: 'Đang chạy', stopped: 'Đã dừng', done: 'Xong' };
 const isAborted = (r) => r.stopReason === 'aborted';
 const isUserPaused = (r) => r.stopReason === 'paused';
-const statusClass = (r) => (r.interrupted ? 'interrupted' : r.status);
-const statusLabel = (r) => (r.interrupted ? 'Bị ngắt' : isUserPaused(r) ? 'Tạm dừng' : STATUS[r.status]);
+const isAsking = (r) => r.status === 'chat' && r.chatState === 'ask';
+const statusClass = (r) => (r.interrupted ? 'interrupted' : isAsking(r) ? 'paused' : r.status);
+const statusLabel = (r) => (r.interrupted ? 'Bị ngắt' : isUserPaused(r) ? 'Tạm dừng' : isAsking(r) ? 'Chờ bạn' : STATUS[r.status]);
 const GROUPS = [
-  ['need', 'Cần bạn', (r) => ['paused', 'attached'].includes(r.status)],
+  ['need', 'Cần bạn', (r) => ['paused', 'attached'].includes(r.status) || isAsking(r)],
+  ['chat', 'Đang chat', (r) => r.status === 'chat' && !isAsking(r)],
   ['broken', 'Bị ngắt', (r) => r.interrupted],
   ['run', 'Đang chạy', (r) => r.status === 'running' && !r.interrupted],
   ['stop', 'Đã dừng', (r) => r.status === 'stopped' && !isAborted(r)],
@@ -32,7 +35,7 @@ let lastStates = {};
 let lastSig = '';
 let flowChoice = 0;
 let runFiles = [];
-const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp' };
+const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp', done: 'xong' };
 const ABORT_BTN = '<button class="btn ghost" data-act="abort">Huỷ run</button>';
 
 
@@ -41,11 +44,26 @@ async function post(action, body, sentMessage = 'Đã gửi. Autopilot chạy n�
     const res = await fetch(`/api/autopilot/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const out = await res.json();
     toast(res.ok ? sentMessage : `Không gửi được: ${out.error}`, !res.ok);
-    return res.ok;
+    return res.ok ? out : null;
   } catch (e) {
     toast(`Không tới được server autopilot: ${e.message}`, true);
-    return false;
+    return null;
   }
+}
+
+const shQuote = (s) => `'${s.replace(/'/g, `'\\''`)}'`;
+const tabIdOf = ({ key, runId }) => `ap-${key}-${runId}`;
+
+function openChatTab(launch) {
+  const env = Object.entries(launch.env).map(([k, v]) => `${k}=${shQuote(v)}`).join(' ');
+  openTerminal(`cd ${shQuote(launch.cwd)} && ${env} claude ${launch.args.map(shQuote).join(' ')}`, launch.key, tabIdOf(launch));
+}
+
+// Tab còn mở thì chỉ chuyển sang; đã đóng thì xin CLI lệnh nối phiên claude mới nhất của worktree
+async function reopenChat(run) {
+  if (hasTab(tabIdOf(run))) return openTerminal(null, run.key, tabIdOf(run));
+  const launch = await post('open', { key: run.key, resume: true }, 'Đã mở lại tab Claude của run.');
+  if (launch) openChatTab(launch);
 }
 
 function renderQueue() {
@@ -62,7 +80,7 @@ function renderQueue() {
       : `<h3><span>${title}</span><span class="mono">${runs.length}</span></h3>`;
     return `<div class="group ${cls}">${head}${folded ? '' : runs.map((r) => `
       <button class="item ${r.key === selectedKey ? 'on' : ''}" data-key="${esc(r.key)}">
-        <span class="key">${esc(r.key)}</span><span class="cost mono">${money(r.totals.usd)}</span>
+        <span class="key">${esc(r.key)}</span><span class="cost mono">${r.mode === 'chat' ? `${compact(r.totals.tokens)} tok` : money(r.totals.usd)}</span>
         <span class="sub">${esc(r.flowLabel)} · ${esc(r.stage ?? 'hoàn tất')}</span>
         <span class="mini">${r.cells.filter((c) => !c.side).map((c) => `<i class="${c.state}"></i>`).join('')}</span>
       </button>`).join('')}</div>`;
@@ -222,7 +240,6 @@ async function renderMain() {
   if (!artifact || !tabs.includes(artifact)) artifact = starred.find((f) => f === 'plan.md') ?? starred.at(-1) ?? tabs[0] ?? null;
 
   const { lane, side } = mainLane(run.cells);
-  const elapsed = run.receipts.reduce((n, r) => n + (r.ms ?? 0), 0);
   const tokens = run.totals.tokens ?? 0;
   $('#apMain').innerHTML = `
     <div class="top">
@@ -231,7 +248,7 @@ async function renderMain() {
         <div class="meta">${esc(run.flowLabel)}. Router chọn vì: ${esc(run.routerReason)}</div>
         <div class="meta"><code>${esc(run.campaignDir ?? 'chưa có campaign')}</code></div>
       </div>
-      <div class="meters">${usage('ph-lightning', compact(tokens), 'token tiêu hao', `${tokens.toLocaleString('vi-VN')} token (gồm cache) · ${money(run.totals.usd)}`)}${usage('ph-timer', `${mins(elapsed)}′`, 'phút tiêu hao', 'thời gian máy chạy các bước, không tính lúc chờ duyệt')}</div>
+      <div class="meters">${usage('ph-lightning', compact(tokens), 'token tiêu hao', `${tokens.toLocaleString('vi-VN')} token (gồm cache) · ${money(run.totals.usd)}`)}${usage('ph-timer', `${run.totals.minutes}′`, 'phút tiêu hao', run.mode === 'chat' ? 'từ đầu tới cuối phiên claude mới nhất của tab' : 'thời gian máy chạy các bước, không tính lúc chờ duyệt')}</div>
     </div>
     <div class="flow"><div class="flow-inner" id="flowInner">
       <svg class="wires" id="wires"></svg>
@@ -248,7 +265,7 @@ async function renderMain() {
         <div class="timeline">${run.receipts.map((r, i) => `
           <div class="tl ${esc(r.verdict)}" style="animation-delay:${i * 30}ms">
             <div class="row1"><b>${esc(r.stage)} · vòng ${r.round}</b><span>${money(r.costUsd)}</span></div>
-            <div class="row2">${esc(r.verdict)} · ${r.blocking} chặn · ${r.advisory} gợi ý · ${r.turns} lượt · ${mins(r.ms)}′</div>
+            <div class="row2">${esc(r.verdict)}${r.note !== undefined ? (r.note ? ` · ${esc(r.note)}` : '') : ` · ${r.blocking} chặn · ${r.advisory} gợi ý · ${r.turns} lượt · ${mins(r.ms)}′`}</div>
           </div>`).join('') || '<p style="color:var(--text-3);font-size:13px">Chưa có lượt nào.</p>'}</div>
         <div class="total"><span>${run.totals.runs} lượt claude · ${run.totals.turns} turns</span><span>${money(run.totals.usd)}</span></div>
       </section>
@@ -269,6 +286,8 @@ function placeSideLane(run, lane) {
 
 function dockMessage(run) {
   const stage = `<b>${esc(run.stage ?? '')}</b>`;
+  if (isAsking(run)) return `Claude đang chờ bạn ở ${stage}${run.chatNote ? `: ${esc(run.chatNote)}` : ''} — trả lời trong tab Claude.`;
+  if (run.status === 'chat') return `Run chat đang ở ${stage}. Làm việc trong tab Claude, claude tự báo tiến độ lên board.`;
   if (run.interrupted) return `Run bị ngắt ở ${stage} (không còn process chạy). Chạy tiếp để làm lại bước này.`;
   if (run.status === 'paused') return `Chờ bạn ở ${stage}. Duyệt để chạy tiếp, hoặc ghi chú rồi trả về.`;
   if (run.status === 'attached') return `Chờ bạn ở ${stage}: chạy <code>${esc(run.command)}</code> trong phiên Claude.`;
@@ -278,7 +297,7 @@ function dockMessage(run) {
 }
 
 function renderDock(run) {
-  const show = ['paused', 'attached', 'stopped'].includes(run.status) || run.interrupted;
+  const show = ['paused', 'attached', 'stopped', 'chat'].includes(run.status) || run.interrupted;
   $('#dock').classList.toggle('show', show);
   if (!show) return;
   const paused = run.status === 'paused';
@@ -287,7 +306,9 @@ function renderDock(run) {
   $('#note').style.display = paused || cut ? '' : 'none';
   $('#note').placeholder = cut ? 'Nhắn claude khi chạy tiếp: đổi hướng, bổ sung gì...' : 'Ghi chú khi trả về: cần sửa gì...';
   $('#prevNote').textContent = run.rejectNote ? `Lần trả về trước: ${run.rejectNote}` : '';
-  $('#actions').innerHTML = paused
+  $('#actions').innerHTML = run.status === 'chat'
+    ? `${ABORT_BTN}<button class="btn ghost" data-act="reopen"><i class="ph-bold ph-terminal-window"></i>Mở lại tab</button><button class="btn go" data-act="done"><i class="ph-bold ph-check"></i>Xong</button>`
+    : paused
     ? `${ABORT_BTN}<button class="btn back" data-act="reject"><i class="ph-bold ph-arrow-u-up-left"></i>Trả về <kbd>R</kbd></button><button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Duyệt <kbd>A</kbd></button>`
     : run.status === 'attached'
       ? `${ABORT_BTN}<button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Đã xong, chạy tiếp</button>`
@@ -349,16 +370,17 @@ function openPalette() {
   setTimeout(() => $('#ticket').focus(), 50);
 }
 const closePalette = () => $('#veil').classList.remove('show');
-async function startRun() {
+async function startRun(mode) {
   const input = $('#ticket').value.trim();
   if (!input) return toast('Nhập mã ticket hoặc link.', true);
   const flow = [{ id: '' }, ...data.flows][flowChoice].id || undefined;
-  if (await post('run', { input, flow })) {
-    $('#ticket').value = '';
-    closePalette();
-    selectedKey = input.match(/[A-Z][A-Z0-9]*-\d+/)?.[0] ?? selectedKey;
-    setTimeout(() => { lastSig = ''; refresh(); }, 2500);
-  }
+  const out = mode === 'chat' ? await post('open', { input, flow }, 'Đã tạo worktree, mở tab Claude.') : await post('run', { input, flow });
+  if (!out) return;
+  $('#ticket').value = '';
+  closePalette();
+  if (mode === 'chat') openChatTab(out);
+  selectedKey = mode === 'chat' ? out.key : input.match(/[A-Z][A-Z0-9]*-\d+/)?.[0] ?? selectedKey;
+  setTimeout(() => { lastSig = ''; refresh(); }, mode === 'chat' ? 0 : 2500);
 }
 
 
@@ -389,7 +411,7 @@ const MARKUP = `
   <div class="palette" role="dialog" aria-label="Chạy ticket mới">
     <input id="ticket" placeholder="GW-123 hoặc link sheet / Jira" autocomplete="off">
     <div class="flows" id="flows"></div>
-    <div class="foot"><span>↑↓ chọn luồng · Enter chạy · Esc đóng</span><span id="paletteHint"></span></div>
+    <div class="foot"><span>↑↓ chọn luồng · Esc đóng</span><span class="modes"><button class="btn ghost" data-mode="auto" title="Chạy các bước bằng claude -p tới mốc cần bạn">Chạy tự động <kbd>⌘↵</kbd></button><button class="btn go" data-mode="chat" title="Tạo worktree rồi mở một tab Claude để làm cùng bạn">Mở tab chat <kbd>↵</kbd></button></span></div>
   </div>
 </div>`;
 
@@ -437,11 +459,14 @@ export function mount(el) {
   });
   $('#actions').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
+    if (b?.dataset.act === 'reopen') return reopenChat(data.runs.find((r) => r.key === selectedKey));
     if (b && (b.dataset.act !== 'abort' || armAbort(b))) act(b.dataset.act);
   });
   $('#openPalette').addEventListener('click', openPalette);
   $('#veil').addEventListener('click', (e) => {
     if (e.target.id === 'veil') return closePalette();
+    const mode = e.target.closest('[data-mode]');
+    if (mode) return startRun(mode.dataset.mode);
     const opt = e.target.closest('.flowopt');
     if (opt) { flowChoice = Number(opt.dataset.i); renderFlows(); $('#ticket').focus(); }
   });
@@ -453,11 +478,11 @@ export function mount(el) {
       if (e.key === 'Escape') closePalette();
       if (e.key === 'ArrowDown') { flowChoice = (flowChoice + 1) % total; renderFlows(); e.preventDefault(); }
       if (e.key === 'ArrowUp') { flowChoice = (flowChoice + total - 1) % total; renderFlows(); e.preventDefault(); }
-      if (e.key === 'Enter') startRun();
+      if (e.key === 'Enter') startRun(e.metaKey || e.ctrlKey ? 'auto' : 'chat');
       return;
     }
     if (typing || !$('#dock').classList.contains('show')) return;
-    if (e.key === 'a') act('approve');
+    if (e.key === 'a' && $('#actions [data-act="approve"]')) act('approve');
     if (e.key === 'r') $('#note').focus();
   };
   $('#note').addEventListener('keydown', (e) => {

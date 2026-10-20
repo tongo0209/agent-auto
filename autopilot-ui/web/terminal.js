@@ -164,8 +164,8 @@ function activate(id) {
   requestAnimationFrame(fitVisible);
 }
 
-function addTab({ command, title } = {}) {
-  const tab = { id: `t-${Date.now().toString(36)}`, title: title ?? `claude ${state.tabs.length + 1}` };
+function addTab({ command, title, id } = {}) {
+  const tab = { id: id ?? `t-${Date.now().toString(36)}`, title: title ?? `claude ${state.tabs.length + 1}` };
   state.tabs.push(tab);
   connect(tab, command);
   activate(tab.id);
@@ -193,9 +193,13 @@ export function toggleTerminal() {
   if (state.open && !state.tabs.length) addTab();
 }
 
-export function openTerminal(command, title) {
+export const hasTab = (id) => state.tabs.some((t) => t.id === id);
+
+// Có id và tab còn mở thì chỉ chuyển sang tab đó, không chạy lại lệnh
+export function openTerminal(command, title, id) {
   setOpen(true);
-  addTab({ command, title });
+  if (id && hasTab(id)) return activate(id);
+  addTab({ command, title, id });
 }
 
 export function initTerminal() {

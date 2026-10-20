@@ -111,3 +111,9 @@ test('listView: run chat lấy token + phút từ phiên claude mới nhất c�
   assert.strictEqual(chat.cells.find((c) => c.id === 'plan').state, 'waiting');
   assert.ok(view.runs.findIndex((r) => r.key === 'GW-6') < view.runs.findIndex((r) => r.key === 'GW-2'));
 });
+
+test('listArtifacts: bỏ thư mục con (wt/ của worktree) — chỉ liệt kê file', () => {
+  writeArtifact({ ...run, key: 'GW-7' }, 'brief.md', '# x');
+  fs.mkdirSync(path.join(process.env.AUTOPILOT_RUNS_DIR, 'GW-7', run.runId, 'wt', 'repo'), { recursive: true });
+  assert.deepStrictEqual(listArtifacts('GW-7', run.runId), ['brief.md']);
+});

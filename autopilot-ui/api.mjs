@@ -63,7 +63,8 @@ export async function listView() {
 export function listArtifacts(key, runId) {
   if (!SAFE_SEGMENT.test(key) || !SAFE_SEGMENT.test(runId)) return [];
   const dir = runDir(key, runId);
-  return fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f !== 'run.json' && !f.startsWith('.')).sort() : [];
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isFile() && d.name !== 'run.json' && !d.name.startsWith('.')).map((d) => d.name).sort();
 }
 
 export function artifactFile(key, runId, name) {

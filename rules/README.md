@@ -13,7 +13,7 @@ luật** thay vì diễn giải lại; giao subagent thì trỏ file, khỏi cop
 | `layout-standard.md` | `R-LAY-1..8` | dựng list/danh sách — absolute vs flex/grid, gap, scroll |
 | `promo-states.md` | `R-ST-1..8` | ô nhận thưởng — đủ 3 trạng thái off/active/received |
 | `popup-library.md` | `R-POP-1..10` | popup bất kỳ (popup là design system, không phải markup rời) |
-| `html-handoff.md` | `R-HO-1..12` | đưa HTML sang repo bàn giao |
+| `html-handoff.md` | `R-HO-1..13` | đưa HTML sang repo bàn giao |
 | `repo-new-mainsite.md` | `R-TWIG-1..7` | `.twig` trong repo mainsite |
 | `repo-vportal2view.md` | `R-VP2-1..6` | `.twig` trong repo portal |
 | `repo-gt-promotion.md` | `R-GTP-1..6` | repo template chiến dịch |

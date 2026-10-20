@@ -43,8 +43,8 @@ Lưu ý: không truyền `url` mà `prodTemplate.url` có giá trị ⇒ engine 
 
 | ID | Sev | Luật (chi tiết + ví dụ ở mục dưới) |
 |---|---|---|
-| **R-JS-1** | MUST | Nối engine promotion: `el` đủ 6 key, `informContent` khoá trong `#popup_inform`, tự trừ `.spoint` trong `callback` |
-| **R-JS-2** | MUST | Animation chọn quà: `timeWait` là biểu thức từ hằng animation; 1 mẫu `wait` + vòng `for`, không chép `class Core` |
+| **R-JS-1** | MUST | Nối engine promotion: `el` đủ 6 key, `informContent` khoá trong `#popup_inform`, tự trừ `.spoint` trong `callback`; `pm__point spoint` cùng thẻ, khởi tạo ở `window.load`, `directory: ''`, `<body>` chỉ class ngôn ngữ |
+| **R-JS-2** | MUST | Animation chọn quà: `timeWait` là biểu thức từ hằng animation (getter hoặc gán lại trong `animResult`); 1 mẫu `wait` + vòng `for`, không chép `class Core` |
 | **R-JS-3** | MUST | Phần tử mang `MJ__*`: cấm chờ click lan lên `document` — nghe ở pha capture hoặc bind thẳng |
 | **R-JS-4** | MUST | Popup mở/đóng qua `MJ__toogleActive`/`MJ__close-popup`; mở bằng JS = 1 helper trong `main/`; cấm bộ quản lý popup riêng |
 | **R-JS-5** | MUST | Phản ứng với thứ BE/lib ghi vào DOM: `render()` + `MutationObserver`, cấm `setInterval` dò |
@@ -62,6 +62,12 @@ Lưu ý: không truyền `url` mà `prodTemplate.url` có giá trị ⇒ engine 
 `#popup_inform .pm__inform-text`. Cần hiện lượt còn lại thì trong `callback` gọi `prodTemplate.fnPromotion()`
 rồi trừ `.spoint` theo số quà vừa nhận, cập nhật mọi node `.spoint` (PC lẫn MB). `base` dưới = các field
 `url/debug/directory/items/names` lấy từ `prodTemplate`.
+Thêm (luật 6 kit, AI-RULES Lucky §6.2–6.3):
+- Ô số lượt mang **cả 2 class trên cùng 1 thẻ** `pm__point spoint` — `pm__point` cho bundle kit, `spoint` cho `el.cp` của lib.
+- Khởi tạo ở `window.load` (hoặc `readyState === 'complete'`) — ở `DOMContentLoaded` lib/`$` chưa sẵn.
+- `directory: ''`; ảnh quà trong popup lấy theo `src` ảnh quà đang hiển thị trên trang (build-pro/CDN đổi path + đuôi webp).
+- `<body>` chỉ mang class ngôn ngữ — lib tra `names[$('body').attr('class')]`, thêm class là mất tên quà (R-JS-13).
+Mẫu: kit `gameplays/luckydraw-gift-exchange/components/fe-draw/draw-animation.js` · `tn3q/landing/2026-ld-sinhnhat/assets/sn6-frame2/sn6-frame2.js` (cấu hình: `assets/sn6-core/html/config-production.html.twig`).
 ```js
 // ❌ gộp nông: el mất action/reward/inform…, lỗi ghi vào mọi .pm__inform-text, lượt trên màn đứng yên
 promotion({ ...base, el: { cp: '.spoint' } });
@@ -90,8 +96,9 @@ Dẫn chứng: `ddtank/2026-chengdu-tournament/assets/Frame2/Frame2.js:92-143` (
 
 ### R-JS-2 · MUST · Animation chọn quà khớp engine
 `timeWait` (engine chờ bao lâu mới mở popup) phải là **biểu thức từ hằng animation có tên** — cấm số trần.
-Thời lượng phụ thuộc ô trúng thì giữ object `config` và gán lại `config.timeWait` trong `animResult`
-(engine giữ tham chiếu `config` nhờ gộp nông). Nháy ô quà dùng 1 mẫu: `wait()` + vòng `for` có số bước là hằng;
+Thời lượng phụ thuộc ô trúng thì dùng getter `config: { get timeWait() { return wait.ms; } }` với `wait.ms` tính
+**đồng bộ** trong `animResult` (kit), hoặc giữ object `config` và gán lại `config.timeWait` trong `animResult` — cả hai
+hợp lệ vì lib 1.3.2 `$.extend` nông nên `settings.config` là chính object đã truyền; task mới ưu tiên getter. Nháy ô quà dùng 1 mẫu: `wait()` + vòng `for` có số bước là hằng;
 không chép `class Core` (mỗi bước `new Core()` làm `clearTimeout` bên trong vô tác dụng), không biến đếm
 dùng chung giữa các lượt.
 ```js

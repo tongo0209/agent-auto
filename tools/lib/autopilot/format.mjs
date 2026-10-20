@@ -1,5 +1,7 @@
 const SYMBOL = { done: '✓', running: '●', waiting: '⏸', stopped: '✗', pending: '·', skipped: '↷' };
 const CURRENT_STATE = { running: 'running', paused: 'waiting', attached: 'waiting', stopped: 'stopped' };
+const CHAT_STATE = { doing: 'running', ask: 'waiting', pass: 'done', fail: 'stopped' };
+const currentState = (run) => (run.status === 'chat' ? CHAT_STATE[run.chatState] ?? 'pending' : CURRENT_STATE[run.status]);
 
 const minutes = (ms) => Math.round(ms / 60_000);
 const usd = (n) => Math.round(n * 100) / 100;
@@ -10,7 +12,7 @@ export function stageCells(run, flow) {
     const receipts = run.receipts.filter((r) => r.stage === s.id);
     const last = receipts.at(-1);
     const passedPause = s.kind === 'pause' && ranLater(i);
-    const state = s.id === run.stage ? CURRENT_STATE[run.status] : receipts.length || passedPause ? 'done' : 'pending';
+    const state = s.id === run.stage ? currentState(run) : receipts.length || passedPause ? 'done' : 'pending';
     return {
       id: s.id, kind: s.kind, state, rounds: receipts.length,
       max: s.loop?.max ?? null,

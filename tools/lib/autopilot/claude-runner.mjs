@@ -26,6 +26,8 @@ const SANDBOX_SETTINGS = JSON.stringify({
 const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 const FAKE_PASS = '```autopilot-verdict\n{"verdict":"pass"}\n```';
 
+export const sandboxArgs = () => (labWritesOn() ? [] : ['--settings', SANDBOX_SETTINGS]);
+
 export const tokensOf = (usage = {}) =>
   (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
 
@@ -34,8 +36,7 @@ export function buildClaudeArgs({ prompt, model, toolset, resumeSessionId }) {
   const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--allowedTools', TOOLSETS[toolset]];
   if (model) args.push('--model', model);
   if (resumeSessionId) args.push('--resume', resumeSessionId);
-  if (!labWritesOn()) args.push('--settings', SANDBOX_SETTINGS);
-  return args;
+  return [...args, ...sandboxArgs()];
 }
 
 export const guardCode = (text = '') => text.match(/\bG-[A-Z]+-\d+\b/)?.[0] ?? null;

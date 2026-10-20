@@ -4,13 +4,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { createRun, applyEvent, resumeRun, stageOf } from './lib/autopilot/engine.mjs';
-import { drive } from './lib/autopilot/driver.mjs';
+import { createRun, applyEvent, resumeRun, stageOf, roundOf } from './lib/autopilot/engine.mjs';
+import { drive, isolate, runGateStage, WHEN } from './lib/autopilot/driver.mjs';
+import { runGates } from './lib/autopilot/gates.mjs';
+import { briefOf, briefFile, chatLaunch } from './lib/autopilot/chat.mjs';
 import { loadFlow, listFlows, validateFlow, PROMPTS_DIR } from './lib/autopilot/flows.mjs';
 import { gatherSignals } from './lib/autopilot/signals.mjs';
 import { route, loadRules } from './lib/autopilot/router.mjs';
-import { newRunId, loadRun, listRuns, saveRun, runsDir, runDir, pauseFile, childFile } from './lib/autopilot/store.mjs';
-import { removeWorktree } from './lib/autopilot/worktree.mjs';
+import { newRunId, loadRun, listRuns, saveRun, runsDir, runDir, pauseFile, childFile, writeArtifact } from './lib/autopilot/store.mjs';
+import { addWorktree, removeWorktree } from './lib/autopilot/worktree.mjs';
 import { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted } from './lib/autopilot/lock.mjs';
 import { formatStatus } from './lib/autopilot/format.mjs';
 
@@ -20,6 +22,11 @@ const MAIN_ROOT = path.join(os.homedir(), 'VNG', 'agent-auto');
 const DATA_ROOT = process.env.AUTOPILOT_DATA_ROOT || (fs.existsSync(path.join(AGENT_ROOT, 'state.json')) ? AGENT_ROOT : MAIN_ROOT);
 const USAGE = `Dùng:
   autopilot run <KEY|link> [--flow id] [--campaign dir] [--budget-usd n] [--bg]
+  autopilot open <KEY|link> [--flow id] [--campaign dir]   (run chat: worktree + brief.md, in JSON để mở tab claude)
+  autopilot open <KEY> --resume                             (mở lại tab: nối phiên claude mới nhất của worktree)
+  autopilot mark <KEY> <bước> <doing|pass|fail|ask> [--note "…"]
+  autopilot gates <KEY> [check…]   (mặc định mọi cổng của luồng trừ commit)
+  autopilot done <KEY>             (run chat xong, giữ worktree + nhánh để review)
   autopilot status [KEY]
   autopilot approve <KEY> [--note "…"]
   autopilot reject <KEY> --note "…"
@@ -38,7 +45,7 @@ function describeDecision({ flow, target, reason, questions = [] }) {
 function parseArgs(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--bg' || argv[i] === '--validate') opts[argv[i].slice(2)] = true;
+    if (['--bg', '--validate', '--resume'].includes(argv[i])) opts[argv[i].slice(2)] = true;
     else if (argv[i].startsWith('--')) opts[argv[i].slice(2)] = argv[++i];
     else opts._.push(argv[i]);
   }
@@ -88,10 +95,7 @@ function startBackground(argv) {
   console.log(`Chạy nền PID ${child.pid} · log: ${log}`);
 }
 
-async function cmdRun(opts, argv) {
-  const input = opts._[1] ?? die(USAGE);
-  if (opts.bg) return startBackground(argv);
-
+function newRun(opts, input) {
   const signals = gatherSignals({ input, agentRoot: DATA_ROOT, campaign: opts.campaign });
   const decided = opts.flow ? { flow: opts.flow, reason: `chọn tay --flow ${opts.flow}` } : route(signals, loadRules());
   if (STOP_DECISIONS.includes(decided.flow)) die(describeDecision(decided));
@@ -108,13 +112,92 @@ async function cmdRun(opts, argv) {
     key: signals.key ?? `ADHOC-${runId}`, runId, flow, routerReason: decided.reason,
     repo, campaignDir: target.campaignDir, campaignDirs: target.campaignDirs, handoffDir: target.handoffDir, cloneSource: signals.cloneSource, sheetUrl: signals.sheetUrl, sheetKind: signals.sheetKind, repos: [repo, ...target.repos], now: now.getTime(),
   });
+  return { run, flow, reason: decided.reason };
+}
+
+async function cmdRun(opts, argv) {
+  const input = opts._[1] ?? die(USAGE);
+  if (opts.bg) return startBackground(argv);
+  const { run, flow, reason } = newRun(opts, input);
   if (opts['budget-usd']) run.budget.usd = Number(opts['budget-usd']);
-  console.log(`▶ ${run.key} → ${flow.id} (${decided.reason})`);
+  console.log(`▶ ${run.key} → ${flow.id} (${reason})`);
   await continueRun(run, input);
+}
+
+function cmdOpen(opts) {
+  const input = opts._[1] ?? die(USAGE);
+  if (opts.resume) return console.log(JSON.stringify(chatLaunch(mustLoadChat(input), { resume: true })));
+  const { run: created, flow } = newRun(opts, input);
+  if (created.campaignDir) holdCampaign(created.campaignDir, { key: created.key, runId: created.runId });
+  const run = { ...isolate(created, { addWorktree }), mode: 'chat', status: 'chat', chatState: null };
+  saveRun(run);
+  fs.writeFileSync(briefFile(run), briefOf(run, flow, input));
+  console.log(JSON.stringify(chatLaunch(run)));
+}
+
+const MARKS = ['doing', 'pass', 'fail', 'ask'];
+
+// Chỉ pass/fail là kết quả của một lượt nên mới thành receipt; doing/ask chỉ đổi trạng thái trên board
+function cmdMark(opts) {
+  const [, key, stage, state] = opts._;
+  const run = mustLoadChat(key ?? die(USAGE));
+  const flow = loadFlow(run.flow);
+  if (!stageOf(flow, stage)) die(`Bước lạ: ${stage} — luồng ${flow.id} có: ${flow.stages.map((s) => s.id).join(', ')}`);
+  if (!MARKS.includes(state)) die(`Trạng thái lạ: ${state} — dùng ${MARKS.join('|')}`);
+  const note = opts.note ?? null;
+  const receipt = { stage, verdict: state, note, round: roundOf(run, stage), at: new Date().toISOString(), blocking: 0, advisory: 0, turns: 0, costUsd: 0, ms: 0 };
+  const receipts = ['pass', 'fail'].includes(state) ? [...run.receipts, receipt] : run.receipts;
+  saveRun({ ...run, stage, chatState: state, chatNote: note, receipts });
+  console.log(`${run.key} · ${stage} → ${state}`);
+}
+
+const sameChecks = (a, b) => a.checks.join() === b.checks.join();
+
+function gateStagesFor(run, flow, wanted) {
+  const flowChecks = new Set(flow.stages.flatMap((s) => s.checks ?? []));
+  const unknown = wanted.filter((c) => !flowChecks.has(c));
+  if (unknown.length) die(`check lạ với luồng ${flow.id}: ${unknown.join(', ')} — có: ${[...flowChecks].join(', ')}`);
+  const pick = (checks) => (wanted.length ? checks.filter((c) => wanted.includes(c)) : checks.filter((c) => c !== 'commit'));
+  return flow.stages
+    .filter((s) => s.kind === 'gate' && (!s.when || WHEN[s.when](run)))
+    .map((s) => ({ ...s, checks: pick(s.checks) }))
+    .filter((s, i, all) => s.checks.length && all.findIndex((o) => sameChecks(o, s)) === i);
+}
+
+async function cmdGates(opts) {
+  let run = mustLoadChat(opts._[1] ?? die(USAGE));
+  const stages = gateStagesFor(run, loadFlow(run.flow), opts._.slice(2));
+  if (!stages.length) die('Không có cổng nào áp dụng cho run này.');
+  const deps = { now: Date.now, runGates, ...driveDeps() };
+  let allPass = true;
+  for (const stage of stages) {
+    const event = await runGateStage(run, stage, deps);
+    const receipt = { ...event.receipt, round: roundOf(run, stage.id), at: new Date().toISOString() };
+    run = { ...run, receipts: [...run.receipts, receipt] };
+    allPass &&= event.type === 'pass';
+    const result = JSON.parse(fs.readFileSync(path.join(runDir(run.key, run.runId), `${stage.id}-r${receipt.round}.json`), 'utf8'));
+    console.log(`${stage.id}: ${event.type === 'pass' ? 'ĐẠT' : event.type === 'halt' ? `LỖI (${event.reason})` : 'CHƯA ĐẠT'} · ${stage.id}-r${receipt.round}.json`);
+    for (const r of result.results) console.log(`  ${r.check} ${r.status}${r.note ? ` · ${r.note}` : ''}${r.blocking.map((b) => `\n    ${b}`).join('')}`);
+  }
+  saveRun(run);
+  if (!allPass) process.exit(1);
+}
+
+function cmdDone(opts) {
+  const run = mustLoadChat(opts._[1] ?? die(USAGE));
+  saveRun({ ...run, status: 'done', stage: null, chatState: null });
+  releaseCampaign(run);
+  console.log(`${run.key} xong — worktree giữ ở ${Object.values(run.worktrees).join(', ') || '—'} để review/commit.`);
 }
 
 function mustLoad(key) {
   return loadRun(key) ?? die(`Chưa có run nào cho ${key}`);
+}
+
+function mustLoadChat(key) {
+  const run = mustLoad(key);
+  if (run.mode !== 'chat' || run.status !== 'chat') die(`${key} không phải run chat đang mở (${run.mode ?? 'auto'} · ${run.status}).`);
+  return run;
 }
 
 async function cmdDecide(opts, type) {
@@ -194,6 +277,10 @@ const argv = process.argv.slice(2);
 const opts = parseArgs(argv);
 const COMMANDS = {
   run: () => cmdRun(opts, argv),
+  open: () => cmdOpen(opts),
+  mark: () => cmdMark(opts),
+  gates: () => cmdGates(opts),
+  done: () => cmdDone(opts),
   status: () => cmdStatus(opts),
   approve: () => cmdDecide(opts, 'approve'),
   reject: () => cmdDecide(opts, 'reject'),

@@ -9,7 +9,6 @@ Kết thúc câu trả lời bằng ĐÚNG MỘT khối dưới đây (khối cu
 - pass: xong việc của stage này. revise: còn lỗi chặn (bắt buộc liệt kê trong blocking). fail: không làm được.
 - KHÔNG hỏi user giữa chừng: câu hỏi cần user trả lời → verdict "fail", ghi câu hỏi vào blocking.`;
 
-export function renderPrompt(template, vars, marker) {
-  const body = template.replace(/\{\{(\w+)\}\}/g, (_, name) => vars[name] ?? '');
-  return `AUTOPILOT_RUN: ${marker}\n${body}\n${VERDICT_FOOTER}`;
-}
+export const fillVars = (template, vars) => template.replace(/\{\{(\w+)\}\}/g, (_, name) => vars[name] ?? '');
+
+export const renderPrompt = (template, vars, marker) => `AUTOPILOT_RUN: ${marker}\n${fillVars(template, vars)}\n${VERDICT_FOOTER}`;

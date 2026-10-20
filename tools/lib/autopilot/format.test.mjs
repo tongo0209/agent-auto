@@ -47,3 +47,10 @@ test('formatStatus có hàng stage, dòng round và dòng tổng', () => {
   assert.match(out, /review · r1 · revise · 1 blocking · 4 advisory · 41 turns · 2 phút · \$1\.32/);
   assert.match(out, /Tổng: 3 lượt claude · 10 phút · \$4\.17/);
 });
+
+test('stageCells: run chat lấy trạng thái bước hiện tại từ mark (ask → waiting, doing → running)', () => {
+  const chat = { ...run, status: 'chat', stage: 'review' };
+  assert.strictEqual(stageCells({ ...chat, chatState: 'ask' }, flow)[1].state, 'waiting');
+  assert.strictEqual(stageCells({ ...chat, chatState: 'doing' }, flow)[1].state, 'running');
+  assert.strictEqual(stageCells({ ...chat, chatState: null }, flow)[1].state, 'pending');
+});

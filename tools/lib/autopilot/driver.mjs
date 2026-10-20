@@ -16,7 +16,7 @@ const CLI = 'node ~/VNG/agent-auto/tools/autopilot.mjs';
 
 const readIfExists = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '');
 
-const WHEN = {
+export const WHEN = {
   touchesUi: (run) => (run.files ?? []).some((f) => UI_FILE.test(f)),
   touchesPm: (run) => (run.files ?? []).some((f) => UI_FILE.test(f) && readIfExists(path.join(toWorktree(run.worktrees, run.repo), f)).includes('pm__')),
   hasHandoff: (run) => Boolean(run.handoffDir),
@@ -37,7 +37,7 @@ function feedbackFile(run) {
 
 const campaignsOf = (run) => (run.campaignDirs?.length ? run.campaignDirs : [run.campaignDir].filter(Boolean));
 
-function stageVars(run, stage, input) {
+export function stageVars(run, stage, input) {
   const wt = (p) => toWorktree(run.worktrees, p) ?? '';
   return {
     KEY: run.key,
@@ -128,7 +128,7 @@ async function gatesOn(run, stage, deps, dir) {
   });
 }
 
-async function runGateStage(run, stage, deps) {
+export async function runGateStage(run, stage, deps) {
   const round = roundOf(run, stage.id);
   const started = deps.now();
   const parts = [];
@@ -147,7 +147,7 @@ async function runGateStage(run, stage, deps) {
   return { type: result.pass ? 'pass' : 'revise', receipt };
 }
 
-const commandFor = (stage, run) => (typeof stage.command === 'string' ? stage.command : stage.command[run.sheetKind ?? 'google']);
+export const commandFor = (stage, run) => (typeof stage.command === 'string' ? stage.command : stage.command[run.sheetKind ?? 'google']);
 
 function announce(run, stage, deps) {
   const title = `Autopilot ${run.key}`;
@@ -179,7 +179,7 @@ async function runStage(run, stage, deps) {
 }
 
 // Stage sửa code chỉ được chạy trong worktree riêng: tạo không được thì dừng, không lùi về repo thật
-function isolate(run, deps) {
+export function isolate(run, deps) {
   const pending = (run.repos ?? [run.repo]).filter((r) => r && !isInWorktree(run.worktrees, toWorktree(run.worktrees, r)));
   if (!pending.length) return run;
   const worktrees = { ...run.worktrees };

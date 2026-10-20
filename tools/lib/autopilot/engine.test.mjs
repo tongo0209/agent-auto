@@ -359,3 +359,28 @@ test('checkRunPlan: hợp lệ → null; stage lạ, mốc duyệt, cổng thi�
   assert.strictEqual(checkRunPlan(FLOW, { disabled: [], breakpoints: ['final'] }), 'không đặt điểm dừng ở mốc duyệt final');
   assert.strictEqual(checkRunPlan(FLOW, { disabled: ['gates'], breakpoints: [], skipReason: '  ' }), 'tắt cổng gates cần lý do (--skip-reason)');
 });
+
+test('goto không nhận stage returnTo caller (fix): không có trong danh sách, chooseAction báo quay về stage gọi nó', () => {
+  const run = { ...stoppedAtGates(), receipts: [...stoppedAtGates().receipts, receipt('fix')] };
+  assert.ok(!ofType(allowedActions(run, FLOW), 'goto').stages.includes('fix'));
+  assert.throws(() => chooseAction(run, FLOW, { type: 'goto', stage: 'fix', note: 'x' }, { now: T0 }), /fix chỉ chạy khi review gọi — quay về review, gates thay vì/);
+});
+
+test('goto/retry vào stage đang tắt → gỡ khỏi plan.disabled', () => {
+  const stopped = { ...stoppedAtGates(), plan: { disabled: ['implement', 'gates'], breakpoints: [], skipReason: 'x' } };
+  assert.deepStrictEqual(chooseAction(stopped, FLOW, { type: 'goto', stage: 'implement', note: 'n' }, { now: T0 }).plan.disabled, ['gates']);
+  assert.deepStrictEqual(chooseAction(stopped, FLOW, { type: 'retry' }, { now: T0 }).plan.disabled, ['implement']);
+});
+
+test('gateSkipped không ghi trùng cùng stage', () => {
+  const skip = (run) => applyEvent({ ...run, stage: 'gates' }, FLOW, { type: 'skip', by: 'user', reason: 'r' }, T0);
+  assert.strictEqual(skip(skip(fresh())).gateSkipped.length, 1);
+});
+
+test('run bị ngắt (interrupted) nhận retry/goto/skip như stopped; break vẫn giữ status running', () => {
+  const running = { ...stoppedAtGates(), status: 'running', stopReason: null };
+  assert.deepStrictEqual(types(allowedActions(running, FLOW, { interrupted: true })), ['retry', 'goto', 'skip', 'break']);
+  const retried = chooseAction(running, FLOW, { type: 'retry' }, { now: T0, interrupted: true });
+  assert.deepStrictEqual([retried.status, retried.stage], ['running', 'gates']);
+  assert.strictEqual(chooseAction(running, FLOW, { type: 'break', stage: 'design-gap-check' }, { now: T0, interrupted: true }).status, 'running');
+});

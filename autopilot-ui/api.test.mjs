@@ -8,6 +8,7 @@ process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-api-'
 process.env.AUTOPILOT_CLAUDE_PROJECTS = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-proj-'));
 const { listView, artifactFile, listArtifacts, actionArgs, checkAction, liveLog } = await import('./api.mjs');
 const { saveRun, writeArtifact } = await import('../tools/lib/autopilot/store.mjs');
+const { acquire } = await import('../tools/lib/autopilot/lock.mjs');
 
 const run = {
   key: 'GW-1', runId: '20261020-100000', flow: 'landing-fix', status: 'paused', stage: 'approve-plan', stopReason: null,
@@ -146,12 +147,26 @@ test('actionArgs: goto/skip/pick/break và run có kế hoạch', () => {
 
 test('checkAction: run đang chạy không skip được; run đã xong qua plan cho goto', () => {
   saveRun({ ...run, key: 'GW-5', status: 'running', stage: 'plan', receipts: [] });
+  acquire('run', { key: 'GW-5', runId: run.runId });
   assert.throws(() => checkAction('skip', { key: 'GW-5' }), /đang chạy/);
   assert.doesNotThrow(() => checkAction('break', { key: 'GW-5', stage: 'fix' }));
   assert.doesNotThrow(() => checkAction('approve', { key: 'GW-5' }));
   assert.throws(() => checkAction('retry', { key: 'GW-404' }), /run/);
   assert.throws(() => checkAction('run', { input: 'GW-9', flow: 'landing-fix', skip: ['nope'] }), /stage nope/);
   assert.doesNotThrow(() => checkAction('run', { input: 'GW-9' }));
+});
+
+test('checkAction: run bị ngắt nhận retry/goto; listView có retry cho run bị ngắt', async () => {
+  saveRun({ ...run, key: 'GW-11', status: 'running', stage: 'plan-review' });
+  assert.doesNotThrow(() => checkAction('retry', { key: 'GW-11' }));
+  assert.doesNotThrow(() => checkAction('goto', { key: 'GW-11', stage: 'plan', note: 'x' }));
+  const view = (await listView()).runs.find((r) => r.key === 'GW-11');
+  assert.ok(view.actions.some((a) => a.type === 'retry'));
+});
+
+test('checkAction break --off ở stage không có điểm dừng → no-op, không lỗi', () => {
+  assert.doesNotThrow(() => checkAction('break', { key: 'GW-1', stage: 'plan', off: true }));
+  assert.throws(() => checkAction('break', { key: 'GW-1', stage: 'plan' }), /đã chạy xong/);
 });
 
 test('listView: run có actions, options chỉ ở approve-plan, mặc định plan/gateSkipped/choice', async () => {
@@ -167,4 +182,9 @@ test('listView: run có actions, options chỉ ở approve-plan, mặc định p
   const withOptions = (await listView()).runs.find((r) => r.key === 'GW-6');
   assert.deepStrictEqual(withOptions.options.map((o) => o.id), ['A', 'B']);
   assert.ok(withOptions.actions.some((a) => a.type === 'pick'));
+});
+
+test('checkAction skip qua API: không lỗi "Invalid time value"', () => {
+  saveRun({ ...run, key: 'GW-12', status: 'stopped', stage: 'plan-review', stopReason: 'fail:plan-review' });
+  assert.doesNotThrow(() => checkAction('skip', { key: 'GW-12' }));
 });

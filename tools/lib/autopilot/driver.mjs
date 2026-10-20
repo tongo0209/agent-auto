@@ -201,8 +201,11 @@ export function isolate(run, deps) {
   return { ...run, worktrees, bases };
 }
 
-// break ghi run.json không qua lock; plan trên đĩa thắng bản trong bộ nhớ để lần saveRun sau không xoá nó
-const withPlanOnDisk = (run) => ({ ...run, plan: loadRun(run.key, run.runId)?.plan ?? run.plan });
+// break chỉ ghi breakpoints vào run.json không qua lock; breakpoints trên đĩa thắng để lần saveRun sau không xoá nó
+const withPlanOnDisk = (run) => {
+  const onDisk = loadRun(run.key, run.runId)?.plan;
+  return onDisk ? { ...run, plan: { ...onDisk, ...run.plan, breakpoints: onDisk.breakpoints } } : run;
+};
 
 export async function drive(startRun, flow, overrides = {}) {
   const deps = {
@@ -233,7 +236,7 @@ export async function drive(startRun, flow, overrides = {}) {
       continue;
     }
     const stage = action.stage;
-    if ((run.plan?.disabled ?? []).includes(stage.id)) {
+    if ((run.plan?.disabled ?? []).includes(stage.id) && (!stage.when || WHEN[stage.when](run))) {
       const reason = run.plan.skipReason ?? 'tắt từ đầu';
       const receipt = { stage: stage.id, verdict: 'skipped-by-user', note: reason, blocking: 0, advisory: 0, turns: 0, costUsd: 0, ms: 0 };
       run = applyEvent(run, flow, { type: 'skip', by: 'user', reason, receipt }, deps.now());
@@ -251,6 +254,8 @@ export async function drive(startRun, flow, overrides = {}) {
     if (isAbortedOnDisk(run)) return { ...run, status: 'stopped', stopReason: 'aborted' };
     if (event.cutSession) fs.rmSync(pauseFile(run.key, run.runId), { force: true });
     const { cutSession, resumeNote, ...rest } = run;
+    // Note của user chỉ dành cho stage claude đầu tiên chạy sau khi quay lại
+    if (stage.kind === 'claude' && event.receipt) rest.rejectNote = null;
     run = applyEvent(event.cutSession ? { ...rest, cutSession: event.cutSession } : rest, flow, event, deps.now());
     run = withPlanOnDisk(run);
     if (['pass', 'skip'].includes(event.type) && run.status === 'running' && (run.plan?.breakpoints ?? []).includes(stage.id)) {

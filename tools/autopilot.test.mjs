@@ -58,12 +58,13 @@ test('plan-review revise 4 lần → stopped loop-exhausted, status báo lý do'
   assert.match(status.out, /Tổng: 8 lượt claude/);
 });
 
-test('reject có note → note vào prompt plan vòng sau', () => {
+test('reject có note → plan vòng sau nhận note rồi xoá (note dùng 1 lần)', () => {
   const { cli, campaign, runs } = sandbox();
   cli('run', 'GW-4', '--flow', 'landing-fix', '--campaign', campaign);
   cli('reject', 'GW-4', '--note', 'thêm trạng thái đã nhận');
   const run = lastRun(runs, 'GW-4');
-  assert.strictEqual(run.rejectNote, 'thêm trạng thái đã nhận');
+  assert.strictEqual(run.rejectNote, null);
+  assert.strictEqual(run.receipts.filter((r) => r.stage === 'plan').at(-1).round, 2);
   assert.strictEqual(run.stage, 'approve-plan');
 });
 
@@ -317,7 +318,7 @@ test('reject run done: mở lại ở fix với note, chạy lại tới commit 
   const r = cli('reject', 'GW-32', '--note', 'nút lệch 4px');
   assert.strictEqual(r.code, 0, r.out);
   const run = lastRun(runs, 'GW-32');
-  assert.deepStrictEqual([run.runId, run.status, run.rejectNote, run.reviewedAt], [before.runId, 'done', 'nút lệch 4px', null]);
+  assert.deepStrictEqual([run.runId, run.status, run.rejectNote, run.reviewedAt], [before.runId, 'done', null, null]);
   assert.deepStrictEqual(run.receipts.slice(before.receipts.length).map((x) => x.stage), ['fix', 'gates', 'ui-check', 'commit']);
   assert.deepStrictEqual(run.worktrees, before.worktrees);
   assert.match(cli('reject', 'GW-32').out, /--note/);
@@ -450,7 +451,7 @@ test('goto plan ở approve-plan cần --note; có note → plan chạy vòng 2 
   assert.notStrictEqual(cli('goto', 'GW-32', 'plan').code, 0);
   assert.strictEqual(cli('goto', 'GW-32', 'plan', '--note', 'thêm tab').code, 0);
   const run = lastRun(runs, 'GW-32');
-  assert.deepStrictEqual([run.status, run.stage, run.rejectNote], ['paused', 'approve-plan', 'thêm tab']);
+  assert.deepStrictEqual([run.status, run.stage, run.rejectNote], ['paused', 'approve-plan', null]);
   assert.strictEqual(run.receipts.filter((r) => r.stage === 'plan').at(-1).round, 2);
 });
 
@@ -517,6 +518,27 @@ test('break bật/tắt điểm dừng không chạy run; --off tắt; run done 
   assert.strictEqual(lastRun(runs, 'GW-37').status, 'done');
   assert.notStrictEqual(cli('break', 'GW-37', 'commit').code, 0);
   assert.notStrictEqual(cli('break', 'GW-37', 'commit', '--off').code, 0, 'run done: từ chối cả khi không đổi gì');
+});
+
+test('break không đổi gì (--off ở stage chưa có điểm dừng) → không ghi run.json', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-40', '--flow', 'landing-fix', '--campaign', campaign);
+  const file = path.join(runs, 'GW-40', lastRun(runs, 'GW-40').runId, 'run.json');
+  fs.writeFileSync(file, JSON.stringify(lastRun(runs, 'GW-40')));
+  const before = fs.readFileSync(file, 'utf8');
+  assert.strictEqual(cli('break', 'GW-40', 'code-review', '--off').code, 0);
+  assert.strictEqual(fs.readFileSync(file, 'utf8'), before);
+});
+
+test('run bị ngắt (running, không process giữ lock) → retry chạy lại stage, không cần resume', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-41', '--flow', 'landing-fix', '--campaign', campaign);
+  const run = lastRun(runs, 'GW-41');
+  fs.writeFileSync(path.join(runs, 'GW-41', run.runId, 'run.json'), JSON.stringify({ ...run, status: 'running', stage: 'plan-review' }));
+  const r = cli('retry', 'GW-41');
+  assert.strictEqual(r.code, 0, r.out);
+  const after = lastRun(runs, 'GW-41');
+  assert.deepStrictEqual([after.status, after.stage, after.receipts.length], ['paused', 'approve-plan', run.receipts.length + 1]);
 });
 
 const overBudgetAt = (runs, key, stage) => {

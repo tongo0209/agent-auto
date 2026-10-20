@@ -47,7 +47,7 @@ function viewOf(saved) {
     gateSkipped: run.gateSkipped ?? [],
     choice: run.choice ?? null,
     options,
-    actions: allowedActions(run, flow, { options }),
+    actions: allowedActions(run, flow, { options, interrupted: isInterrupted(run) }),
     interrupted: isInterrupted(run),
     awaitingReview: run.status === 'done' && !run.reviewedAt && Object.keys(run.worktrees ?? {}).length > 0,
     flowLabel: flow.label,
@@ -142,8 +142,10 @@ export function checkAction(action, body = {}) {
   if (!['retry', 'goto', 'skip', 'pick', 'break'].includes(action)) return;
   const run = loadRun(body.key);
   if (!run) throw new Error(`không có run ${body.key}`);
-  const { stage, option, note, reason } = body;
-  chooseAction(run, loadFlow(run.flow), { type: action, stage, option, note, reason }, { options: planOptions(run) });
+  const { stage, option, note, reason, off } = body;
+  const breakUnchanged = action === 'break' && run.status !== 'done' && (run.plan?.breakpoints ?? []).includes(stage) === !off;
+  if (breakUnchanged) return;
+  chooseAction(run, loadFlow(run.flow), { type: action, stage, option, note, reason }, { options: planOptions(run), now: Date.now(), interrupted: isInterrupted(run) });
 }
 
 const TAIL_BYTES = 256 * 1024;

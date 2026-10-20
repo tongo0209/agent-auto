@@ -288,7 +288,7 @@ async function cmdResume(opts) {
 
 function mustChoose(run, flow, action) {
   try {
-    return chooseAction(run, flow, action, { options: planOptions(run), now: Date.now() });
+    return chooseAction(run, flow, action, { options: planOptions(run), now: Date.now(), interrupted: isInterrupted(run) });
   } catch (e) {
     die(e.message);
   }
@@ -317,7 +317,11 @@ function cmdBreak(opts) {
   const stage = mustStage(flow, opts._[2] ?? die(USAGE)).id;
   const isOn = (run.plan?.breakpoints ?? []).includes(stage);
   const wantOn = !opts.off;
-  const next = isOn === wantOn ? run : mustChoose(run, flow, { type: 'break', stage });
+  if (isOn === wantOn) return console.log(formatStatus(run, flow));
+  const { breakpoints } = mustChoose(run, flow, { type: 'break', stage }).plan;
+  // Driver có thể vừa ghi run.json: đọc bản mới nhất, chỉ thay breakpoints
+  const latest = loadRun(run.key, run.runId);
+  const next = { ...latest, plan: { disabled: [], ...latest.plan, breakpoints } };
   saveRun(next);
   console.log(formatStatus(next, flow));
 }

@@ -528,3 +528,52 @@ test('plan: điểm dừng ghi vào run.json trong lúc stage chạy → driver 
   assert.deepStrictEqual([run.status, run.stopReason], ['stopped', 'breakpoint:code-review']);
   assert.deepStrictEqual(loadRun(start.key, start.runId).plan.breakpoints, ['code-review']);
 });
+
+const atApproveResult = async (flow, deps, plan = {}) => {
+  const run = await drive(atImplement(planned(plan), flow), flow, deps);
+  assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-result']);
+  return run;
+};
+
+test('goto code-review với note: prompt code-review nhận note 1 lần, stage sau không thấy, rejectNote bị xoá', async () => {
+  const flow = loadFlow('landing-fix');
+  const { runClaude, calls } = fakeClaude({ 'code-review': [{ result: verdict('pass') }, { result: verdict('revise', { blocking: ['x'] }) }, { result: verdict('pass') }] });
+  const deps = base({ runClaude, runGates: fakeGates().runGates });
+  const paused = await atApproveResult(flow, deps);
+  calls.length = 0;
+  const run = await drive(chooseAction(paused, flow, { type: 'goto', stage: 'code-review', note: 'NOTE-XYZ' }, { now: Date.now() }), flow, deps);
+  assert.deepStrictEqual(calls.map((c) => c.stageId), ['code-review', 'fix', 'code-review', 'ui-check']);
+  assert.match(calls[0].prompt, /Ghi chú của user khi quay lại: NOTE-XYZ/);
+  assert.ok(calls.slice(1).every((c) => !c.prompt.includes('NOTE-XYZ')));
+  assert.strictEqual(run.rejectNote, null);
+});
+
+test('reject ở approve-result: fix.md đã có {{rejectNote}} → note không bị nối lần 2', async () => {
+  const flow = loadFlow('landing-fix');
+  const { runClaude, calls } = fakeClaude({});
+  const deps = base({ runClaude, runGates: fakeGates().runGates });
+  const paused = await atApproveResult(flow, deps);
+  calls.length = 0;
+  await drive(applyEvent(paused, flow, { type: 'reject', note: 'NOTE-ABC' }, Date.now()), flow, deps);
+  assert.strictEqual(calls[0].prompt.split('NOTE-ABC').length, 2);
+  assert.ok(!calls[0].prompt.includes('Ghi chú của user khi quay lại'));
+});
+
+test('gates tắt từ đầu, goto gates → gates chạy thật, gateSkipped không ghi trùng', async () => {
+  const flow = loadFlow('landing-fix');
+  const gates = fakeGates();
+  const deps = base({ runClaude: fakeClaude({}).runClaude, runGates: gates.runGates });
+  const paused = await atApproveResult(flow, deps, { disabled: ['gates'], skipReason: 'build hỏng sẵn' });
+  assert.strictEqual(gates.calls.some((c) => c.checks.includes('build')), false);
+  const run = await drive(chooseAction(paused, flow, { type: 'goto', stage: 'gates', note: 'chạy cổng thật' }, { now: Date.now() }), flow, deps);
+  assert.ok(gates.calls.some((c) => c.checks.includes('build')));
+  assert.deepStrictEqual(run.plan.disabled, []);
+  assert.strictEqual(run.gateSkipped.length, 1);
+});
+
+test('cổng tắt nhưng tự bỏ theo luật when → không tính vào gateSkipped', async () => {
+  const flow = loadFlow('landing-fix');
+  const deps = base({ runClaude: fakeClaude({}).runClaude, runGates: fakeGates().runGates });
+  const run = await atApproveResult(flow, deps, { disabled: ['handoff-gates'], skipReason: 'không cần' });
+  assert.deepStrictEqual(run.gateSkipped, []);
+});

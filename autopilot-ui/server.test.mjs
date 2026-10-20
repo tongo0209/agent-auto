@@ -9,6 +9,7 @@ process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-srv-'
 const { createServer } = await import('./server.mjs');
 const { listFlows } = await import('../tools/lib/autopilot/flows.mjs');
 const { saveRun } = await import('../tools/lib/autopilot/store.mjs');
+const { acquire } = await import('../tools/lib/autopilot/lock.mjs');
 const { panelClaude } = await import('./panel-claude.mjs');
 const opened = [];
 const spawned = [];
@@ -118,6 +119,7 @@ test('retry/skip/goto/pick/break: soát trước khi spawn; GET /runs có action
     blockedBy: [], loops: {}, sessions: {}, budget: { usd: 25, minutes: 120 }, receipts: [], ...patch,
   });
   make('GW-11', {});
+  acquire('run', { key: 'GW-11', runId: '20261020-120000' });
   const before = spawned.length;
   const refused = await post('skip', { key: 'GW-11' });
   assert.strictEqual(refused.status, 400);

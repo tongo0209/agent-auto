@@ -11,4 +11,7 @@ Kết thúc câu trả lời bằng ĐÚNG MỘT khối dưới đây (khối cu
 
 export const fillVars = (template, vars) => template.replace(/\{\{(\w+)\}\}/g, (_, name) => vars[name] ?? '');
 
-export const renderPrompt = (template, vars, marker) => `AUTOPILOT_RUN: ${marker}\n${fillVars(template, vars)}\n${VERDICT_FOOTER}`;
+// Prompt không chừa chỗ cho note (goto/retry vào stage bất kỳ) thì nối note vào cuối
+const noteBlock = (template, note) => (note && !template.includes('{{rejectNote}}') ? `\nGhi chú của user khi quay lại: ${note}\n` : '');
+
+export const renderPrompt = (template, vars, marker) => `AUTOPILOT_RUN: ${marker}\n${fillVars(template, vars)}${noteBlock(template, vars.rejectNote)}\n${VERDICT_FOOTER}`;

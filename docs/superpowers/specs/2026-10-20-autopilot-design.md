@@ -239,7 +239,20 @@ Push không bao giờ tự làm.
    cho cùng loại task, baseline `docs/notes/wall-baseline-2026-09-23.json`). Ghi kết quả vào `docs/notes/autopilot-acceptance.md`.
    Autopilot đắt hơn >1.5× mà không giảm số vòng fix/bug lọt ⇒ báo user trước khi coi là xong.
 
-## 14. Rủi ro đã biết
+## 14. Sống chung với Claude CLI tương tác
+
+Autopilot chỉ THÊM, không thay: skill gõ tay, hook, `CLAUDE.md`, rules, console giữ nguyên hành vi.
+
+- **Tương tác không đổi hành vi:** `claude-runner` đặt env `AUTOPILOT_RUN=<KEY>/<runId>` cho mọi `claude -p` nó gọi.
+  Đoạn `## Chạy dưới autopilot` trong SKILL.md mở đầu bằng điều kiện "chỉ áp dụng khi prompt có dòng `AUTOPILOT_RUN:`"
+  (runner chèn dòng này vào đầu mọi prompt stage). Test: `claude-runner.test.mjs` kiểm env + dòng đầu prompt;
+  `skills-autopilot-section.test.mjs` kiểm mọi SKILL.md có đoạn đó đều mở bằng đúng câu điều kiện.
+- **Đụng campaign:** run đang chạy ghi `runs/.held.json` (`campaignDir → KEY/runId`), xoá khi `done`/`stopped`/`abort`.
+  `autopilot status` liệt kê campaign đang bị giữ; `tools/statusline.mjs` hiện thêm `🤖 <KEY> giữ <campaign>` để phiên tay thấy
+  trước khi sửa cùng chỗ. Không chặn phiên tay (chỉ báo).
+- **Quota:** autopilot dùng chung tài khoản Claude; receipts + `budget` là chỗ kiểm.
+
+## 15. Rủi ro đã biết
 
 | Rủi ro | Giảm thiểu |
 |---|---|

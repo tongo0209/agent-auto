@@ -287,7 +287,7 @@ function renderDock(run) {
     ? `<button class="btn ghost" data-act="abort">Huỷ run</button><button class="btn back" data-act="reject"><i class="ph-bold ph-arrow-u-up-left"></i>Trả về <kbd>R</kbd></button><button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Duyệt <kbd>A</kbd></button>`
     : run.status === 'attached'
       ? `<button class="btn ghost" data-act="abort">Huỷ run</button><button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Đã xong, chạy tiếp</button>`
-      : run.stopReason === 'aborted' ? '' : `<button class="btn go" data-act="resume"><i class="ph-bold ph-play"></i>Chạy tiếp</button>`;
+      : run.stopReason === 'aborted' ? '' : `<button class="btn ghost" data-act="abort">Huỷ run</button><button class="btn go" data-act="resume"><i class="ph-bold ph-play"></i>Chạy tiếp</button>`;
 }
 
 async function refresh() {

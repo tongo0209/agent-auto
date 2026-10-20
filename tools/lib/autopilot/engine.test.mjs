@@ -332,3 +332,11 @@ test('chooseAction goto stage trước plan (flow không bắt đầu bằng pla
   assert.strictEqual(chooseAction(run, UI_FLOW, { type: 'goto', stage: 'cut' }, { now: T0 }).choice, null);
   assert.strictEqual(chooseAction(run, UI_FLOW, { type: 'goto', stage: 'plan' }, { now: T0 }).choice, null);
 });
+
+test('chooseAction retry/goto: bỏ cutSession + resumeNote để chạy phiên mới', () => {
+  const cut = { ...stoppedAtGates(), cutSession: { stage: 'implement', sessionId: 's-old' }, resumeNote: 'cũ' };
+  for (const action of [{ type: 'retry' }, { type: 'goto', stage: 'implement' }]) {
+    const run = chooseAction(cut, FLOW, action, { now: T0 });
+    assert.deepStrictEqual([run.cutSession, run.resumeNote], [undefined, undefined]);
+  }
+});

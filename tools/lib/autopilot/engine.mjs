@@ -169,7 +169,8 @@ export function chooseAction(run, flow, action, { options = [], now } = {}) {
   if (!allowed) {
     throw new Error(run.status === 'running' ? `run đang chạy, chỉ đặt được điểm dừng (không làm được "${action.type}")` : `không làm được "${action.type}" ở trạng thái ${run.status}, stage ${run.stage}`);
   }
-  const resumed = { ...run, status: 'running', stopReason: null };
+  const { cutSession, resumeNote, ...withoutCut } = run;
+  const resumed = { ...(['retry', 'goto'].includes(action.type) ? withoutCut : run), status: 'running', stopReason: null };
 
   switch (action.type) {
     case 'retry': {

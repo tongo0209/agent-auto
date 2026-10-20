@@ -1,6 +1,7 @@
 # Stage implement — {{KEY}} (luồng {{flow}})
 
 Repo `{{repo}}` · Campaign `{{campaignDir}}`. Code theo `{{runDir}}/plan.md` đã được user duyệt. Góp ý thêm của user: {{rejectNote}}
+Phương án user đã chọn (nếu có): {{choice}}
 
 Luật đọc trước khi sửa (theo những gì chạm tới, đọc file, không đoán):
 - Mọi code: `~/VNG/agent-auto/rules/code-style.md`

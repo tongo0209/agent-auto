@@ -56,6 +56,7 @@ export function stageVars(run, stage, input) {
     rejectNote: run.rejectNote ?? '',
     callerOfFix: run.callerOfFix ?? '',
     feedbackFile: feedbackFile(run),
+    choice: run.choice ? `${run.choice.id} · ${run.choice.title}${run.choice.note ? `\n${run.choice.note}` : ''}` : '',
   };
 }
 
@@ -228,6 +229,13 @@ export async function drive(startRun, flow, overrides = {}) {
       continue;
     }
     const stage = action.stage;
+    if ((run.plan?.disabled ?? []).includes(stage.id)) {
+      const reason = run.plan.skipReason ?? 'tắt từ đầu';
+      const receipt = { stage: stage.id, verdict: 'skipped-by-user', note: reason, blocking: 0, advisory: 0, turns: 0, costUsd: 0, ms: 0 };
+      run = applyEvent(run, flow, { type: 'skip', by: 'user', reason, receipt }, deps.now());
+      saveRun(run);
+      continue;
+    }
     try {
       run = isolate(run, deps);
     } catch (e) {
@@ -240,6 +248,9 @@ export async function drive(startRun, flow, overrides = {}) {
     if (event.cutSession) fs.rmSync(pauseFile(run.key, run.runId), { force: true });
     const { cutSession, resumeNote, ...rest } = run;
     run = applyEvent(event.cutSession ? { ...rest, cutSession: event.cutSession } : rest, flow, event, deps.now());
+    if (['pass', 'skip'].includes(event.type) && run.status === 'running' && (run.plan?.breakpoints ?? []).includes(stage.id)) {
+      run = applyEvent(run, flow, { type: 'halt', reason: `breakpoint:${stage.id}` }, deps.now());
+    }
     saveRun(run);
   }
 }

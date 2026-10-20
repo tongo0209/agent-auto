@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-drive-'));
 const { drive } = await import('./driver.mjs');
-const { createRun, applyEvent, resumeRun, reopenRun } = await import('./engine.mjs');
+const { createRun, applyEvent, resumeRun, reopenRun, chooseAction } = await import('./engine.mjs');
 const { loadFlow } = await import('./flows.mjs');
 const { runDir, loadRun, saveRun, pauseFile } = await import('./store.mjs');
 const { holdCampaign, heldCampaigns } = await import('./lock.mjs');
@@ -436,4 +436,79 @@ test('run trả về sau review: fix → cổng → bỏ mốc duyệt kết qu�
   assert.match(calls[0].prompt, /nút lệch 4px/);
   assert.deepStrictEqual(gates.calls.map((c) => c.checks.at(-1)), ['layout-gate', 'commit']);
   assert.ok(!run.receipts.some((r) => r.stage === 'approve-result'));
+});
+
+const planned = (plan, flowId = 'landing-fix') =>
+  createRun({ key: 'GW-1', runId: `r${Math.random().toString(36).slice(2, 8)}`, flow: loadFlow(flowId), routerReason: 't', repo: '/repo', campaignDir: '/repo/products/x/landing/a', now: Date.now(), ...plan });
+const atImplement = (run, flow) => applyEvent([1, 2].reduce((r) => applyEvent(r, flow, { type: 'pass' }, Date.now()), run), flow, { type: 'approve' }, Date.now());
+
+test('plan: stage tắt → receipt skipped-by-user, không gọi runClaude cho stage đó', async () => {
+  const flow = loadFlow('landing-fix');
+  const { runClaude, calls } = fakeClaude({});
+  const run = await drive(planned({ disabled: ['plan-review'] }), flow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.deepStrictEqual(calls.map((c) => c.stageId), ['plan']);
+  assert.partialDeepStrictEqual(run.receipts.find((r) => r.stage === 'plan-review'), { stage: 'plan-review', verdict: 'skipped-by-user', note: 'tắt từ đầu', blocking: 0, advisory: 0, turns: 0, costUsd: 0, ms: 0 });
+  assert.strictEqual(run.stage, 'approve-plan');
+});
+
+test('plan: gates tắt kèm skipReason → gateSkipped ghi lý do', async () => {
+  const flow = loadFlow('landing-fix');
+  const { runClaude } = fakeClaude({});
+  const gates = fakeGates();
+  let run = await drive(planned({ disabled: ['gates'], skipReason: 'đã build tay' }), flow, base({ runClaude, runGates: gates.runGates }));
+  run = applyEvent(run, flow, { type: 'approve' }, Date.now());
+  run = await drive(run, flow, base({ runClaude, runGates: gates.runGates }));
+  assert.deepStrictEqual(run.gateSkipped.map(({ stage, reason }) => ({ stage, reason })), [{ stage: 'gates', reason: 'đã build tay' }]);
+  assert.strictEqual(gates.calls.some((c) => c.checks.includes('build')), false);
+});
+
+test('plan: điểm dừng implement → stopped breakpoint:implement, stage = stage kế; resume chạy tới mốc pause kế', async () => {
+  const flow = loadFlow('landing-fix');
+  const { runClaude, calls } = fakeClaude({});
+  const gates = fakeGates();
+  const start = atImplement(planned({ breakpoints: ['implement'] }), flow);
+  const first = await drive(start, flow, base({ runClaude, runGates: gates.runGates }));
+  assert.deepStrictEqual([first.status, first.stopReason, first.stage], ['stopped', 'breakpoint:implement', 'code-review']);
+  assert.deepStrictEqual(calls.map((c) => c.stageId), ['implement']);
+  const next = await drive(resumeRun(first, {}), flow, base({ runClaude, runGates: gates.runGates }));
+  assert.deepStrictEqual([next.status, next.stage], ['paused', 'approve-result']);
+});
+
+test('plan: điểm dừng ngay trước stage pause → vẫn paused, không đổi thành stopped', async () => {
+  const flow = loadFlow('landing-fix');
+  const { runClaude } = fakeClaude({});
+  const run = await drive(planned({ breakpoints: ['plan-review'] }), flow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-plan']);
+});
+
+test('choice: phương án đã chọn vào prompt implement; không note thì không xuống dòng thừa', async () => {
+  const flow = loadFlow('landing-fix');
+  const { runClaude, calls } = fakeClaude({});
+  const start = { ...atImplement(planned({}), flow), choice: { id: 'A', title: 'Một tab', note: 'giữ nút cũ' } };
+  await drive(start, flow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.match(calls[0].prompt, /A · Một tab\ngiữ nút cũ/);
+  const bare = await import('./driver.mjs');
+  assert.strictEqual(bare.stageVars({ ...start, choice: { id: 'B', title: 'Hai', note: null } }, { id: 'implement' }).choice, 'B · Hai');
+  assert.strictEqual(bare.stageVars({ ...start, choice: null }, { id: 'implement' }).choice, '');
+});
+
+test('run cũ không có plan → chạy như trước', async () => {
+  const flow = loadFlow('landing-fix');
+  const { runClaude, calls } = fakeClaude({});
+  const { plan, ...old } = newRun('landing-fix');
+  const run = await drive(old, flow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.deepStrictEqual([run.stage, calls.length], ['approve-plan', 2]);
+});
+
+test('goto sau dừng ngay: không nối cutSession cũ, chạy phiên mới', async () => {
+  const flow = loadFlow('landing-fix');
+  const { runClaude, calls } = fakeClaude({});
+  const gates = fakeGates();
+  const halted = await drive(atImplement(planned({ breakpoints: ['implement'] }), flow), flow, base({ runClaude, runGates: gates.runGates }));
+  const cut = { ...halted, cutSession: { stage: 'implement', sessionId: 's-old' }, resumeNote: 'cũ' };
+  const again = chooseAction(cut, flow, { type: 'goto', stage: 'implement' }, { now: Date.now() });
+  calls.length = 0;
+  await drive({ ...again, plan: { ...again.plan, breakpoints: [] } }, flow, base({ runClaude, runGates: gates.runGates }));
+  assert.strictEqual(calls[0].stageId, 'implement');
+  assert.ok(calls.every((c) => c.resumeSessionId !== 's-old' && !/bị dừng giữa chừng/.test(c.prompt)));
 });

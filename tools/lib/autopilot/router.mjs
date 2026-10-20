@@ -11,11 +11,20 @@ function holds(cond, signals) {
   return value === undefined ? Boolean(signals[field]) : signals[field] === value;
 }
 
+const fill = (text, signals) => text.replace(/\{(\w+)\}/g, (_, name) => signals[name] ?? '?');
+
 export function route(signals, rules) {
   const rule = rules.find((r) => r.all.every((cond) => holds(cond, signals)));
-  if (!rule) return { flow: null, matched: [], reason: 'không luật nào khớp — chọn tay bằng --flow' };
+  if (!rule) return { flow: 'manual', matched: [], reason: 'không luật nào khớp — chọn tay bằng --flow' };
+  const matched = rule.all;
+  if (rule.flow === 'manual') return { flow: 'manual', matched, reason: fill(rule.reason, signals) };
+  if (rule.flow === 'ask') return { flow: 'ask', matched, reason: fill(rule.reason, signals), questions: rule.questions.map((q) => fill(q, signals)) };
   if (rule.needsCampaign !== false && !signals.campaignDir) {
-    return { flow: null, matched: rule.all, reason: `khớp ${rule.flow} nhưng thiếu campaignDir (state.issues.${signals.key}.paths) — chọn tay bằng --flow --campaign` };
+    return {
+      flow: 'ask', target: rule.flow, matched,
+      reason: `khớp ${rule.flow} nhưng thiếu campaignDir (state.issues.${signals.key}.paths)`,
+      questions: ['Folder campaign (products/<game>/landing/<slug>) của ticket là gì?'],
+    };
   }
-  return { flow: rule.flow, matched: rule.all, reason: `${rule.flow}: ${rule.all.join(' · ')}` };
+  return { flow: rule.flow, matched, reason: `${rule.flow}: ${matched.join(' · ')}` };
 }

@@ -115,3 +115,15 @@ test('route đọc phase từ AUTOPILOT_DATA_ROOT khi code chạy ở worktree k
   assert.match(r.stdout + r.stderr, /buglist/);
   assert.match(r.stdout, /"phase": "bugfix"/);
 });
+
+test('G1: route task con chưa có buglist → in ask + câu hỏi; run từ chối', () => {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-data-'));
+  fs.writeFileSync(path.join(data, 'state.json'), JSON.stringify({ issues: { 'GW-1': { phase: 'wait-test' }, 'GW-2': { parent: 'GW-1', phase: 'wait-test' } } }));
+  const env = { ...process.env, AUTOPILOT_DATA_ROOT: data, AUTOPILOT_RUNS_DIR: path.join(data, 'runs') };
+  const r = spawnSync(process.execPath, [CLI, 'route', 'GW-2'], { env, encoding: 'utf8' });
+  assert.match(r.stdout, /^ask — task con của GW-1/);
+  assert.match(r.stdout, /1\. Link buglist/);
+  const run = spawnSync(process.execPath, [CLI, 'run', 'GW-2'], { env, encoding: 'utf8' });
+  assert.strictEqual(run.status, 1);
+  assert.match(run.stderr, /Kế thừa paths của GW-1/);
+});

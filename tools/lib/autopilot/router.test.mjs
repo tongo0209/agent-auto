@@ -7,7 +7,7 @@ import { route, loadRules } from './router.mjs';
 import { gatherSignals } from './signals.mjs';
 
 const RULES = loadRules();
-const base = { key: 'GW-1', inputIsSheet: false, phase: 'coding', hasRawDesign: false, hasDesign: false, hasCutAssets: false, campaignDir: '/r/c', campaignExists: true, briefText: '' };
+const base = { key: 'GW-1', parentKey: null, hasBugSheet: false, inputIsSheet: false, phase: 'coding', hasRawDesign: false, hasDesign: false, hasCutAssets: false, campaignDir: '/r/c', campaignExists: true, briefText: '' };
 
 test('link sheet → buglist kể cả không có campaign', () => {
   assert.strictEqual(route({ ...base, inputIsSheet: true, campaignDir: null }, RULES).flow, 'buglist');
@@ -29,10 +29,22 @@ test('chỉ có brief → feature', () => {
   assert.strictEqual(route({ ...base, briefText: 'thêm nút share' }, RULES).flow, 'feature');
 });
 
-test('không có campaignDir → null, không đoán', () => {
+test('không có campaignDir → ask, không đoán', () => {
   const r = route({ ...base, hasDesign: true, campaignDir: null }, RULES);
-  assert.strictEqual(r.flow, null);
+  assert.strictEqual(r.flow, 'ask');
   assert.match(r.reason, /campaignDir/);
+});
+
+test('G1: task con có buglist (kế thừa) → buglist', () => {
+  assert.strictEqual(route({ ...base, parentKey: 'GW-901', hasBugSheet: true, phase: 'wait-test' }, RULES).flow, 'buglist');
+});
+
+test('G1: task con chưa có buglist → ask kèm câu hỏi link buglist', () => {
+  const r = route({ ...base, parentKey: 'GW-918', phase: 'wait-test', hasDesign: true }, RULES);
+  assert.strictEqual(r.flow, 'ask');
+  assert.match(r.reason, /GW-918/);
+  assert.ok(r.questions.length >= 1 && r.questions.length <= 3);
+  assert.match(r.questions[0], /buglist/i);
 });
 
 test('reason liệt kê điều kiện đã khớp', () => {
@@ -58,4 +70,15 @@ test('gatherSignals đọc state/config/designs/tasks', () => {
     ['GW-7', repo, path.join(repo, 'products/x/landing/a'), true, true, true, true, false],
   );
   assert.strictEqual(gatherSignals({ input: 'https://docs.google.com/spreadsheets/d/x', agentRoot: root }).inputIsSheet, true);
+});
+
+test('G1: task con kế thừa paths + bugSheets của cha', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-sig-'));
+  const repo = path.join(root, 'cdn-source');
+  fs.mkdirSync(path.join(repo, 'products/x/landing/a'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ repos: { 'cdn-source': repo } }));
+  const parent = { paths: [{ repo: 'cdn-source', path: 'products/x/landing/a' }], bugSheets: ['https://docs.google.com/spreadsheets/d/p'] };
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues: { 'GW-1': parent, 'GW-2': { parent: 'GW-1', phase: 'bugfix' } } }));
+  const s = gatherSignals({ input: 'GW-2', agentRoot: root });
+  assert.deepStrictEqual([s.parentKey, s.campaignDir, s.hasBugSheet], ['GW-1', path.join(repo, 'products/x/landing/a'), true]);
 });

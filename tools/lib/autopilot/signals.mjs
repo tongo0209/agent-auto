@@ -18,8 +18,12 @@ export function gatherSignals({ input, agentRoot, campaign }) {
   const state = readJson(path.join(agentRoot, 'state.json'));
   const repos = readJson(path.join(agentRoot, 'config.json')).repos ?? {};
   const issue = state.issues?.[key] ?? {};
+  const parent = state.issues?.[issue.parent] ?? {};
+  const paths = issue.paths?.length ? issue.paths : parent.paths ?? [];
+  const bugSheets = issue.bugSheets?.length ? issue.bugSheets : parent.bugSheets ?? [];
+  const inputIsSheet = SHEET_INPUT.test(input);
 
-  const target = (issue.paths ?? []).find((p) => repos[p.repo]);
+  const target = paths.find((p) => repos[p.repo]);
   const repo = campaign ? Object.values(repos).find((r) => campaign.startsWith(r)) ?? null : target ? repos[target.repo] : null;
   const campaignDir = campaign ?? (target ? path.join(repos[target.repo], target.path) : null);
 
@@ -31,7 +35,9 @@ export function gatherSignals({ input, agentRoot, campaign }) {
   return {
     key,
     input,
-    inputIsSheet: SHEET_INPUT.test(input),
+    inputIsSheet,
+    parentKey: issue.parent ?? null,
+    hasBugSheet: inputIsSheet || bugSheets.length > 0,
     phase: issue.phase ?? null,
     repo,
     campaignDir,

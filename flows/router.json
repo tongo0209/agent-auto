@@ -1,6 +1,12 @@
 {
   "rules": [
     { "flow": "buglist", "all": ["inputIsSheet"], "needsCampaign": false },
+    { "flow": "buglist", "all": ["parentKey", "hasBugSheet"] },
+    {
+      "flow": "ask", "all": ["parentKey", "!hasBugSheet"],
+      "reason": "task con của {parentKey} chưa có buglist — chưa có gì để fix",
+      "questions": ["Link buglist (Google Sheet/Excel) của task con này ở đâu?", "Kế thừa paths của {parentKey} có đúng folder cần fix không?"]
+    },
     { "flow": "buglist", "all": ["phase=bugfix"] },
     { "flow": "landing-new", "all": ["hasRawDesign", "!hasCutAssets", "!campaignExists"] },
     { "flow": "landing-fix", "all": ["hasDesign", "campaignExists"] },

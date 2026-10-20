@@ -26,6 +26,13 @@ const USAGE = `Dùng:
   autopilot abort <KEY>
   autopilot route <KEY|link> | route --validate`;
 
+const STOP_DECISIONS = ['ask', 'manual'];
+
+function describeDecision({ flow, target, reason, questions = [] }) {
+  const head = flow === 'manual' ? `manual — ${reason}` : flow === 'ask' ? `ask${target ? ` (${target})` : ''} — ${reason}` : `${flow} — ${reason}`;
+  return [head, ...questions.map((q, i) => `  ${i + 1}. ${q}`)].join('\n');
+}
+
 function parseArgs(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -85,7 +92,7 @@ async function cmdRun(opts, argv) {
 
   const signals = gatherSignals({ input, agentRoot: DATA_ROOT, campaign: opts.campaign });
   const decided = opts.flow ? { flow: opts.flow, reason: `chọn tay --flow ${opts.flow}` } : route(signals, loadRules());
-  if (!decided.flow) die(`Không chọn được luồng: ${decided.reason}`);
+  if (STOP_DECISIONS.includes(decided.flow)) die(describeDecision(decided));
 
   const holder = signals.campaignDir && heldCampaigns()[signals.campaignDir];
   if (holder) die(`${signals.campaignDir} đang bị ${holder.key}/${holder.runId} giữ — xong/abort run đó trước.`);
@@ -149,8 +156,7 @@ function cmdRoute(opts) {
     return console.log(`${listFlows().length} luồng hợp lệ: ${listFlows().join(', ')}`);
   }
   const signals = gatherSignals({ input: opts._[1] ?? die(USAGE), agentRoot: DATA_ROOT, campaign: opts.campaign });
-  const decided = route(signals, loadRules());
-  console.log(`${decided.flow ?? '✗ không chọn được'} — ${decided.reason}`);
+  console.log(describeDecision(route(signals, loadRules())));
   console.log(JSON.stringify({ ...signals, briefText: signals.briefText.slice(0, 80) }, null, 2));
 }
 

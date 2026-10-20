@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import http from 'node:http';
-import { createRequire } from 'node:module';
 import { attachTerminal } from './terminal.mjs';
+import { consoleRequire } from './console-root.mjs';
 
-const WebSocket = createRequire(import.meta.url)('../console/node_modules/ws');
+const WebSocket = consoleRequire('ws');
 
 const open = (url) =>
   new Promise((resolve) => {

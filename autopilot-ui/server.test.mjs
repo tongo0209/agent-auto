@@ -8,7 +8,7 @@ import http from 'node:http';
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-srv-'));
 const { createServer } = await import('./server.mjs');
 const spawned = [];
-const server = createServer({ spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
+const server = createServer({ allowWrites: true, spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
 after(() => server.close());
@@ -57,4 +57,17 @@ test('live log chưa có → 204', async () => {
 
 test('artifact không có → 404', async () => {
   assert.strictEqual((await fetch(`${base}/api/autopilot/runs/GW-1/r1/artifacts/x.md`)).status, 404);
+});
+
+test('bản thử mặc định chặn mọi lệnh ghi, kể cả autopilot', async () => {
+  const lab = createServer({ spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
+  await new Promise((r) => lab.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${lab.address().port}`;
+  const before = spawned.length;
+  const post = (p) => fetch(`${url}${p}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"key":"GW-1"}' });
+  assert.strictEqual((await post('/api/autopilot/approve')).status, 403);
+  assert.strictEqual((await post('/api/board/check')).status, 403);
+  assert.strictEqual((await fetch(`${url}/api/state`)).status, 200);
+  assert.strictEqual(spawned.length, before);
+  lab.close();
 });

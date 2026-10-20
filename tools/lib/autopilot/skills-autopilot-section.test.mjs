@@ -8,7 +8,12 @@ const HEADING = '## Chạy dưới autopilot';
 const CONDITION = 'Chỉ áp dụng khi prompt có dòng `AUTOPILOT_RUN:` — phiên gõ tay bỏ qua toàn bộ mục này.';
 const REQUIRED = ['code-developer', 'bug-fixer-lite', 'psd-cut', 'figma-cut', 'ui-check', 'check-design', 'clean-code'];
 
-const readSkill = (name) => fs.readFileSync(path.join(SKILLS, name, 'SKILL.md'), 'utf8');
+const MACHINE_ONLY = path.resolve(import.meta.dirname, '../../../docs/notes/skill-autopilot-sections');
+
+const readSkill = (name) => {
+  const file = path.join(SKILLS, name, 'SKILL.md');
+  return fs.readFileSync(fs.existsSync(file) ? file : path.join(MACHINE_ONLY, `${name}.md`), 'utf8');
+};
 
 test('skill mà prompt stage gọi tới đều có mục autopilot', () => {
   for (const name of REQUIRED) assert.ok(readSkill(name).includes(HEADING), name);

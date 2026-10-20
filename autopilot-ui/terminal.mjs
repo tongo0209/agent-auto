@@ -1,7 +1,6 @@
 // Bản của console/server/ws/terminal.js, khác đúng một chỗ: socket cũ đóng muộn sau reload không được gỡ socket mới
-import { createRequire } from 'node:module';
+import { consoleRequire } from './console-root.mjs';
 
-const consoleRequire = createRequire(new URL('../console/server/index.js', import.meta.url));
 const { WebSocketServer } = consoleRequire('ws');
 const pty = consoleRequire('node-pty');
 const { PTY_CWD, file } = consoleRequire('./lib/paths');

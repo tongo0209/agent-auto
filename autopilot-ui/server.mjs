@@ -4,17 +4,15 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { createRequire } from 'node:module';
 import { listView, listArtifacts, artifactFile, actionArgs, liveLog } from './api.mjs';
 import { runsDir } from '../tools/lib/autopilot/store.mjs';
 import { attachTerminal } from './terminal.mjs';
+import { CONSOLE, consoleRequire } from './console-root.mjs';
 
 const PORT = Number(process.env.AUTOPILOT_UI_PORT) || 4800;
 const WEB = path.join(import.meta.dirname, 'web');
-const CONSOLE = path.join(import.meta.dirname, '..', 'console');
 const CLI = path.join(import.meta.dirname, '..', 'tools', 'autopilot.mjs');
 const LOCAL_HOST = /^(127\.0\.0\.1|localhost)(:\d+)?$/;
-const consoleRequire = createRequire(path.join(CONSOLE, 'server', 'index.js'));
 const express = consoleRequire('express');
 const CONSOLE_ROUTES = ['state', 'git', 'activity', 'months', 'docs', 'open', 'review', 'board', 'alerts', 'learn', 'ticket', 'doctor', 'handoff', 'jira', 'delta', 'radar', 'debt', 'bugs', 'queue', 'finish'];
 
@@ -71,9 +69,11 @@ async function handleAutopilot(req, res, spawnCli) {
     send(res, 404, { error: 'không có' });
 }
 
-export function createServer({ spawnCli = spawnDetached } = {}) {
+export function createServer({ spawnCli = spawnDetached, allowWrites = process.env.AUTOPILOT_LAB_WRITES === '1' } = {}) {
   const app = express();
   app.use((req, res, next) => (LOCAL_HOST.test(req.headers.host ?? '') ? next() : send(res, 403, { error: 'host lạ' })));
+  app.use('/api', (req, res, next) =>
+    allowWrites || req.method === 'GET' ? next() : send(res, 403, { error: 'Bản thử (agent-auto-lab) chặn ghi dữ liệu thật. Chạy với AUTOPILOT_LAB_WRITES=1 nếu thật sự muốn ghi.' }));
   app.use('/api/autopilot', (req, res) => handleAutopilot(req, res, spawnCli));
   app.use(express.json());
   for (const name of CONSOLE_ROUTES) app.use('/api', consoleRequire(`./routes/${name}`));

@@ -41,7 +41,7 @@ function fitVisible() {
   for (const [id, entry] of live) if (state.grid || id === state.active) entry.fit();
 }
 
-function connect(tab, { fresh, command }) {
+function connect(tab, command) {
   const term = new window.Terminal({ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 12.5, theme: THEME, cursorBlink: true, scrollback: 5000 });
   const fit = new window.FitAddon.FitAddon();
   term.loadAddon(fit);
@@ -51,7 +51,7 @@ function connect(tab, { fresh, command }) {
   $('#termBody').append(pane);
   term.open(pane);
 
-  const ws = new WebSocket(`ws://${location.host}/term?id=${encodeURIComponent(tab.id)}${fresh ? '&startup=1' : ''}`);
+  const ws = new WebSocket(`ws://${location.host}/term?id=${encodeURIComponent(tab.id)}&startup=1`);
   const send = (msg) => ws.readyState === 1 && ws.send(JSON.stringify(msg));
   const entry = {
     term, pane, ws,
@@ -167,7 +167,7 @@ function activate(id) {
 function addTab({ command, title } = {}) {
   const tab = { id: `t-${Date.now().toString(36)}`, title: title ?? `claude ${state.tabs.length + 1}` };
   state.tabs.push(tab);
-  connect(tab, { fresh: true, command });
+  connect(tab, command);
   activate(tab.id);
 }
 
@@ -199,7 +199,7 @@ export function openTerminal(command, title) {
 }
 
 export function initTerminal() {
-  for (const tab of state.tabs) connect(tab, { fresh: false });
+  for (const tab of state.tabs) connect(tab);
   if (!state.tabs.some((t) => t.id === state.active)) state.active = state.tabs[0]?.id ?? null;
   if (state.open && !state.tabs.length) addTab();
   renderTools();

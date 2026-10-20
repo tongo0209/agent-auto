@@ -42,3 +42,10 @@ Bấm Duyệt thì chặn POST bằng `page.route` để không duyệt thật G
 1. Màn đầu = Timeline/lịch sắp tới (console cũ có Gantt + dự báo: xem console/web của 4747 để bóc dữ liệu + API nào). Đặt làm route mặc định.
 2. Task: tách mục rõ + thu gọn/mở từng mục.
 3. Verify 1920/768 (chặn POST), kiểm 768 cho 7 màn subagent làm (chưa xem ảnh), trạng thái lỗi.
+
+## Mốc 20/10 chiều
+- Xong + commit: shellEnv 9b4f2b3 · toolbar terminal f4d5e41 · startup tab khôi phục 2cde17a · Lịch/Task/ẩn ADHOC 55e1681 · thứ tự nhóm Task 1226068. Server 4800 chạy lại từ lab (task bmjyks9qd).
+- Treo chờ user: sửa GW-881 done-fe → wait-test + luật /daily (chưa làm, state.json là dữ liệu thật).
+- Lỗi lab: autopilot route đọc state.json ở lab (không có) ⇒ phase null ⇒ không khớp luồng. Sửa: đọc state của main chỉ-đọc.
+- Implement của autopilot sửa thẳng cdn-source thật ⇒ cần worktree cdn-source riêng + tắt write-sheet trước khi chạy thử task thật.
+- Đang làm: thư viện trường hợp task (task-cases) — bóc từ state.json/memory/lessons/git → bảng case → luồng; trình user duyệt trước khi code.

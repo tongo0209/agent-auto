@@ -38,6 +38,8 @@ let lastStates = {};
 let lastSig = '';
 let flowChoice = 0;
 let preview = null;
+let previewSeq = 0;
+let previewBusy = false;
 let runFiles = [];
 const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp', reviewed: 'đã review' };
 const ABORT_BTN = '<button class="btn ghost" data-act="abort">Huỷ run</button>';
@@ -390,6 +392,7 @@ function renderFlows() {
   $('#flows').innerHTML = opts.map((f, i) => `<button class="flowopt ${i === flowChoice ? 'on' : ''}" data-i="${i}"><span>${esc(f.label)}</span><small>${esc(f.id || 'auto')}</small></button>`).join('');
 }
 function openPalette() {
+  resetPreview();
   flowChoice = 0;
   renderFlows();
   $('#veil').classList.add('show');
@@ -397,12 +400,21 @@ function openPalette() {
 }
 function closePalette() {
   $('#veil').classList.remove('show');
-  backToInput();
+  resetPreview();
 }
-function backToInput() {
+function resetPreview() {
+  previewSeq++;
+  previewBusy = false;
   preview = null;
   $('#palette').classList.remove('previewing');
+}
+function backToInput() {
+  resetPreview();
   $('#ticket').focus();
+}
+function setPreviewBusy(busy) {
+  previewBusy = busy;
+  if (preview) $('[data-pv="run"]').disabled = !canRunPreview();
 }
 function launched(mode, input, out) {
   $('#ticket').value = '';
@@ -424,16 +436,22 @@ const AUTO_SKIP_HINT = 'tự bỏ nếu không đụng UI/pm';
 const isApproval = (s) => s.kind === 'pause' || s.kind === 'attached';
 const needsSkipReason = () => preview.stages.some((s) => preview.off.has(s.id) && s.gateLike);
 const allClaudeOff = () => preview.stages.filter((s) => s.kind === 'claude').every((s) => preview.off.has(s.id));
-const canRunPreview = () => Boolean(preview.flow) && (!needsSkipReason() || preview.skipReason.trim() !== '');
+const canRunPreview = () => !previewBusy && Boolean(preview.flow) && (!needsSkipReason() || preview.skipReason.trim() !== '');
 
 async function loadPreview(input, flow) {
+  const seq = ++previewSeq;
+  setPreviewBusy(true);
+  let loaded;
   try {
     const query = new URLSearchParams({ input, ...(flow && { flow }) });
-    preview = { input, ...(await api(`autopilot/preview?${query}`)), off: new Set(), stops: new Set(), skipReason: '' };
+    loaded = await api(`autopilot/preview?${query}`);
   } catch (e) {
-    return toast(`Không xem trước được: ${e.message}`, true);
+    toast(`Không xem trước được: ${e.message}`, true);
   }
-  renderPreview();
+  if (seq !== previewSeq) return;
+  previewBusy = false;
+  if (loaded) preview = { input, ...loaded, off: new Set(), stops: new Set(), skipReason: '' };
+  if (preview) renderPreview();
 }
 function previewCell(s) {
   const off = preview.off.has(s.id);
@@ -442,7 +460,7 @@ function previewCell(s) {
     ? '<small class="pv-lock">mốc duyệt</small>'
     : `<span class="pv-ctl"><button class="pv-sw ${off ? '' : 'on'}" data-pv="toggle" role="switch" aria-checked="${!off}" aria-label="Bật/tắt ${esc(s.id)}"></button><button class="pv-pin ${stop ? 'on' : ''}" data-pv="stop" aria-pressed="${stop}" title="Dừng sau bước này"><i class="ph-bold ph-map-pin"></i></button></span>`;
   const hint = s.predicted === 'skip' && !off ? `<small class="pv-auto">${AUTO_SKIP_HINT}</small>` : '';
-  return `<div class="pv-cell ${s.kind} ${off ? 'off' : ''} ${s.predicted === 'skip' ? 'auto-skip' : ''}" data-id="${esc(s.id)}"><b>${esc(s.id)}</b><small>${s.gateLike ? 'cổng' : esc(s.kind)}</small>${hint}${controls}</div>`;
+  return `<div class="pv-cell ${esc(s.kind)} ${off ? 'off' : ''} ${s.predicted === 'skip' ? 'auto-skip' : ''}" data-id="${esc(s.id)}"><b>${esc(s.id)}</b><small>${s.gateLike ? 'cổng' : esc(s.kind)}</small>${hint}${controls}</div>`;
 }
 function renderPreview() {
   const flows = preview.flow ? preview.flows : [{ id: '', label: '— chọn luồng —' }, ...preview.flows];
@@ -457,9 +475,12 @@ function renderPreview() {
     <div class="pv-foot"><span>Enter chạy · Esc đóng · 📍 dừng sau bước</span><button class="btn go" data-pv="run" ${canRunPreview() ? '' : 'disabled'}>Chạy <kbd>↵</kbd></button></div>`;
 }
 async function runPreview() {
+  if (previewBusy) return;
   const { input, flow, off, stops, skipReason } = preview;
+  setPreviewBusy(true);
   const out = await post('run', { input, flow, skip: [...off], skipReason, breaks: [...stops] });
-  if (out) launched('run', input, out);
+  if (out) return launched('run', input, out);
+  setPreviewBusy(false);
 }
 function onPreviewClick(action, stageId) {
   if (action === 'back') return backToInput();
@@ -467,6 +488,7 @@ function onPreviewClick(action, stageId) {
   const set = action === 'toggle' ? preview.off : preview.stops;
   set.has(stageId) ? set.delete(stageId) : set.add(stageId);
   renderPreview();
+  $(`.pv-cell[data-id="${stageId}"] [data-pv="${action}"]`).focus();
   if (action === 'toggle' && needsSkipReason() && !preview.skipReason) $('#pvReason').focus();
 }
 
@@ -579,7 +601,7 @@ export function mount(el) {
       const total = data.flows.length + 1;
       if (e.key === 'Escape') closePalette();
       if (preview) {
-        if (e.key === 'Enter' && document.activeElement.tagName !== 'BUTTON' && canRunPreview()) runPreview();
+        if (e.key === 'Enter' && !['BUTTON', 'SELECT'].includes(document.activeElement.tagName) && canRunPreview()) runPreview();
         return;
       }
       if (e.key === 'ArrowDown') { flowChoice = (flowChoice + 1) % total; renderFlows(); e.preventDefault(); }

@@ -67,6 +67,7 @@ test('Bash chỉ đọc source gốc, hoặc ghi trong worktree → cho qua', ()
     [WT, 'sed -n 1,40p ~/VNG/agent-auto/rules/pm-contract.md'],
     [WT, "find ~/VNG/git-vng/cdn-source/products/tlbb -name '*.twig'"],
     [WT, `node ~/VNG/agent-auto/tools/pm-gate.mjs --page ${WT}/products/a`],
+    [WT, `node ~/VNG/agent-auto/tools/handoff-drift.mjs --dist dist/index.html ${HOME}/VNG/git-vng/gt-promotion-template/x/mainsite/index.html --json`],
     [WT, 'node ~/VNG/agent-auto/tools/project-note.mjs show x; node ~/VNG/agent-auto/tools/layout-gate.mjs a'],
     [WT, 'cp ~/VNG/git-vng/cdn-source/a.html ./a.html && echo y > ./local.txt'],
     [WT, 'npm run build && git diff --stat'],

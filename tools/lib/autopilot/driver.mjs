@@ -49,6 +49,7 @@ function stageVars(run, stage, input) {
     handoffDir: wt(run.handoffDir),
     campaignDirs: campaignsOf(run).map(wt).join('\n'),
     cloneSource: wt(run.cloneSource),
+    sheetUrl: run.sheetUrl ?? '',
     sheetKind: run.sheetKind ?? '',
     round: String(roundOf(run, stage.id)),
     rejectNote: run.rejectNote ?? '',

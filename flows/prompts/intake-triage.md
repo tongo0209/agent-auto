@@ -1,6 +1,6 @@
 # Stage intake-triage — buglist {{KEY}}
 
-Đầu vào: {{input}} · loại sheet: {{sheetKind}} (google → Drive/extension Chrome · excel → đọc HTTP Range theo memory doc-xlsx-lon-bang-http-range)
+Đầu vào: {{input}} · buglist: {{sheetUrl}} · loại sheet: {{sheetKind}} (google → Drive/extension Chrome · excel → đọc HTTP Range theo memory doc-xlsx-lon-bang-http-range)
 
 Cổng đầu tiên: header phải có cột `BugID` hoặc `No.` — không có → verdict `fail`, blocking "sheet thiếu cột BugID/No.", dừng (radar không đọc được, cấm tự đánh số).
 

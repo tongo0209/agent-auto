@@ -364,3 +364,10 @@ test('run mới hiện trên đĩa ngay khi stage đầu đang chạy, đúng st
   await drive(start, loadFlow('landing-fix'), base({ runClaude, runGates: fakeGates().runGates }));
   assert.deepStrictEqual([seen?.status, seen?.stage], ['running', 'plan']);
 });
+
+test('buglist: link sheet trong state vào prompt drift-check + intake dù input chỉ là KEY', async () => {
+  const { runClaude, calls } = fakeClaude({});
+  const start = { ...newRun('buglist'), handoffDir: '/gt/x', sheetUrl: 'https://docs.google.com/spreadsheets/d/abc/edit' };
+  await drive(start, loadFlow('buglist'), base({ runClaude, runGates: fakeGates().runGates, input: 'GW-1' }));
+  for (const id of ['drift-check', 'intake-triage']) assert.match(calls.find((c) => c.stageId === id).prompt, /spreadsheets\/d\/abc/);
+});

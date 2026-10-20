@@ -62,6 +62,7 @@ export function gatherSignals({ input, agentRoot, campaign }) {
     inputIsSheet,
     parentKey: issue.parent ?? null,
     hasBugSheet: Boolean(sheetUrl),
+    sheetUrl,
     sheetKind: sheetUrl ? (GOOGLE_SHEET.test(sheetUrl) ? 'google' : 'excel') : null,
     sheetNoBugId: NO_BUG_ID_NOTE.test(issue.note ?? '') || radarBlind,
     phase: issue.phase ?? null,

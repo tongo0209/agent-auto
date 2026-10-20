@@ -6,7 +6,7 @@ const WRITE_TOOLS = { Edit: 'file_path', Write: 'file_path', MultiEdit: 'file_pa
 const WRITES_EVERY_ARG = new Set(['rm', 'mv', 'tee', 'touch', 'mkdir', 'chmod', 'truncate']);
 const WRITES_LAST_ARG = new Set(['cp', 'ln', 'rsync']);
 const GIT_WRITES = new Set(['commit', 'add', 'checkout', 'reset', 'push', 'pull', 'merge', 'rebase', 'stash', 'apply', 'restore', 'clean', 'switch', 'worktree', 'tag', 'rm', 'mv', 'cherry-pick', 'revert', 'am']);
-const READ_ONLY_TOOLS = ['pm-gate.mjs', 'layout-gate.mjs', 'landing-parity.mjs'];
+const READ_ONLY_TOOLS = ['pm-gate.mjs', 'layout-gate.mjs', 'landing-parity.mjs', 'handoff-drift.mjs'];
 const PROJECT_NOTE_READS = ['path', 'show', 'get'];
 const INLINE_WRITE_SIGN = /['"][wa]\+?['"]|writeFile|appendFile|rmSync|unlink|rename|mkdir/;
 

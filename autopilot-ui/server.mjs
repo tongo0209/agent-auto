@@ -53,6 +53,7 @@ export function createServer({ spawnCli = spawnDetached } = {}) {
       if (!String(req.headers['content-type']).startsWith('application/json')) return send(res, 415, { error: 'cần JSON' });
       try {
         const args = actionArgs(parts[2], JSON.parse((await readBody(req)) || '{}'));
+        console.log(`${new Date().toISOString()} ${args.join(' ')}`);
         return send(res, 200, { ok: true, ...spawnCli(args) });
       } catch (e) {
         return send(res, 400, { error: e.message });

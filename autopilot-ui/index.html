@@ -68,7 +68,10 @@ main { min-width: 0; padding: 28px 36px 140px; }
 .flow svg.wires { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
 .lane { display: flex; gap: 44px; position: relative; z-index: 1; }
 .lane.side { margin-top: 64px; padding-left: 0; }
-.node { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 92px; text-align: center; }
+.node { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 92px; text-align: center; cursor: pointer; }
+.node:hover .dot { transform: scale(1.08); }
+.node.gate:hover .dot { transform: rotate(45deg) scale(1.08); }
+.sending { display: inline-flex; align-items: center; gap: 8px; color: var(--wait); font-weight: 600; padding: 10px 4px; }
 .dot { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 19px; border: 2px solid var(--idle); background: var(--bg); color: var(--text-3); transition: border-color .4s var(--ease), background .4s var(--ease), color .4s, transform .3s var(--ease); }
 .node .name { font-size: 12px; font-weight: 600; color: var(--text-2); line-height: 1.25; }
 .node .note { font-family: var(--mono); font-size: 11px; color: var(--text-3); min-height: 16px; }
@@ -250,6 +253,8 @@ let artifact = null;
 let lastStates = {};
 let lastSig = '';
 let flowChoice = 0;
+let runFiles = [];
+const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ', resume: 'chạy tiếp' };
 
 function toast(text, err) {
   const t = $('#toast');
@@ -260,10 +265,15 @@ function toast(text, err) {
 }
 
 async function post(action, body) {
-  const res = await fetch(`/api/autopilot/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const out = await res.json();
-  toast(res.ok ? 'Đã gửi. Autopilot chạy nền, trang tự cập nhật.' : `Không gửi được: ${out.error}`, !res.ok);
-  return res.ok;
+  try {
+    const res = await fetch(`/api/autopilot/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const out = await res.json();
+    toast(res.ok ? 'Đã gửi. Autopilot chạy nền, trang tự cập nhật.' : `Không gửi được: ${out.error}`, !res.ok);
+    return res.ok;
+  } catch (e) {
+    toast(`Không tới được server autopilot: ${e.message}`, true);
+    return false;
+  }
 }
 
 function renderQueue() {
@@ -416,6 +426,7 @@ async function renderMain() {
     return;
   }
   const files = await (await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/artifacts`)).json();
+  runFiles = files;
   const starred = files.filter((f) => run.show.some((g) => globRe(g).test(f)));
   const tabs = [...starred, ...files.filter((f) => !starred.includes(f) && !f.endsWith('.log')), ...files.filter((f) => f.endsWith('.log'))];
   if (!artifact || !files.includes(artifact)) artifact = starred.find((f) => f === 'plan.md') ?? starred.at(-1) ?? tabs[0] ?? null;
@@ -500,7 +511,10 @@ async function act(action) {
     return toast('Trả về cần ghi chú để bước sau biết sửa gì.', true);
   }
   document.querySelectorAll('#actions .btn').forEach((b) => (b.disabled = true));
-  if (await post(action, { key: run.key, note })) $('#note').value = '';
+  if (!(await post(action, { key: run.key, note }))) return renderDock(run);
+  $('#note').value = '';
+  $('#actions').innerHTML = `<span class="sending"><i class="ph-bold ph-circle-notch spin"></i>Đã gửi lệnh ${ACTION_LABEL[action]}, chờ autopilot nhận…</span>`;
+  lastSig = '';
   setTimeout(refresh, 1500);
 }
 
@@ -536,7 +550,20 @@ $('#queue').addEventListener('click', (e) => {
   renderQueue();
   renderMain();
 });
+function stageFile(id) {
+  const rounds = runFiles.filter((f) => f.startsWith(`${id}-r`) && f.endsWith('.json')).sort();
+  return id === 'plan' && runFiles.includes('plan.md') ? 'plan.md' : rounds.at(-1);
+}
 $('#main').addEventListener('click', (e) => {
+  const node = e.target.closest('.node');
+  if (node) {
+    const file = stageFile(node.id.slice(2));
+    if (!file) return toast(`Bước ${node.id.slice(2)} chưa chạy, chưa có kết quả để xem.`);
+    artifact = file;
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.file === file));
+    renderArtifact(data.runs.find((r) => r.key === selectedKey));
+    return $('.panes').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
   const tab = e.target.closest('.tab');
   if (!tab) return;
   artifact = tab.dataset.file;

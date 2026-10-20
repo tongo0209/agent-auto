@@ -6,7 +6,7 @@ import { labWritesOn } from './worktree.mjs';
 const AGENT_ROOT = path.resolve(import.meta.dirname, '../../..');
 const BUILD_SCRIPTS = ['build-optimize', 'build-dev', 'build'];
 const BLOCKING_TAIL = 30;
-const COMMIT_TYPE = { 'landing-new': 'feat', feature: 'feat', 'landing-fix': 'fix', buglist: 'fix' };
+const COMMIT_TYPE = { 'landing-new': 'feat', 'landing-clone': 'feat', 'gameplay-change': 'feat', feature: 'feat', 'landing-fix': 'fix', buglist: 'fix' };
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.git']);
 
 const defaultExec = (cmd, args, { cwd } = {}) => {

@@ -92,3 +92,30 @@ test('G2: path gt-promotion là handoffDir, campaignDir lấy path code', () => 
   const s = gatherSignals({ input: 'GW-1', agentRoot: root });
   assert.deepStrictEqual([s.campaignDir, s.handoffDir, s.repos], [path.join(repos['cdn-source'], 'products/t/landing/e'), path.join(repos['gt-promotion-template'], '688/e-1'), [repos['cdn-source'], repos['gt-promotion-template']]]);
 });
+
+test('G3: có nguồn clone → landing-clone, kể cả khi có PSD chưa cắt', () => {
+  const r = route({ ...base, cloneSource: '/r/src', cloneSourceDir: '/r/src', hasRawDesign: true, campaignExists: false }, RULES);
+  assert.strictEqual(r.flow, 'landing-clone');
+});
+
+test('G3: nguồn clone chỉ là URL (không có folder) → ask campaign nguồn', () => {
+  const r = route({ ...base, cloneSource: 'https://event.vnggames.com/x', cloneSourceDir: null }, RULES);
+  assert.deepStrictEqual([r.flow, r.target], ['ask', 'landing-clone']);
+  assert.match(r.questions.join(' '), /nguồn/);
+});
+
+test('G3: signal cloneSource đọc cloneFrom (folder) hoặc cloneRef (URL)', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-sig-'));
+  const repo = path.join(root, 'cdn-source');
+  fs.mkdirSync(path.join(repo, 'products/j/landing/src'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ repos: { 'cdn-source': repo } }));
+  const issues = {
+    'GW-1': { cloneFrom: [{ repo: 'cdn-source', from: 'products/j/landing/src', to: 'products/j/landing/dst' }] },
+    'GW-2': { cloneRef: 'https://event.vnggames.com/taydu/x' },
+  };
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues }));
+  const a = gatherSignals({ input: 'GW-1', agentRoot: root });
+  assert.deepStrictEqual([a.cloneSource, a.cloneSourceDir, a.campaignDir], [path.join(repo, 'products/j/landing/src'), path.join(repo, 'products/j/landing/src'), path.join(repo, 'products/j/landing/dst')]);
+  const b = gatherSignals({ input: 'GW-2', agentRoot: root });
+  assert.deepStrictEqual([b.cloneSource, b.cloneSourceDir], ['https://event.vnggames.com/taydu/x', null]);
+});

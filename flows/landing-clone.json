@@ -1,0 +1,111 @@
+{
+  "id": "landing-clone",
+  "label": "Clone-reskin landing có sẵn (giữ cấu trúc, thay ảnh/chữ)",
+  "budget": {
+    "usd": 15,
+    "minutes": 90
+  },
+  "ask": [
+    {
+      "need": [
+        "cloneSourceDir"
+      ],
+      "question": "Campaign nguồn chính xác để clone là folder nào (products/<game>/landing/<slug>)?"
+    },
+    {
+      "need": [
+        "campaignDir"
+      ],
+      "question": "Folder campaign đích (tên mới theo R-STR) là gì?"
+    }
+  ],
+  "stages": [
+    {
+      "id": "clone",
+      "kind": "claude",
+      "prompt": "clone.md",
+      "toolset": "implement",
+      "model": "opus",
+      "keepSession": true,
+      "next": "gates"
+    },
+    {
+      "id": "gates",
+      "kind": "gate",
+      "checks": [
+        "build",
+        "landing-parity",
+        "layout-gate"
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 3
+      },
+      "next": "ui-check"
+    },
+    {
+      "id": "ui-check",
+      "kind": "claude",
+      "prompt": "ui-check.md",
+      "toolset": "browser",
+      "model": "sonnet",
+      "loop": {
+        "back": "fix",
+        "max": 3
+      },
+      "next": "handoff"
+    },
+    {
+      "id": "handoff",
+      "kind": "claude",
+      "prompt": "handoff.md",
+      "toolset": "implement",
+      "model": "sonnet",
+      "when": "hasHandoff",
+      "next": "handoff-gates"
+    },
+    {
+      "id": "handoff-gates",
+      "kind": "gate",
+      "scope": "handoff",
+      "when": "hasHandoff",
+      "checks": [
+        "pm-gate-handoff",
+        "check-promotion"
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 2
+      },
+      "next": "approve-result"
+    },
+    {
+      "id": "fix",
+      "kind": "claude",
+      "prompt": "fix.md",
+      "toolset": "implement",
+      "model": "opus",
+      "resume": "clone",
+      "returnTo": "caller"
+    },
+    {
+      "id": "approve-result",
+      "kind": "pause",
+      "show": [
+        "diff",
+        "receipts"
+      ],
+      "onReject": "fix",
+      "rejectReturnTo": "gates",
+      "next": "commit"
+    },
+    {
+      "id": "commit",
+      "kind": "gate",
+      "checks": [
+        "commit"
+      ],
+      "next": null
+    }
+  ]
+}

@@ -4,8 +4,8 @@ import { loadFlow, listFlows, validateFlow, PROMPTS_DIR } from './flows.mjs';
 
 const mini = (stages) => ({ id: 'x', budget: { usd: 1, minutes: 1 }, stages });
 
-test('4 flow thật đều hợp lệ', () => {
-  assert.deepStrictEqual(listFlows().sort(), ['buglist', 'feature', 'landing-fix', 'landing-new']);
+test('flow thật đều hợp lệ', () => {
+  assert.deepStrictEqual(listFlows().sort(), ['buglist', 'feature', 'landing-clone', 'landing-fix', 'landing-new']);
   for (const id of listFlows()) assert.deepStrictEqual(validateFlow(loadFlow(id), { promptsDir: PROMPTS_DIR }), [], id);
 });
 

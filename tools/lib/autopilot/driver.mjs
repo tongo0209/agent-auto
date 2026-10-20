@@ -45,6 +45,7 @@ function stageVars(run, stage, input) {
     repo: wt(run.repo),
     campaignDir: wt(run.campaignDir),
     handoffDir: wt(run.handoffDir),
+    cloneSource: wt(run.cloneSource),
     round: String(roundOf(run, stage.id)),
     rejectNote: run.rejectNote ?? '',
     callerOfFix: run.callerOfFix ?? '',

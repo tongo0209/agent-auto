@@ -103,7 +103,7 @@ async function cmdRun(opts, argv) {
   const runId = newRunId(now);
   const run = createRun({
     key: signals.key ?? `ADHOC-${runId}`, runId, flow, routerReason: decided.reason,
-    repo, campaignDir: signals.campaignDir, handoffDir: signals.handoffDir, repos: [repo, ...signals.repos], now: now.getTime(),
+    repo, campaignDir: signals.campaignDir, handoffDir: signals.handoffDir, cloneSource: signals.cloneSource, repos: [repo, ...signals.repos], now: now.getTime(),
   });
   if (opts['budget-usd']) run.budget.usd = Number(opts['budget-usd']);
   console.log(`▶ ${run.key} → ${flow.id} (${decided.reason})`);

@@ -7,6 +7,7 @@ import http from 'node:http';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-srv-'));
 const { createServer } = await import('./server.mjs');
+const { listFlows } = await import('../tools/lib/autopilot/flows.mjs');
 const spawned = [];
 const server = createServer({ allowWrites: true, spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -35,7 +36,7 @@ test('serve module trang và xterm', async () => {
 test('GET /api/autopilot/runs trả JSON danh sách', async () => {
   const data = await (await fetch(`${base}/api/autopilot/runs`)).json();
   assert.deepStrictEqual(data.runs, []);
-  assert.strictEqual(data.flows.length, 4);
+  assert.strictEqual(data.flows.length, listFlows().length);
 });
 
 test('POST approve gọi CLI; reject thiếu note → 400', async () => {

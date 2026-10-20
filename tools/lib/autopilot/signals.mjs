@@ -24,7 +24,9 @@ export function gatherSignals({ input, agentRoot, campaign }) {
   const bugSheets = issue.bugSheets?.length ? issue.bugSheets : parent.bugSheets ?? [];
   const inputIsSheet = SHEET_INPUT.test(input);
 
-  const known = paths.filter((p) => repos[p.repo]);
+  const clone = issue.cloneFrom?.find((c) => repos[c.repo]);
+  const cloneSourceDir = clone ? path.join(repos[clone.repo], clone.from) : null;
+  const known = [...paths, ...(clone ? [{ repo: clone.repo, path: clone.to }] : [])].filter((p) => repos[p.repo]);
   const target = known.find((p) => p.repo !== HANDOFF_REPO);
   const handoff = known.find((p) => p.repo === HANDOFF_REPO);
   const repo = campaign ? Object.values(repos).find((r) => campaign.startsWith(r)) ?? null : target ? repos[target.repo] : null;
@@ -45,6 +47,8 @@ export function gatherSignals({ input, agentRoot, campaign }) {
     repo,
     campaignDir,
     campaignExists: Boolean(campaignDir && fs.existsSync(campaignDir)),
+    cloneSource: cloneSourceDir ?? issue.cloneRef ?? null,
+    cloneSourceDir: cloneSourceDir && fs.existsSync(cloneSourceDir) ? cloneSourceDir : null,
     handoffDir: handoff ? path.join(repos[handoff.repo], handoff.path) : null,
     repos: [...new Set([target, ...known].filter(Boolean).map((p) => repos[p.repo]))],
     designDir,

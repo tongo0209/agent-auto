@@ -259,3 +259,13 @@ test('G2: buglist diff không chạm pm__/giao diện → bỏ pm-gate + ui-chec
   assert.ok(!gates.calls.some((c) => c.checks.join() === 'pm-gate'));
   assert.ok(!calls.some((c) => c.stageId === 'ui-check'));
 });
+
+test('G3: landing-clone chạy thẳng clone → gates → ui-check tới duyệt kết quả, không dừng duyệt plan', async () => {
+  const flow = loadFlow('landing-clone');
+  const { runClaude, calls } = fakeClaude({ clone: [{ result: verdict('pass', { files: ['products/x/landing/a/index.html'] }) }] });
+  const start = { ...newRun('landing-clone'), cloneSource: '/repo/products/x/landing/src' };
+  const run = await drive(start, flow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-result']);
+  assert.deepStrictEqual(calls.map((c) => c.stageId), ['clone', 'ui-check']);
+  assert.match(calls[0].prompt, /\/repo\/products\/x\/landing\/src/);
+});

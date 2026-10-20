@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { loadFlow } from './flows.mjs';
 
 const RULES_FILE = path.resolve(import.meta.dirname, '../../../flows/router.json');
 
@@ -13,7 +14,9 @@ function holds(cond, signals) {
 
 const fill = (text, signals) => text.replace(/\{(\w+)\}/g, (_, name) => signals[name] ?? '?');
 
-export function route(signals, rules) {
+const flowAsk = (id) => loadFlow(id).ask ?? [];
+
+export function route(signals, rules, askOf = flowAsk) {
   const rule = rules.find((r) => r.all.every((cond) => holds(cond, signals)));
   if (!rule) return { flow: 'manual', matched: [], reason: 'không luật nào khớp — chọn tay bằng --flow' };
   const matched = rule.all;
@@ -26,5 +29,7 @@ export function route(signals, rules) {
       questions: ['Folder campaign (products/<game>/landing/<slug>) của ticket là gì?'],
     };
   }
+  const questions = askOf(rule.flow).filter((a) => !a.need.every((cond) => holds(cond, signals))).map((a) => a.question);
+  if (questions.length) return { flow: 'ask', target: rule.flow, matched, reason: `khớp ${rule.flow} nhưng thiếu đầu vào`, questions };
   return { flow: rule.flow, matched, reason: `${rule.flow}: ${matched.join(' · ')}` };
 }

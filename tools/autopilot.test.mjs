@@ -92,11 +92,11 @@ test('abort nhả campaign', () => {
   assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8')), {});
 });
 
-test('route --validate báo 4 luồng hợp lệ', () => {
+test('route --validate báo mọi luồng hợp lệ', () => {
   const { cli } = sandbox();
   const r = cli('route', '--validate');
   assert.strictEqual(r.code, 0);
-  assert.match(r.out, /4 luồng hợp lệ/);
+  assert.match(r.out, /\d+ luồng hợp lệ: .*landing-clone/);
 });
 
 test('run thứ 2 cùng campaign khi run trước còn giữ → từ chối, không ghi đè quyền giữ', () => {

@@ -34,6 +34,7 @@ const MARKUP = `<div class="page-pad lc">
         <button data-mode="timeline" role="tab"><i class="ph ph-chart-bar-horizontal"></i>Timeline</button>
         <button data-mode="board" role="tab"><i class="ph ph-kanban"></i>Board</button>
       </div>
+      <button class="btn ghost vw-sm" data-sync-jira title="Mở tab claude chạy /daily delta — quét thay đổi trên Jira, board tự cập nhật khi xong"><i class="ph ph-cloud-arrow-down"></i>Đồng bộ Jira</button>
       <button class="btn ghost vw-sm" id="lcReload"><i class="ph ph-arrows-clockwise"></i>Làm mới</button>
     </div>
   </header>

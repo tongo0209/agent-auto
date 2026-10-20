@@ -34,6 +34,7 @@ const MARKUP = `<div class="page-pad td">
   <header class="vw-head">
     <div><h1>Hôm nay</h1><div class="vw-sub mono" id="tdDate">&nbsp;</div></div>
     <div class="vw-tools"><div id="tdRadar"></div>
+      <button class="btn ghost vw-sm" data-sync-jira title="Mở tab claude chạy /daily delta — quét thay đổi trên Jira, board tự cập nhật khi xong"><i class="ph ph-cloud-arrow-down"></i>Đồng bộ Jira</button>
       <button class="btn ghost vw-sm" id="tdReload"><i class="ph ph-arrows-clockwise"></i>Làm mới</button></div>
   </header>
   <div class="vw-kpis" id="tdKpis">${skeleton(2)}</div>

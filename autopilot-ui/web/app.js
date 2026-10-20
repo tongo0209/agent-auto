@@ -77,6 +77,9 @@ document.addEventListener('keydown', (e) => {
     toggleTerminal();
   }
 });
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-sync-jira]')) openTerminal('claude "/daily delta"', 'Đồng bộ Jira', 'daily-delta');
+});
 window.addEventListener('hashchange', route);
 initTerminal();
 route();

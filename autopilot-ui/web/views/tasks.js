@@ -41,6 +41,7 @@ const MARKUP = `<div class="page-pad tk">
       <label class="vw-search"><i class="ph ph-magnifying-glass"></i><input class="vw-input" id="tkFilter" placeholder="Lọc theo mã, tên, ghi chú" aria-label="Lọc task"></label>
       <button class="btn ghost vw-sm" data-fold-all="close"><i class="ph ph-arrows-in-line-vertical"></i>Thu gọn hết</button>
       <button class="btn ghost vw-sm" data-fold-all="open"><i class="ph ph-arrows-out-line-vertical"></i>Mở hết</button>
+      <button class="btn ghost vw-sm" data-sync-jira title="Mở tab claude chạy /daily delta — quét thay đổi trên Jira, board tự cập nhật khi xong"><i class="ph ph-cloud-arrow-down"></i>Đồng bộ Jira</button>
       <button class="btn ghost vw-sm" id="tkReload"><i class="ph ph-arrows-clockwise"></i>Làm mới</button>
     </div>
   </header>

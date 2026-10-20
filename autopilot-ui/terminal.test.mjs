@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import http from 'node:http';
-import { attachTerminal } from './terminal.mjs';
+import { attachTerminal, shellEnv } from './terminal.mjs';
 import { consoleRequire } from './console-root.mjs';
 
 const WebSocket = consoleRequire('ws');
@@ -33,4 +33,10 @@ test('reload: socket cũ đóng SAU khi socket mới gắn vẫn không cắt ou
   newWs.close();
   server.close();
   assert.ok(newWs.output.includes('race-42'), 'socket mới phải nhận output sau khi socket cũ đóng');
+});
+
+test('shell mới không thừa hưởng biến phiên Claude cha (claude con phải chạy như phiên gõ tay)', () => {
+  const env = shellEnv({ PATH: '/bin', HOME: '/h', CLAUDECODE: '1', CLAUDE_CODE_CHILD_SESSION: '1', CLAUDE_CODE_SESSION_ID: 'x', CLAUDE_PID: '9', ANTHROPIC_MODEL: 'm' });
+  assert.deepStrictEqual(Object.keys(env).sort(), ['ANTHROPIC_MODEL', 'HOME', 'LANG', 'PATH', 'TERM']);
+  assert.strictEqual(env.TERM, 'xterm-256color');
 });

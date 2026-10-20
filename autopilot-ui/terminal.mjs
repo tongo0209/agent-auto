@@ -12,6 +12,12 @@ const REPLAY_BYTES = 256 * 1024;
 const SESSION_TTL_MS = 6 * 3600 * 1000;
 const SWEEP_EVERY_MS = 10 * 60 * 1000;
 
+export const shellEnv = (env) => ({
+  ...Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith('CLAUDE'))),
+  TERM: 'xterm-256color',
+  LANG: 'en_US.UTF-8',
+});
+
 export function attachTerminal(server, wsPath) {
   const wss = new WebSocketServer({
     server,
@@ -25,7 +31,7 @@ export function attachTerminal(server, wsPath) {
         cols,
         rows,
         cwd: PTY_CWD,
-        env: { ...process.env, TERM: 'xterm-256color', LANG: 'en_US.UTF-8' },
+        env: shellEnv(process.env),
       }),
     now: () => Date.now(),
     ttlMs: SESSION_TTL_MS,

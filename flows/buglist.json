@@ -15,6 +15,15 @@
   ],
   "stages": [
     {
+      "id": "drift-check",
+      "kind": "claude",
+      "prompt": "drift-check.md",
+      "toolset": "drift",
+      "model": "sonnet",
+      "when": "hasHandoff",
+      "next": "intake-triage"
+    },
+    {
       "id": "intake-triage",
       "kind": "claude",
       "prompt": "intake-triage.md",

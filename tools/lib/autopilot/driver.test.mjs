@@ -313,3 +313,19 @@ test('G7: gates chạy cho từng campaign, prompt lanes liệt kê mọi campai
   const lanes = calls.find((c) => c.stageId === 'lanes');
   assert.ok(inWt.every((d) => lanes.prompt.includes(d)));
 });
+
+test('G9: buglist có bản bàn giao → drift-check chạy trước intake, chỉ được curl/đọc', async () => {
+  const flow = loadFlow('buglist');
+  const { runClaude, calls } = fakeClaude({});
+  await drive({ ...newRun('buglist'), handoffDir: '/repo/gt/x' }, flow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.deepStrictEqual(calls.slice(0, 2).map((c) => c.stageId), ['drift-check', 'intake-triage']);
+  assert.strictEqual(calls[0].toolset, 'drift');
+  const { TOOLSETS } = await import('./claude-runner.mjs');
+  assert.ok(TOOLSETS.drift.includes('Bash(curl:*)') && !TOOLSETS.drift.includes('Edit'));
+});
+
+test('G9: buglist không có bản bàn giao → bỏ drift-check', async () => {
+  const { runClaude, calls } = fakeClaude({});
+  await drive(newRun('buglist'), loadFlow('buglist'), base({ runClaude, runGates: fakeGates().runGates }));
+  assert.strictEqual(calls[0].stageId, 'intake-triage');
+});

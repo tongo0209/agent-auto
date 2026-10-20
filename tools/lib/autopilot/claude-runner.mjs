@@ -7,6 +7,7 @@ const IMPLEMENT = [...REVIEW, 'Edit', 'Skill', 'Agent', 'Bash(npm run:*)', 'Bash
 
 export const TOOLSETS = {
   review: REVIEW.join(','),
+  drift: [...REVIEW, 'Bash(curl:*)', 'Bash(diff:*)'].join(','),
   implement: IMPLEMENT.join(','),
   browser: [...IMPLEMENT, 'mcp__browserpilot__*'].join(','),
   cut: [...IMPLEMENT, 'Bash(osascript:*)', 'mcp__claude_ai_Figma__*'].join(','),

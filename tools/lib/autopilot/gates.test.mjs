@@ -45,6 +45,27 @@ test('không có script build → error', async () => {
   assert.strictEqual(r.error, 'build');
 });
 
+test('campaign là file template twig (vportal2view) → build skipped, không chặn', async () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-gates-'));
+  const twig = path.join(repo, 'gn/layout/a.html.twig');
+  fs.mkdirSync(path.dirname(twig), { recursive: true });
+  fs.writeFileSync(twig, '<div></div>');
+  const r = await runGates(['build'], ctx({ repo, campaignDir: twig }, fakeExec().exec));
+  assert.deepStrictEqual([r.pass, r.error, r.results[0].status], [true, null, 'skipped']);
+});
+
+test('campaign là file twig có pm__ → pm-gate kiểm thẳng file, đủ bộ cổng không vấp', async () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-gates-'));
+  const twig = path.join(repo, 'gn/layout/a.html.twig');
+  fs.mkdirSync(path.dirname(twig), { recursive: true });
+  fs.writeFileSync(twig, '<div class="pm__login"></div>');
+  const { exec, calls } = fakeExec();
+  const r = await runGates(['build', 'pm-gate', 'fe-gate', 'landing-parity', 'layout-gate'], ctx({ repo, campaignDir: twig }, exec));
+  assert.deepStrictEqual([r.pass, r.error], [true, null]);
+  assert.ok(calls.some((c) => c.line.endsWith(`pm-gate.mjs ${twig}`)), calls.map((c) => c.line).join('\n'));
+  assert.ok(calls.some((c) => c.line.endsWith(`layout-gate.mjs ${twig}`)));
+});
+
 test('exit 1 → fail kèm blocking', async () => {
   const f = fixture();
   const r = await runGates(['pm-gate'], ctx(f, fakeExec({ 'pm-gate': 1 }).exec));

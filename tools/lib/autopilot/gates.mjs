@@ -28,7 +28,11 @@ function findBuildScript(campaignDir, repo) {
   return null;
 }
 
+// Campaign bên vportal2view/new-mainsite là 1 file twig chứ không phải thư mục có package.json
+const isTemplateFile = (p) => !fs.statSync(p).isDirectory();
+
 function hasPmHook(dir) {
+  if (isTemplateFile(dir)) return fs.readFileSync(dir, 'utf8').includes('pm__');
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (SKIP_DIRS.has(entry.name)) continue;
     const full = path.join(dir, entry.name);
@@ -44,11 +48,14 @@ const deliverableHtml = (dir) => (handoffHtml(dir).length ? handoffHtml(dir) : h
 // Mỗi check trả lệnh cần chạy, hoặc {skip} / {error} khi không áp dụng được
 const CHECKS = {
   build: ({ campaignDir, repo }) => {
+    if (isTemplateFile(campaignDir)) return { skip: 'file template (twig) — không build ở local' };
     const found = findBuildScript(campaignDir, repo);
     return found ? { cmd: 'npm', args: ['run', found.script], cwd: found.dir } : { error: 'không có script build' };
   },
-  'pm-gate': ({ campaignDir }) =>
-    hasPmHook(campaignDir) ? { cmd: 'node', args: [tool('pm-gate.mjs'), '--page', campaignDir] } : { skip: 'không có pm__' },
+  'pm-gate': ({ campaignDir }) => {
+    if (!hasPmHook(campaignDir)) return { skip: 'không có pm__' };
+    return { cmd: 'node', args: [tool('pm-gate.mjs'), ...(isTemplateFile(campaignDir) ? [] : ['--page']), campaignDir] };
+  },
   'fe-gate': ({ campaignDir, key }) => {
     const dist = path.join(campaignDir, 'dist');
     if (!fs.existsSync(dist)) return { skip: 'chưa có dist/' };

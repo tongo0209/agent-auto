@@ -119,3 +119,25 @@ test('G3: signal cloneSource đọc cloneFrom (folder) hoặc cloneRef (URL)', (
   const b = gatherSignals({ input: 'GW-2', agentRoot: root });
   assert.deepStrictEqual([b.cloneSource, b.cloneSourceDir], ['https://event.vnggames.com/taydu/x', null]);
 });
+
+test('G4: sheet thiếu cột BugID/No. → ask trước intake', () => {
+  const r = route({ ...base, phase: 'bugfix', hasBugSheet: true, sheetNoBugId: true }, RULES);
+  assert.deepStrictEqual([r.flow, r.target], ['ask', 'buglist']);
+  assert.match(r.questions.join(' '), /BugID/);
+});
+
+test('G4: sheetKind google|excel + sheetNoBugId từ note/bugWatch radar mù', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-sig-'));
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ repos: {} }));
+  const issues = {
+    'GW-1': { bugSheets: ['https://docs.google.com/spreadsheets/d/AAA/edit'], note: 'sheet tab Bug — không có cột BugID nên radar không đọc được' },
+    'GW-2': { bugSheets: ['https://vngms-my.sharepoint.com/:x:/g/personal/x/IQB?web=1'] },
+    'GW-3': { bugSheets: ['https://docs.google.com/spreadsheets/d/BBB'] },
+  };
+  const bugWatch = { BBB: { url: 'https://docs.google.com/spreadsheets/d/BBB', lastPollAt: '2026-10-18', seenBugs: {} } };
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues, bugWatch }));
+  const sig = (k) => gatherSignals({ input: k, agentRoot: root });
+  assert.deepStrictEqual([sig('GW-1').sheetKind, sig('GW-1').sheetNoBugId], ['google', true]);
+  assert.deepStrictEqual([sig('GW-2').sheetKind, sig('GW-2').sheetNoBugId], ['excel', false]);
+  assert.strictEqual(sig('GW-3').sheetNoBugId, true);
+});

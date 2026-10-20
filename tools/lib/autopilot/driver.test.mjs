@@ -269,3 +269,15 @@ test('G3: landing-clone chạy thẳng clone → gates → ui-check tới duyệ
   assert.deepStrictEqual(calls.map((c) => c.stageId), ['clone', 'ui-check']);
   assert.match(calls[0].prompt, /\/repo\/products\/x\/landing\/src/);
 });
+
+test('G4: write-sheet chọn writer theo sheetKind (excel → bug-sheet-tick)', async () => {
+  const flow = loadFlow('buglist');
+  const { runClaude } = fakeClaude({});
+  process.env.AUTOPILOT_LAB_WRITES = '1';
+  let run = await drive({ ...newRun('buglist'), sheetKind: 'excel' }, flow, base({ runClaude, runGates: fakeGates().runGates }));
+  run = applyEvent(run, flow, { type: 'approve' }, Date.now());
+  run = await drive(run, flow, base({ runClaude, runGates: fakeGates().runGates }));
+  delete process.env.AUTOPILOT_LAB_WRITES;
+  assert.strictEqual(run.stage, 'write-sheet');
+  assert.match(notified.at(-1), /bug-sheet-tick/);
+});

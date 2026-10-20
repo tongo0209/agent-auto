@@ -46,6 +46,7 @@ function stageVars(run, stage, input) {
     campaignDir: wt(run.campaignDir),
     handoffDir: wt(run.handoffDir),
     cloneSource: wt(run.cloneSource),
+    sheetKind: run.sheetKind ?? '',
     round: String(roundOf(run, stage.id)),
     rejectNote: run.rejectNote ?? '',
     callerOfFix: run.callerOfFix ?? '',
@@ -127,10 +128,12 @@ async function runGateStage(run, stage, deps) {
   return { type: result.pass ? 'pass' : 'revise', receipt };
 }
 
+const commandFor = (stage, run) => (typeof stage.command === 'string' ? stage.command : stage.command[run.sheetKind ?? 'google']);
+
 function announce(run, stage, deps) {
   const title = `Autopilot ${run.key}`;
   if (run.status === 'paused') deps.notify(title, `chờ bạn ở ${stage.id} — duyệt: ${CLI} approve ${run.key} · trả về: ${CLI} reject ${run.key} --note "…"`);
-  if (run.status === 'attached') deps.notify(title, `chạy trong phiên Claude: ${stage.command} — xong thì: ${CLI} approve ${run.key}`);
+  if (run.status === 'attached') deps.notify(title, `chạy trong phiên Claude: ${commandFor(stage, run)} — xong thì: ${CLI} approve ${run.key}`);
   if (run.status === 'stopped') deps.notify(title, `dừng: ${run.stopReason} — xem: ${CLI} status ${run.key}`);
   if (run.status === 'done') deps.notify(title, 'xong — đã commit, push vẫn chờ bạn');
 }

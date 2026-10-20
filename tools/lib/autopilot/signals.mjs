@@ -3,6 +3,8 @@ import path from 'node:path';
 
 const HANDOFF_REPO = 'gt-promotion-template';
 const SHEET_INPUT = /docs\.google\.com\/spreadsheets|sharepoint\.com|\.xlsx(\?|$)/i;
+const GOOGLE_SHEET = /docs\.google\.com\/spreadsheets/i;
+const NO_BUG_ID_NOTE = /không có cột BugID/i;
 const RAW_DESIGN = /\.(psd|psb)$/i;
 const IMAGE = /\.(png|jpe?g|webp)$/i;
 
@@ -23,6 +25,10 @@ export function gatherSignals({ input, agentRoot, campaign }) {
   const paths = issue.paths?.length ? issue.paths : parent.paths ?? [];
   const bugSheets = issue.bugSheets?.length ? issue.bugSheets : parent.bugSheets ?? [];
   const inputIsSheet = SHEET_INPUT.test(input);
+  const sheetUrl = inputIsSheet ? input : bugSheets[0] ?? null;
+  // radar đã poll mà không ra dòng nào = sheet không có cột BugID để đọc
+  const watch = Object.values(state.bugWatch ?? {}).find((w) => sheetUrl?.startsWith(w.url));
+  const radarBlind = Boolean(watch?.lastPollAt && Object.keys(watch.seenBugs ?? {}).length === 0);
 
   const clone = issue.cloneFrom?.find((c) => repos[c.repo]);
   const cloneSourceDir = clone ? path.join(repos[clone.repo], clone.from) : null;
@@ -42,7 +48,9 @@ export function gatherSignals({ input, agentRoot, campaign }) {
     input,
     inputIsSheet,
     parentKey: issue.parent ?? null,
-    hasBugSheet: inputIsSheet || bugSheets.length > 0,
+    hasBugSheet: Boolean(sheetUrl),
+    sheetKind: sheetUrl ? (GOOGLE_SHEET.test(sheetUrl) ? 'google' : 'excel') : null,
+    sheetNoBugId: NO_BUG_ID_NOTE.test(issue.note ?? '') || radarBlind,
     phase: issue.phase ?? null,
     repo,
     campaignDir,

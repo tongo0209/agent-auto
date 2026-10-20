@@ -5,6 +5,14 @@
     "usd": 30,
     "minutes": 150
   },
+  "ask": [
+    {
+      "need": [
+        "!sheetNoBugId"
+      ],
+      "question": "Sheet không có cột BugID/No. (radar mù) — thêm cột BugID hay chỉ định cột nào định danh bug?"
+    }
+  ],
   "stages": [
     {
       "id": "intake-triage",
@@ -128,7 +136,10 @@
     {
       "id": "write-sheet",
       "kind": "attached",
-      "command": "/bug-fixer-lite report",
+      "command": {
+        "google": "/bug-fixer-lite report",
+        "excel": "python3 tools/bug-sheet-tick.py (Graph API) — không ghi được thì xuất block dán tay cột Status"
+      },
       "realWrite": true,
       "next": null
     }

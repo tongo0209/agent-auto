@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // autopilot — chạy ticket qua luồng khai báo trong flows/, mỗi stage một `claude -p`. Spec: docs/superpowers/specs/2026-10-20-autopilot-design.md
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRun, applyEvent, resumeRun, stageOf } from './lib/autopilot/engine.mjs';
@@ -13,6 +14,9 @@ import { acquire, release, holdCampaign, releaseCampaign, heldCampaigns } from '
 import { formatStatus } from './lib/autopilot/format.mjs';
 
 const AGENT_ROOT = path.resolve(import.meta.dirname, '..');
+// worktree lab không có state.json/config.json (dữ liệu ngoài git) nên đọc của repo chính
+const MAIN_ROOT = path.join(os.homedir(), 'VNG', 'agent-auto');
+const DATA_ROOT = process.env.AUTOPILOT_DATA_ROOT || (fs.existsSync(path.join(AGENT_ROOT, 'state.json')) ? AGENT_ROOT : MAIN_ROOT);
 const USAGE = `Dùng:
   autopilot run <KEY|link> [--flow id] [--campaign dir] [--budget-usd n] [--bg]
   autopilot status [KEY]
@@ -38,7 +42,7 @@ function die(message) {
 }
 
 function repoOf(dir) {
-  const configFile = path.join(AGENT_ROOT, 'config.json');
+  const configFile = path.join(DATA_ROOT, 'config.json');
   const repos = fs.existsSync(configFile) ? JSON.parse(fs.readFileSync(configFile, 'utf8')).repos ?? {} : {};
   return Object.values(repos).find((r) => dir.startsWith(r)) ?? path.dirname(dir);
 }
@@ -79,7 +83,7 @@ async function cmdRun(opts, argv) {
   const input = opts._[1] ?? die(USAGE);
   if (opts.bg) return startBackground(argv);
 
-  const signals = gatherSignals({ input, agentRoot: AGENT_ROOT, campaign: opts.campaign });
+  const signals = gatherSignals({ input, agentRoot: DATA_ROOT, campaign: opts.campaign });
   const decided = opts.flow ? { flow: opts.flow, reason: `chọn tay --flow ${opts.flow}` } : route(signals, loadRules());
   if (!decided.flow) die(`Không chọn được luồng: ${decided.reason}`);
 
@@ -144,7 +148,7 @@ function cmdRoute(opts) {
     if (problems.length) die(problems.join('\n'));
     return console.log(`${listFlows().length} luồng hợp lệ: ${listFlows().join(', ')}`);
   }
-  const signals = gatherSignals({ input: opts._[1] ?? die(USAGE), agentRoot: AGENT_ROOT, campaign: opts.campaign });
+  const signals = gatherSignals({ input: opts._[1] ?? die(USAGE), agentRoot: DATA_ROOT, campaign: opts.campaign });
   const decided = route(signals, loadRules());
   console.log(`${decided.flow ?? '✗ không chọn được'} — ${decided.reason}`);
   console.log(JSON.stringify({ ...signals, briefText: signals.briefText.slice(0, 80) }, null, 2));

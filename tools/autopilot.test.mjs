@@ -104,3 +104,11 @@ test('run thứ 2 cùng campaign khi run trước còn giữ → từ chối, kh
   assert.match(r.out, /GW-10/);
   assert.deepStrictEqual(Object.values(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8'))).map((o) => o.key), ['GW-10']);
 });
+
+test('route đọc phase từ AUTOPILOT_DATA_ROOT khi code chạy ở worktree khác', () => {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-data-'));
+  fs.writeFileSync(path.join(data, 'state.json'), JSON.stringify({ issues: { 'GW-1': { phase: 'bugfix' } } }));
+  const r = spawnSync(process.execPath, [CLI, 'route', 'GW-1'], { env: { ...process.env, AUTOPILOT_DATA_ROOT: data }, encoding: 'utf8' });
+  assert.match(r.stdout + r.stderr, /buglist/);
+  assert.match(r.stdout, /"phase": "bugfix"/);
+});

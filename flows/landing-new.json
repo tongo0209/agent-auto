@@ -1,0 +1,175 @@
+{
+  "id": "landing-new",
+  "label": "Dựng landing mới từ design",
+  "budget": {
+    "usd": 40,
+    "minutes": 240
+  },
+  "stages": [
+    {
+      "id": "cut",
+      "kind": "claude",
+      "prompt": "cut.md",
+      "toolset": "cut",
+      "model": "opus",
+      "next": "check-design",
+      "lock": "photoshop"
+    },
+    {
+      "id": "check-design",
+      "kind": "claude",
+      "prompt": "check-design.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "spec",
+      "onRevise": "design-gap"
+    },
+    {
+      "id": "design-gap",
+      "kind": "pause",
+      "show": [
+        "check-design-r*.json"
+      ],
+      "next": "spec"
+    },
+    {
+      "id": "spec",
+      "kind": "claude",
+      "prompt": "spec.md",
+      "toolset": "implement",
+      "model": "opus",
+      "next": "plan"
+    },
+    {
+      "id": "plan",
+      "kind": "claude",
+      "prompt": "plan.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "plan-review"
+    },
+    {
+      "id": "plan-review",
+      "kind": "claude",
+      "prompt": "plan-review.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "approve-plan",
+      "loop": {
+        "back": "plan",
+        "max": 3
+      }
+    },
+    {
+      "id": "approve-plan",
+      "kind": "pause",
+      "show": [
+        "plan.md",
+        "plan-review-r*.json"
+      ],
+      "onReject": "plan",
+      "next": "implement"
+    },
+    {
+      "id": "implement",
+      "kind": "claude",
+      "prompt": "implement.md",
+      "toolset": "implement",
+      "model": "opus",
+      "next": "code-review",
+      "keepSession": true
+    },
+    {
+      "id": "code-review",
+      "kind": "claude",
+      "prompt": "code-review.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "gates",
+      "loop": {
+        "back": "fix",
+        "max": 3
+      }
+    },
+    {
+      "id": "gates",
+      "kind": "gate",
+      "checks": [
+        "build",
+        "pm-gate",
+        "fe-gate",
+        "landing-parity",
+        "layout-gate"
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 3
+      },
+      "next": "ui-check"
+    },
+    {
+      "id": "ui-check",
+      "kind": "claude",
+      "prompt": "ui-check.md",
+      "toolset": "browser",
+      "model": "sonnet",
+      "next": "clean-code",
+      "loop": {
+        "back": "fix",
+        "max": 3
+      }
+    },
+    {
+      "id": "clean-code",
+      "kind": "claude",
+      "prompt": "clean-code.md",
+      "toolset": "implement",
+      "model": "opus",
+      "next": "gates-final"
+    },
+    {
+      "id": "gates-final",
+      "kind": "gate",
+      "checks": [
+        "build",
+        "pm-gate",
+        "fe-gate",
+        "landing-parity",
+        "layout-gate"
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 2
+      },
+      "next": "approve-result"
+    },
+    {
+      "id": "fix",
+      "kind": "claude",
+      "prompt": "fix.md",
+      "toolset": "implement",
+      "model": "opus",
+      "resume": "implement",
+      "returnTo": "caller"
+    },
+    {
+      "id": "approve-result",
+      "kind": "pause",
+      "show": [
+        "diff",
+        "receipts"
+      ],
+      "onReject": "fix",
+      "rejectReturnTo": "gates-final",
+      "next": "commit"
+    },
+    {
+      "id": "commit",
+      "kind": "gate",
+      "checks": [
+        "commit"
+      ],
+      "next": null
+    }
+  ]
+}

@@ -182,3 +182,13 @@ Verify
 Trước khi báo xong, tự đọc lại đoạn đã dọn bằng con mắt intern/fresher: đọc **một lượt từ trên xuống,
 không nhảy file** — có hiểu nó làm gì không? Không đạt thì làm phẳng thêm hoặc đổi tên cho rõ.
 **Cấm chữa bằng cách thêm comment** — đó là đúng cái vấn đề skill này sinh ra để dọn.
+
+## Chạy dưới autopilot
+
+Chỉ áp dụng khi prompt có dòng `AUTOPILOT_RUN:` — phiên gõ tay bỏ qua toàn bộ mục này.
+
+- Chạy ĐÚNG giai đoạn prompt stage nêu, rồi dừng. Đầu vào/đầu ra là file trong thư mục run prompt đưa.
+- KHÔNG hỏi user (không AskUserQuestion, không chờ xác nhận): chỗ skill bảo "hỏi user" → kết thúc bằng verdict `fail`, ghi câu hỏi vào `blocking`; autopilot sẽ dừng và gọi user.
+- KHÔNG commit, KHÔNG push, KHÔNG ghi sheet/Jira — stage `commit`/`write-sheet` của autopilot làm sau khi user duyệt.
+- Kết thúc bằng khối `autopilot-verdict` đúng như prompt mô tả.
+- Phạm vi = diff chưa commit trong campaign của run.

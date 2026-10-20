@@ -1,0 +1,85 @@
+{
+  "id": "buglist",
+  "label": "Xử lý buglist QC",
+  "budget": {
+    "usd": 30,
+    "minutes": 150
+  },
+  "stages": [
+    {
+      "id": "intake-triage",
+      "kind": "claude",
+      "prompt": "intake-triage.md",
+      "toolset": "intake",
+      "model": "opus",
+      "next": "lanes"
+    },
+    {
+      "id": "lanes",
+      "kind": "claude",
+      "prompt": "lanes.md",
+      "toolset": "implement",
+      "model": "opus",
+      "next": "gates",
+      "keepSession": true
+    },
+    {
+      "id": "gates",
+      "kind": "gate",
+      "checks": [
+        "build"
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 2
+      },
+      "next": "verify"
+    },
+    {
+      "id": "verify",
+      "kind": "claude",
+      "prompt": "verify.md",
+      "toolset": "browser",
+      "model": "sonnet",
+      "next": "approve-result",
+      "loop": {
+        "back": "fix",
+        "max": 2
+      }
+    },
+    {
+      "id": "fix",
+      "kind": "claude",
+      "prompt": "fix.md",
+      "toolset": "implement",
+      "model": "opus",
+      "resume": "lanes",
+      "returnTo": "caller"
+    },
+    {
+      "id": "approve-result",
+      "kind": "pause",
+      "show": [
+        "diff",
+        "receipts"
+      ],
+      "onReject": "fix",
+      "rejectReturnTo": "gates",
+      "next": "commit"
+    },
+    {
+      "id": "commit",
+      "kind": "gate",
+      "checks": [
+        "commit"
+      ],
+      "next": "write-sheet"
+    },
+    {
+      "id": "write-sheet",
+      "kind": "attached",
+      "command": "/bug-fixer-lite report",
+      "next": null
+    }
+  ]
+}

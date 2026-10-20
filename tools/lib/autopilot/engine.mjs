@@ -61,7 +61,10 @@ function transition(run, flow, stage, event) {
       return stage.loop ? loopBack(run, flow, stage) : stop(run, `fail:${stage.id}`);
     case 'reject': {
       const noted = { ...run, rejectNote: event.note ?? null };
-      return stage.onReject ? moveTo(noted, flow, stage.onReject) : stop(noted, 'rejected');
+      if (!stage.onReject) return stop(noted, 'rejected');
+      const target = stageOf(flow, stage.onReject);
+      const caller = target.returnTo === 'caller' ? { callerOfFix: stage.rejectReturnTo ?? stage.id } : {};
+      return moveTo({ ...noted, ...caller }, flow, target.id);
     }
     default:
       throw new Error(`event lạ: ${event.type}`);

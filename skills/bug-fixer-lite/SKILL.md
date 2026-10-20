@@ -349,3 +349,13 @@ File: `~/.claude/knowledge/bug-fixer-lite/ownership/<project>.md` — tạo khi 
 
 **Sheet có ảnh in-cell mà bug tham chiếu hình, HOẶC INTAKE.3 map được cột `RecommendImage` ⇒ Read `reference/sheet-images.md` TRƯỚC khi dispatch lane** (ảnh recommend chạy SAU triage đợt 1). Không có cả hai ⇒ bỏ qua.
 Luật cứng nhắc lại ở lõi: chỉ nhãn ĐÚNG mới được làm đích, mơ hồ chỉ để định vị — KHÔNG bao giờ fix ngược; design-checker so ảnh MỘT CHIỀU — chỉ được HẠ verdict, TUYỆT ĐỐI không nâng FAIL thành PASS.
+
+## Chạy dưới autopilot
+
+Chỉ áp dụng khi prompt có dòng `AUTOPILOT_RUN:` — phiên gõ tay bỏ qua toàn bộ mục này.
+
+- Chạy ĐÚNG giai đoạn prompt stage nêu, rồi dừng. Đầu vào/đầu ra là file trong thư mục run prompt đưa.
+- KHÔNG hỏi user (không AskUserQuestion, không chờ xác nhận): chỗ skill bảo "hỏi user" → kết thúc bằng verdict `fail`, ghi câu hỏi vào `blocking`; autopilot sẽ dừng và gọi user.
+- KHÔNG commit, KHÔNG push, KHÔNG ghi sheet/Jira — stage `commit`/`write-sheet` của autopilot làm sau khi user duyệt.
+- Kết thúc bằng khối `autopilot-verdict` đúng như prompt mô tả.
+- `intake-triage` = INTAKE + [1]; `lanes` = [2] (không build); `verify` = [4]. Giai đoạn [3] BUILD do stage `gates` làm, [5] GHI CHROME do user chạy `/bug-fixer-lite report` ở stage `write-sheet`.

@@ -1,0 +1,117 @@
+{
+  "id": "landing-fix",
+  "label": "Sửa landing có sẵn theo design",
+  "budget": {
+    "usd": 25,
+    "minutes": 120
+  },
+  "stages": [
+    {
+      "id": "plan",
+      "kind": "claude",
+      "prompt": "plan.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "plan-review"
+    },
+    {
+      "id": "plan-review",
+      "kind": "claude",
+      "prompt": "plan-review.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "approve-plan",
+      "loop": {
+        "back": "plan",
+        "max": 3
+      }
+    },
+    {
+      "id": "approve-plan",
+      "kind": "pause",
+      "show": [
+        "plan.md",
+        "plan-review-r*.json"
+      ],
+      "onReject": "plan",
+      "next": "implement"
+    },
+    {
+      "id": "implement",
+      "kind": "claude",
+      "prompt": "implement.md",
+      "toolset": "implement",
+      "model": "opus",
+      "next": "code-review",
+      "keepSession": true
+    },
+    {
+      "id": "code-review",
+      "kind": "claude",
+      "prompt": "code-review.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "gates",
+      "loop": {
+        "back": "fix",
+        "max": 3
+      }
+    },
+    {
+      "id": "gates",
+      "kind": "gate",
+      "checks": [
+        "build",
+        "pm-gate",
+        "fe-gate",
+        "landing-parity",
+        "layout-gate"
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 3
+      },
+      "next": "ui-check"
+    },
+    {
+      "id": "ui-check",
+      "kind": "claude",
+      "prompt": "ui-check.md",
+      "toolset": "browser",
+      "model": "sonnet",
+      "next": "approve-result",
+      "loop": {
+        "back": "fix",
+        "max": 3
+      }
+    },
+    {
+      "id": "fix",
+      "kind": "claude",
+      "prompt": "fix.md",
+      "toolset": "implement",
+      "model": "opus",
+      "resume": "implement",
+      "returnTo": "caller"
+    },
+    {
+      "id": "approve-result",
+      "kind": "pause",
+      "show": [
+        "diff",
+        "receipts"
+      ],
+      "onReject": "fix",
+      "rejectReturnTo": "gates",
+      "next": "commit"
+    },
+    {
+      "id": "commit",
+      "kind": "gate",
+      "checks": [
+        "commit"
+      ],
+      "next": null
+    }
+  ]
+}

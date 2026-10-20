@@ -367,3 +367,13 @@ Câu hỏi phải gọn (AskUserQuestion, ngay trong phiên — không push kên
 - Agent chết → **đọc artifact trên đĩa rồi resume**, không chạy lại từ đầu và **CẤM tự hạ mode**.
 - Mọi handoff qua file với đường dẫn tường minh. Agent báo fail → xử lý trung thực: báo user, không che.
 - Luôn kết thúc bằng phần Tổng kết.
+
+## Chạy dưới autopilot
+
+Chỉ áp dụng khi prompt có dòng `AUTOPILOT_RUN:` — phiên gõ tay bỏ qua toàn bộ mục này.
+
+- Chạy ĐÚNG giai đoạn prompt stage nêu, rồi dừng. Đầu vào/đầu ra là file trong thư mục run prompt đưa.
+- KHÔNG hỏi user (không AskUserQuestion, không chờ xác nhận): chỗ skill bảo "hỏi user" → kết thúc bằng verdict `fail`, ghi câu hỏi vào `blocking`; autopilot sẽ dừng và gọi user.
+- KHÔNG commit, KHÔNG push, KHÔNG ghi sheet/Jira — stage `commit`/`write-sheet` của autopilot làm sau khi user duyệt.
+- Kết thúc bằng khối `autopilot-verdict` đúng như prompt mô tả.
+- Mode do stage quyết: `implement`/`fix` = làm như mode `code`/`fix` theo `plan.md` đã duyệt (bỏ bước trình kế hoạch, bỏ checker — autopilot có stage review/ui-check riêng); `spec` = chỉ bước design-analyst.

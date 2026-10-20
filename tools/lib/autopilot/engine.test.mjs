@@ -131,3 +131,20 @@ test('applyEvent không mutate input, roundOf đếm receipt', () => {
   assert.strictEqual(roundOf(next, 'plan'), 2);
   assert.strictEqual(roundOf(next, 'plan-review'), 1);
 });
+
+test('reject ở pause sang fix → fix xong quay về rejectReturnTo', () => {
+  const flow = {
+    id: 'r', budget: { usd: 10, minutes: 60 },
+    stages: [
+      { id: 'gates', kind: 'gate', next: 'result' },
+      { id: 'fix', kind: 'claude', returnTo: 'caller' },
+      { id: 'result', kind: 'pause', onReject: 'fix', rejectReturnTo: 'gates', next: null },
+    ],
+  };
+  let run = createRun({ key: 'K', runId: 'r', flow, repo: '/r', campaignDir: '/c', now: T0 });
+  run = applyEvent(run, flow, { type: 'pass' }, T0);
+  run = applyEvent(run, flow, { type: 'reject', note: 'lệch 4px' }, T0);
+  assert.deepStrictEqual([run.stage, run.callerOfFix], ['fix', 'gates']);
+  run = applyEvent(run, flow, { type: 'pass' }, T0);
+  assert.strictEqual(run.stage, 'gates');
+});

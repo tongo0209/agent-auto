@@ -6,7 +6,7 @@ const block = (obj) => '```autopilot-verdict\n' + JSON.stringify(obj) + '\n```';
 
 test('khối chuẩn → pass với đủ mảng', () => {
   const v = parseVerdict('xong.\n' + block({ verdict: 'pass', advisory: ['a'], files: ['x.scss'], note: 'ok' }));
-  assert.deepStrictEqual(v, { verdict: 'pass', blocking: [], advisory: ['a'], files: ['x.scss'], note: 'ok', malformed: false });
+  assert.deepStrictEqual(v, { verdict: 'pass', blocking: [], advisory: ['a'], files: ['x.scss'], note: 'ok', campaignDir: null, malformed: false });
 });
 
 test('nhiều khối → lấy khối cuối', () => {
@@ -34,4 +34,9 @@ test('revise mà blocking rỗng → pass, giữ advisory', () => {
 
 test('verdict lạ → fail malformed', () => {
   assert.strictEqual(parseVerdict(block({ verdict: 'ok' })).malformed, true);
+});
+
+test('giữ campaignDir khi stage intake báo về', () => {
+  assert.strictEqual(parseVerdict(block({ verdict: 'pass', campaignDir: 'products/x/landing/a' })).campaignDir, 'products/x/landing/a');
+  assert.strictEqual(parseVerdict(block({ verdict: 'pass' })).campaignDir, null);
 });

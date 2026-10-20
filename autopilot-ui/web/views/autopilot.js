@@ -8,6 +8,7 @@ const globRe = (g) => new RegExp('^' + g.split('*').map((p) => p.replace(/[.+?^$
 const STATUS = { paused: 'Chờ bạn duyệt', attached: 'Chờ chạy trong phiên', chat: 'Đang chat', running: 'Đang chạy', stopped: 'Đã dừng', done: 'Xong' };
 const isAborted = (r) => r.stopReason === 'aborted';
 const isUserPaused = (r) => r.stopReason === 'paused';
+const hasCode = (r) => r.status === 'done' && Object.keys(r.worktrees ?? {}).length > 0;
 const isAsking = (r) => r.status === 'chat' && r.chatState === 'ask';
 const statusClass = (r) => (r.interrupted ? 'interrupted' : isAsking(r) || r.awaitingReview ? 'paused' : r.status);
 const statusLabel = (r) => (r.interrupted ? 'Bị ngắt' : isUserPaused(r) ? 'Tạm dừng' : isAsking(r) ? 'Chờ bạn' : r.awaitingReview ? 'Chờ review' : STATUS[r.status]);
@@ -312,6 +313,7 @@ function placeSideLane(run, lane) {
 function dockMessage(run) {
   const stage = `<b>${esc(run.stage ?? '')}</b>`;
   if (run.awaitingReview) return 'Run xong, <b>chờ bạn review</b> code ở tab Thay đổi. Cần sửa thì ghi chú rồi Trả về sửa hoặc Sửa tiếp bằng chat.';
+  if (hasCode(run)) return 'Run đã review. Vẫn sửa tiếp được: xem code ở tab Thay đổi, ghi chú rồi Trả về sửa hoặc Sửa tiếp bằng chat.';
   if (isAsking(run)) return `Claude đang chờ bạn ở ${stage}${run.chatNote ? `: ${esc(run.chatNote)}` : ''} — trả lời trong tab Claude.`;
   if (run.status === 'chat') return `Run chat đang ở ${stage}. Làm việc trong tab Claude, claude tự báo tiến độ lên board.`;
   if (run.interrupted) return `Run bị ngắt ở ${stage} (không còn process chạy). Chạy tiếp để làm lại bước này.`;
@@ -322,20 +324,21 @@ function dockMessage(run) {
   return `Run đã dừng <b>(${esc(run.stopReason)})</b>.`;
 }
 
-const REVIEW_ACTIONS = `${ABORT_BTN}<button class="btn ghost" data-pick><i class="ph-bold ph-git-merge"></i>Đưa vào source</button><button class="btn ghost" data-act="followup"><i class="ph-bold ph-terminal-window"></i>Sửa tiếp bằng chat</button><button class="btn back" data-act="reject"><i class="ph-bold ph-arrow-u-up-left"></i>Trả về sửa</button><button class="btn go" data-act="reviewed"><i class="ph-bold ph-check"></i>Đã review</button>`;
+const REVIEW_ACTIONS = `${ABORT_BTN}<button class="btn ghost" data-pick><i class="ph-bold ph-git-merge"></i>Đưa vào source</button><button class="btn ghost" data-act="followup"><i class="ph-bold ph-terminal-window"></i>Sửa tiếp bằng chat</button><button class="btn back" data-act="reject"><i class="ph-bold ph-arrow-u-up-left"></i>Trả về sửa</button>`;
+const REVIEWED_BTN = '<button class="btn go" data-act="reviewed"><i class="ph-bold ph-check"></i>Đã review</button>';
 
 function renderDock(run) {
-  const show = ['paused', 'attached', 'stopped', 'chat'].includes(run.status) || run.interrupted || run.awaitingReview;
+  const show = ['paused', 'attached', 'stopped', 'chat'].includes(run.status) || run.interrupted || hasCode(run);
   $('#dock').classList.toggle('show', show);
   $('#pickBox').innerHTML = '';
   if (!show) return;
   const paused = run.status === 'paused';
   $('#dockMessage').innerHTML = dockMessage(run);
   const cut = isUserPaused(run) && run.cutSession;
-  $('#note').style.display = paused || cut || run.awaitingReview ? '' : 'none';
-  $('#note').placeholder = cut ? 'Nhắn claude khi chạy tiếp: đổi hướng, bổ sung gì...' : run.awaitingReview ? 'Cần sửa gì (cho Trả về sửa hoặc Sửa tiếp bằng chat)...' : 'Ghi chú khi trả về: cần sửa gì...';
+  $('#note').style.display = paused || cut || hasCode(run) ? '' : 'none';
+  $('#note').placeholder = cut ? 'Nhắn claude khi chạy tiếp: đổi hướng, bổ sung gì...' : hasCode(run) ? 'Cần sửa gì (cho Trả về sửa hoặc Sửa tiếp bằng chat)...' : 'Ghi chú khi trả về: cần sửa gì...';
   $('#prevNote').textContent = run.rejectNote ? `Lần trả về trước: ${run.rejectNote}` : '';
-  $('#actions').innerHTML = run.awaitingReview ? REVIEW_ACTIONS : run.status === 'chat'
+  $('#actions').innerHTML = hasCode(run) ? REVIEW_ACTIONS + (run.awaitingReview ? REVIEWED_BTN : '') : run.status === 'chat'
     ? `${ABORT_BTN}<button class="btn ghost" data-act="reopen"><i class="ph-bold ph-terminal-window"></i>Mở lại tab</button><button class="btn go" data-act="done"><i class="ph-bold ph-check"></i>Xong</button>`
     : paused
     ? `${ABORT_BTN}<button class="btn back" data-act="reject"><i class="ph-bold ph-arrow-u-up-left"></i>Trả về <kbd>R</kbd></button><button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Duyệt <kbd>A</kbd></button>`

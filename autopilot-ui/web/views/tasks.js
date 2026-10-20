@@ -4,7 +4,7 @@ import { JIRA, phaseOf, MILESTONE, daysUntil, shortDate, stamp, markdown, settle
 const STATE_REFRESH_MS = 20000;
 const EXTRA_REFRESH_MS = 60000;
 const HEAT = ['bugfix', 'coding', 'deliver', 'ready', 'waiting-design', 'wait-test', 'done-fe', 'reassigned', 'closed'];
-const GROUP_ORDER = ['Fix bug', 'Đang code', 'Giao HTML', 'Sẵn sàng', 'Chờ design', 'Chờ test', 'Phase lạ', 'Đã xong / ra khỏi tay'];
+const GROUP_ORDER = ['Chờ design', 'Sẵn sàng', 'Đang code', 'Fix bug', 'Giao HTML', 'Chờ test', 'Phase lạ', 'Đã xong / ra khỏi tay'];
 const MANUAL_FINISH = ['wait-test', 'bugfix'];
 const VIEWPORT_WIDTH = { pc: 1920, mb: 768 };
 const MOBILE_NAME = /(^|[_\-. ])(mb|mobile|m)([_\-. ]|$)/i;
@@ -130,7 +130,8 @@ export function mount(el, ctx) {
     const tracked = rows.filter((r) => !phaseOf(r.shownPhase).folded).length;
     $('#tkSub').textContent = `${tracked} đang theo · ${Object.keys(st.state.issues ?? {}).length} ticket trong state · ${st.today}`;
     if (!rows.length) return ($('#tkList').innerHTML = note(q ? 'ph-magnifying-glass' : 'ph-tray', q ? 'Không có task nào khớp bộ lọc.' : 'Chưa có task nào trong state. Chạy <code>/daily</code> để quét Jira.'));
-    const groups = GROUP_ORDER.map((label) => ({ label, items: rows.filter((r) => phaseOf(r.shownPhase).group === label) })).filter((g) => g.items.length);
+    const soonest = (r) => nextMilestone(r.issue, st.today)?.days ?? Infinity;
+    const groups = GROUP_ORDER.map((label) => ({ label, items: rows.filter((r) => phaseOf(r.shownPhase).group === label).sort((x, y) => soonest(x) - soonest(y)) })).filter((g) => g.items.length);
     let n = 0;
     $('#tkList').innerHTML = groups.map((g) => {
       const folded = collapsed.has(g.label) && !q;

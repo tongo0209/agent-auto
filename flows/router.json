@@ -1,0 +1,9 @@
+{
+  "rules": [
+    { "flow": "buglist", "all": ["inputIsSheet"], "needsCampaign": false },
+    { "flow": "buglist", "all": ["phase=bugfix"] },
+    { "flow": "landing-new", "all": ["hasRawDesign", "!hasCutAssets", "!campaignExists"] },
+    { "flow": "landing-fix", "all": ["hasDesign", "campaignExists"] },
+    { "flow": "feature", "all": ["briefText", "campaignExists"] }
+  ]
+}

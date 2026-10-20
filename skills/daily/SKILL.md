@@ -49,6 +49,11 @@ xem mục handoff) và `closed` (Done thật).
   Task thuần mainsite: coding → wait-test.
 - Phase chỉ TIẾN khi có bằng chứng thật (file design tồn tại, code đã verify, HTML đã chép,
   buglist xuất hiện). Không có bằng chứng → giữ phase cũ.
+- **Jira COMPLETED / "push code rồi" ≠ `done-fe`** (user chốt 20/10/2026). Xong phần code mà CHƯA qua
+  mốc test, hoặc chưa có buglist ⇒ `wait-test`. Chỉ lên `done-fe` khi: mốc test đã qua VÀ
+  `bug-radar scan` không còn dòng chưa settled — hoặc bug đã tách sang ticket con (cha `done-fe`,
+  con `bugfix`). Ca thật: delta 5/10 nhảy GW-881 `coding → done-fe` khi chưa có test/buglist ⇒ sai,
+  user sửa về `wait-test`; GW-901 `done-fe` đúng vì bug nằm ở GW-950.
 - Mốc timeline (design/HTML/test/release) bóc từ ticket → `state.issues[key].milestones`.
   Phase thực tế chậm hơn mốc → cảnh báo ⏰ ĐẦU báo cáo (vd: quá mốc HTML mà chưa coding xong).
 - **Mốc = DEADLINE, nên khoảng ngày lấy ngày CUỐI.** Nguồn hay ghi kiểu khoảng

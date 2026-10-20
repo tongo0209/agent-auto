@@ -58,3 +58,9 @@ Bấm Duyệt thì chặn POST bằng `page.route` để không duyệt thật G
 - 15:3x: 4800 đã restart (task bbkrmkrmh) với aafe309 (mở nút autopilot) + 5818086 (token/phút tiêu hao, bỏ budget mặc định). Run thử 7 luồng vẫn chạy nền (b3826ppks, log scratchpad/run-all.log).
 - Đang làm: tạm dừng theo ý (marker .pause, dừng sau bước hiện tại) + phát hiện run bị ngắt (status running mà lock chết) → nút Chạy tiếp.
 - 89253fc (merge ff): pause/Bị ngắt + Chạy tiếp, 177/177. CẦN restart 4800 (hỏi user). GW-912 dừng budget $10 ở gates (do script --budget-usd 10); source gốc đổi lúc 15:11 là commit ghoststory của phiên khác, không phải autopilot.
+
+## Checkpoint 20/10 15:50 — dừng ngay / nhắn / huỷ dọn sạch (ĐANG LÀM, chưa commit)
+- Đã commit: e2e379f sandbox chỉ chặn ghi · 875fd18 lưu run trước mỗi stage · 09cd22b sheetUrl vào prompt buglist + cho handoff-drift · b348b90 nút Huỷ cho run đã dừng. Server 4800 restart 15:3x (task bap975gsm).
+- Đang làm (test đỏ đã viết): runner ghi `.child` {pid} + detached + bắt session_id từ dòng init (XANH) · driver: stopRequested → halt paused + run.cutSession {stage,sessionId}, không retry, không receipt; resume nối `--resume` + continuePrompt (+ run.resumeNote) (driver.mjs) · CLI pause/abort tắt nhóm PID trong `.child` (chưa làm) · test cũ driver.test.mjs:333 cần đổi sang hành vi mới.
+- Tiếp: abort = tắt + xoá worktree (`git worktree remove --force`) + nhánh autopilot/<KEY>-<runId> + rm thư mục run; UI bỏ nhóm "Đã huỷ"; `resume --note` + ô nhắn ở dock khi stopReason paused.
+- Đợt thử 7 luồng XONG 15:48: GW-912 gates budget · GW-963 plan fail (mâu thuẫn quyết định payment 14:51 → hỏi user A/B) · GW-909 fetch-design fail (SharePoint cần extension) · GW-950 drift-check fail (thiếu sheetUrl — đã sửa, chạy lại run MỚI) · GW-844 user pause trước implement · GW-627 plan fail · GW-806 clone fail (chưa xem lý do).

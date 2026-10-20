@@ -55,30 +55,38 @@ function runFake({ stageId, round }) {
   };
 }
 
-export function runClaude({ stageId, round, prompt, model, toolset, resumeSessionId, cwd, marker, timeoutMs = DEFAULT_TIMEOUT_MS, logFile }) {
+export function runClaude({ stageId, round, prompt, model, toolset, resumeSessionId, cwd, marker, timeoutMs = DEFAULT_TIMEOUT_MS, logFile, childFile }) {
   if (process.env.AUTOPILOT_FAKE) return Promise.resolve(runFake({ stageId, round }));
 
   const args = buildClaudeArgs({ prompt, model, toolset, resumeSessionId });
   const started = Date.now();
   return new Promise((resolve) => {
-    const child = spawn('claude', args, { cwd, env: { ...process.env, AUTOPILOT_RUN: marker }, stdio: ['ignore', 'pipe', 'pipe'] });
+    // detached: tiến trình con thành trưởng nhóm, pause/abort tắt được cả nhóm (claude + lệnh Bash nó gọi)
+    const child = spawn('claude', args, { cwd, env: { ...process.env, AUTOPILOT_RUN: marker }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    if (childFile) fs.writeFileSync(childFile, JSON.stringify({ pid: child.pid }));
     if (logFile) fs.mkdirSync(path.dirname(logFile), { recursive: true });
     const log = logFile ? fs.createWriteStream(logFile) : null;
     let lastLine = '';
     let pending = '';
     let stderr = '';
+    let startedSession = null;
     child.stdout.on('data', (d) => {
       log?.write(d);
       pending += d;
       const lines = pending.split('\n');
       pending = lines.pop();
-      for (const line of lines) if (line.trim()) lastLine = line;
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        lastLine = line;
+        startedSession ??= line.includes('"session_id"') ? line.match(/"session_id":"([^"]+)"/)?.[1] : null;
+      }
     });
     child.stderr.on('data', (d) => (stderr += d));
     const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
 
     child.on('close', (code, signal) => {
       clearTimeout(timer);
+      if (childFile) fs.rmSync(childFile, { force: true });
       if (pending.trim()) lastLine = pending;
       log?.end(stderr ? `\n--- stderr ---\n${stderr}` : '');
       const ms = Date.now() - started;
@@ -87,7 +95,7 @@ export function runClaude({ stageId, round, prompt, model, toolset, resumeSessio
         json = JSON.parse(lastLine);
         if (json.type !== 'result') throw new Error('thiếu sự kiện result');
       } catch {
-        resolve({ ok: false, sessionId: null, turns: 0, costUsd: 0, ms, result: stderr, error: signal ? `timeout (${signal})` : `exit ${code}, không có sự kiện result` });
+        resolve({ ok: false, sessionId: startedSession, turns: 0, costUsd: 0, ms, result: stderr, error: signal ? `timeout (${signal})` : `exit ${code}, không có sự kiện result` });
         return;
       }
       resolve({

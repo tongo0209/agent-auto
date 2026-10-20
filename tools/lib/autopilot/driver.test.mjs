@@ -330,7 +330,7 @@ test('G9: buglist không có bản bàn giao → bỏ drift-check', async () => 
   assert.strictEqual(calls[0].stageId, 'intake-triage');
 });
 
-test('pause: marker đặt giữa stage → chạy xong stage đó rồi dừng paused; resume chạy tiếp stage kế, budget giữ nguyên', async () => {
+test('pause: marker đặt giữa stage → dừng ngay ở stage đó; resume nối lại stage đó, budget giữ nguyên', async () => {
   const flow = loadFlow('landing-fix');
   const start = newRun('landing-fix');
   const pausing = fakeClaude({});
@@ -342,7 +342,7 @@ test('pause: marker đặt giữa stage → chạy xong stage đó rồi dừng 
     return pausing.runClaude(opts);
   };
   let run = await drive(start, flow, base({ runClaude, runGates: fakeGates().runGates }));
-  assert.deepStrictEqual([run.status, run.stopReason, run.stage], ['stopped', 'paused', 'plan-review']);
+  assert.deepStrictEqual([run.status, run.stopReason, run.stage], ['stopped', 'paused', 'plan']);
   assert.deepStrictEqual(pausing.calls.map((c) => c.stageId), ['plan']);
   assert.strictEqual(fs.existsSync(pauseFile(start.key, start.runId)), false);
   assert.deepStrictEqual(loadRun(start.key, start.runId).stopReason, 'paused');
@@ -351,7 +351,7 @@ test('pause: marker đặt giữa stage → chạy xong stage đó rồi dừng 
   assert.deepStrictEqual([resumed.budget, resumed.loops], [run.budget, run.loops]);
   run = await drive(resumed, flow, base({ runClaude: pausing.runClaude, runGates: fakeGates().runGates }));
   assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-plan']);
-  assert.deepStrictEqual(pausing.calls.map((c) => c.stageId), ['plan', 'plan-review']);
+  assert.deepStrictEqual(pausing.calls.map((c) => c.stageId), ['plan', 'plan', 'plan-review']);
 });
 
 test('run mới hiện trên đĩa ngay khi stage đầu đang chạy, đúng stage đang chạy', async () => {
@@ -370,4 +370,31 @@ test('buglist: link sheet trong state vào prompt drift-check + intake dù input
   const start = { ...newRun('buglist'), handoffDir: '/gt/x', sheetUrl: 'https://docs.google.com/spreadsheets/d/abc/edit' };
   await drive(start, loadFlow('buglist'), base({ runClaude, runGates: fakeGates().runGates, input: 'GW-1' }));
   for (const id of ['drift-check', 'intake-triage']) assert.match(calls.find((c) => c.stageId === id).prompt, /spreadsheets\/d\/abc/);
+});
+
+test('dừng ngay: pause giữa stage → không chạy lại, không tính vòng, nhớ phiên để nối', async () => {
+  const start = newRun('landing-fix');
+  let calls = 0;
+  const runClaude = async () => {
+    calls++;
+    fs.mkdirSync(runDir(start.key, start.runId), { recursive: true });
+    fs.writeFileSync(pauseFile(start.key, start.runId), '');
+    return { ok: false, sessionId: 's-plan', turns: 0, costUsd: 0, ms: 5, result: '', error: 'exit null' };
+  };
+  const run = await drive(start, loadFlow('landing-fix'), base({ runClaude, runGates: fakeGates().runGates }));
+  assert.strictEqual(calls, 1);
+  assert.deepStrictEqual([run.status, run.stopReason, run.stage, run.receipts.length], ['stopped', 'paused', 'plan', 0]);
+  assert.deepStrictEqual(run.cutSession, { stage: 'plan', sessionId: 's-plan' });
+  assert.strictEqual(fs.existsSync(pauseFile(start.key, start.runId)), false);
+});
+
+test('chạy tiếp sau dừng ngay → nối đúng phiên đang dở, xong thì quên phiên', async () => {
+  const { runClaude, calls } = fakeClaude({});
+  const cut = { ...newRun('landing-fix'), status: 'stopped', stopReason: 'paused', cutSession: { stage: 'plan', sessionId: 's-plan' }, resumeNote: 'thêm tab sự kiện' };
+  const run = await drive(resumeRun(cut, {}), loadFlow('landing-fix'), base({ runClaude, runGates: fakeGates().runGates }));
+  assert.strictEqual(calls[0].resumeSessionId, 's-plan');
+  assert.match(calls[0].prompt, /bị dừng giữa chừng[\s\S]*thêm tab sự kiện/);
+  assert.doesNotMatch(calls[1].prompt, /thêm tab sự kiện/);
+  assert.strictEqual(calls[1].resumeSessionId, null);
+  assert.deepStrictEqual([run.cutSession, run.resumeNote], [undefined, undefined]);
 });

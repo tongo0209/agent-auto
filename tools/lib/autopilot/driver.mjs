@@ -4,7 +4,7 @@ import { nextAction, applyEvent, roundOf } from './engine.mjs';
 import { parseVerdict } from './verdict.mjs';
 import { renderPrompt } from './prompts.mjs';
 import { PROMPTS_DIR } from './flows.mjs';
-import { runDir, saveRun, loadRun, writeArtifact, pauseFile } from './store.mjs';
+import { runDir, saveRun, loadRun, writeArtifact, pauseFile, childFile } from './store.mjs';
 import { acquire, release, holdCampaign, heldCampaigns } from './lock.mjs';
 import { runClaude as realRunClaude, guardCode } from './claude-runner.mjs';
 import { runGates as realRunGates } from './gates.mjs';
@@ -63,19 +63,33 @@ const receiptOf = (stage, v, res) => ({
   turns: res.turns, costUsd: res.costUsd, tokens: res.tokens ?? 0, ms: res.ms,
 });
 
+const isAbortedOnDisk = (run) => {
+  const onDisk = loadRun(run.key, run.runId);
+  return !onDisk || onDisk.stopReason === 'aborted';
+};
+const stopRequested = (run) => fs.existsSync(pauseFile(run.key, run.runId)) || isAbortedOnDisk(run);
+
+function continuePrompt(run, marker) {
+  const note = run.resumeNote ? `\nNgười dùng nhắn khi dừng: ${run.resumeNote}\n` : '';
+  return `AUTOPILOT_RUN: ${marker}\nBước này bị dừng giữa chừng theo lệnh người dùng. Làm tiếp từ chỗ dở (kiểm lại file đang sửa dở trong worktree), rồi trả verdict như yêu cầu ban đầu.${note}`;
+}
+
 async function runClaudeStage(run, stage, deps) {
   const round = roundOf(run, stage.id);
   const template = fs.readFileSync(path.join(PROMPTS_DIR, stage.prompt), 'utf8');
   const marker = `${run.key}/${run.runId}`;
+  const cut = run.cutSession?.stage === stage.id ? run.cutSession : null;
   const opts = {
     stageId: stage.id, round, model: stage.model, toolset: stage.toolset, marker,
-    prompt: renderPrompt(template, stageVars(run, stage, deps.input), marker),
-    resumeSessionId: stage.resume ? run.sessions[stage.resume] : null,
+    prompt: cut ? continuePrompt(run, marker) : renderPrompt(template, stageVars(run, stage, deps.input), marker),
+    resumeSessionId: cut ? cut.sessionId : stage.resume ? run.sessions[stage.resume] : null,
     cwd: run.repo ? toWorktree(run.worktrees, run.repo) : deps.agentRoot,
-    logFile: path.join(runDir(run.key, run.runId), `${stage.id}-r${round}.log`),
+    logFile: path.join(runDir(run.key, run.runId), `${stage.id}-r${round}${cut ? '-tiep' : ''}.log`),
+    childFile: childFile(run.key, run.runId),
   };
 
   let res = await deps.runClaude(opts);
+  if (stopRequested(run)) return { type: 'halt', reason: 'paused', cutSession: { stage: stage.id, sessionId: res.sessionId ?? cut?.sessionId ?? null } };
   if (!res.ok) res = await deps.runClaude(opts);
   const v = parseVerdict(res.result);
   writeArtifact(run, `${stage.id}-r${round}.json`, v);
@@ -207,9 +221,10 @@ export async function drive(startRun, flow, overrides = {}) {
     }
     saveRun(run);
     const event = await runStage(run, stage, deps);
-    const onDisk = loadRun(run.key, run.runId);
-    if (onDisk?.stopReason === 'aborted') return onDisk;
-    run = applyEvent(run, flow, event, deps.now());
+    if (isAbortedOnDisk(run)) return { ...run, status: 'stopped', stopReason: 'aborted' };
+    if (event.cutSession) fs.rmSync(pauseFile(run.key, run.runId), { force: true });
+    const { cutSession, resumeNote, ...rest } = run;
+    run = applyEvent(event.cutSession ? { ...rest, cutSession: event.cutSession } : rest, flow, event, deps.now());
     saveRun(run);
   }
 }

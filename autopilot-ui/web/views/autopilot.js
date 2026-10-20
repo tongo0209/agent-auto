@@ -32,7 +32,8 @@ let lastStates = {};
 let lastSig = '';
 let flowChoice = 0;
 let runFiles = [];
-const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ', resume: 'chạy tiếp' };
+const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp' };
+const ABORT_BTN = '<button class="btn ghost" data-act="abort">Huỷ run</button>';
 
 
 async function post(action, body, sentMessage = 'Đã gửi. Autopilot chạy nền, trang tự cập nhật.') {
@@ -226,7 +227,7 @@ async function renderMain() {
   $('#apMain').innerHTML = `
     <div class="top">
       <div>
-        <div class="head"><h1>${esc(run.key)}</h1><span class="state ${statusClass(run)}">${statusLabel(run)}${run.stopReason && !isUserPaused(run) ? ` · ${esc(run.stopReason)}` : ''}</span>${run.status === 'running' && !run.interrupted ? '<button class="btn ghost" data-pause><i class="ph-bold ph-pause"></i>Tạm dừng</button>' : ''}</div>
+        <div class="head"><h1>${esc(run.key)}</h1><span class="state ${statusClass(run)}">${statusLabel(run)}${run.stopReason && !isUserPaused(run) ? ` · ${esc(run.stopReason)}` : ''}</span>${run.status === 'running' && !run.interrupted ? `<button class="btn ghost" data-pause><i class="ph-bold ph-pause"></i>Dừng ngay</button>${ABORT_BTN}` : ''}</div>
         <div class="meta">${esc(run.flowLabel)}. Router chọn vì: ${esc(run.routerReason)}</div>
         <div class="meta"><code>${esc(run.campaignDir ?? 'chưa có campaign')}</code></div>
       </div>
@@ -271,6 +272,7 @@ function dockMessage(run) {
   if (run.interrupted) return `Run bị ngắt ở ${stage} (không còn process chạy). Chạy tiếp để làm lại bước này.`;
   if (run.status === 'paused') return `Chờ bạn ở ${stage}. Duyệt để chạy tiếp, hoặc ghi chú rồi trả về.`;
   if (run.status === 'attached') return `Chờ bạn ở ${stage}: chạy <code>${esc(run.command)}</code> trong phiên Claude.`;
+  if (isUserPaused(run) && run.cutSession) return `Đã dừng giữa ${stage}. Nhắn thêm cho claude (tuỳ chọn) rồi Chạy tiếp, claude nối đúng phiên đang dở.`;
   if (isUserPaused(run)) return `Đã tạm dừng trước ${stage}. Chạy tiếp khi bạn sẵn sàng.`;
   return `Run đã dừng <b>(${esc(run.stopReason)})</b>.`;
 }
@@ -281,13 +283,15 @@ function renderDock(run) {
   if (!show) return;
   const paused = run.status === 'paused';
   $('#dockMessage').innerHTML = dockMessage(run);
-  $('#note').style.display = paused ? '' : 'none';
+  const cut = isUserPaused(run) && run.cutSession;
+  $('#note').style.display = paused || cut ? '' : 'none';
+  $('#note').placeholder = cut ? 'Nhắn claude khi chạy tiếp: đổi hướng, bổ sung gì...' : 'Ghi chú khi trả về: cần sửa gì...';
   $('#prevNote').textContent = run.rejectNote ? `Lần trả về trước: ${run.rejectNote}` : '';
   $('#actions').innerHTML = paused
-    ? `<button class="btn ghost" data-act="abort">Huỷ run</button><button class="btn back" data-act="reject"><i class="ph-bold ph-arrow-u-up-left"></i>Trả về <kbd>R</kbd></button><button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Duyệt <kbd>A</kbd></button>`
+    ? `${ABORT_BTN}<button class="btn back" data-act="reject"><i class="ph-bold ph-arrow-u-up-left"></i>Trả về <kbd>R</kbd></button><button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Duyệt <kbd>A</kbd></button>`
     : run.status === 'attached'
-      ? `<button class="btn ghost" data-act="abort">Huỷ run</button><button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Đã xong, chạy tiếp</button>`
-      : run.stopReason === 'aborted' ? '' : `<button class="btn ghost" data-act="abort">Huỷ run</button><button class="btn go" data-act="resume"><i class="ph-bold ph-play"></i>Chạy tiếp</button>`;
+      ? `${ABORT_BTN}<button class="btn go" data-act="approve"><i class="ph-bold ph-check"></i>Đã xong, chạy tiếp</button>`
+      : run.stopReason === 'aborted' ? '' : `${ABORT_BTN}<button class="btn go" data-act="resume"><i class="ph-bold ph-play"></i>Chạy tiếp</button>`;
 }
 
 async function refresh() {
@@ -299,6 +303,16 @@ async function refresh() {
   lastSig = sig;
   renderQueue();
   if (document.activeElement?.id !== 'note') await renderMain();
+}
+
+// Huỷ xoá hẳn worktree + nhánh + thư mục run nên phải bấm 2 lần
+function armAbort(btn) {
+  if (btn.dataset.armed) return true;
+  btn.dataset.armed = '1';
+  btn.textContent = 'Bấm lần nữa để xoá hẳn';
+  btn.classList.add('danger');
+  setTimeout(() => { delete btn.dataset.armed; btn.textContent = 'Huỷ run'; btn.classList.remove('danger'); }, 3000);
+  return false;
 }
 
 async function act(action) {
@@ -320,7 +334,7 @@ async function act(action) {
 async function pauseRun(btn) {
   const run = data.runs.find((r) => r.key === selectedKey);
   btn.disabled = true;
-  if (await post('pause', { key: run.key }, `Sẽ dừng sau bước ${run.stage} đang chạy.`)) btn.innerHTML = '<i class="ph-bold ph-circle-notch spin"></i>Chờ dừng…';
+  if (await post('pause', { key: run.key }, `Đã dừng ngay bước ${run.stage}.`)) btn.innerHTML = '<i class="ph-bold ph-circle-notch spin"></i>Đang dừng…';
   else btn.disabled = false;
 }
 
@@ -404,6 +418,8 @@ export function mount(el) {
   $('#apMain').addEventListener('click', (e) => {
     const pauseBtn = e.target.closest('[data-pause]');
     if (pauseBtn) return pauseRun(pauseBtn);
+    const abortBtn = e.target.closest('.head [data-act="abort"]');
+    if (abortBtn) return armAbort(abortBtn) && act('abort');
     const node = e.target.closest('.node');
     if (node) {
       const file = stageFile(node.id.slice(2));
@@ -421,7 +437,7 @@ export function mount(el) {
   });
   $('#actions').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
-    if (b) act(b.dataset.act);
+    if (b && (b.dataset.act !== 'abort' || armAbort(b))) act(b.dataset.act);
   });
   $('#openPalette').addEventListener('click', openPalette);
   $('#veil').addEventListener('click', (e) => {

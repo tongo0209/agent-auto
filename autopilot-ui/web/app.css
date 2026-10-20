@@ -156,6 +156,7 @@ button { cursor: pointer; border: 0; background: none; }
 .btn.back { color: #fecaca; border-color: color-mix(in srgb, var(--stop) 60%, var(--line)); }
 .btn.back:hover { background: color-mix(in srgb, var(--stop) 14%, var(--bg-2)); }
 .btn.ghost { color: var(--text-2); }
+.btn.danger { color: #fff; background: var(--stop); border-color: var(--stop); }
 .btn kbd { font-family: var(--mono); font-size: 11px; opacity: .65; }
 
 .panes { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; margin-top: 30px; }

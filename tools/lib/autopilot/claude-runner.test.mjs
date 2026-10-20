@@ -100,3 +100,21 @@ test('đường thật: output không phải JSON → ok false', async () => {
     process.env.PATH = oldPath;
   }
 });
+
+test('đường thật: ghi PID ra childFile, bị tắt giữa chừng vẫn trả sessionId của phiên', async () => {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-bin-'));
+  fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\necho \'{"type":"system","subtype":"init","session_id":"s7"}\'\nexec sleep 5\n', { mode: 0o755 });
+  const childFile = path.join(bin, '.child');
+  const oldPath = process.env.PATH;
+  process.env.PATH = `${bin}:${oldPath}`;
+  try {
+    const running = runClaude({ stageId: 'plan', round: 1, prompt: 'x', toolset: 'review', marker: 'm', childFile });
+    await new Promise((r) => setTimeout(r, 300));
+    process.kill(-JSON.parse(fs.readFileSync(childFile, 'utf8')).pid, 'SIGTERM');
+    const r = await running;
+    assert.deepStrictEqual([r.ok, r.sessionId], [false, 's7']);
+    assert.strictEqual(fs.existsSync(childFile), false);
+  } finally {
+    process.env.PATH = oldPath;
+  }
+});

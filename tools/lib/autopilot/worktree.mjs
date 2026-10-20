@@ -30,6 +30,11 @@ export function addWorktree({ repo, parentDir, branch, linkDirs = [] }) {
   return { top, dir };
 }
 
+export function removeWorktree({ top, dir, branch }) {
+  if (fs.existsSync(dir)) git(['-C', top, 'worktree', 'remove', '--force', dir]);
+  spawnSync('git', ['-C', top, 'branch', '-D', branch]);
+}
+
 export function toWorktree(worktrees, realPath) {
   if (!realPath) return realPath;
   const top = Object.keys(worktrees ?? {}).find((t) => realPath === t || realPath.startsWith(`${t}${path.sep}`));

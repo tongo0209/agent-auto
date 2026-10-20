@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 const CLI = path.join(import.meta.dirname, 'autopilot.mjs');
 const verdict = (v, extra = {}) => '```autopilot-verdict\n' + JSON.stringify({ verdict: v, ...extra }) + '\n```';
@@ -84,12 +84,16 @@ test('resume sau loop-exhausted chạy tiếp', () => {
   assert.strictEqual(lastRun(runs, 'GW-6').stage, 'approve-plan');
 });
 
-test('abort nhả campaign', () => {
+test('abort nhả campaign + dọn sạch: worktree, nhánh autopilot/*, thư mục run', () => {
   const { cli, campaign, runs } = sandbox();
   cli('run', 'GW-7', '--flow', 'landing-fix', '--campaign', campaign);
-  cli('abort', 'GW-7');
-  assert.strictEqual(lastRun(runs, 'GW-7').stopReason, 'aborted');
+  const { runId } = lastRun(runs, 'GW-7');
+  const repo = path.resolve(campaign, '../../../..');
+  assert.strictEqual(cli('abort', 'GW-7').code, 0);
   assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8')), {});
+  assert.strictEqual(fs.existsSync(path.join(runs, 'GW-7', runId)), false);
+  assert.strictEqual(spawnSync('git', ['-C', repo, 'branch', '--list', `autopilot/GW-7-${runId}`], { encoding: 'utf8' }).stdout.trim(), '');
+  assert.doesNotMatch(spawnSync('git', ['-C', repo, 'worktree', 'list'], { encoding: 'utf8' }).stdout, /GW-7/);
 });
 
 test('route --validate báo mọi luồng hợp lệ', () => {
@@ -173,4 +177,20 @@ test('pause rồi resume: dừng trước stage kế, resume chạy tiếp đún
   assert.strictEqual(after.receipts.at(paused.receipts.length).stage, 'implement');
   assert.deepStrictEqual(after.budget, paused.budget);
   assert.strictEqual(after.status, 'paused');
+});
+
+test('pause/abort tắt ngay tiến trình claude đang chạy của run', async () => {
+  for (const action of ['pause', 'abort']) {
+    const { cli, campaign, runs } = sandbox();
+    cli('run', 'GW-8', '--flow', 'landing-fix', '--campaign', campaign);
+    const waiting = lastRun(runs, 'GW-8');
+    const dir = path.join(runs, 'GW-8', waiting.runId);
+    fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify({ ...waiting, status: 'running', stage: 'implement' }));
+    lockRun(runs, waiting, process.pid);
+    const child = spawn('sleep', ['30'], { detached: true, stdio: 'ignore' });
+    fs.writeFileSync(path.join(dir, '.child'), JSON.stringify({ pid: child.pid }));
+    const exited = new Promise((resolve) => child.on('exit', (_, signal) => resolve(signal)));
+    assert.strictEqual(cli(action, 'GW-8').code, 0);
+    assert.strictEqual(await Promise.race([exited, new Promise((r) => setTimeout(() => r('vẫn sống'), 2000))]), 'SIGTERM', `${action} phải tắt PID ${child.pid}`);
+  }
 });

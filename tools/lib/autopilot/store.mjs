@@ -14,6 +14,7 @@ export const runDir = (key, runId) => path.join(runsDir(), key, runId);
 
 // CLI pause chỉ thả file này; run.json do process driver ghi
 export const pauseFile = (key, runId) => path.join(runDir(key, runId), '.pause');
+export const childFile = (key, runId) => path.join(runDir(key, runId), '.child');
 
 export function writeJsonAtomic(file, data) {
   fs.mkdirSync(path.dirname(file), { recursive: true });

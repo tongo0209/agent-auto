@@ -9,7 +9,8 @@ import { drive } from './lib/autopilot/driver.mjs';
 import { loadFlow, listFlows, validateFlow, PROMPTS_DIR } from './lib/autopilot/flows.mjs';
 import { gatherSignals } from './lib/autopilot/signals.mjs';
 import { route, loadRules } from './lib/autopilot/router.mjs';
-import { newRunId, loadRun, listRuns, saveRun, runsDir, pauseFile } from './lib/autopilot/store.mjs';
+import { newRunId, loadRun, listRuns, saveRun, runsDir, runDir, pauseFile, childFile } from './lib/autopilot/store.mjs';
+import { removeWorktree } from './lib/autopilot/worktree.mjs';
 import { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted } from './lib/autopilot/lock.mjs';
 import { formatStatus } from './lib/autopilot/format.mjs';
 
@@ -22,8 +23,8 @@ const USAGE = `Dùng:
   autopilot status [KEY]
   autopilot approve <KEY> [--note "…"]
   autopilot reject <KEY> --note "…"
-  autopilot pause <KEY>    (chạy xong bước hiện tại rồi dừng; resume để chạy tiếp)
-  autopilot resume <KEY> [--budget-usd n] [--budget-minutes n]   (dừng vì budget mà không truyền → tự nới 1.5×)
+  autopilot pause <KEY>    (dừng ngay bước claude đang chạy; resume nối tiếp đúng phiên)
+  autopilot resume <KEY> [--note "…"] [--budget-usd n] [--budget-minutes n]   (--note: nhắn vào bước bị dừng giữa chừng)
   autopilot abort <KEY>
   autopilot route <KEY|link> | route --validate`;
 
@@ -128,7 +129,7 @@ async function cmdResume(opts) {
   const run = mustLoad(opts._[1] ?? die(USAGE));
   if (run.status !== 'stopped' && run.status !== 'running') die(`${run.key} đang ${run.status} — dùng approve/reject.`);
   const num = (flag) => (opts[flag] ? Number(opts[flag]) : undefined);
-  const resumed = resumeRun(run, { budgetUsd: num('budget-usd'), budgetMinutes: num('budget-minutes') });
+  const resumed = { ...resumeRun(run, { budgetUsd: num('budget-usd'), budgetMinutes: num('budget-minutes') }), resumeNote: opts.note };
   const kind = stageOf(loadFlow(run.flow), resumed.stage)?.kind;
   await continueRun(kind === 'pause' ? { ...resumed, status: 'paused' } : resumed);
 }
@@ -138,14 +139,30 @@ function cmdPause(opts) {
   if (run.status !== 'running') die(`${run.key} đang ${run.status}, không có gì để tạm dừng.`);
   if (isInterrupted(run)) die(`${run.key} đã bị ngắt (không còn process chạy) — dùng resume để chạy tiếp.`);
   fs.writeFileSync(pauseFile(run.key, run.runId), '');
-  console.log(`${run.key} sẽ dừng sau bước ${run.stage} đang chạy.`);
+  console.log(killStage(run) ? `${run.key} đã dừng ngay giữa bước ${run.stage}; resume để nối tiếp.` : `${run.key} sẽ dừng sau bước ${run.stage} đang chạy.`);
+}
+
+// Tắt cả nhóm tiến trình claude của stage đang chạy (runner spawn detached nên PID = mã nhóm)
+function killStage(run) {
+  const file = childFile(run.key, run.runId);
+  if (!fs.existsSync(file)) return false;
+  const { pid } = JSON.parse(fs.readFileSync(file, 'utf8'));
+  try {
+    process.kill(-pid, 'SIGTERM');
+  } catch {
+    try { process.kill(pid, 'SIGTERM'); } catch { return false; }
+  }
+  return true;
 }
 
 function cmdAbort(opts) {
   const run = mustLoad(opts._[1] ?? die(USAGE));
   saveRun({ ...run, status: 'stopped', stopReason: 'aborted' });
+  killStage(run);
   releaseCampaign(run);
-  console.log(`${run.key} đã dừng (aborted).`);
+  for (const [top, dir] of Object.entries(run.worktrees ?? {})) removeWorktree({ top, dir, branch: `autopilot/${run.key}-${run.runId}` });
+  fs.rmSync(runDir(run.key, run.runId), { recursive: true, force: true });
+  console.log(`${run.key} đã huỷ và dọn sạch worktree, nhánh, thư mục run.`);
 }
 
 function cmdStatus(opts) {

@@ -1,8 +1,12 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { parseOptions } from './format.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
+
+// Dữ liệu thật (projects/, designs/, tasks/) luôn ở repo chính, kể cả khi code chạy từ worktree lab
+export const dataRoot = () => process.env.AUTOPILOT_DATA_ROOT || path.join(os.homedir(), 'VNG', 'agent-auto');
 
 export const runsDir = () => process.env.AUTOPILOT_RUNS_DIR || path.join(REPO_ROOT, 'runs');
 

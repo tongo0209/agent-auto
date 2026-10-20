@@ -118,7 +118,7 @@ test('R19: git ghi đội lốt (-c, env, /usr/bin/git, sh -c, bash -c, xargs, p
 test('R20: rm -r / find -delete trong repo của run → chặn; agent-auto-lab cũng là vùng chỉ đọc', () => {
   const CDN = `${HOME}/VNG/git-vng/cdn-source`;
   const own = (command) => sandboxDenial({ tool_name: 'Bash', tool_input: { command }, cwd: CDN }, HOME, [CDN]);
-  for (const cmd of ['rm -rf products/a', 'rm -r products', 'rm -fr dist', 'rm -R x', 'rm --recursive x', 'find . -name x -delete', '(rm -rf products)'])
+  for (const cmd of ['rm -rf products/a', 'rm -r products', 'rm -fr src', 'rm -R x', 'rm --recursive x', 'find . -name x -delete', '(rm -rf products)'])
     assert.match(own(cmd) ?? '', /xoá/, cmd);
   assert.strictEqual(own('rm products/a/old.png'), null);
   assert.strictEqual(own('rm -f products/a/old.png'), null);
@@ -135,4 +135,46 @@ test('R19: subshell và GIT_DIR= trên repo gốc → chặn', () => {
   assert.match(own(`git --git-dir=${CDN}/.git checkout -- .`) ?? '', /repo gốc/);
   assert.match(own(`git -C ${CDN} update-ref refs/heads/tont HEAD~1`) ?? '', /repo gốc/);
   assert.strictEqual(own(`git -C ${CDN} log -1`), null);
+});
+
+const CDN2 = `${HOME}/VNG/git-vng/cdn-source`;
+const RUNS = `${HOME}/VNG/agent-auto-lab/runs`;
+const inRun = (command, cwd = CDN2) => sandboxDenial({ tool_name: 'Bash', tool_input: { command }, cwd }, HOME, [CDN2, `${RUNS}/GW-1/r1`]);
+
+test('review 67e9228: git ghi lọt qua nhóm lệnh, &, -lc, \\git, timeout, alias, pipe vào sh, plumbing khác → chặn', () => {
+  for (const cmd of [
+    '{ git commit -am x; }', 'true & git reset --hard', 'bash -lc "git stash"', '\\git checkout -- .', 'timeout 60 git reset --hard',
+    'git -c alias.ci=commit ci -m x', 'echo "git reset --hard" | sh', 'git sparse-checkout set a', 'git bisect start', 'git config user.name x',
+    'git branch --delete x', 'git branch -df x', 'git branch --move a b', `GIT_DIR=${CDN2}/.git git -C /tmp reset --hard`,
+  ]) assert.ok(inRun(cmd), cmd);
+});
+
+test('review 67e9228: git chỉ đọc, xoá dist/thư mục run, tool kiểm tra của agent-auto → cho qua', () => {
+  for (const cmd of [
+    'git stash list', 'git worktree list', 'git tag -l', 'git tag', 'git apply --check a.patch', 'git config --get user.name', 'git branch -a',
+    'rm -rf products/x/landing/a/dist', 'find products/x/landing/a/dist -delete', `rm -rf ${RUNS}/GW-1/r1/tmp`,
+    `node ${HOME}/VNG/agent-auto/tools/fe-gate.mjs products/a`, `node ${HOME}/VNG/agent-auto/tools/check-promotion.mjs 2 a.html`,
+    `python3 ${HOME}/VNG/agent-auto/tools/baked-text-guard.py products/a`, 'npm run build-pro 2>&1 | tail -5', 'npm run dev &',
+  ]) assert.strictEqual(inRun(cmd), null, cmd);
+});
+
+test('review 67e9228: xoá đệ quy lọt (\\rm, xargs rm, node rmSync recursive) → chặn', () => {
+  for (const cmd of ['\\rm -rf products/a', 'find products -name "*.png" | xargs rm -f', `node -e "require('fs').rmSync('products/a',{recursive:true})"`])
+    assert.ok(inRun(cmd), cmd);
+  assert.match(inRun('\\rm -rf ~/VNG/agent-auto/tasks') ?? '', /agent-auto/);
+});
+
+test('review 67e9228: ghi config claude-teamB, redirect &> >|, dd/curl/tar/unzip/cp -t/npm --prefix ra ngoài → chặn', () => {
+  for (const cmd of [
+    'echo x > ~/.claude-teamB/settings.json', 'echo {} > ~/.claude.json', 'echo x &> ~/VNG/agent-auto/x', 'echo x >| ~/VNG/agent-auto/x',
+    'dd if=a of=~/VNG/agent-auto/x', 'curl -o ~/VNG/agent-auto/x http://a', 'tar -xf a.tar -C ~/VNG/agent-auto', 'unzip a.zip -d ~/VNG/agent-auto/x',
+    'cp -t ~/VNG/agent-auto a', 'npm --prefix ~/VNG/agent-auto install',
+  ]) assert.ok(inRun(cmd), cmd);
+});
+
+test('review 67e9228: file điều khiển của run (run.json, .pause, .child) → chặn; báo cáo trong thư mục run → cho qua', () => {
+  for (const f of ['run.json', '.pause', '.child'])
+    assert.ok(sandboxDenial({ tool_name: 'Write', tool_input: { file_path: `${RUNS}/GW-1/r1/${f}` }, cwd: CDN2 }, HOME, [CDN2, `${RUNS}/GW-1/r1`]), f);
+  assert.ok(inRun(`echo 1 > ${RUNS}/GW-1/r1/.child`));
+  assert.strictEqual(sandboxDenial({ tool_name: 'Write', tool_input: { file_path: `${RUNS}/GW-1/r1/plan.md` }, cwd: CDN2 }, HOME, [CDN2, `${RUNS}/GW-1/r1`]), null);
 });

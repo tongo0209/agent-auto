@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { statusEntries } from './worktree.mjs';
+import { dataRoot } from './store.mjs';
 
 const AGENT_ROOT = path.resolve(import.meta.dirname, '../../..');
 const BUILD_SCRIPTS = ['build-optimize', 'build-pro', 'build-dev', 'build'];
@@ -9,13 +10,15 @@ const BLOCKING_TAIL = 30;
 const COMMIT_TYPE = { 'landing-new': 'feat', 'landing-clone': 'feat', 'gameplay-change': 'feat', feature: 'feat', 'landing-fix': 'fix', buglist: 'fix' };
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.git']);
 
-const defaultExec = (cmd, args, { cwd } = {}) => {
-  const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+const defaultExec = (cmd, args, { cwd, env } = {}) => {
+  const r = spawnSync(cmd, args, { cwd, env: env && { ...process.env, ...env }, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return { code: r.status ?? 1, stdout: r.stdout ?? '', stderr: r.stderr ?? r.error?.message ?? '' };
 };
 
 const isCdnSource = (repo) => path.basename(repo) === 'cdn-source';
 const tool = (name) => path.join(AGENT_ROOT, 'tools', name);
+// pm-gate đọc khoá gameplay ở file dự án — phải là bản thật, không phải projects/ rỗng của lab
+const pmGateEnv = () => ({ PM_PROJECTS_DIR: path.join(dataRoot(), 'projects') });
 
 function findBuildScript(campaignDir, repo) {
   for (let dir = campaignDir; dir.startsWith(repo); dir = path.dirname(dir)) {
@@ -54,12 +57,12 @@ const CHECKS = {
   },
   'pm-gate': ({ campaignDir }) => {
     if (!hasPmHook(campaignDir)) return { skip: 'không có pm__' };
-    return { cmd: 'node', args: [tool('pm-gate.mjs'), ...(isTemplateFile(campaignDir) ? [] : ['--page']), campaignDir] };
+    return { cmd: 'node', args: [tool('pm-gate.mjs'), ...(isTemplateFile(campaignDir) ? [] : ['--page']), campaignDir], env: pmGateEnv() };
   },
   'fe-gate': ({ campaignDir, key }) => {
     const dist = path.join(campaignDir, 'dist');
     if (!fs.existsSync(dist)) return { skip: 'chưa có dist/' };
-    const design = path.join(AGENT_ROOT, 'designs', key);
+    const design = path.join(dataRoot(), 'designs', key);
     return { cmd: 'node', args: [tool('fe-gate.mjs'), dist, ...(fs.existsSync(design) ? ['--design', design] : [])] };
   },
   'landing-parity': ({ campaignDir, repo }) =>
@@ -68,7 +71,7 @@ const CHECKS = {
   // pm-gate-handoff nhận campaignDir = folder gt-promotion của ticket
   'pm-gate-handoff': ({ campaignDir }) => {
     const files = handoffHtml(campaignDir);
-    return files.length ? { cmd: 'node', args: [tool('pm-gate.mjs'), ...files, '--baseline', 'none'] } : { skip: 'chưa có mainsite/*.html' };
+    return files.length ? { cmd: 'node', args: [tool('pm-gate.mjs'), ...files, '--baseline', 'none'], env: pmGateEnv() } : { skip: 'chưa có mainsite/*.html' };
   },
   'check-promotion': ({ campaignDir }) => {
     const files = deliverableHtml(campaignDir);
@@ -92,16 +95,20 @@ function runCommit(ctx) {
   // -uall: liệt kê từng file trong thư mục chưa track
   const status = () => statusEntries(git(['status', '--porcelain', '-z', '-uall']).stdout);
   const stop = (note, blocking = [], extra = {}) => ({ check: 'commit', status: 'error', blocking, note, ...extra });
-  const merging = () => fs.existsSync(path.resolve(ctx.repo, git(['rev-parse', '--git-path', 'MERGE_HEAD']).stdout.trim())) || status().some((e) => UNMERGED.test(e.code));
+  const mergeHead = () => {
+    const r = git(['rev-parse', '--git-path', 'MERGE_HEAD']);
+    return r.code === 0 && fs.existsSync(path.resolve(ctx.repo, r.stdout.trim()));
+  };
+  const merging = () => mergeHead() || status().some((e) => UNMERGED.test(e.code));
   if (merging()) return stop(MERGE_STOP);
 
   const changed = new Set(status().map((e) => e.path));
   const dirtyAtStart = new Set(ctx.dirty ?? []);
   const scopes = (ctx.scopes ?? [ctx.campaignDir]).map((d) => path.relative(ctx.repo, path.resolve(ctx.repo, d)));
   const inScope = (f) => scopes.some((s) => s === '' || f === s || f.startsWith(`${s}/`));
-  const touched = ctx.files.filter((f) => changed.has(f));
-  const files = touched.filter((f) => inScope(f) && !dirtyAtStart.has(f));
-  const left = touched.filter((f) => !files.includes(f)).map((f) => `${f} (${dirtyAtStart.has(f) ? 'dở từ trước khi run bắt đầu' : 'ngoài campaign'})`);
+  // campaign đã bị run khoá: mọi file đổi trong đó (trừ file dở từ trước) là của run, kể cả file agent quên khai
+  const files = [...changed].filter((f) => inScope(f) && !dirtyAtStart.has(f));
+  const left = ctx.files.filter((f) => changed.has(f) && !files.includes(f)).map((f) => `${f} (${dirtyAtStart.has(f) ? 'dở từ trước khi run bắt đầu' : 'ngoài campaign'})`);
   if (!files.length && left.length) return stop('run có sửa file nhưng không file nào commit tự động được — commit tay hoặc skip cổng commit', left);
 
   let commit = null;
@@ -133,7 +140,7 @@ function runCheck(name, ctx) {
   if (plan.skip) return { check: name, status: 'skipped', blocking: [], note: plan.skip };
   if (plan.error) return { check: name, status: 'error', blocking: [], note: plan.error };
 
-  const r = ctx.exec(plan.cmd, plan.args, { cwd: plan.cwd ?? ctx.repo });
+  const r = ctx.exec(plan.cmd, plan.args, { cwd: plan.cwd ?? ctx.repo, env: plan.env });
   if (r.code === 0) return { check: name, status: 'pass', blocking: [], note: '' };
   if (r.code === 1) return { check: name, status: 'fail', blocking: tail(r), note: '' };
   return { check: name, status: 'error', blocking: tail(r), note: `exit ${r.code}` };

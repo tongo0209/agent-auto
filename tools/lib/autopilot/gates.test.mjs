@@ -139,7 +139,9 @@ function gitRepo() {
   const f = fixture();
   const git = (...args) => spawnSync('git', args, { cwd: f.repo, encoding: 'utf8' });
   git('init', '-q');
-  git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init');
+  // package.json là file có sẵn của campaign; index.html chưa track = phần run vừa dựng
+  git('add', 'products/x/landing/a/package.json');
+  git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'init');
   return { ...f, git };
 }
 
@@ -271,7 +273,25 @@ test('scopes: run 2 campaign cùng repo, chỉ campaign thứ 2 có sửa → 1 
   fs.mkdirSync(second, { recursive: true });
   fs.writeFileSync(path.join(second, 'index.html'), 'b');
   const files = ['products/x/landing/b/index.html'];
-  const r = await runGates(['commit'], { ...f, scopes: [f.campaignDir, second], key: 'GW-1', flowId: 'landing-fix', files, planTitle: 'Sửa b' });
+  const r = await runGates(['commit'], { ...f, scopes: [f.campaignDir, second], dirty: ['products/x/landing/a/index.html'], key: 'GW-1', flowId: 'landing-fix', files, planTitle: 'Sửa b' });
   assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
   assert.strictEqual(f.git('show', '--name-only', '--format=', 'HEAD').stdout.trim(), files[0]);
+});
+
+test('I4: file đổi trong campaign nhưng agent quên khai ở files → vẫn commit, không skipped', async () => {
+  const f = gitRepo();
+  fs.writeFileSync(path.join(f.campaignDir, 'quen-khai.js'), 'x');
+  fs.writeFileSync(path.join(f.repo, 'khac.txt'), 'của phiên khác');
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa' });
+  assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
+  assert.match(f.git('show', '--name-only', '--format=', 'HEAD').stdout, /quen-khai\.js/);
+  assert.doesNotMatch(f.git('show', '--name-only', '--format=', 'HEAD').stdout, /khac\.txt/);
+});
+
+test('M5: rev-parse MERGE_HEAD lỗi không bị coi là merge dở', async () => {
+  const f = fixture();
+  const exec = (cmd, args) => (args[0] === 'rev-parse' && args[1] === '--git-path' ? { code: 128, stdout: '', stderr: 'fatal' } : fakeExec({}, ' M products/x/landing/a/index.html\0').exec(cmd, args));
+  const r = await runGates(['commit'], ctx(f, exec, { files: ['products/x/landing/a/index.html'] }));
+  assert.notStrictEqual(r.results[0].note, undefined);
+  assert.doesNotMatch(r.results[0].note, /merge dở/);
 });

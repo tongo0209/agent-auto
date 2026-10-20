@@ -4,7 +4,7 @@ import { nextAction, applyEvent, roundOf, finalApproval } from './engine.mjs';
 import { parseVerdict } from './verdict.mjs';
 import { renderPrompt } from './prompts.mjs';
 import { PROMPTS_DIR } from './flows.mjs';
-import { runDir, saveRun, loadRun, writeArtifact, pauseFile, childFile } from './store.mjs';
+import { dataRoot, runDir, saveRun, loadRun, writeArtifact, pauseFile, childFile } from './store.mjs';
 import { acquire, release, holdCampaign, heldCampaigns, holdRepo } from './lock.mjs';
 import { runClaude as realRunClaude, guardCode } from './claude-runner.mjs';
 import { runGates as realRunGates } from './gates.mjs';
@@ -39,7 +39,7 @@ function feedbackFile(run) {
 const campaignsOf = (run) => (run.campaignDirs?.length ? run.campaignDirs : [run.campaignDir].filter(Boolean));
 
 // Stage ghi code trong repo của run + báo cáo vào thư mục run; phần còn lại của agent-auto-lab chỉ đọc
-export const writableOf = (run) => [...Object.keys(run.workBranch ?? {}), runDir(run.key, run.runId)];
+export const writableOf = (run) => [...Object.keys(run.workBranch ?? {}), runDir(run.key, run.runId), path.join(dataRoot(), 'designs', run.key)];
 
 export function stageVars(run, stage, input) {
   const wt = (p) => toWorktree(run.worktrees, p) ?? '';

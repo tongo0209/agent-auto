@@ -8,7 +8,8 @@ const STATUS = { paused: 'Chờ bạn duyệt', attached: 'Chờ chạy trong ph
 const GROUPS = [['need', 'Cần bạn', ['paused', 'attached']], ['run', 'Đang chạy', ['running']], ['stop', 'Đã dừng', ['stopped']], ['done', 'Xong', ['done']]];
 const ICON_BY_STATE = { done: 'ph-check', running: 'ph-circle-notch spin', waiting: 'ph-hand', stopped: 'ph-x' };
 const ICON_BY_ID = { plan: 'ph-map-trifold', 'plan-review': 'ph-magnifying-glass', implement: 'ph-code', 'code-review': 'ph-git-diff', gates: 'ph-shield-check', 'gates-final': 'ph-shield-check', 'ui-check': 'ph-browser', fix: 'ph-wrench', commit: 'ph-git-commit', cut: 'ph-scissors', 'check-design': 'ph-ruler', spec: 'ph-list-checks', 'clean-code': 'ph-broom', 'intake-triage': 'ph-tray', lanes: 'ph-git-fork', verify: 'ph-check-square', 'write-sheet': 'ph-table' };
-const TAB_LABEL = (f) => f === 'plan.md' ? 'Plan' : `${f.endsWith('.log') ? 'Log ' : ''}${f.replace(/\.(json|log|md)$/, '').replace(/-r(\d+)$/, ' · vòng $1')}`;
+const LIVE = 'live';
+const TAB_LABEL = (f) => f === LIVE ? 'Trực tiếp' : f === 'plan.md' ? 'Plan' : `${f.endsWith('.log') ? 'Log ' : ''}${f.replace(/\.(json|log|md)$/, '').replace(/-r(\d+)$/, ' · vòng $1')}`;
 
 let data = { runs: [], flows: [] };
 let selectedKey = null;
@@ -162,9 +163,25 @@ function verdictView(v) {
     ${v.files?.length ? `<h4>File</h4><pre class="raw">${esc(v.files.join('\n'))}</pre>` : ''}</div>`;
 }
 
+const LOG_ICON = { init: 'ph-power', text: 'ph-chat-text', tool: 'ph-wrench', result: 'ph-arrow-bend-down-right', done: 'ph-flag-checkered' };
+
+async function renderLog(run) {
+  const pane = $('#doc');
+  const res = await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/live${artifact === LIVE ? '' : `/${encodeURIComponent(artifact)}`}`);
+  if (res.status === 204) return (pane.innerHTML = '<p style="color:var(--text-3)">Bước hiện tại chưa ghi log. Log hiện ở đây ngay khi claude bắt đầu chạy.</p>');
+  const { file, lines } = await res.json();
+  const stick = !pane.firstElementChild || pane.scrollHeight - pane.scrollTop - pane.clientHeight < 40;
+  pane.innerHTML = `<div class="log">
+    <div class="log-h">${artifact === LIVE && run.status === 'running' ? '<span class="pulse"></span>' : ''}<code>${esc(file)}</code><span>${lines.length} sự kiện</span></div>
+    ${lines.map((l) => `<div class="ll ${l.kind}"><i class="ph ${LOG_ICON[l.kind]}"></i><span>${esc(l.text)}</span></div>`).join('')}
+  </div>`;
+  if (stick) pane.scrollTop = pane.scrollHeight;
+}
+
 async function renderArtifact(run) {
   const pane = $('#doc');
   if (!artifact) return (pane.innerHTML = '<p style="color:var(--text-3)">Chưa có kết quả nào.</p>');
+  if (artifact === LIVE || artifact.endsWith('.log')) return renderLog(run);
   const text = await (await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/artifacts/${encodeURIComponent(artifact)}`)).text();
   let html;
   if (artifact.endsWith('.md')) html = `<div class="md">${markdown(text)}</div>`;
@@ -184,8 +201,9 @@ async function renderMain() {
   const files = await (await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/artifacts`)).json();
   runFiles = files;
   const starred = files.filter((f) => run.show.some((g) => globRe(g).test(f)));
-  const tabs = [...starred, ...files.filter((f) => !starred.includes(f) && !f.endsWith('.log')), ...files.filter((f) => f.endsWith('.log'))];
-  if (!artifact || !files.includes(artifact)) artifact = starred.find((f) => f === 'plan.md') ?? starred.at(-1) ?? tabs[0] ?? null;
+  const tabs = [...(run.status === 'running' ? [LIVE] : []), ...starred, ...files.filter((f) => !starred.includes(f) && !f.endsWith('.log')), ...files.filter((f) => f.endsWith('.log'))];
+  if (run.status === 'running' && artifact !== LIVE && !files.includes(artifact)) artifact = LIVE;
+  if (!artifact || !tabs.includes(artifact)) artifact = starred.find((f) => f === 'plan.md') ?? starred.at(-1) ?? tabs[0] ?? null;
 
   const { lane, side } = mainLane(run.cells);
   const elapsed = run.receipts.reduce((n, r) => n + (r.ms ?? 0), 0);
@@ -205,7 +223,7 @@ async function renderMain() {
     </div></div>
     <div class="panes">
       <section>
-        <div class="tabs">${tabs.map((f) => `<button class="tab ${f === artifact ? 'on' : ''}" data-file="${esc(f)}">${starred.includes(f) ? '<span class="star">★</span>' : ''}${esc(TAB_LABEL(f))}</button>`).join('')}</div>
+        <div class="tabs">${tabs.map((f) => `<button class="tab ${f === artifact ? 'on' : ''}" data-file="${esc(f)}">${f === LIVE ? '<span class="pulse"></span>' : starred.includes(f) ? '<span class="star">★</span>' : ''}${esc(TAB_LABEL(f))}</button>`).join('')}</div>
         <div id="doc"><div class="skel"></div><div class="skel" style="width:70%"></div></div>
       </section>
       <section>
@@ -398,8 +416,13 @@ export function mount(el) {
   window.addEventListener('resize', onResize);
   refresh();
   const timer = setInterval(() => refresh().catch(() => {}), 4000);
+  const liveTimer = setInterval(() => {
+    const run = data.runs.find((r) => r.key === selectedKey);
+    if (run?.status === 'running' && artifact === LIVE) renderLog(run).catch(() => {});
+  }, 2000);
   return () => {
     clearInterval(timer);
+    clearInterval(liveTimer);
     document.removeEventListener('keydown', onKey);
     window.removeEventListener('resize', onResize);
   };

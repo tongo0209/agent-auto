@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-api-'));
-const { listView, artifactFile, listArtifacts, actionArgs } = await import('./api.mjs');
+const { listView, artifactFile, listArtifacts, actionArgs, liveLog } = await import('./api.mjs');
 const { saveRun, writeArtifact } = await import('../tools/lib/autopilot/store.mjs');
 
 const run = {
@@ -45,4 +45,23 @@ test('actionArgs: dựng đúng lệnh CLI, chặn đầu vào xấu', () => {
   assert.throws(() => actionArgs('rm', { key: 'GW-1' }), /action/);
   assert.throws(() => actionArgs('approve', { key: 'GW-1; rm -rf /' }), /key/);
   assert.throws(() => actionArgs('run', { input: 'GW-9', flow: '../x' }), /flow/);
+});
+
+test('liveLog: đọc .log mới nhất của run, đổi stream-json thành dòng dễ đọc', () => {
+  const events = [
+    { type: 'system', subtype: 'init', model: 'opus' },
+    { type: 'assistant', message: { content: [{ type: 'text', text: 'Đọc plan' }, { type: 'tool_use', name: 'Read', input: { file_path: '/a/b.scss' } }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', content: 'x'.repeat(500) }] } },
+  ];
+  writeArtifact(run, 'implement-r1.log', `${events.map((e) => JSON.stringify(e)).join('\n')}\n{"type":"assis`);
+  const live = liveLog('GW-1', '20261020-100000');
+  assert.strictEqual(live.file, 'implement-r1.log');
+  assert.deepStrictEqual(live.lines.map((l) => l.kind), ['init', 'text', 'tool', 'result']);
+  assert.strictEqual(live.lines[2].text, 'Read /a/b.scss');
+  assert.ok(live.lines[3].text.length <= 200);
+  writeArtifact(run, 'plan-r1.log', '{"type":"result","num_turns":3,"total_cost_usd":0.4}\n');
+  assert.deepStrictEqual(liveLog('GW-1', '20261020-100000', 'plan-r1.log').lines, [{ kind: 'done', text: 'xong · 3 lượt · $0.40' }]);
+  assert.strictEqual(liveLog('GW-1', '20261020-100000', 'plan.md'), null);
+  assert.strictEqual(liveLog('../x', '1'), null);
+  assert.strictEqual(liveLog('GW-2', '20261020-100000'), null);
 });

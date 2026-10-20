@@ -28,6 +28,7 @@ body.dragging { cursor: col-resize; user-select: none; }
 .page-pad { padding: 28px 36px 60px; }
 
 .term { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; border-left: 1px solid var(--line); background: #07090b; min-width: 0; overflow: hidden; }
+.term[hidden] { display: none; }
 .term-grip { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 2; }
 .term-grip:hover, body.dragging .term-grip { background: color-mix(in srgb, var(--ok) 40%, transparent); }
 .term-tabs { display: flex; align-items: center; gap: 2px; padding: 8px 8px 0; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
@@ -160,6 +161,18 @@ button { cursor: pointer; border: 0; background: none; }
 .md th, .md td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
 .md th { background: var(--bg-2); color: var(--text); font-weight: 600; }
 .md blockquote { margin: 0; padding-left: 12px; border-left: 2px solid var(--line-2); color: var(--text-2); }
+#doc:has(.log) { max-height: 64vh; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--line-2) transparent; }
+.log { font: 12.5px/1.5 var(--mono); }
+.log-h { position: sticky; top: 0; display: flex; align-items: center; gap: 10px; padding: 6px 0 10px; background: var(--bg); color: var(--text-3); z-index: 1; }
+.log-h code { color: var(--text-2); }
+.ll { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; padding: 3px 0; color: var(--text-2); }
+.ll span { white-space: pre-wrap; word-break: break-word; }
+.ll.text { color: var(--text); }
+.ll.tool i { color: var(--run); }
+.ll.result { color: var(--text-3); padding-left: 26px; }
+.ll.done i, .ll.init i { color: var(--ok); }
+.pulse { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--run); box-shadow: 0 0 0 0 color-mix(in srgb, var(--run) 60%, transparent); animation: pulse 1.6s infinite; vertical-align: middle; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
 pre.raw { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; color: var(--text-2); margin: 0; }
 .verdict { display: grid; gap: 14px; }
 .verdict .tag { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 15px; }

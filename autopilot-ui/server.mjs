@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { listView, listArtifacts, artifactFile, actionArgs } from './api.mjs';
+import { listView, listArtifacts, artifactFile, actionArgs, liveLog } from './api.mjs';
 import { runsDir } from '../tools/lib/autopilot/store.mjs';
 
 const PORT = Number(process.env.AUTOPILOT_UI_PORT) || 4800;
@@ -48,6 +48,10 @@ async function handleAutopilot(req, res, spawnCli) {
     const parts = pathname.split('/').filter(Boolean).map(decodeURIComponent);
 
     if (req.method === 'GET' && parts[2] === 'runs' && parts.length === 3) return send(res, 200, await listView());
+    if (req.method === 'GET' && parts[2] === 'runs' && parts[5] === 'live') {
+      const live = liveLog(parts[3], parts[4], parts[6]);
+      return live ? send(res, 200, live) : send(res, 204, '');
+    }
     if (req.method === 'GET' && parts[2] === 'runs' && parts[5] === 'artifacts') {
       if (parts.length === 6) return send(res, 200, listArtifacts(parts[3], parts[4]));
       const file = artifactFile(parts[3], parts[4], parts[6] ?? '');

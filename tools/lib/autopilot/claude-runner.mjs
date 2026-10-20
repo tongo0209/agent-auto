@@ -23,7 +23,7 @@ const FAKE_PASS = '```autopilot-verdict\n{"verdict":"pass"}\n```';
 
 export function buildClaudeArgs({ prompt, model, toolset, resumeSessionId }) {
   if (!TOOLSETS[toolset]) throw new Error(`toolset lạ: ${toolset}`);
-  const args = ['-p', prompt, '--output-format', 'json', '--allowedTools', TOOLSETS[toolset]];
+  const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--allowedTools', TOOLSETS[toolset]];
   if (model) args.push('--model', model);
   if (resumeSessionId) args.push('--resume', resumeSessionId);
   return args;
@@ -52,24 +52,32 @@ export function runClaude({ stageId, round, prompt, model, toolset, resumeSessio
   const started = Date.now();
   return new Promise((resolve) => {
     const child = spawn('claude', args, { cwd, env: { ...process.env, AUTOPILOT_RUN: marker }, stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = '';
+    if (logFile) fs.mkdirSync(path.dirname(logFile), { recursive: true });
+    const log = logFile ? fs.createWriteStream(logFile) : null;
+    let lastLine = '';
+    let pending = '';
     let stderr = '';
-    child.stdout.on('data', (d) => (stdout += d));
+    child.stdout.on('data', (d) => {
+      log?.write(d);
+      pending += d;
+      const lines = pending.split('\n');
+      pending = lines.pop();
+      for (const line of lines) if (line.trim()) lastLine = line;
+    });
     child.stderr.on('data', (d) => (stderr += d));
     const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
 
     child.on('close', (code, signal) => {
       clearTimeout(timer);
-      if (logFile) {
-        fs.mkdirSync(path.dirname(logFile), { recursive: true });
-        fs.writeFileSync(logFile, `${stdout}\n--- stderr ---\n${stderr}`);
-      }
+      if (pending.trim()) lastLine = pending;
+      log?.end(stderr ? `\n--- stderr ---\n${stderr}` : '');
       const ms = Date.now() - started;
       let json;
       try {
-        json = JSON.parse(stdout);
+        json = JSON.parse(lastLine);
+        if (json.type !== 'result') throw new Error('thiếu sự kiện result');
       } catch {
-        resolve({ ok: false, sessionId: null, turns: 0, costUsd: 0, ms, result: stderr, error: signal ? `timeout (${signal})` : `exit ${code}, output không phải JSON` });
+        resolve({ ok: false, sessionId: null, turns: 0, costUsd: 0, ms, result: stderr, error: signal ? `timeout (${signal})` : `exit ${code}, không có sự kiện result` });
         return;
       }
       resolve({

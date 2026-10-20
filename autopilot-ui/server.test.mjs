@@ -51,6 +51,10 @@ test('Host lạ (DNS rebinding) → 403', async () => {
   assert.strictEqual(status, 403);
 });
 
+test('live log chưa có → 204', async () => {
+  assert.strictEqual((await fetch(`${base}/api/autopilot/runs/GW-1/r1/live`)).status, 204);
+});
+
 test('artifact không có → 404', async () => {
   assert.strictEqual((await fetch(`${base}/api/autopilot/runs/GW-1/r1/artifacts/x.md`)).status, 404);
 });

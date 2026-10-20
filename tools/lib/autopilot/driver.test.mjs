@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-drive-'));
 const { drive } = await import('./driver.mjs');
@@ -36,7 +37,8 @@ function fakeGates(byRound = {}) {
 }
 
 const notified = [];
-const base = (extra = {}) => ({ now: () => Date.now(), notify: (t, m) => notified.push(m), ...extra });
+const fakeWorktree = ({ repo, parentDir }) => ({ top: repo, dir: path.join(parentDir, path.basename(repo)) });
+const base = (extra = {}) => ({ now: () => Date.now(), notify: (t, m) => notified.push(m), addWorktree: fakeWorktree, ...extra });
 const newRun = (flowId) =>
   createRun({ key: 'GW-1', runId: `r${Math.random().toString(36).slice(2, 8)}`, flow: loadFlow(flowId), routerReason: 't', repo: '/repo', campaignDir: '/repo/products/x/landing/a', now: Date.now() });
 
@@ -144,4 +146,59 @@ test('stage ném lỗi → stopped crash:<stage>, run.json không kẹt running'
   const run = await drive(newRun('landing-fix'), loadFlow('landing-fix'), base({ runClaude, runGates: fakeGates().runGates }));
   assert.match(run.stopReason, /^crash:plan/);
   assert.strictEqual(loadRun(run.key, run.runId).status, 'stopped');
+});
+
+function tmpGitRepo() {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-wt-'));
+  const git = (...args) => spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+  git('init', '-q');
+  fs.mkdirSync(path.join(repo, 'products/x/landing/a'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'products/x/landing/a/index.html'), '<div></div>');
+  git('add', '.');
+  git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'init');
+  return { repo: fs.realpathSync(repo), git };
+}
+
+test('G0: stage claude + gate chạy trong worktree riêng autopilot/<KEY>-<runId>, không cwd vào repo thật', async () => {
+  const { repo, git } = tmpGitRepo();
+  const flow = loadFlow('landing-fix');
+  const start = { ...newRun('landing-fix'), repo, repos: [repo], campaignDir: path.join(repo, 'products/x/landing/a') };
+  const { runClaude, calls } = fakeClaude({});
+  const gates = fakeGates();
+  let run = await drive(start, flow, { now: () => Date.now(), notify: () => {}, runClaude, runGates: gates.runGates });
+  run = applyEvent(run, flow, { type: 'approve' }, Date.now());
+  run = await drive(run, flow, { now: () => Date.now(), notify: () => {}, runClaude, runGates: gates.runGates });
+
+  const wt = path.join(runDir(run.key, run.runId), 'wt', path.basename(repo));
+  assert.ok(calls.every((c) => c.cwd === wt), calls.map((c) => c.cwd).join(','));
+  assert.ok(calls.every((c) => !c.prompt.includes(`${repo}/products`)));
+  assert.strictEqual(gates.calls[0].ctx.repo, wt);
+  assert.strictEqual(gates.calls[0].ctx.campaignDir, path.join(wt, 'products/x/landing/a'));
+  assert.strictEqual(gates.calls[0].ctx.isolated, true);
+  assert.match(git('branch', '--list', `autopilot/${run.key}-${run.runId}`).stdout, /autopilot\//);
+  assert.strictEqual(git('status', '--porcelain').stdout, '');
+});
+
+test('G0: không tạo được worktree → stopped, không lùi về repo thật', async () => {
+  const notGit = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-nogit-'));
+  const { runClaude, calls } = fakeClaude({});
+  const start = { ...newRun('landing-fix'), repo: notGit, repos: [notGit], campaignDir: notGit };
+  const run = await drive(start, loadFlow('landing-fix'), { now: () => Date.now(), notify: () => {}, runClaude, runGates: fakeGates().runGates });
+  assert.match(run.stopReason, /^worktree:/);
+  assert.strictEqual(calls.length, 0);
+});
+
+test('G0: write-sheet (ghi thật) tự bỏ qua khi chưa có AUTOPILOT_LAB_WRITES', async () => {
+  const flow = loadFlow('buglist');
+  const { runClaude } = fakeClaude({});
+  let run = await drive(newRun('buglist'), flow, base({ runClaude, runGates: fakeGates().runGates }));
+  run = applyEvent(run, flow, { type: 'approve' }, Date.now());
+  run = await drive(run, flow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.strictEqual(run.status, 'done');
+  process.env.AUTOPILOT_LAB_WRITES = '1';
+  let gated = await drive(newRun('buglist'), flow, base({ runClaude, runGates: fakeGates().runGates }));
+  gated = applyEvent(gated, flow, { type: 'approve' }, Date.now());
+  gated = await drive(gated, flow, base({ runClaude, runGates: fakeGates().runGates }));
+  delete process.env.AUTOPILOT_LAB_WRITES;
+  assert.deepStrictEqual([gated.status, gated.stage], ['attached', 'write-sheet']);
 });

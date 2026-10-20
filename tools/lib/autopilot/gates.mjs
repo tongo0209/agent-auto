@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { labWritesOn } from './worktree.mjs';
 
 const AGENT_ROOT = path.resolve(import.meta.dirname, '../../..');
 const BUILD_SCRIPTS = ['build-optimize', 'build-dev', 'build'];
@@ -68,13 +69,14 @@ export function commitMessage(flowId, planTitle) {
 }
 
 function runCommit(ctx) {
+  if (!ctx.isolated && !labWritesOn()) return { check: 'commit', status: 'skipped', blocking: [], note: 'repo thật — chỉ commit khi AUTOPILOT_LAB_WRITES=1' };
   const files = changedFiles(ctx);
   if (files.length === 0) return { check: 'commit', status: 'skipped', blocking: [], note: 'không có file nào vừa sửa trong campaign' };
 
   const steps = [
     ['add', '--', ...files],
     ['commit', '--only', ...files, '-m', commitMessage(ctx.flowId, ctx.planTitle)],
-    ...(isCdnSource(ctx.repo) ? [['pull', '--no-rebase', '--no-edit', 'origin', 'master']] : []),
+    ...(isCdnSource(ctx.repo) && labWritesOn() ? [['pull', '--no-rebase', '--no-edit', 'origin', 'master']] : []),
   ];
   for (const args of steps) {
     const r = ctx.exec('git', args, { cwd: ctx.repo });

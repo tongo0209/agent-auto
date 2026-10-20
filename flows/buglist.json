@@ -79,6 +79,7 @@
       "id": "write-sheet",
       "kind": "attached",
       "command": "/bug-fixer-lite report",
+      "realWrite": true,
       "next": null
     }
   ]

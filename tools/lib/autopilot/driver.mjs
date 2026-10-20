@@ -9,6 +9,7 @@ import { acquire, release, holdCampaign, heldCampaigns } from './lock.mjs';
 import { runClaude as realRunClaude, guardCode } from './claude-runner.mjs';
 import { runGates as realRunGates } from './gates.mjs';
 import { notify as realNotify } from './notify.mjs';
+import { addWorktree as realAddWorktree, toWorktree, isInWorktree, labWritesOn } from './worktree.mjs';
 
 const UI_FILE = /\.(twig|html|scss|css)$/;
 const CLI = 'node ~/VNG/agent-auto/tools/autopilot.mjs';
@@ -31,13 +32,14 @@ function feedbackFile(run) {
 }
 
 function stageVars(run, stage, input) {
+  const wt = (p) => toWorktree(run.worktrees, p) ?? '';
   return {
     KEY: run.key,
     flow: run.flow,
     input: input ?? run.key,
     runDir: runDir(run.key, run.runId),
-    repo: run.repo ?? '',
-    campaignDir: run.campaignDir ?? '',
+    repo: wt(run.repo),
+    campaignDir: wt(run.campaignDir),
     round: String(roundOf(run, stage.id)),
     rejectNote: run.rejectNote ?? '',
     callerOfFix: run.callerOfFix ?? '',
@@ -58,7 +60,7 @@ async function runClaudeStage(run, stage, deps) {
     stageId: stage.id, round, model: stage.model, toolset: stage.toolset, marker,
     prompt: renderPrompt(template, stageVars(run, stage, deps.input), marker),
     resumeSessionId: stage.resume ? run.sessions[stage.resume] : null,
-    cwd: run.repo || deps.agentRoot,
+    cwd: run.repo ? toWorktree(run.worktrees, run.repo) : deps.agentRoot,
     logFile: path.join(runDir(run.key, run.runId), `${stage.id}-r${round}.log`),
   };
 
@@ -78,6 +80,7 @@ async function runClaudeStage(run, stage, deps) {
     holdCampaign(v.campaignDir, { key: run.key, runId: run.runId });
     run.campaignDir = v.campaignDir;
     run.repo = deps.repoOf(v.campaignDir);
+    run.repos = [...new Set([...(run.repos ?? []), run.repo].filter(Boolean))];
   }
   run.files = [...new Set([...(run.files ?? []), ...v.files])];
   return { type: v.verdict, receipt, sessionId: res.sessionId };
@@ -86,8 +89,10 @@ async function runClaudeStage(run, stage, deps) {
 async function runGateStage(run, stage, deps) {
   const round = roundOf(run, stage.id);
   const started = deps.now();
+  const repo = toWorktree(run.worktrees, run.repo);
   const result = await deps.runGates(stage.checks, {
-    repo: run.repo, campaignDir: run.campaignDir, key: run.key, flowId: run.flow, files: run.files ?? [], planTitle: planTitle(run),
+    repo, campaignDir: toWorktree(run.worktrees, run.campaignDir), isolated: isInWorktree(run.worktrees, repo),
+    key: run.key, flowId: run.flow, files: run.files ?? [], planTitle: planTitle(run),
   });
   writeArtifact(run, `${stage.id}-r${round}.json`, result);
   const failed = result.results.filter((r) => r.status === 'fail');
@@ -128,20 +133,42 @@ async function runStage(run, stage, deps) {
   }
 }
 
+// Stage sửa code chỉ được chạy trong worktree riêng: tạo không được thì dừng, không lùi về repo thật
+function isolate(run, deps) {
+  const pending = (run.repos ?? [run.repo]).filter((r) => r && !isInWorktree(run.worktrees, toWorktree(run.worktrees, r)));
+  if (!pending.length) return run;
+  const worktrees = { ...run.worktrees };
+  for (const repo of pending) {
+    const { top, dir } = deps.addWorktree({ repo, parentDir: path.join(runDir(run.key, run.runId), 'wt'), branch: `autopilot/${run.key}-${run.runId}` });
+    worktrees[top] = dir;
+  }
+  return { ...run, worktrees };
+}
+
 export async function drive(startRun, flow, overrides = {}) {
   const deps = {
-    now: Date.now, runClaude: realRunClaude, runGates: realRunGates, notify: realNotify, repoOf: () => null,
+    now: Date.now, runClaude: realRunClaude, runGates: realRunGates, notify: realNotify, repoOf: () => null, addWorktree: realAddWorktree,
     agentRoot: path.resolve(import.meta.dirname, '../../..'), ...overrides,
   };
   let run = { ...startRun };
   for (;;) {
     const action = nextAction(run, flow);
+    if (action.type === 'attached' && action.stage.realWrite && !labWritesOn()) {
+      run = applyEvent(run, flow, { type: 'skip' }, deps.now());
+      continue;
+    }
     if (!['claude', 'gate'].includes(action.type)) {
       saveRun(run);
       announce(run, action.stage, deps);
       return run;
     }
     const stage = action.stage;
+    try {
+      run = isolate(run, deps);
+    } catch (e) {
+      run = applyEvent(run, flow, { type: 'halt', reason: `worktree: ${e.message}` }, deps.now());
+      continue;
+    }
     const event = await runStage(run, stage, deps);
     const onDisk = loadRun(run.key, run.runId);
     if (onDisk?.stopReason === 'aborted') return onDisk;

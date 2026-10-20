@@ -12,6 +12,9 @@ function sandbox(fakeScript = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-cli-'));
   const campaign = path.join(root, 'repo/products/x/landing/a');
   fs.mkdirSync(campaign, { recursive: true });
+  const git = (...args) => spawnSync('git', args, { cwd: path.join(root, 'repo'), encoding: 'utf8' });
+  git('init', '-q');
+  git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init');
   const fake = path.join(root, 'fake.json');
   fs.writeFileSync(fake, JSON.stringify(fakeScript));
   const env = { ...process.env, AUTOPILOT_RUNS_DIR: path.join(root, 'runs'), AUTOPILOT_FAKE: fake, AUTOPILOT_FAKE_GATES: 'pass', AUTOPILOT_NO_NOTIFY: '1' };
@@ -38,13 +41,13 @@ for (const flow of ['landing-fix', 'feature', 'landing-new']) {
   });
 }
 
-test('buglist: dừng ở write-sheet attached rồi approve → done', () => {
+test('buglist: chưa bật AUTOPILOT_LAB_WRITES → bỏ write-sheet, approve kết quả là done', () => {
   const { cli, campaign, runs } = sandbox();
   cli('run', 'GW-2', '--flow', 'buglist', '--campaign', campaign);
   cli('approve', 'GW-2');
-  assert.strictEqual(lastRun(runs, 'GW-2').status, 'attached');
-  cli('approve', 'GW-2');
-  assert.strictEqual(lastRun(runs, 'GW-2').status, 'done');
+  const run = lastRun(runs, 'GW-2');
+  assert.strictEqual(run.status, 'done');
+  assert.strictEqual(Object.values(run.worktrees).filter((wt) => wt.startsWith(runs)).length, 1);
 });
 
 test('plan-review revise 4 lần → stopped loop-exhausted, status báo lý do', () => {

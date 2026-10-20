@@ -225,6 +225,7 @@ export function initTerminal() {
     if (tab) activate(tab.dataset.id);
   });
   window.addEventListener('resize', applyWidth);
+  new ResizeObserver(() => state.open && fitVisible()).observe($('#term'));
   $('#termGrip').addEventListener('pointerdown', (e) => {
     e.preventDefault();
     document.body.classList.add('dragging');

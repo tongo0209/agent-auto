@@ -9,6 +9,7 @@ process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-srv-'
 const { createServer } = await import('./server.mjs');
 const { listFlows } = await import('../tools/lib/autopilot/flows.mjs');
 const { saveRun } = await import('../tools/lib/autopilot/store.mjs');
+const { panelClaude } = await import('./panel-claude.mjs');
 const opened = [];
 const spawned = [];
 const execd = [];
@@ -82,18 +83,18 @@ test('bản thử: nút autopilot chạy được (run nằm trong worktree + sa
   lab.close();
 });
 
-test('POST open chạy CLI đồng bộ, trả nguyên JSON để UI mở tab; CLI lỗi → 400 kèm lý do', async () => {
+test('POST open chạy CLI đồng bộ, trả JSON kèm lệnh gõ vào tab (claude có đoạn dặn panel); CLI lỗi → 400 kèm lý do', async () => {
   const post = (body) => fetch(`${base}/api/autopilot/open`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const ok = await post({ input: 'GW-1', flow: 'feature' });
   assert.strictEqual(ok.status, 200);
-  assert.deepStrictEqual(await ok.json(), { key: 'GW-1', cwd: '/wt', args: ['x'], env: {} });
+  assert.deepStrictEqual(await ok.json(), { key: 'GW-1', cwd: '/wt', args: ['x'], env: {}, command: `cd '/wt' && ${panelClaude(['x'])}` });
   assert.deepStrictEqual(execd.at(-1), ['open', 'GW-1', '--flow', 'feature']);
-  const bad = await post({ key: 'GW-404', resume: true });
+  const bad = await post({ key: 'GW-404', attach: true });
   assert.strictEqual(bad.status, 400);
   assert.match((await bad.json()).error, /GW-404/);
   const before = spawned.length;
-  assert.strictEqual((await fetch(`${base}/api/autopilot/done`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"key":"GW-1"}' })).status, 200);
-  assert.deepStrictEqual([spawned.length - before, spawned.at(-1)], [1, ['done', 'GW-1']]);
+  assert.strictEqual((await fetch(`${base}/api/autopilot/reviewed`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"key":"GW-1"}' })).status, 200);
+  assert.deepStrictEqual([spawned.length - before, spawned.at(-1)], [1, ['reviewed', 'GW-1']]);
 });
 
 test('GET changes đọc git của run; POST code chỉ mở worktree của chính run đó', async () => {

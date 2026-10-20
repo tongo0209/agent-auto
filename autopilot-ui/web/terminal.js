@@ -12,6 +12,10 @@ const QUICK = [
 const DAILY_MENU = ['/daily plan', '/daily week', '/daily wrap', '/daily status'];
 const THEME = { background: '#07090b', foreground: '#e7ebef', cursor: '#34d399', selectionBackground: '#2e3742', black: '#0b0d10', green: '#34d399', yellow: '#fbbf24', red: '#f87171', blue: '#60a5fa' };
 
+// Lệnh claude của panel (kèm đoạn dặn) do server gửi trong mỗi lần attached
+let panelClaude = 'claude';
+const expand = (cmd) => (cmd === 'claude' ? panelClaude : cmd);
+
 const saved = (() => {
   try {
     return JSON.parse(localStorage.getItem(STORE)) ?? {};
@@ -72,7 +76,8 @@ function connect(tab, command) {
       term.write(msg.data);
       trackOutput(entry);
     }
-    if (msg.type === 'attached' && msg.fresh) entry.run(command ?? msg.startup ?? '');
+    if (msg.type === 'attached') panelClaude = msg.claude;
+    if (msg.type === 'attached' && msg.fresh) entry.run(expand(command ?? msg.startup ?? ''));
     if (msg.type === 'exit') term.write('\r\n[phiên đã thoát]\r\n');
   };
   ws.onclose = renderTabs;
@@ -139,7 +144,7 @@ function renderTools() {
 function runQuick(cmd) {
   const entry = live.get(state.active);
   if (!entry || entry.ws.readyState > 1) return addTab({ command: cmd, title: cmd === 'claude' ? undefined : cmd });
-  entry.run(cmd);
+  entry.run(expand(cmd));
   entry.term.focus();
 }
 

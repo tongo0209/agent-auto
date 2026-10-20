@@ -87,16 +87,16 @@ export function worktreeOf({ key, runId, dir }) {
   return dir;
 }
 
-export function actionArgs(action, { key, note, input, flow, resume, followup } = {}) {
-  if (action === 'run' || (action === 'open' && !resume && !followup)) {
+export function actionArgs(action, { key, note, input, flow, attach } = {}) {
+  if (action === 'run' || (action === 'open' && !attach)) {
     if (!input || input.startsWith('-')) throw new Error('input không hợp lệ');
     if (flow && !listFlows().includes(flow)) throw new Error('flow không có');
     return [action, input, ...(flow ? ['--flow', flow] : [])];
   }
-  if (!['approve', 'reject', 'pause', 'resume', 'abort', 'done', 'reviewed', 'open'].includes(action)) throw new Error(`action lạ: ${action}`);
+  if (!['approve', 'reject', 'pause', 'resume', 'abort', 'reviewed', 'open'].includes(action)) throw new Error(`action lạ: ${action}`);
   if (!KEY.test(key ?? '')) throw new Error('key không hợp lệ');
   const noteArgs = note?.trim() ? ['--note', note.trim()] : [];
-  if (action === 'open') return resume ? ['open', key, '--resume'] : ['open', key, '--followup', ...noteArgs];
+  if (action === 'open') return ['open', key, '--attach'];
   if (action === 'reject' && !noteArgs.length) throw new Error('reject cần note');
   return [action, key, ...noteArgs];
 }

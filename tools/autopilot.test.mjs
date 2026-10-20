@@ -227,15 +227,15 @@ test('open: tạo run chat + worktree + brief.md, in JSON để UI mở tab', ()
   assert.ok(campaign);
 });
 
-test('open --resume: nối phiên claude mới nhất của worktree; chưa có phiên thì mở lại bằng brief', () => {
+test('open --attach run chat: nối phiên claude mới nhất của worktree; chưa có phiên thì mở lại bằng brief', () => {
   const { cli, launch, projects } = openChat();
-  assert.strictEqual(JSON.parse(cli('open', 'GW-20', '--resume').out).args[0], launch.args[0]);
+  assert.strictEqual(JSON.parse(cli('open', 'GW-20', '--attach').out).args[0], launch.args[0]);
   const dir = path.join(projects, launch.cwd.replace(/[^A-Za-z0-9]/g, '-'));
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'cu.jsonl'), '{}\n');
   fs.utimesSync(path.join(dir, 'cu.jsonl'), new Date(2020, 1, 1), new Date(2020, 1, 1));
   fs.writeFileSync(path.join(dir, 'moi.jsonl'), '{}\n');
-  const resumed = JSON.parse(cli('open', 'GW-20', '--resume').out);
+  const resumed = JSON.parse(cli('open', 'GW-20', '--attach').out);
   assert.deepStrictEqual(resumed.args.slice(0, 2), ['--resume', 'moi']);
   assert.strictEqual(resumed.cwd, launch.cwd);
 });
@@ -347,4 +347,51 @@ test('open --followup: chat tiếp trên chính worktree của run done, brief k
   assert.match(brief, /autopilot\.mjs gates GW-34 commit/);
   assert.strictEqual(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8'))[campaign].key, 'GW-34');
   assert.match(cli('open', 'GW-34', '--followup').out, /chưa xong/);
+});
+
+const attach = (cli, runs, key) => {
+  const r = cli('open', key, '--attach');
+  assert.strictEqual(r.code, 0, r.out);
+  const launch = JSON.parse(r.out);
+  const run = lastRun(runs, key);
+  const brief = path.join(runs, key, run.runId, 'attach.md');
+  assert.ok(launch.args[0].includes(brief));
+  assert.ok(launch.args.includes('--settings'));
+  return { launch, run, brief: fs.readFileSync(brief, 'utf8') };
+};
+
+test('open --attach run done: không đổi run, phiên mới trên worktree, brief có trạng thái + lượt + nhánh + artifact + lệnh dùng được + luật source', () => {
+  const { cli, runs } = doneRun('GW-35');
+  const before = lastRun(runs, 'GW-35');
+  const { launch, run, brief } = attach(cli, runs, 'GW-35');
+  assert.deepStrictEqual(run, before);
+  assert.ok(launch.cwd.startsWith(Object.values(before.worktrees)[0]));
+  assert.deepStrictEqual(launch.env, { AUTOPILOT_RUN: `GW-35/${run.runId}` });
+  assert.match(brief, /done/);
+  assert.match(brief, /commit · vòng 1 · pass/);
+  assert.match(brief, /autopilot\/GW-35-/);
+  assert.match(brief, /gates-r1\.json/);
+  for (const cmd of ['reviewed GW-35', 'reject GW-35 --note', 'open GW-35 --followup', 'abort GW-35', 'status GW-35']) assert.ok(brief.includes(cmd), cmd);
+  for (const cmd of ['pause GW-35', 'resume GW-35', 'approve GW-35']) assert.ok(!brief.includes(cmd), cmd);
+  assert.match(brief, /KHÔNG tự cherry-pick/);
+});
+
+test('open --attach run dừng / chờ duyệt: lệnh theo trạng thái, kèm lý do dừng', () => {
+  const stopped = sandbox({ 'plan-review': [{ result: verdict('revise', { blocking: ['thiếu tab'] }) }] });
+  stopped.cli('run', 'GW-36', '--flow', 'landing-fix', '--campaign', stopped.campaign);
+  const { brief } = attach(stopped.cli, stopped.runs, 'GW-36');
+  assert.match(brief, /loop-exhausted:plan-review/);
+  assert.ok(brief.includes('resume GW-36 [--note'));
+  assert.ok(!brief.includes('reviewed GW-36'));
+
+  const paused = sandbox();
+  paused.cli('run', 'GW-37', '--flow', 'landing-fix', '--campaign', paused.campaign);
+  const waiting = attach(paused.cli, paused.runs, 'GW-37').brief;
+  assert.ok(waiting.includes('approve GW-37') && waiting.includes('reject GW-37 --note'));
+  assert.strictEqual(lastRun(paused.runs, 'GW-37').status, 'paused');
+});
+
+test('open --attach run chưa có: báo lỗi', () => {
+  const { cli } = sandbox();
+  assert.match(cli('open', 'GW-404', '--attach').out, /Chưa có run/);
 });

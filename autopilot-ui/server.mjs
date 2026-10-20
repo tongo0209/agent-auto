@@ -7,6 +7,7 @@ import { spawn, execFile } from 'node:child_process';
 import { listView, listArtifacts, artifactFile, actionArgs, liveLog, changesOf, worktreeOf } from './api.mjs';
 import { runsDir } from '../tools/lib/autopilot/store.mjs';
 import { attachTerminal } from './terminal.mjs';
+import { launchCommand } from './panel-claude.mjs';
 import { CONSOLE, consoleRequire } from './console-root.mjs';
 
 const PORT = Number(process.env.AUTOPILOT_UI_PORT) || 4800;
@@ -79,7 +80,9 @@ async function handleAutopilot(req, res, { spawnCli, execCli, openEditor }) {
         console.log(`${new Date().toISOString()} ${args.join(' ')}`);
         if (args[0] !== 'open') return send(res, 200, { ok: true, ...spawnCli(args) });
         const out = await execCli(args);
-        return out.code ? send(res, 400, { error: out.stderr.trim() || `exit ${out.code}` }) : send(res, 200, JSON.parse(out.stdout));
+        if (out.code) return send(res, 400, { error: out.stderr.trim() || `exit ${out.code}` });
+        const launch = JSON.parse(out.stdout);
+        return send(res, 200, { ...launch, command: launchCommand(launch) });
       } catch (e) {
         return send(res, 400, { error: e.message });
       }

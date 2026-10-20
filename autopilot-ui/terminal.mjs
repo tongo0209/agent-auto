@@ -1,5 +1,6 @@
 // Bản của console/server/ws/terminal.js, khác đúng một chỗ: socket cũ đóng muộn sau reload không được gỡ socket mới
 import { consoleRequire } from './console-root.mjs';
+import { panelClaude } from './panel-claude.mjs';
 
 const { WebSocketServer } = consoleRequire('ws');
 const pty = consoleRequire('node-pty');
@@ -53,7 +54,7 @@ export function attachTerminal(server, wsPath) {
     }
     owners.set(id, ws);
     if (replay) send({ type: 'output', data: replay });
-    send({ type: 'attached', fresh, resumed: !fresh, startup });
+    send({ type: 'attached', fresh, resumed: !fresh, startup, claude: panelClaude() });
 
     ws.on('message', (raw) => {
       let msg;

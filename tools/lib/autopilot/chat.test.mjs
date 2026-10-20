@@ -6,7 +6,10 @@ import path from 'node:path';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-chat-'));
 process.env.AUTOPILOT_CLAUDE_PROJECTS = root;
-const { latestSession, sessionUsage } = await import('./chat.mjs');
+process.env.AUTOPILOT_RUNS_DIR = path.join(root, 'runs');
+const { latestSession, sessionUsage, chatCwd, attachBriefOf } = await import('./chat.mjs');
+const { loadFlow } = await import('./flows.mjs');
+const LAB = path.resolve(import.meta.dirname, '../../..');
 
 const line = (o) => JSON.stringify(o);
 
@@ -33,4 +36,23 @@ test('sessionUsage: cộng usage mỗi message 1 lần (stream ghi lặp cùng i
     '{"type":"assis',
   ].join('\n'));
   assert.deepStrictEqual(sessionUsage(file), { tokens: 440, ms: 5 * 60_000 });
+});
+
+test('chatCwd: run chưa có worktree (chưa isolate) thì mở ở agent-auto-lab, không phải repo gốc', () => {
+  assert.strictEqual(chatCwd({ repo: '/x/repo', worktrees: {} }), LAB);
+  assert.strictEqual(chatCwd({ repo: null, worktrees: {} }), LAB);
+  assert.strictEqual(chatCwd({ repo: '/x/repo', worktrees: { '/x/repo': '/w/repo' } }), '/w/repo');
+});
+
+test('attachBriefOf run tự động đang chạy: dặn pause trước khi sửa file, chỉ có lệnh pause', () => {
+  const run = { key: 'GW-50', runId: 'r1', flow: 'landing-fix', status: 'running', stage: 'implement', stopReason: null, receipts: [{ stage: 'plan', round: 1, verdict: 'pass' }], worktrees: {}, repo: null };
+  fs.mkdirSync(path.join(root, 'runs', 'GW-50', 'r1'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'runs', 'GW-50', 'r1', 'plan.md'), '# p');
+  const brief = attachBriefOf(run, loadFlow('landing-fix'), []);
+  assert.match(brief, /implement/);
+  assert.match(brief, /plan · vòng 1 · pass/);
+  assert.match(brief, /plan\.md/);
+  assert.match(brief, /phải `pause` trước khi sửa file/);
+  assert.ok(brief.includes('pause GW-50'));
+  assert.ok(!brief.includes('reviewed GW-50'));
 });

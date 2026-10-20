@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import http from 'node:http';
 import { attachTerminal, shellEnv } from './terminal.mjs';
 import { consoleRequire } from './console-root.mjs';
+import { panelClaude } from './panel-claude.mjs';
 
 const WebSocket = consoleRequire('ws');
 
@@ -39,4 +40,16 @@ test('shell mới không thừa hưởng biến phiên Claude cha (claude con ph
   const env = shellEnv({ PATH: '/bin', HOME: '/h', CLAUDECODE: '1', CLAUDE_CODE_CHILD_SESSION: '1', CLAUDE_CODE_SESSION_ID: 'x', CLAUDE_PID: '9', ANTHROPIC_MODEL: 'm' });
   assert.deepStrictEqual(Object.keys(env).sort(), ['ANTHROPIC_MODEL', 'HOME', 'LANG', 'PATH', 'TERM']);
   assert.strictEqual(env.TERM, 'xterm-256color');
+});
+
+test('attached gửi kèm lệnh claude của panel để nút claude / tab + gõ ra có đoạn dặn', async () => {
+  const server = http.createServer();
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  attachTerminal(server, '/term');
+  const ws = new WebSocket(`ws://127.0.0.1:${server.address().port}/term?id=panel-1`);
+  const attached = await new Promise((resolve) => ws.on('message', (raw) => JSON.parse(raw).type === 'attached' && resolve(JSON.parse(raw))));
+  ws.send(JSON.stringify({ type: 'kill' }));
+  ws.close();
+  server.close();
+  assert.strictEqual(attached.claude, panelClaude());
 });

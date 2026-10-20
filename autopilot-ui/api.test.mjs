@@ -56,13 +56,11 @@ test('actionArgs: dựng đúng lệnh CLI, chặn đầu vào xấu', () => {
   assert.throws(() => actionArgs('approve', { key: 'GW-1; rm -rf /' }), /key/);
   assert.throws(() => actionArgs('run', { input: 'GW-9', flow: '../x' }), /flow/);
   assert.deepStrictEqual(actionArgs('open', { input: 'GW-9', flow: 'feature' }), ['open', 'GW-9', '--flow', 'feature']);
-  assert.deepStrictEqual(actionArgs('open', { key: 'GW-9', resume: true }), ['open', 'GW-9', '--resume']);
-  assert.deepStrictEqual(actionArgs('done', { key: 'GW-9' }), ['done', 'GW-9']);
+  assert.deepStrictEqual(actionArgs('open', { key: 'GW-9', attach: true }), ['open', 'GW-9', '--attach']);
   assert.deepStrictEqual(actionArgs('reviewed', { key: 'GW-9' }), ['reviewed', 'GW-9']);
-  assert.deepStrictEqual(actionArgs('open', { key: 'GW-9', followup: true, note: 'đổi màu' }), ['open', 'GW-9', '--followup', '--note', 'đổi màu']);
-  assert.deepStrictEqual(actionArgs('open', { key: 'GW-9', followup: true }), ['open', 'GW-9', '--followup']);
+  assert.throws(() => actionArgs('done', { key: 'GW-9' }), /action lạ/);
   assert.throws(() => actionArgs('open', { input: '--resume' }), /input/);
-  assert.throws(() => actionArgs('open', { key: '../x', resume: true }), /key/);
+  assert.throws(() => actionArgs('open', { key: '../x', attach: true }), /key/);
 });
 
 test('liveLog: đọc .log mới nhất của run, đổi stream-json thành dòng dễ đọc', () => {

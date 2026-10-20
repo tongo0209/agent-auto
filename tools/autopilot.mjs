@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { createRun, applyEvent, resumeRun, reopenRun, finalApproval, stageOf, roundOf } from './lib/autopilot/engine.mjs';
 import { drive, isolate, runGateStage, WHEN } from './lib/autopilot/driver.mjs';
 import { runGates } from './lib/autopilot/gates.mjs';
-import { briefOf, briefFile, chatLaunch, followupBriefOf } from './lib/autopilot/chat.mjs';
+import { briefOf, briefFile, chatLaunch, followupBriefOf, attachBriefOf, attachFile, attachLaunch } from './lib/autopilot/chat.mjs';
 import { runChanges } from './lib/autopilot/review.mjs';
 import { loadFlow, listFlows, validateFlow, PROMPTS_DIR } from './lib/autopilot/flows.mjs';
 import { gatherSignals } from './lib/autopilot/signals.mjs';
@@ -24,7 +24,7 @@ const DATA_ROOT = process.env.AUTOPILOT_DATA_ROOT || (fs.existsSync(path.join(AG
 const USAGE = `Dùng:
   autopilot run <KEY|link> [--flow id] [--campaign dir] [--budget-usd n] [--bg]
   autopilot open <KEY|link> [--flow id] [--campaign dir]   (run chat: worktree + brief.md, in JSON để mở tab claude)
-  autopilot open <KEY> --resume                             (mở lại tab: nối phiên claude mới nhất của worktree)
+  autopilot open <KEY> --attach                             (tab claude cho run bất kỳ: run chat nối phiên mới nhất, run khác phiên mới với attach.md)
   autopilot mark <KEY> <bước> <doing|pass|fail|ask> [--note "…"]
   autopilot gates <KEY> [check…]   (mặc định mọi cổng của luồng trừ commit)
   autopilot open <KEY> --followup [--note "…"]             (run đã xong: mở tab chat sửa tiếp trên chính worktree đó)
@@ -48,7 +48,7 @@ function describeDecision({ flow, target, reason, questions = [] }) {
 function parseArgs(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i++) {
-    if (['--bg', '--validate', '--resume', '--followup'].includes(argv[i])) opts[argv[i].slice(2)] = true;
+    if (['--bg', '--validate', '--attach', '--followup'].includes(argv[i])) opts[argv[i].slice(2)] = true;
     else if (argv[i].startsWith('--')) opts[argv[i].slice(2)] = argv[++i];
     else opts._.push(argv[i]);
   }
@@ -129,7 +129,7 @@ async function cmdRun(opts, argv) {
 
 function cmdOpen(opts) {
   const input = opts._[1] ?? die(USAGE);
-  if (opts.resume) return console.log(JSON.stringify(chatLaunch(mustLoadChat(input), { resume: true })));
+  if (opts.attach) return openAttach(mustLoad(input));
   if (opts.followup) return openFollowup(mustLoadDone(input), opts.note);
   const { run: created, flow } = newRun(opts, input);
   if (created.campaignDir) holdCampaign(created.campaignDir, { key: created.key, runId: created.runId });
@@ -137,6 +137,13 @@ function cmdOpen(opts) {
   saveRun(run);
   fs.writeFileSync(briefFile(run), briefOf(run, flow, input));
   console.log(JSON.stringify(chatLaunch(run)));
+}
+
+// Chỉ ghi attach.md, không đổi trạng thái run: mở tab để xem/hỏi không được làm run lệch board
+function openAttach(run) {
+  if (run.mode === 'chat' && run.status === 'chat') return console.log(JSON.stringify(chatLaunch(run, { resume: true })));
+  fs.writeFileSync(attachFile(run), attachBriefOf(run, loadFlow(run.flow), runChanges(run)));
+  console.log(JSON.stringify(attachLaunch(run)));
 }
 
 function openFollowup(done, note) {

@@ -162,6 +162,9 @@ button { cursor: pointer; border: 0; background: none; }
 .btn.ghost:hover { color: var(--text); border-color: var(--text-3); }
 .btn:focus-visible { outline: 2px solid var(--run); outline-offset: 2px; }
 .btn.sm { padding: 5px 10px; gap: 6px; font-size: 12px; }
+.btn.claude { background: color-mix(in srgb, var(--run) 18%, var(--bg-2)); border-color: var(--run); color: var(--text); }
+.btn.claude:hover { background: color-mix(in srgb, var(--run) 30%, var(--bg-2)); }
+.dock-hint { display: block; margin-top: 4px; font-size: 12px; color: var(--text-3); }
 
 .repo-changes { margin-bottom: 22px; }
 .rc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -184,10 +187,6 @@ pre.diff span { display: inline-block; min-width: 100%; padding: 0 12px; color: 
 pre.diff .add { color: #a7f3d0; background: color-mix(in srgb, var(--ok) 12%, transparent); }
 pre.diff .del { color: #fecaca; background: color-mix(in srgb, var(--stop) 12%, transparent); }
 pre.diff .hunk { color: var(--run); }
-.pick-box:not(:empty) { margin-top: 10px; font-size: 13px; color: var(--text-2); }
-.pick-box p { margin: 0 0 6px; }
-.pick { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-.pick code { flex: 1; min-width: 0; font: 12px var(--mono); padding: 6px 10px; border-radius: var(--r); background: var(--bg); border: 1px solid var(--line-2); overflow-x: auto; white-space: nowrap; }
 
 .panes { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; margin-top: 30px; }
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }

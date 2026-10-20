@@ -65,3 +65,21 @@ test('isInterrupted: run running mà không process nào giữ lock run của n�
   fs.rmSync(path.join(dir, '.lock-run'));
   assert.strictEqual(isInterrupted({ ...A, status: 'paused' }), false);
 });
+
+test('nhiều process cùng acquire một lúc → đúng 1 process được', async () => {
+  const { spawn } = await import('node:child_process');
+  const lockUrl = new URL('./lock.mjs', import.meta.url).href;
+  const script = `const { acquire } = await import(${JSON.stringify(lockUrl)}); while (Date.now() < Number(process.env.START_AT)); console.log(acquire('run', { key: 'GW-' + process.pid, runId: 'r' }).ok); setTimeout(() => {}, 1000);`;
+  const one = () => new Promise((resolve) => {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', script], { env: { ...process.env } });
+    let out = '';
+    child.stdout.on('data', (d) => (out += d));
+    child.on('exit', () => resolve(out.trim()));
+  });
+  for (let round = 0; round < 5; round++) {
+    fs.rmSync(path.join(dir, '.lock-run'), { force: true });
+    process.env.START_AT = String(Date.now() + 400);
+    const results = await Promise.all(Array.from({ length: 8 }, one));
+    assert.strictEqual(results.filter((r) => r === 'true').length, 1, `vòng ${round}: ${results}`);
+  }
+});

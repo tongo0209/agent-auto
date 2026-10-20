@@ -79,11 +79,12 @@ function driveDeps(input) {
 }
 
 // Chạy tiếp một run dưới lock 'run'; xong/dừng thì nhả campaign
-async function continueRun(run, input) {
-  const owner = { key: run.key, runId: run.runId };
+async function continueRun(start, input) {
+  const owner = { key: start.key, runId: start.runId };
   const lock = acquire('run', owner);
   if (!lock.ok) die(`Đang có run khác chạy: ${lock.holder.key}/${lock.holder.runId} — chờ nó tới mốc dừng.`);
   try {
+    const run = start.prepare ? start.prepare(loadRun(owner.key, owner.runId)) : start;
     if (run.campaignDir) holdCampaign(run.campaignDir, owner);
     const flow = loadFlow(run.flow);
     const after = await drive(run, flow, driveDeps(input));
@@ -265,39 +266,48 @@ function mustLoadChat(key) {
   return run;
 }
 
-async function cmdDecide(opts, type) {
-  const run = mustLoad(opts._[1] ?? die(USAGE));
+// Lấy lock trước rồi mới đọc lại run.json và kiểm trạng thái: 2 lệnh song song không cùng chạy từ trạng thái cũ.
+// Dưới lock 'run', run nào còn ghi running trên đĩa đều là run bị ngắt (driver của nó phải đang giữ lock này)
+function continueLatest(key, prepare) {
+  const { key: runKey, runId } = mustLoad(key);
+  return continueRun({ key: runKey, runId, prepare });
+}
+
+function cmdDecide(opts, type) {
   if (type === 'reject' && !opts.note) die('reject cần --note "…" để stage sau biết sửa gì.');
-  const flow = loadFlow(run.flow);
-  if (type === 'reject' && run.status === 'done') {
-    holdAgain(run);
-    return continueRun(reopenRun(run, flow, opts.note, Date.now()));
-  }
-  if (!['paused', 'attached'].includes(run.status)) die(`${run.key} đang ${run.status}, không có gì để ${type}.`);
-  await continueRun(applyEvent(run, flow, { type, note: opts.note }, Date.now()));
+  return continueLatest(opts._[1] ?? die(USAGE), (run) => {
+    const flow = loadFlow(run.flow);
+    if (type === 'reject' && run.status === 'done') {
+      holdAgain(run);
+      return reopenRun(run, flow, opts.note, Date.now());
+    }
+    if (!['paused', 'attached'].includes(run.status)) die(`${run.key} đang ${run.status}, không có gì để ${type}.`);
+    return applyEvent(run, flow, { type, note: opts.note }, Date.now());
+  });
 }
 
-async function cmdResume(opts) {
-  const run = mustLoad(opts._[1] ?? die(USAGE));
-  if (run.status !== 'stopped' && run.status !== 'running') die(`${run.key} đang ${run.status} — dùng approve/reject.`);
-  const num = (flag) => (opts[flag] ? Number(opts[flag]) : undefined);
-  const resumed = { ...resumeRun(run, { budgetUsd: num('budget-usd'), budgetMinutes: num('budget-minutes') }), resumeNote: opts.note };
-  const kind = stageOf(loadFlow(run.flow), resumed.stage)?.kind;
-  await continueRun(kind === 'pause' ? { ...resumed, status: 'paused' } : resumed);
+function cmdResume(opts) {
+  return continueLatest(opts._[1] ?? die(USAGE), (run) => {
+    if (run.status !== 'stopped' && run.status !== 'running') die(`${run.key} đang ${run.status} — dùng approve/reject.`);
+    const num = (flag) => (opts[flag] ? Number(opts[flag]) : undefined);
+    const resumed = { ...resumeRun(run, { budgetUsd: num('budget-usd'), budgetMinutes: num('budget-minutes') }), resumeNote: opts.note };
+    const kind = stageOf(loadFlow(run.flow), resumed.stage)?.kind;
+    return kind === 'pause' ? { ...resumed, status: 'paused' } : resumed;
+  });
 }
 
-function mustChoose(run, flow, action) {
+function mustChoose(run, flow, action, interrupted) {
   try {
-    return chooseAction(run, flow, action, { options: planOptions(run), now: Date.now(), interrupted: isInterrupted(run) });
+    return chooseAction(run, flow, action, { options: planOptions(run), now: Date.now(), interrupted });
   } catch (e) {
     die(e.message);
   }
 }
 
 // Lệnh lựa chọn trên pipeline: engine kiểm hợp lệ, CLI chỉ dịch cờ sang action
-async function cmdChoose(opts, type) {
-  const run = mustLoad(opts._[1] ?? die(USAGE));
-  const flow = loadFlow(run.flow);
+function cmdChoose(opts, type) {
+  const key = opts._[1] ?? die(USAGE);
+  const flow = loadFlow(mustLoad(key).flow);
   const action = {
     type,
     note: opts.note,
@@ -306,8 +316,10 @@ async function cmdChoose(opts, type) {
     ...(type === 'pick' && { option: opts._[2] ?? die(USAGE) }),
   };
   if (type === 'goto' && !opts.note?.trim()) die('goto cần --note "…" để stage đó biết làm lại gì.');
-  const next = mustChoose(run, flow, action);
-  await continueRun(stageOf(flow, next.stage)?.kind === 'pause' ? { ...next, status: 'paused' } : next);
+  return continueLatest(key, (run) => {
+    const next = mustChoose(run, flow, action, run.status === 'running');
+    return stageOf(flow, next.stage)?.kind === 'pause' ? { ...next, status: 'paused' } : next;
+  });
 }
 
 function cmdBreak(opts) {
@@ -318,7 +330,7 @@ function cmdBreak(opts) {
   const isOn = (run.plan?.breakpoints ?? []).includes(stage);
   const wantOn = !opts.off;
   if (isOn === wantOn) return console.log(formatStatus(run, flow));
-  const { breakpoints } = mustChoose(run, flow, { type: 'break', stage }).plan;
+  const { breakpoints } = mustChoose(run, flow, { type: 'break', stage }, isInterrupted(run)).plan;
   // Driver có thể vừa ghi run.json: đọc bản mới nhất, chỉ thay breakpoints
   const latest = loadRun(run.key, run.runId);
   const next = { ...latest, plan: { disabled: [], ...latest.plan, breakpoints } };

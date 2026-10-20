@@ -85,3 +85,9 @@ test('chạy qua ca ⇒ ghi team đang dùng', () => {
   assert.match(statusLine({ state: { issues: {} }, today: TODAY, session: withLimits(5, 1), team: 'B' }), /⚡B 5h 5% · 7d 1%$/);
   assert.match(statusLine({ state: { issues: {} }, today: TODAY, session: SESSION, team: 'A' }), /⚡A$/);
 });
+
+test('campaign đang bị autopilot giữ thì hiện để phiên tay tránh sửa cùng chỗ', () => {
+  const held = { '/r/products/x/landing/a': { key: 'GW-950', runId: 'r1' }, '/r/products/y/landing/b': { key: 'GW-951', runId: 'r2' } };
+  assert.match(statusLine({ state: { issues: {} }, today: TODAY, session: SESSION, held }), /🤖 GW-950 giữ a \+1/);
+  assert.doesNotMatch(statusLine({ state: { issues: {} }, today: TODAY, session: SESSION }), /🤖/);
+});

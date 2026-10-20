@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { countPending, isWatched } from './bug-radar.mjs';
 import alerts from '../console/server/lib/alerts.js';
+import { heldCampaigns } from './lib/autopilot/lock.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const HOT_LIMIT_PERCENT = 90;
@@ -23,7 +24,7 @@ function limitPart(rateLimits = {}, team = '') {
   return [icon + team, usage].filter(Boolean).join(' ');
 }
 
-export function statusLine({ state, today, session = {}, team } = {}) {
+export function statusLine({ state, today, session = {}, team, held = {} } = {}) {
   const safe = state && typeof state === 'object' ? state : { issues: {} };
   const dir = session.workspace?.current_dir || session.cwd || ROOT;
   const parts = [path.basename(dir)];
@@ -38,6 +39,13 @@ export function statusLine({ state, today, session = {}, team } = {}) {
   if (crits.length) {
     const rest = crits.length > 1 ? ` +${crits.length - 1}` : '';
     parts.push(`⏰ ${crits[0].key} ${crits[0].text}${rest}`);
+  }
+
+  const heldRuns = Object.entries(held);
+  if (heldRuns.length) {
+    const [dir, owner] = heldRuns[0];
+    const rest = heldRuns.length > 1 ? ` +${heldRuns.length - 1}` : '';
+    parts.push(`🤖 ${owner.key} giữ ${path.basename(dir)}${rest}`);
   }
 
   const limit = limitPart(session.rate_limits, team);
@@ -60,5 +68,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.met
   };
   const session = parse(await readAll(), {});
   const state = parse(fs.readFileSync(path.join(ROOT, 'state.json'), 'utf8'), null);
-  process.stdout.write(statusLine({ state, today: new Date().toISOString().slice(0, 10), session, team: process.env.CLAUDE_FAILOVER_TEAM }));
+  process.stdout.write(statusLine({ state, today: new Date().toISOString().slice(0, 10), session, team: process.env.CLAUDE_FAILOVER_TEAM, held: heldCampaigns() }));
 }

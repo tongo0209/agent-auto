@@ -24,3 +24,8 @@ User chốt 20/10: làm đủ 7 màn + terminal, UI mới hoàn toàn, 4747 vẫ
 ## Verify
 `node --test --test-timeout=20000 autopilot-ui/*.test.mjs tools/autopilot.test.mjs tools/lib/autopilot/*.test.mjs`, rồi browserpilot trên 4800.
 Bấm Duyệt thì chặn POST bằng `page.route` để không duyệt thật GW-912/882.
+
+## Đang làm 20/10 chiều (sau khi user than "code vào source đang làm")
+- User chốt: tách hết ra worktree `~/VNG/agent-auto-lab` (nhánh `autopilot-lab`, tạo từ 2ecb114). main agent-auto lùi về 986377d bằng `git reset --keep`, file dở của phiên khác giữ nguyên.
+- Còn phải: chép views/*.js + views.css (subagent viết, chưa commit) + docs/architecture.md + runs/ sang lab; chạy 4800 từ lab; sửa đường dẫn trong ~/.claude/CLAUDE.md (promptAgent) sang agent-auto-lab.
+- Yêu cầu mới của user: console mới mất phần "theo dõi list timeline" (console cũ có) → làm lại dạng timeline list hoặc board kiểu Jira.

@@ -13,7 +13,7 @@ agent-auto phải chuẩn hoá theo nó ở 3 chỗ:
 - **Đầu ra:** bản bàn giao `mainsite/` giữ khối `prodTemplate`. Folder `Promotion/` **không thuộc phạm vi** (user chốt 20/10/2026: chỉ quan tâm `mainsite/` đúng chuẩn, không đụng `Promotion/`).
 
 Thành công khi:
-- `pm-gate` chặn được trang Lucky có `pm__rut` mà thiếu `prodTemplate`, thiếu `spoint`, thiếu `names.en`, hoặc `data-item` lệch `items`.
+- `pm-gate` chặn được trang Lucky có `pm__rut` mà thiếu `prodTemplate`, thiếu `spoint`, thiếu `names.en`, hoặc khối `prodTemplate` rỗng; `data-item` lệch `items` được báo 🟡.
 - Luật trong `rules/` không còn chỗ nào mâu thuẫn với kit, ngoài các chỗ "production thắng kit" có dẫn chứng.
 
 ## 2. Kết quả soát toàn kit (bằng chứng)
@@ -33,7 +33,7 @@ Thành công khi:
 | Khai bằng `var` | Đọc tên trần → `const` ở cấp trên cùng của script cổ điển vẫn thấy | 55 `const`, 2 `var` | Production thắng: nhận `var`/`const`/`let` cấp trên cùng; chặn `type="module"` và khai trong hàm |
 | `pm__point spoint` trên cùng 1 thẻ | `el:{cp:".spoint"…}` mặc định | 34 cùng thẻ, 46 có `spoint` | Không có `spoint` = 🔴; khác thẻ = 🟡 |
 | `names.en` + key = class `<body>` | `${r.en?`…${r[i("body").attr("class")][e.indexWord]}`:""}` | — | 🔴 |
-| `data-item` trên ô quà | Chỉ hiệu ứng mẫu của kit dùng | 4/62 | Không có = 🟡; có mà lệch `items` = 🔴 |
+| `data-item` trên ô quà | Chỉ hiệu ứng mẫu của kit dùng | 4/62 (JX1M 59399 dùng `data-item` đánh số ô theo nghĩa riêng) | Không có = 🟡; lệch `items` = 🟡 (sửa sau đo 20/10: 🔴 ban đầu chặn nhầm JX1M; so theo chuỗi vì ZSM 58018 khai `items` số) |
 | Comment `BACKEND:` trên khối | — | 2/62 | 🔴 ở file bàn giao, 🟡 trong cdn-source |
 | `timeWait` dạng getter | `$.extend` nông → `settings.config` chung object; gán lại trong `animResult` cũng chạy | — | Nhận cả hai, task mới ưu tiên getter |
 
@@ -57,15 +57,20 @@ User chốt: `Promotion/` ngoài phạm vi, không sửa, không soát.
 | Khai trong `<script type="module">` hoặc không ở cấp trên cùng | 🔴 |
 | Khối đứng sau `<script src=…libraryMainsite-*.js>` | 🔴 |
 | `vm` không đánh giá được object | 🟡 "soát tay" — bỏ các soát nội dung bên dưới |
+| Khối rỗng `prodTemplate = {}` (TLBBVNG 62834/62835/62837: engine do platform khởi tạo) | 🔴, 1 lỗi duy nhất — không tách thành names/items |
 | Thiếu `names.en` | 🔴 |
 | Thiếu `names[<class của body>]` | 🔴 |
 | `items` thiếu `length`/`type`, hoặc `length` ≠ số mã quà | 🔴 |
 | Không phần tử nào có class `spoint` | 🔴 |
 | `spoint` và `pm__point` ở 2 thẻ khác nhau | 🟡 |
-| Có `data-item` mà giá trị không thuộc giá trị của `items` | 🔴 |
+| Có `data-item` mà giá trị (so theo chuỗi) không thuộc giá trị của `items` | 🟡 |
 | Không có `data-item` nào | 🟡 |
 | Không có comment chứa `BACKEND:` ngay trước khối `<script>` (chỉ cho phép khoảng trắng xen giữa) | 🔴 file bàn giao / `hooks-at: source`; 🟡 file trong campaign cdn-source có `hooks-at: handoff` — cùng logic hạ mức của `PG-REQ` |
 
+- Bổ sung sau đo thật 20/10 (Task 2):
+  - Biến platform chèn lúc chạy (`url: mainProgramUrl`, 15/62 file) → `vm` gán `undefined` rồi chạy lại trên context mới (tối đa 10 biến), không rơi vào 🟡 "soát tay".
+  - `spoint` soát trước `vm` (chỉ dựa DOM).
+  - `tools/pm-gate/scan.mjs`: comment HTML chứa `<script>` (MASTER Lucky dòng 511) từng mở khối raw và nuốt phần tử tới `</script>` kế tiếp → giờ khớp comment trước.
 - Cố ý **không** soát: `debug.status` (backend đổi `false` là đúng quy trình); `el` 6 key, `timeWait`, `window.load`
   (nằm trong bundle JS, không có trong HTML — thuộc R-JS-1/R-JS-2).
 - Landing cũ: `--baseline HEAD` sẵn có đẩy lỗi có từ trước vào nhóm nợ.

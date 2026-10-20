@@ -1,0 +1,39 @@
+import { test } from 'node:test';
+import assert from 'node:assert';
+import { formatStatus, stageCells, totals } from './format.mjs';
+
+const flow = { id: 'f', stages: [
+  { id: 'plan', kind: 'claude', next: 'review' },
+  { id: 'review', kind: 'claude', next: 'ok' },
+  { id: 'ok', kind: 'pause', next: 'commit' },
+  { id: 'commit', kind: 'gate', next: null },
+] };
+const run = {
+  key: 'GW-1', runId: 'r1', flow: 'f', status: 'paused', stage: 'ok', stopReason: null, routerReason: 'landing-fix: hasDesign',
+  receipts: [
+    { stage: 'plan', round: 1, verdict: 'pass', blocking: 0, advisory: 0, turns: 69, costUsd: 2.73, ms: 420000 },
+    { stage: 'review', round: 1, verdict: 'revise', blocking: 1, advisory: 4, turns: 41, costUsd: 1.32, ms: 120000 },
+    { stage: 'review', round: 2, verdict: 'pass', blocking: 0, advisory: 0, turns: 2, costUsd: 0.12, ms: 60000 },
+  ],
+};
+
+test('stageCells: done / waiting / pending', () => {
+  assert.deepStrictEqual(stageCells(run, flow).map((c) => [c.id, c.state]), [['plan', 'done'], ['review', 'done'], ['ok', 'waiting'], ['commit', 'pending']]);
+  assert.strictEqual(stageCells(run, flow)[1].rounds, 2);
+});
+
+test('stageCells: stage đang dừng → stopped, đang chạy → running', () => {
+  assert.strictEqual(stageCells({ ...run, status: 'stopped', stage: 'review' }, flow)[1].state, 'stopped');
+  assert.strictEqual(stageCells({ ...run, status: 'running', stage: 'review' }, flow)[1].state, 'running');
+});
+
+test('totals cộng turns, phút, $', () => {
+  assert.deepStrictEqual(totals(run), { runs: 3, turns: 112, minutes: 10, usd: 4.17 });
+});
+
+test('formatStatus có hàng stage, dòng round và dòng tổng', () => {
+  const out = formatStatus(run, flow);
+  assert.match(out, /✓ plan → ✓ review → ⏸ ok → · commit/);
+  assert.match(out, /review · r1 · revise · 1 blocking · 4 advisory · 41 turns · 2 phút · \$1\.32/);
+  assert.match(out, /Tổng: 3 lượt claude · 10 phút · \$4\.17/);
+});

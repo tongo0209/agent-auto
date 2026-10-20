@@ -148,3 +148,8 @@ test('reject ở pause sang fix → fix xong quay về rejectReturnTo', () => {
   run = applyEvent(run, flow, { type: 'pass' }, T0);
   assert.strictEqual(run.stage, 'gates');
 });
+
+test('halt dừng run với lý do, vẫn ghi receipt', () => {
+  const run = applyEvent(fresh(), FLOW, { type: 'halt', reason: 'runner:plan', receipt: receipt('plan') }, T0);
+  assert.deepStrictEqual([run.status, run.stopReason, run.receipts.length], ['stopped', 'runner:plan', 1]);
+});

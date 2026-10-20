@@ -66,6 +66,8 @@ function transition(run, flow, stage, event) {
       const caller = target.returnTo === 'caller' ? { callerOfFix: stage.rejectReturnTo ?? stage.id } : {};
       return moveTo({ ...noted, ...caller }, flow, target.id);
     }
+    case 'halt':
+      return stop(run, event.reason);
     default:
       throw new Error(`event lạ: ${event.type}`);
   }

@@ -353,3 +353,14 @@ test('pause: marker đặt giữa stage → chạy xong stage đó rồi dừng 
   assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-plan']);
   assert.deepStrictEqual(pausing.calls.map((c) => c.stageId), ['plan', 'plan-review']);
 });
+
+test('run mới hiện trên đĩa ngay khi stage đầu đang chạy, đúng stage đang chạy', async () => {
+  const start = newRun('landing-fix');
+  let seen;
+  const runClaude = async () => {
+    seen ??= loadRun(start.key, start.runId);
+    return { ok: true, sessionId: 's', turns: 1, costUsd: 0.1, ms: 10, result: verdict('pass'), error: null };
+  };
+  await drive(start, loadFlow('landing-fix'), base({ runClaude, runGates: fakeGates().runGates }));
+  assert.deepStrictEqual([seen?.status, seen?.stage], ['running', 'plan']);
+});

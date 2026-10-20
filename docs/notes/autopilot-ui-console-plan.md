@@ -55,3 +55,6 @@ Bấm Duyệt thì chặn POST bằng `page.route` để không duyệt thật G
 - Script chạy thử: scratchpad/run-all.sh → run-all.log; snapshot source gốc trước/sau mỗi run (snap-before/after-<KEY>.txt).
 - Thứ tự: GW-912 landing-fix · GW-963 gameplay-change · GW-909 design-intake · GW-950 buglist · GW-844 landing-new · GW-627 feature · GW-806 landing-clone.
 - Chờ user: mở nút autopilot qua cổng 403 (server.mjs sửa, CHƯA commit — classifier chặn); restart 4800 phải hỏi; push 2 nhánh.
+- 15:3x: 4800 đã restart (task bbkrmkrmh) với aafe309 (mở nút autopilot) + 5818086 (token/phút tiêu hao, bỏ budget mặc định). Run thử 7 luồng vẫn chạy nền (b3826ppks, log scratchpad/run-all.log).
+- Đang làm: tạm dừng theo ý (marker .pause, dừng sau bước hiện tại) + phát hiện run bị ngắt (status running mà lock chết) → nút Chạy tiếp.
+- 89253fc (merge ff): pause/Bị ngắt + Chạy tiếp, 177/177. CẦN restart 4800 (hỏi user). GW-912 dừng budget $10 ở gates (do script --budget-usd 10); source gốc đổi lúc 15:11 là commit ghoststory của phiên khác, không phải autopilot.

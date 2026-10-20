@@ -204,6 +204,7 @@ export async function drive(startRun, flow, overrides = {}) {
       run = applyEvent(run, flow, { type: 'halt', reason: `worktree: ${e.message}` }, deps.now());
       continue;
     }
+    saveRun(run);
     const event = await runStage(run, stage, deps);
     const onDisk = loadRun(run.key, run.runId);
     if (onDisk?.stopReason === 'aborted') return onDisk;

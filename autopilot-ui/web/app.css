@@ -259,3 +259,6 @@ pre.raw { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word
   .dock-card { grid-template-columns: 1fr; }
   .lane { gap: 28px; }
 }
+.group h3.fold { cursor: pointer; user-select: none; }
+.group h3.fold:hover { color: var(--text-2); }
+.group.aborted .item { opacity: .6; }

@@ -5,7 +5,17 @@ const mins = (ms) => Math.round((ms ?? 0) / 60000);
 const globRe = (g) => new RegExp('^' + g.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$');
 
 const STATUS = { paused: 'Chờ bạn duyệt', attached: 'Chờ chạy trong phiên', running: 'Đang chạy', stopped: 'Đã dừng', done: 'Xong' };
-const GROUPS = [['need', 'Cần bạn', ['paused', 'attached']], ['run', 'Đang chạy', ['running']], ['stop', 'Đã dừng', ['stopped']], ['done', 'Xong', ['done']]];
+const isAborted = (r) => r.stopReason === 'aborted';
+const GROUPS = [
+  ['need', 'Cần bạn', (r) => ['paused', 'attached'].includes(r.status)],
+  ['run', 'Đang chạy', (r) => r.status === 'running'],
+  ['stop', 'Đã dừng', (r) => r.status === 'stopped' && !isAborted(r)],
+  ['done', 'Xong', (r) => r.status === 'done'],
+  ['aborted', 'Đã huỷ', isAborted],
+];
+const FOLD_KEY = 'console2.apAbortedOpen';
+let abortedOpen = false;
+try { abortedOpen = localStorage.getItem(FOLD_KEY) === '1'; } catch {}
 const ICON_BY_STATE = { done: 'ph-check', running: 'ph-circle-notch spin', waiting: 'ph-hand', stopped: 'ph-x' };
 const ICON_BY_ID = { plan: 'ph-map-trifold', 'plan-review': 'ph-magnifying-glass', implement: 'ph-code', 'code-review': 'ph-git-diff', gates: 'ph-shield-check', 'gates-final': 'ph-shield-check', 'ui-check': 'ph-browser', fix: 'ph-wrench', commit: 'ph-git-commit', cut: 'ph-scissors', 'check-design': 'ph-ruler', spec: 'ph-list-checks', 'clean-code': 'ph-broom', 'intake-triage': 'ph-tray', lanes: 'ph-git-fork', verify: 'ph-check-square', 'write-sheet': 'ph-table' };
 const LIVE = 'live';
@@ -38,10 +48,14 @@ function renderQueue() {
     $('#apQueue').innerHTML = '<p style="color:var(--text-3);padding:12px 8px;font-size:13px">Chưa có run nào. Bấm "Chạy ticket" để bắt đầu.</p>';
     return;
   }
-  $('#apQueue').innerHTML = GROUPS.map(([cls, title, statuses]) => {
-    const runs = data.runs.filter((r) => statuses.includes(r.status));
+  $('#apQueue').innerHTML = GROUPS.map(([cls, title, belongs]) => {
+    const runs = data.runs.filter(belongs);
     if (!runs.length) return '';
-    return `<div class="group ${cls}"><h3><span>${title}</span><span class="mono">${runs.length}</span></h3>${runs.map((r) => `
+    const folded = cls === 'aborted' && !abortedOpen;
+    const head = cls === 'aborted'
+      ? `<h3 class="fold" data-fold title="Run đã huỷ và hoàn tác — giữ lại để xem log, không cần xử lý"><span><i class="ph ph-caret-${folded ? 'right' : 'down'}"></i> ${title}</span><span class="mono">${runs.length}</span></h3>`
+      : `<h3><span>${title}</span><span class="mono">${runs.length}</span></h3>`;
+    return `<div class="group ${cls}">${head}${folded ? '' : runs.map((r) => `
       <button class="item ${r.key === selectedKey ? 'on' : ''}" data-key="${esc(r.key)}">
         <span class="key">${esc(r.key)}</span><span class="cost mono">${money(r.totals.usd)}</span>
         <span class="sub">${esc(r.flowLabel)} · ${esc(r.stage ?? 'hoàn tất')}</span>
@@ -269,7 +283,7 @@ async function refresh() {
   const next = await (await fetch('/api/autopilot/runs')).json();
   const sig = JSON.stringify(next.runs);
   data = next;
-  selectedKey ??= data.runs[0]?.key ?? null;
+  selectedKey ??= data.runs.find((r) => !isAborted(r))?.key ?? null;
   if (sig === lastSig) return;
   lastSig = sig;
   renderQueue();
@@ -352,6 +366,11 @@ export function mount(el) {
   lastSig = '';
   lastStates = {};
   $('#apQueue').addEventListener('click', (e) => {
+    if (e.target.closest('[data-fold]')) {
+      abortedOpen = !abortedOpen;
+      try { localStorage.setItem(FOLD_KEY, abortedOpen ? '1' : '0'); } catch {}
+      return renderQueue();
+    }
     const key = e.target.closest('.item')?.dataset.key;
     if (!key || key === selectedKey) return;
     selectedKey = key;

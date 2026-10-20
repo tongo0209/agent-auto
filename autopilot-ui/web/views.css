@@ -520,3 +520,4 @@ button.bd-box:hover { color: var(--ok); } button.bd-box:active { transform: scal
 .pv-lock { margin-top: auto; padding-top: 4px; }
 .palette .pv-why { width: 100%; background: var(--bg-2); border: 1px solid var(--stop); border-radius: var(--r); padding: 10px 12px; font-size: 14px; }
 .pv-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--text-3); }
+.pv-warn { margin: 0; padding: 8px 12px; border-radius: var(--r); font-size: 13px; color: var(--wait); background: color-mix(in srgb, var(--wait) 12%, transparent); }

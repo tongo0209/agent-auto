@@ -423,6 +423,7 @@ async function startRun(mode) {
 const AUTO_SKIP_HINT = 'tự bỏ nếu không đụng UI/pm';
 const isApproval = (s) => s.kind === 'pause' || s.kind === 'attached';
 const needsSkipReason = () => preview.stages.some((s) => preview.off.has(s.id) && s.gateLike);
+const allClaudeOff = () => preview.stages.filter((s) => s.kind === 'claude').every((s) => preview.off.has(s.id));
 const canRunPreview = () => Boolean(preview.flow) && (!needsSkipReason() || preview.skipReason.trim() !== '');
 
 async function loadPreview(input, flow) {
@@ -451,6 +452,7 @@ function renderPreview() {
       <select id="pvFlow" aria-label="Luồng">${flows.map((f) => `<option value="${esc(f.id)}" ${f.id === (preview.flow ?? '') ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}</select></div>
     <p class="pv-reason">${esc(preview.reason)}</p>
     <div class="pv-stages">${preview.stages.map(previewCell).join('') || '<p class="pv-empty">Chọn luồng để xem các bước.</p>'}</div>
+    ${preview.stages.length && allClaudeOff() ? '<p class="pv-warn">Đã tắt hết các bước claude — run chỉ còn cổng và mốc duyệt, không có gì được viết.</p>' : ''}
     ${needsSkipReason() ? `<input id="pvReason" class="pv-why" placeholder="Lý do tắt cổng (bắt buộc)" value="${esc(preview.skipReason)}" autocomplete="off">` : ''}
     <div class="pv-foot"><span>Enter chạy · Esc đóng · 📍 dừng sau bước</span><button class="btn go" data-pv="run" ${canRunPreview() ? '' : 'disabled'}>Chạy <kbd>↵</kbd></button></div>`;
 }

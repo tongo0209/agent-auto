@@ -41,3 +41,5 @@ luckydraw-gift-exchange	pm__title-form	in:pm__condition-module	allow	gtp 3 reque
 *	popup_getlist	-	known	popup nhiệm vụ nhận lượt riêng (BE đổ list, không hook pm__): gt-promotion + cdn-source ~1514 lần; mẫu 688-TLBBVNG/Request-new-event-H5-58176/promotion; GW-890 user chốt 13/10	no
 *	popup_rule	-	known	popup thể lệ UI tự dựng (iframe, không hook pm__): gt-promotion 216 file html + cdn-source 136 dist/index.html; GW-890 user chốt 13/10	no
 *	data-src	-	known	lazyload của libraryMainsite (MS__/MJ__lazyload) trên img hook như captcha-image: gt-promotion 28 file captcha-image mang data-src; GW-890 user chốt 13/10	no
+luckydraw-gift-exchange	data-item	-	known	ô quà khớp prodTemplate.items cho hiệu ứng rút (kit AI-RULES Lucky §6, fe-draw/draw-animation.js); mainsite gt-promotion 5/62 file pm__rut — 20/10/2026	no
+*	prodTemplate	-	known	khai const hợp lệ: 54/57 mainsite gt-promotion khai const; lib 1.3.2 đọc tên trần (typeof prodTemplate) — kit đòi var chặt hơn cần, 20/10/2026	no

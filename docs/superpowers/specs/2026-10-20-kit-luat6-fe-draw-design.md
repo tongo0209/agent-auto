@@ -33,7 +33,7 @@ Thành công khi:
 | Khai bằng `var` | Đọc tên trần → `const` ở cấp trên cùng của script cổ điển vẫn thấy | 55 `const`, 2 `var` | Production thắng: nhận `var`/`const`/`let` cấp trên cùng; chặn `type="module"` và khai trong hàm |
 | `pm__point spoint` trên cùng 1 thẻ | `el:{cp:".spoint"…}` mặc định | 34 cùng thẻ, 46 có `spoint` | Không có `spoint` = 🔴; khác thẻ = 🟡 |
 | `names.en` + key = class `<body>` | `${r.en?`…${r[i("body").attr("class")][e.indexWord]}`:""}` | — | 🔴 |
-| `data-item` trên ô quà | Chỉ hiệu ứng mẫu của kit dùng | 4/62 (JX1M 59399 dùng `data-item` đánh số ô theo nghĩa riêng) | Không có = 🟡; lệch `items` = 🟡 (sửa sau đo 20/10: 🔴 ban đầu chặn nhầm JX1M; so theo chuỗi vì ZSM 58018 khai `items` số) |
+| `data-item` trên ô quà | Chỉ hiệu ứng mẫu của kit dùng | 5/62 (JX1M 59399 dùng `data-item` đánh số ô theo nghĩa riêng) | Không có = 🟡; lệch `items` = 🟡 (sửa sau đo 20/10: 🔴 ban đầu chặn nhầm JX1M; so theo chuỗi vì ZSM 58018 khai `items` số) |
 | Comment `BACKEND:` trên khối | — | 2/62 | 🔴 ở file bàn giao, 🟡 trong cdn-source |
 | `timeWait` dạng getter | `$.extend` nông → `settings.config` chung object; gán lại trong `animResult` cũng chạy | — | Nhận cả hai, task mới ưu tiên getter |
 
@@ -83,7 +83,7 @@ User chốt: `Promotion/` ngoài phạm vi, không sửa, không soát.
 | `rules/pm-contract.md` | R-PM-7: 5 → 6 luật AI-GUIDE §3, nêu luật 6 + trỏ `fe-draw/`. Bảng mã thêm `PG-DRAW` (🔴·🟡). R-PM-10 thêm (h): test x1 và x5/x10 ở debug, popup bật **sau** khi hiệu ứng dừng, đóng popup tắt sáng ô trúng. R-PM-11 bước 3: Lucky có `pm__rut` ⇒ ghi bảng quà vào mục 5 (xem 3.4) |
 | `rules/landing-js.md` R-JS-1 | Thêm: ô lượt `pm__point spoint` cùng thẻ; khởi tạo ở `window.load`; `directory: ''` + lấy ảnh theo `src` quà đang hiển thị; `<body>` chỉ mang class ngôn ngữ (lib tra `names` theo nó). Dẫn mẫu `fe-draw/draw-animation.js` + `tn3q/landing/2026-ld-sinhnhat` |
 | `rules/landing-js.md` R-JS-2 | `timeWait`: getter (kit) hoặc gán lại trong `animResult`, cả hai hợp lệ; task mới dùng getter. Ghi dẫn chứng đọc lib |
-| `rules/pm-kit-overrides.tsv` | 1 dòng `*  prodTemplate  -  known  <dẫn chứng 55/57 mainsite khai const + lib typeof>  no`. Ghi thêm vào `docs/notes/2026-09-23-kit-vs-production.md` (R-PM-9) |
+| `rules/pm-kit-overrides.tsv` | 1 dòng `*  prodTemplate  -  known  <dẫn chứng 54/57 mainsite khai const + lib typeof>  no`. Ghi thêm vào `docs/notes/2026-09-23-kit-vs-production.md` (R-PM-9) |
 
 ### 3.3. Bàn giao — `rules/html-handoff.md` R-HO-13 MUST
 

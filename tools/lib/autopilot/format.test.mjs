@@ -54,3 +54,8 @@ test('stageCells: run chat lấy trạng thái bước hiện tại từ mark (a
   assert.strictEqual(stageCells({ ...chat, chatState: 'doing' }, flow)[1].state, 'running');
   assert.strictEqual(stageCells({ ...chat, chatState: null }, flow)[1].state, 'pending');
 });
+
+test('stageCells: bước bị bỏ qua (bước sau đã chạy hoặc run xong) → skipped, không xám như chưa chạy', () => {
+  const doneRun = { ...run, status: 'done', stage: null, receipts: [run.receipts[0], { stage: 'commit', round: 1, verdict: 'pass', blocking: 0, advisory: 0, turns: 0, costUsd: 0, ms: 1000 }] };
+  assert.deepStrictEqual(stageCells(doneRun, flow).map((c) => c.state), ['done', 'skipped', 'done', 'done']);
+});

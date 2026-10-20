@@ -11,8 +11,8 @@ export function stageCells(run, flow) {
   return flow.stages.map((s, i) => {
     const receipts = run.receipts.filter((r) => r.stage === s.id);
     const last = receipts.at(-1);
-    const passedPause = s.kind === 'pause' && ranLater(i);
-    const state = s.id === run.stage ? currentState(run) : receipts.length || passedPause ? 'done' : 'pending';
+    const passed = run.status === 'done' || ranLater(i);
+    const state = s.id === run.stage ? currentState(run) : receipts.length || (passed && s.kind === 'pause') ? 'done' : passed ? 'skipped' : 'pending';
     return {
       id: s.id, kind: s.kind, state, rounds: receipts.length,
       max: s.loop?.max ?? null,

@@ -384,3 +384,16 @@ test('run bị ngắt (interrupted) nhận retry/goto/skip như stopped; break v
   assert.deepStrictEqual([retried.status, retried.stage], ['running', 'gates']);
   assert.strictEqual(chooseAction(running, FLOW, { type: 'break', stage: 'design-gap-check' }, { now: T0, interrupted: true }).status, 'running');
 });
+
+test('skip fix (user) do gates gọi: cần lý do, đi tiếp sau gates, ghi gateSkipped cho gates — không quay lại gates lặp lỗi cũ', () => {
+  const stoppedAtFix = { ...stoppedAtGates(), status: 'running', stopReason: null };
+  let run = applyEvent(stoppedAtFix, FLOW, { type: 'revise', receipt: receipt('gates') }, T0);
+  assert.deepStrictEqual([run.stage, run.callerOfFix], ['fix', 'gates']);
+  run = applyEvent(run, FLOW, { type: 'fail', receipt: receipt('fix') }, T0);
+  run = { ...run, status: 'stopped', stopReason: 'fail:fix' };
+  assert.strictEqual(ofType(allowedActions(run, FLOW), 'skip').needsReason, true);
+  assert.throws(() => chooseAction(run, FLOW, { type: 'skip' }, { now: T0 }), /cần lý do/);
+  const next = chooseAction(run, FLOW, { type: 'skip', reason: 'fe-gate báo oan' }, { now: T0 });
+  assert.deepStrictEqual([next.stage, next.callerOfFix], ['design-gap-check', null]);
+  assert.deepStrictEqual(next.gateSkipped.map((g) => [g.stage, g.reason]), [['gates', 'fe-gate báo oan']]);
+});

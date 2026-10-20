@@ -73,8 +73,11 @@ function loopBack(run, flow, stage) {
 
 function transition(run, flow, stage, event) {
   switch (event.type) {
-    case 'pass':
     case 'skip':
+      // user bỏ qua fix = chấp nhận lỗi còn lại của stage đã gọi fix, đi tiếp sau stage đó thay vì chạy lại nó
+      if (stage.returnTo === 'caller' && event.by === 'user') return moveTo({ ...run, callerOfFix: null }, flow, stageOf(flow, run.callerOfFix).next);
+      return advance(run, flow, stage);
+    case 'pass':
     case 'approve':
       return advance(run, flow, stage);
     case 'revise':
@@ -114,9 +117,10 @@ export function applyEvent(run, flow, event, now) {
   }
   if (event.sessionId && stage.keepSession) next = { ...next, sessions: { ...next.sessions, [stage.id]: event.sessionId } };
 
-  const alreadySkipped = (next.gateSkipped ?? []).some((g) => g.stage === stage.id);
-  if (event.type === 'skip' && event.by === 'user' && isGateLike(stage) && !alreadySkipped) {
-    next = { ...next, gateSkipped: [...(next.gateSkipped ?? []), { stage: stage.id, reason: event.reason, at: new Date(now).toISOString() }] };
+  const skippedGate = stage.returnTo === 'caller' && next.callerOfFix ? stageOf(flow, next.callerOfFix) : stage;
+  const alreadySkipped = (next.gateSkipped ?? []).some((g) => g.stage === skippedGate.id);
+  if (event.type === 'skip' && event.by === 'user' && isGateLike(skippedGate) && !alreadySkipped) {
+    next = { ...next, gateSkipped: [...(next.gateSkipped ?? []), { stage: skippedGate.id, reason: event.reason, at: new Date(now).toISOString() }] };
   }
 
   next = transition(next, flow, stage, event);
@@ -170,7 +174,7 @@ export function allowedActions(run, flow, { options = [], interrupted = false } 
     const passed = flow.stages.filter((s) => s.id !== run.stage && !isCalledOnly(s) && hasReceipt(run, s.id)).map((s) => s.id);
     if (passed.length) actions.push({ type: 'goto', stages: passed });
   }
-  if (retryable) actions.push({ type: 'skip', needsReason: isGateLike(stage) });
+  if (retryable) actions.push({ type: 'skip', needsReason: isGateLike(stage) || stage.returnTo === 'caller' });
   if (status === 'paused' && run.stage === 'approve-plan' && options.length >= 2) {
     actions.push({ type: 'pick', options: options.map((o) => o.id) });
   }

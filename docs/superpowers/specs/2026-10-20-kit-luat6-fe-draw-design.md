@@ -129,3 +129,5 @@ Mỗi phát hiện có ca test riêng trong `tools/pm-gate.test.mjs` (78, 88–1
 | `scan.mjs`: `{# … <template> … #}` nuốt phần tử phía sau (có từ trước) | `RAW_TEXT` khớp `{# #}` trước. So 2113 file thật: khác 3 file, cả 3 là sửa đúng |
 
 Đối chứng sau sửa: 107 file `pm__rut` gt-promotion (63 mainsite, thêm `658-KTO/…/Mainsite/` viết hoa mà phép đo cũ sót) — 0 file ngoài mainsite bị PG-DRAW; 325 trang cdn-source — PG-DRAW giống hệt bản HEAD (844/844 dòng).
+
+Review vòng 3 (trên 141ff0a): không bug nào ăn vào file thật (63 mainsite + 339 trang cdn-source). Vá rẻ 4 điểm, có test 103–105: đường dẫn qua symlink → `realpathSync`; `// const prodTemplate` hay chuỗi trong script khác (có thật ở ballistic, sofi preregister) không tính là khai báo; `<style>/<textarea>/<template>` là raw; node thiếu `--permission` (22.0–22.12) → 🟡 nói rõ. Để lại, ghi nhận: stub không mô phỏng `typeof`/`window.X`/spread/so sánh nên các nhánh đó có thể ra 🔴 thay vì 🟡 — corpus hiện 0 khối dùng cho names/items. Test chạy 111/0 trên node 22.23, 24.21, 25.9; gt-promotion và cdn-source quét lại giống hệt.

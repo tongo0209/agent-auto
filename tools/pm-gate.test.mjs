@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync, rmSync, symlinkSync } from 'node:fs';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { tmpdir, homedir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -610,6 +610,20 @@ const CASES = [
   ]],
   ['102 draw-concat-global: cộng chuỗi biến platform (`mainProgramUrl + \'…\'`, gno 4 tuổi) vẫn soát tiếp', () => [
     ['L', gate(L, once(base(L), "url: typeof baseURL !== 'undefined' ? baseURL : ''", "url: mainProgramUrl + 'assets/'")), (r) => noRed(r) && !hasDraw(r)],
+  ]],
+  ['103 draw-symlink: đi qua symlink tới gt-promotion vẫn chỉ soát mainsite/', () => {
+    const file = writeCase(withoutDraw(base(L)), 'gt-promotion-template/G/promotion/index.html');
+    const link = join(root, `gtp-link-${Date.now()}`);
+    symlinkSync(file.slice(0, file.indexOf('gt-promotion-template/') + 'gt-promotion-template'.length), link);
+    return [['L', run([join(link, 'G/promotion/index.html'), '--gameplay', L, '--baseline', 'none']), (r) => Boolean(r.json) && !hasDraw(r)]];
+  }],
+  ['104 draw-commented-decl: `// const prodTemplate` trong script khác (ballistic, sofi) không tính là khai báo', () => [
+    ['comment', gate(L, once(base(L), DRAW_BLOCK, `<script>// const prodTemplate = {\n</script>\n${DRAW_BLOCK}`)), (r) => noRed(r) && !hasDraw(r)],
+    ['chuỗi', gate(L, once(base(L), DRAW_BLOCK, `<script>var s = "let prodTemplate = missing";</script>\n${DRAW_BLOCK}`)), (r) => noRed(r) && !hasDraw(r)],
+    ['sau comment khối cùng dòng vẫn tính', gate(L, once(base(L), '<script>const prodTemplate', '<script>/* cấu hình */ const prodTemplate')), (r) => noRed(r) && !hasDraw(r)],
+  ]],
+  ['105 draw-style-raw: `<style>` nhắc `<script>` không mở khối giả', () => [
+    ['L', gate(L, once(base(L), DRAW_BLOCK, `<style>/* <script> */</style>\n${DRAW_BLOCK}`)), (r) => noRed(r) && !hasDraw(r)],
   ]],
   ['96 comment Twig nhắc `<script>` không nuốt phần tử phía sau', () => [
     ['L', gate(L, once(base(L), '<body class="vn">', '<body class="vn">\n{# dán khối trước <script> lib #}')), noRed],

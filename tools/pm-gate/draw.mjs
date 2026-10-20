@@ -1,10 +1,12 @@
 // PG-DRAW (kit luật 6): trang có pm__rut phải khai prodTemplate trước lib — đọc HTML thô vì scan.mjs làm trống ruột <script>.
 import { spawnSync } from 'node:child_process';
+import { existsSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // Khớp comment trước: `<script>` nằm trong comment (MASTER Lucky dòng 511) không mở khối; `<!--` trong chuỗi JS không thành comment.
-const TAGS = /<!--[\s\S]*?-->|{#[\s\S]*?#}|<script\b((?:"[^"]*"|'[^']*'|[^>"'])*)>([\s\S]*?)<\/script\s*>/gi;
-const DECLARES_PROD_TEMPLATE = /\b(var|let|const)\s+prodTemplate\s*=/;
+const TAGS = /<!--[\s\S]*?-->|{#[\s\S]*?#}|<script\b((?:"[^"]*"|'[^']*'|[^>"'])*)>([\s\S]*?)<\/script\s*>|<(style|textarea|template)\b[^>]*>[\s\S]*?<\/\3\s*>/gi;
+// Đầu câu lệnh: `// const prodTemplate` hay chuỗi "let prodTemplate" (ballistic, sofi preregister) không tính.
+const DECLARES_PROD_TEMPLATE = /(?:^|[;{}]|\*\/)[ \t]*(var|let|const)\s+prodTemplate\s*=/m;
 const TYPE = /(?:^|\s)type\s*=\s*["']?([^"'\s>]*)/i;
 const CLASSIC_TYPE = /^((text|application)\/(java|ecma)script)?$/i;
 const DEFER = /(?:^|\s)defer\b/i;
@@ -16,13 +18,12 @@ const MAINSITE_DIR = /(^|\/)mainsite\//i;
 const PROMOTION_DIR = /(^|\/)Promotion\//;
 const ITEMS_META = new Set(['length', 'type']);
 const CHILD_TIMEOUT_MS = 5000;
-const MIN_NODE_WITH_PERMISSION = 22;
 const EXTERNAL = '__pm_gate_external__:';
 const EXTERNAL_NAMES = new RegExp(`${EXTERNAL}([\\w$]+)`, 'g');
 
 // User chốt 20/10: gt-promotion chỉ soát mainsite/; ngoài đó (cdn-source) promotion/ là source nên vẫn soát.
 const outOfScope = (file) => {
-  const path = resolve(file);
+  const path = existsSync(file) ? realpathSync(file) : resolve(file);
   return GT_PROMOTION_DIR.test(path) ? !MAINSITE_DIR.test(path) : PROMOTION_DIR.test(path);
 };
 
@@ -67,10 +68,10 @@ function childFailure(child) {
 }
 
 function evaluate(body) {
-  if (Number(process.versions.node.split('.')[0]) < MIN_NODE_WITH_PERMISSION) {
-    return { error: `node ${process.versions.node} chưa có --permission — PG-DRAW chưa soát names/items/data-item, nâng node ≥ ${MIN_NODE_WITH_PERMISSION} rồi chạy lại` };
-  }
   const child = spawnSync(process.execPath, ['--permission', '-e', `(${evaluateInChild})(${JSON.stringify(EXTERNAL)})`], { input: body, encoding: 'utf8', timeout: CHILD_TIMEOUT_MS, env: {} });
+  if (child.stderr.includes('bad option: --permission')) {
+    return { error: `node ${process.versions.node} chưa có cờ --permission — PG-DRAW chưa soát names/items/data-item, nâng node ≥ 22.13 rồi chạy lại` };
+  }
   try {
     return JSON.parse(child.stdout);
   } catch {

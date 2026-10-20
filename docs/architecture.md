@@ -32,7 +32,9 @@ Các thư mục dữ liệu vẫn còn sau khi clone nhờ `.gitkeep`, chỉ là
 | `history/phases.jsonl` | 1 dòng mỗi lần phase đổi → nguồn lead time thật |
 | `knowledge/metrics.jsonl` | Console tự ghi 1 dòng/ngày/ticket, **đo từ git** |
 | `knowledge/lessons.md` | Bài học liên-dự-án; `fe-gate` fail thì tự append block nháp |
-| `console/` | Web local (webpack + jQuery + xterm) — README riêng ở trong |
+| `console/` | Web local (webpack + jQuery + xterm) — README riêng ở trong. Trang `/autopilot` tự đứng ở `console/server/autopilot-page/` |
+| `flows/` | Luồng autopilot khai báo bằng JSON (`landing-new`, `landing-fix`, `feature`, `buglist`) + `router.json` + `prompts/` cho từng stage |
+| `runs/<KEY>/<runId>/` | `run.json` + artifact từng stage (`plan.md`, `<stage>-rN.json`/`.log`) của autopilot. Không vào git |
 
 ### Tool
 
@@ -52,6 +54,7 @@ Các thư mục dữ liệu vẫn còn sau khi clone nhờ `.gitkeep`, chỉ là
 | `tools/baked-text-guard.py` | Bắt lỗi **chữ lồng chữ**: text vừa bake trong ảnh vừa render bằng HTML. Build PASS, console sạch, checker qua — chỉ mắt người mới thấy | — |
 | `tools/check-handoff-sync.py` | So **chữ 2 nửa bàn giao** `Promotion/` ↔ `mainsite/` của gt-promotion-template theo từ, ghép cặp kiểu "×20 ↔ x1", bỏ qua khác markup/thứ tự block (R-HO-5) | 6 nhóm |
 | `tools/handoff-drift.mjs` | So **bản bàn giao ↔ `dist/`**: `mainsite/` phải khớp từng class/id/data/chữ/asset (ERROR), `Promotion/` chỉ WARN hook dist có mà bản BE thiếu (R-HO-11) | 9 ca |
+| `tools/autopilot.mjs` | **Autopilot**: chạy ticket qua luồng trong `flows/`, mỗi stage một `claude -p` mới (fix resume phiên implement), cổng chạy bằng Node, dừng ở mốc duyệt. `run/status/approve/reject/resume/abort/route`. Spec `docs/superpowers/specs/2026-10-20-autopilot-design.md` | e2e + `tools/lib/autopilot/*.test.mjs` |
 | `tools/sp-diff.mjs` | So 2 manifest cũ ↔ mới để biết designer sửa/thêm/xoá file gì | — |
 
 ## Cổng chất lượng trước khi báo xong

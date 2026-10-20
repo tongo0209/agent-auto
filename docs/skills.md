@@ -18,6 +18,14 @@ phiên mới.
 | | `wrap` | Chốt ngày, soạn standup, ghi metrics |
 | | `status` / `doctor` | Xem board hôm nay / chạy `state-doctor` và tự sửa cái sửa được |
 
+### Autopilot (chạy nền ngoài phiên)
+
+`node ~/VNG/agent-auto/tools/autopilot.mjs run <KEY|link>` — router chọn 1 trong 4 luồng (`landing-new`,
+`landing-fix`, `feature`, `buglist`), mỗi stage là 1 `claude -p` mới gọi đúng skill ở trên, cổng
+(build · pm-gate · fe-gate · landing-parity · layout-gate · commit) chạy bằng Node. Dừng ở mốc duyệt →
+noti macOS; duyệt/trả về ở `http://127.0.0.1:4747/autopilot` hoặc `autopilot approve|reject <KEY> --note "…"`.
+Không bao giờ push. Skill gõ tay không đổi hành vi (đoạn `## Chạy dưới autopilot` chỉ áp khi prompt có `AUTOPILOT_RUN:`).
+
 Vòng đời phase mỗi ticket: `🕐 chờ-design → 📐 sẵn-sàng → 💻 đang-code → 📦 giao-HTML →
 🧪 chờ-test → 🐛 fix-bug → ✅ xong-FE`.
 

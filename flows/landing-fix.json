@@ -5,6 +5,20 @@
     "usd": 25,
     "minutes": 120
   },
+  "ask": [
+    {
+      "need": [
+        "gameplayOk"
+      ],
+      "question": "Gameplay là gì — khoá theo cặp AI-RULES nào (project-note lock, R-PM-11)?"
+    },
+    {
+      "need": [
+        "campaignDir"
+      ],
+      "question": "Folder campaign (products/<game>/landing/<slug>) của ticket là gì?"
+    }
+  ],
   "stages": [
     {
       "id": "plan",

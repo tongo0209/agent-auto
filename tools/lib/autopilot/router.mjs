@@ -22,14 +22,12 @@ export function route(signals, rules, askOf = flowAsk) {
   const matched = rule.all;
   if (rule.flow === 'manual') return { flow: 'manual', matched, reason: fill(rule.reason, signals) };
   if (rule.flow === 'ask') return { flow: 'ask', matched, reason: fill(rule.reason, signals), questions: rule.questions.map((q) => fill(q, signals)) };
-  if (rule.needsCampaign !== false && !signals.campaignDir) {
-    return {
-      flow: 'ask', target: rule.flow, matched,
-      reason: `khớp ${rule.flow} nhưng thiếu campaignDir (state.issues.${signals.key}.paths)`,
-      questions: ['Folder campaign (products/<game>/landing/<slug>) của ticket là gì?'],
-    };
+  const unmet = askOf(rule.flow)
+    .filter((a) => !(rule.needsCampaign === false && a.need.includes('campaignDir')))
+    .filter((a) => !a.need.every((cond) => holds(cond, signals)));
+  if (unmet.length) {
+    const missing = unmet.flatMap((a) => a.need).join(', ');
+    return { flow: 'ask', target: rule.flow, matched, reason: `khớp ${rule.flow} nhưng chưa đạt: ${missing}`, questions: unmet.map((a) => a.question) };
   }
-  const questions = askOf(rule.flow).filter((a) => !a.need.every((cond) => holds(cond, signals))).map((a) => a.question);
-  if (questions.length) return { flow: 'ask', target: rule.flow, matched, reason: `khớp ${rule.flow} nhưng thiếu đầu vào`, questions };
   return { flow: rule.flow, matched, reason: `${rule.flow}: ${matched.join(' · ')}` };
 }

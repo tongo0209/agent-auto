@@ -11,6 +11,12 @@
         "!sheetNoBugId"
       ],
       "question": "Sheet không có cột BugID/No. (radar mù) — thêm cột BugID hay chỉ định cột nào định danh bug?"
+    },
+    {
+      "need": [
+        "campaignDir"
+      ],
+      "question": "Folder campaign (products/<game>/landing/<slug>) của ticket là gì?"
     }
   ],
   "stages": [

@@ -1,33 +1,24 @@
 {
   "rules": [
-    {
-      "flow": "ask", "all": ["pathsUnconfirmed"],
-      "reason": "paths của {key} đang mượn/chưa confirm (pathsConfirmed=false) — không chạy trên folder đoán",
-      "questions": ["Folder nào thật sự thuộc {key} (products/… và bản bàn giao)?"]
-    },
-    {
-      "flow": "manual", "all": ["liveSkin"],
-      "reason": "skin/mainsite đang chạy production — clone bản -renew trên nhánh riêng rồi chạy lại (memory khong-sua-skin-dang-chay-truoc-design)"
-    },
-    {
-      "flow": "ask", "all": ["tooManyCampaigns"],
-      "reason": "{key} có {campaignCount} campaign, vượt trần 5 lane song song",
-      "questions": ["Chia đợt thế nào — 5 campaign nào chạy trước?"]
-    },
-    { "flow": "buglist", "all": ["inputIsSheet"], "needsCampaign": false },
-    { "flow": "gameplay-change", "all": ["gameplayChanged"] },
-    { "flow": "buglist", "all": ["parentKey", "hasBugSheet"] },
-    {
-      "flow": "ask", "all": ["parentKey", "!hasBugSheet"],
-      "reason": "task con của {parentKey} chưa có buglist — chưa có gì để fix",
-      "questions": ["Link buglist (Google Sheet/Excel) của task con này ở đâu?", "Kế thừa paths của {parentKey} có đúng folder cần fix không?"]
-    },
-    { "flow": "buglist", "all": ["phase=bugfix"] },
-    { "flow": "design-intake", "all": ["phase=waiting-design"], "needsCampaign": false },
-    { "flow": "design-intake", "all": ["designLinkPending"], "needsCampaign": false },
-    { "flow": "landing-clone", "all": ["cloneSource"] },
-    { "flow": "landing-new", "all": ["hasRawDesign", "!hasCutAssets", "!campaignExists"] },
-    { "flow": "landing-fix", "all": ["hasDesign", "campaignExists"] },
-    { "flow": "feature", "all": ["briefText", "campaignExists"] }
+    {"flow": "ask", "all": ["pathsUnconfirmed"], "reason": "paths của {key} đang mượn/chưa confirm (pathsConfirmed=false) — không chạy trên folder đoán", "questions": ["Folder nào thật sự thuộc {key} (products/… và bản bàn giao)?"]},
+    {"flow": "manual", "all": ["liveSkin"], "reason": "skin/mainsite đang chạy production — clone bản -renew trên nhánh riêng rồi chạy lại (memory khong-sua-skin-dang-chay-truoc-design)"},
+    {"flow": "manual", "all": ["siteClone"], "reason": "clone site/wiki sang Twig (vportal2view) — bóc nguồn nhiều tầng, không render Twig ở local được (R-VP2); người làm"},
+    {"flow": "manual", "all": ["partnerSource"], "reason": "source tĩnh/bundle đối tác (pc/ + mobile/dist/) — không có spec máy đọc, mỗi bundle một kiểu; người làm"},
+    {"flow": "manual", "all": ["tooling"], "reason": "tooling nội bộ (tontagent/) — đi TDD + verification-before-completion, không qua luồng landing"},
+    {"flow": "ask", "all": ["tooManyCampaigns"], "reason": "{key} có {campaignCount} campaign, vượt trần 5 lane song song", "questions": ["Chia đợt thế nào — 5 campaign nào chạy trước?"]},
+    {"flow": "ask", "all": ["assigneeUnclear"], "reason": "note của {key} ghi người làm khác assignee", "questions": ["Người làm chính là mình hay người ghi trong description/HTML?"]},
+    {"flow": "buglist", "all": ["inputIsSheet"], "needsCampaign": false},
+    {"flow": "gameplay-change", "all": ["gameplayChanged"]},
+    {"flow": "buglist", "all": ["parentKey", "hasBugSheet"]},
+    {"flow": "ask", "all": ["parentKey", "!hasBugSheet"], "reason": "task con của {parentKey} chưa có buglist — chưa có gì để fix", "questions": ["Link buglist (Google Sheet/Excel) của task con này ở đâu?", "Kế thừa paths của {parentKey} có đúng folder cần fix không?"]},
+    {"flow": "buglist", "all": ["phase=bugfix"]},
+    {"flow": "manual", "all": ["idlePhase"], "reason": "phase {phase}: đang chờ test/đã xong, chưa có việc code — có buglist/bug mới thì radar chuyển bugfix"},
+    {"flow": "design-intake", "all": ["phase=waiting-design"], "needsCampaign": false},
+    {"flow": "design-intake", "all": ["designLinkPending"], "needsCampaign": false},
+    {"flow": "landing-clone", "all": ["cloneSource"]},
+    {"flow": "landing-new", "all": ["hasRawDesign", "!hasCutAssets", "!campaignExists"]},
+    {"flow": "landing-fix", "all": ["hasDesign", "campaignExists"]},
+    {"flow": "feature", "all": ["briefText", "campaignExists"]},
+    {"flow": "manual", "all": [], "reason": "không đủ tín hiệu cho luồng nào (phase {phase}; chưa có design/brief/buglist/nguồn clone) — làm tay hoặc chọn --flow"}
   ]
 }

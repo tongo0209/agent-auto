@@ -5,6 +5,26 @@
     "usd": 40,
     "minutes": 240
   },
+  "ask": [
+    {
+      "need": [
+        "campaignDir"
+      ],
+      "question": "Folder campaign (products/<game>/landing/<slug>) của ticket là gì?"
+    },
+    {
+      "need": [
+        "gameplayOk"
+      ],
+      "question": "Gameplay là gì — khoá theo cặp AI-RULES nào (project-note lock, R-PM-11)?"
+    },
+    {
+      "need": [
+        "hasRawDesign"
+      ],
+      "question": "File design gốc (PSD/Figma) nằm ở đâu?"
+    }
+  ],
   "stages": [
     {
       "id": "cut",

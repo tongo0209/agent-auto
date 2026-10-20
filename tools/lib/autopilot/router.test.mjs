@@ -7,7 +7,7 @@ import { route, loadRules } from './router.mjs';
 import { gatherSignals } from './signals.mjs';
 
 const RULES = loadRules();
-const base = { key: 'GW-1', parentKey: null, hasBugSheet: false, inputIsSheet: false, phase: 'coding', hasRawDesign: false, hasDesign: false, hasCutAssets: false, campaignDir: '/r/c', campaignExists: true, briefText: '' };
+const base = { key: 'GW-1', gameplayOk: true, parentKey: null, hasBugSheet: false, inputIsSheet: false, phase: 'coding', hasRawDesign: false, hasDesign: false, hasCutAssets: false, campaignDir: '/r/c', campaignExists: true, briefText: '' };
 
 test('link sheet → buglist kể cả không có campaign', () => {
   assert.strictEqual(route({ ...base, inputIsSheet: true, campaignDir: null }, RULES).flow, 'buglist');
@@ -218,4 +218,53 @@ test('G8: liveSkin khớp skin-* / *-mainsite, bỏ qua bản -renew', () => {
   fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues }));
   const live = ['GW-1', 'GW-2', 'GW-3', 'GW-4'].map((k) => gatherSignals({ input: k, agentRoot: root }).liveSkin);
   assert.deepStrictEqual(live, [true, false, true, false]);
+});
+
+test('G10: source đối tác / clone site / tooling → manual có lý do', () => {
+  for (const flag of ['partnerSource', 'siteClone', 'tooling']) {
+    const r = route({ ...base, [flag]: true, phase: 'bugfix', hasDesign: true }, RULES);
+    assert.strictEqual(r.flow, 'manual', flag);
+    assert.ok(r.reason.length > 20, flag);
+  }
+});
+
+test('G10: phase chờ test/xong mà không có việc → manual; không tín hiệu nào → manual cuối, không câm', () => {
+  assert.strictEqual(route({ ...base, phase: 'wait-test', idlePhase: true, hasDesign: true }, RULES).flow, 'manual');
+  const r = route({ ...base, phase: 'coding' }, RULES);
+  assert.strictEqual(r.flow, 'manual');
+  assert.doesNotMatch(r.reason, /không luật nào khớp/);
+});
+
+test('mục 19: assignee mơ hồ → ask 1 câu', () => {
+  const r = route({ ...base, assigneeUnclear: true, phase: 'waiting-design' }, RULES);
+  assert.strictEqual(r.flow, 'ask');
+  assert.strictEqual(r.questions.length, 1);
+});
+
+test('C: landing promotion chưa khoá gameplay → ask câu hỏi của luồng', () => {
+  const r = route({ ...base, hasDesign: true, gameplayOk: false }, RULES);
+  assert.deepStrictEqual([r.flow, r.target], ['ask', 'landing-fix']);
+  assert.match(r.questions[0], /Gameplay/);
+});
+
+test('C: luồng không cần campaign (sheet link) bỏ câu hỏi campaignDir', () => {
+  const r = route({ ...base, inputIsSheet: true, hasBugSheet: true, campaignDir: null }, RULES);
+  assert.strictEqual(r.flow, 'buglist');
+});
+
+test('G10: signal partnerSource (pc/ + mobile/dist/), siteClone (vportal2view -clone), tooling (tontagent/), assigneeUnclear', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-sig-'));
+  const repos = { 'cdn-source': path.join(root, 'cdn'), vportal2view: path.join(root, 'vp') };
+  fs.mkdirSync(path.join(repos['cdn-source'], 'products/an/landing/w/pc'), { recursive: true });
+  fs.mkdirSync(path.join(repos['cdn-source'], 'products/an/landing/w/mobile/dist'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ repos }));
+  const issues = {
+    'GW-1': { paths: [{ repo: 'cdn-source', path: 'products/an/landing/w' }] },
+    'GW-2': { paths: [{ repo: 'vportal2view', path: 'templates/3kroh-clone' }] },
+    'GW-3': { paths: [{ repo: 'cdn-source', path: 'products/tontagent/fx' }], note: 'HTML ghi VuNBPP.' },
+  };
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues }));
+  const sig = (k) => gatherSignals({ input: k, agentRoot: root });
+  assert.deepStrictEqual([sig('GW-1').partnerSource, sig('GW-2').siteClone, sig('GW-3').tooling, sig('GW-3').assigneeUnclear], [true, true, true, true]);
+  assert.deepStrictEqual([sig('GW-1').siteClone, sig('GW-1').tooling, sig('GW-1').assigneeUnclear], [false, false, false]);
 });

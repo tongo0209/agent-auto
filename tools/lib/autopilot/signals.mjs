@@ -6,6 +6,8 @@ const HANDOFF_REPO = 'gt-promotion-template';
 const MAX_LANES = 5;
 const LIVE_SITE = /(^|\/)(skin-[^/]+|[^/]+-mainsite)$/;
 const RENEW = /-renew$/;
+const IDLE_PHASES = ['wait-test', 'done-fe', 'closed', 'reassigned'];
+const ASSIGNEE_UNCLEAR = /Người làm chính:|HTML ghi [A-ZĐ]/;
 const SHEET_INPUT = /docs\.google\.com\/spreadsheets|sharepoint\.com|\.xlsx(\?|$)/i;
 const GOOGLE_SHEET = /docs\.google\.com\/spreadsheets/i;
 const NO_BUG_ID_NOTE = /không có cột BugID/i;
@@ -63,6 +65,8 @@ export function gatherSignals({ input, agentRoot, campaign }) {
     sheetKind: sheetUrl ? (GOOGLE_SHEET.test(sheetUrl) ? 'google' : 'excel') : null,
     sheetNoBugId: NO_BUG_ID_NOTE.test(issue.note ?? '') || radarBlind,
     phase: issue.phase ?? null,
+    idlePhase: IDLE_PHASES.includes(issue.phase),
+    assigneeUnclear: ASSIGNEE_UNCLEAR.test(issue.note ?? ''),
     repo,
     campaignDir,
     campaignExists: Boolean(campaignDir && fs.existsSync(campaignDir)),
@@ -71,6 +75,9 @@ export function gatherSignals({ input, agentRoot, campaign }) {
     campaignDirs,
     campaignCount: campaignDirs.length,
     tooManyCampaigns: campaignDirs.length > MAX_LANES,
+    siteClone: known.some((p) => p.repo === 'vportal2view' && p.path.includes('-clone')),
+    partnerSource: campaignDirs.some((d) => fs.existsSync(path.join(d, 'pc')) && fs.existsSync(path.join(d, 'mobile', 'dist'))),
+    tooling: campaignDirs.some((d) => d.includes(`${path.sep}tontagent`)),
     liveSkin: campaignDirs.some((d) => LIVE_SITE.test(d) && !RENEW.test(d)),
     pathsUnconfirmed: issue.pathsConfirmed === false,
     handoffDir: handoff ? path.join(repos[handoff.repo], handoff.path) : null,
@@ -78,6 +85,7 @@ export function gatherSignals({ input, agentRoot, campaign }) {
     designDir,
     hasRawDesign,
     gameplayLocked: Boolean(lock || issue.gameplay),
+    gameplayOk: Boolean(lock || issue.gameplay || !project),
     gameplayChanged: GAMEPLAY_CHANGE_NOTE.test(issue.note ?? '') || Boolean(lock && issue.gameplay && issue.gameplay !== lock.gameplay),
     designLinkPending: Boolean(issue.designLink) && !DESIGN_DOWNLOADED.test(issue.design?.status ?? ''),
     hasDesign: hasRawDesign || designFiles.some((f) => IMAGE.test(f)),

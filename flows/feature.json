@@ -5,6 +5,20 @@
     "usd": 25,
     "minutes": 120
   },
+  "ask": [
+    {
+      "need": [
+        "campaignDir"
+      ],
+      "question": "Folder campaign (products/<game>/landing/<slug>) của ticket là gì?"
+    },
+    {
+      "need": [
+        "briefText"
+      ],
+      "question": "Yêu cầu cụ thể (ảnh/đoạn chat chỉ chỗ sửa) là gì?"
+    }
+  ],
   "stages": [
     {
       "id": "plan",

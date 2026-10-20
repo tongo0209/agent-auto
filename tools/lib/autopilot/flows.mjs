@@ -6,6 +6,7 @@ import { GATE_CHECKS } from './gates.mjs';
 const FLOWS_DIR = path.resolve(import.meta.dirname, '../../../flows');
 export const PROMPTS_DIR = path.join(FLOWS_DIR, 'prompts');
 const KINDS = ['claude', 'gate', 'pause', 'attached'];
+const MAX_ASK = 3;
 const REF_FIELDS = ['next', 'onReject', 'onRevise', 'resume', 'rejectReturnTo'];
 
 export const listFlows = () =>
@@ -41,6 +42,8 @@ export function validateFlow(flow, { promptsDir }) {
   const ids = flow.stages.map((s) => s.id);
   for (const id of new Set(ids)) if (ids.filter((x) => x === id).length > 1) errors.push(`stage trùng id: ${id}`);
   if (!(flow.budget?.usd > 0 && flow.budget?.minutes > 0)) errors.push('budget usd/minutes phải > 0');
+  if (!(flow.ask?.length >= 1 && flow.ask.length <= MAX_ASK)) errors.push(`ask phải có 1–${MAX_ASK} câu hỏi khi thiếu đầu vào`);
+  for (const a of flow.ask ?? []) if (!a.need?.length || !a.question) errors.push(`ask thiếu need/question: ${JSON.stringify(a)}`);
 
   for (const s of flow.stages) {
     if (!KINDS.includes(s.kind)) errors.push(`${s.id}: kind lạ ${s.kind}`);

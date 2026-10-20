@@ -3,7 +3,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import { listView, listArtifacts, artifactFile, actionArgs, liveLog } from './api.mjs';
 import { runsDir } from '../tools/lib/autopilot/store.mjs';
 import { attachTerminal } from './terminal.mjs';
@@ -30,6 +30,11 @@ function spawnDetached(args) {
   return { pid: child.pid, log };
 }
 
+// open phải chờ CLI in JSON (worktree + lệnh claude) thì UI mới mở được tab
+const runCliAndWait = (args) =>
+  new Promise((resolve) =>
+    execFile(process.execPath, [CLI, ...args], { cwd: path.dirname(CLI) }, (err, stdout, stderr) => resolve({ code: err ? err.code ?? 1 : 0, stdout, stderr })));
+
 const send = (res, status, body, type = 'application/json; charset=utf-8') => {
   res.writeHead(status, { 'Content-Type': type });
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
@@ -42,7 +47,7 @@ const readBody = (req) =>
     req.on('end', () => resolve(raw));
   });
 
-async function handleAutopilot(req, res, spawnCli) {
+async function handleAutopilot(req, res, { spawnCli, execCli }) {
     const { pathname } = new URL(req.originalUrl, 'http://x');
     const parts = pathname.split('/').filter(Boolean).map(decodeURIComponent);
 
@@ -61,7 +66,9 @@ async function handleAutopilot(req, res, spawnCli) {
       try {
         const args = actionArgs(parts[2], JSON.parse((await readBody(req)) || '{}'));
         console.log(`${new Date().toISOString()} ${args.join(' ')}`);
-        return send(res, 200, { ok: true, ...spawnCli(args) });
+        if (args[0] !== 'open') return send(res, 200, { ok: true, ...spawnCli(args) });
+        const out = await execCli(args);
+        return out.code ? send(res, 400, { error: out.stderr.trim() || `exit ${out.code}` }) : send(res, 200, JSON.parse(out.stdout));
       } catch (e) {
         return send(res, 400, { error: e.message });
       }
@@ -69,11 +76,11 @@ async function handleAutopilot(req, res, spawnCli) {
     send(res, 404, { error: 'không có' });
 }
 
-export function createServer({ spawnCli = spawnDetached, allowWrites = process.env.AUTOPILOT_LAB_WRITES === '1' } = {}) {
+export function createServer({ spawnCli = spawnDetached, execCli = runCliAndWait, allowWrites = process.env.AUTOPILOT_LAB_WRITES === '1' } = {}) {
   const app = express();
   app.use((req, res, next) => (LOCAL_HOST.test(req.headers.host ?? '') ? next() : send(res, 403, { error: 'host lạ' })));
   // autopilot đi trước cổng chặn ghi: run chạy trong worktree, hook sandbox chặn ghi ra source gốc
-  app.use('/api/autopilot', (req, res) => handleAutopilot(req, res, spawnCli));
+  app.use('/api/autopilot', (req, res) => handleAutopilot(req, res, { spawnCli, execCli }));
   app.use('/api', (req, res, next) =>
     allowWrites || req.method === 'GET' ? next() : send(res, 403, { error: 'Bản thử (agent-auto-lab) chặn ghi dữ liệu thật. Chạy với AUTOPILOT_LAB_WRITES=1 nếu thật sự muốn ghi.' }));
   app.use(express.json());

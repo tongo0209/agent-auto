@@ -7,8 +7,9 @@ import { stageOf } from '../tools/lib/autopilot/engine.mjs';
 import { stageCells, totals } from '../tools/lib/autopilot/format.mjs';
 import { tokensOf } from '../tools/lib/autopilot/claude-runner.mjs';
 import { isInterrupted } from '../tools/lib/autopilot/lock.mjs';
+import { chatCwd, latestSession, sessionUsage } from '../tools/lib/autopilot/chat.mjs';
 
-const STATUS_ORDER = ['paused', 'attached', 'running', 'stopped', 'done'];
+const STATUS_ORDER = ['paused', 'attached', 'chat', 'running', 'stopped', 'done'];
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const KEY = /^[A-Z][A-Z0-9]*-[A-Za-z0-9-]+$/;
 
@@ -25,6 +26,16 @@ function tokensFromLog(run, receipt) {
 // run chạy trước khi receipt có trường tokens: đọc bù từ log của stage
 const withTokens = (run) => ({ ...run, receipts: run.receipts.map((r) => (r.tokens != null || !r.turns ? r : { ...r, tokens: tokensFromLog(run, r) })) });
 
+const sessionCache = new Map();
+function chatTotals(run) {
+  const session = latestSession(chatCwd(run));
+  if (!session) return { tokens: 0, minutes: 0 };
+  const { mtimeMs } = fs.statSync(session.file);
+  if (sessionCache.get(session.file)?.mtimeMs !== mtimeMs) sessionCache.set(session.file, { mtimeMs, usage: sessionUsage(session.file) });
+  const { tokens, ms } = sessionCache.get(session.file).usage;
+  return { tokens, minutes: Math.round(ms / 60_000) };
+}
+
 function viewOf(saved) {
   const run = withTokens(saved);
   const flow = loadFlow(run.flow);
@@ -36,7 +47,7 @@ function viewOf(saved) {
       const stage = stageOf(flow, c.id);
       return { ...c, next: stage.next ?? null, back: stage.loop?.back ?? null, side: stage.returnTo === 'caller' };
     }),
-    totals: totals(run),
+    totals: run.mode === 'chat' ? { ...totals(run), ...chatTotals(run) } : totals(run),
     show: stageOf(flow, run.stage)?.show ?? [],
     command: stageOf(flow, run.stage)?.command ?? null,
   };
@@ -61,14 +72,15 @@ export function artifactFile(key, runId, name) {
   return fs.existsSync(file) ? file : null;
 }
 
-export function actionArgs(action, { key, note, input, flow } = {}) {
-  if (action === 'run') {
+export function actionArgs(action, { key, note, input, flow, resume } = {}) {
+  if (action === 'run' || (action === 'open' && !resume)) {
     if (!input || input.startsWith('-')) throw new Error('input không hợp lệ');
     if (flow && !listFlows().includes(flow)) throw new Error('flow không có');
-    return ['run', input, ...(flow ? ['--flow', flow] : [])];
+    return [action, input, ...(flow ? ['--flow', flow] : [])];
   }
-  if (!['approve', 'reject', 'pause', 'resume', 'abort'].includes(action)) throw new Error(`action lạ: ${action}`);
+  if (!['approve', 'reject', 'pause', 'resume', 'abort', 'done', 'open'].includes(action)) throw new Error(`action lạ: ${action}`);
   if (!KEY.test(key ?? '')) throw new Error('key không hợp lệ');
+  if (action === 'open') return ['open', key, '--resume'];
   if (action === 'reject' && !note?.trim()) throw new Error('reject cần note');
   return [action, key, ...(note?.trim() ? ['--note', note.trim()] : [])];
 }

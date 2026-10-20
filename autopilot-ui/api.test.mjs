@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-api-'));
+process.env.AUTOPILOT_CLAUDE_PROJECTS = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-proj-'));
 const { listView, artifactFile, listArtifacts, actionArgs, liveLog } = await import('./api.mjs');
 const { saveRun, writeArtifact } = await import('../tools/lib/autopilot/store.mjs');
 
@@ -54,6 +55,11 @@ test('actionArgs: dựng đúng lệnh CLI, chặn đầu vào xấu', () => {
   assert.throws(() => actionArgs('rm', { key: 'GW-1' }), /action/);
   assert.throws(() => actionArgs('approve', { key: 'GW-1; rm -rf /' }), /key/);
   assert.throws(() => actionArgs('run', { input: 'GW-9', flow: '../x' }), /flow/);
+  assert.deepStrictEqual(actionArgs('open', { input: 'GW-9', flow: 'feature' }), ['open', 'GW-9', '--flow', 'feature']);
+  assert.deepStrictEqual(actionArgs('open', { key: 'GW-9', resume: true }), ['open', 'GW-9', '--resume']);
+  assert.deepStrictEqual(actionArgs('done', { key: 'GW-9' }), ['done', 'GW-9']);
+  assert.throws(() => actionArgs('open', { input: '--resume' }), /input/);
+  assert.throws(() => actionArgs('open', { key: '../x', resume: true }), /key/);
 });
 
 test('liveLog: đọc .log mới nhất của run, đổi stream-json thành dòng dễ đọc', () => {
@@ -88,4 +94,20 @@ test('listArtifacts: ẩn file đánh dấu .pause', () => {
   writeArtifact({ ...run, key: 'GW-5' }, '.pause', '');
   writeArtifact({ ...run, key: 'GW-5' }, 'plan.md', '# x');
   assert.deepStrictEqual(listArtifacts('GW-5', run.runId), ['plan.md']);
+});
+
+test('listView: run chat lấy token + phút từ phiên claude mới nhất của worktree, xếp sau run chờ duyệt', async () => {
+  const wt = '/wt/GW-6/cdn-source';
+  saveRun({ ...run, key: 'GW-6', mode: 'chat', status: 'chat', stage: 'plan', chatState: 'ask', repo: '/repo/cdn-source', worktrees: { '/repo/cdn-source': wt }, receipts: [] });
+  const dir = path.join(process.env.AUTOPILOT_CLAUDE_PROJECTS, wt.replace(/[^A-Za-z0-9]/g, '-'));
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 's1.jsonl'), [
+    JSON.stringify({ timestamp: '2026-10-20T10:00:00Z', message: { id: 'm1', usage: { input_tokens: 100, output_tokens: 20 } } }),
+    JSON.stringify({ timestamp: '2026-10-20T10:03:00Z', message: { id: 'm2', usage: { output_tokens: 5 } } }),
+  ].join('\n'));
+  const view = await listView();
+  const chat = view.runs.find((r) => r.key === 'GW-6');
+  assert.deepStrictEqual([chat.totals.tokens, chat.totals.minutes], [125, 3]);
+  assert.strictEqual(chat.cells.find((c) => c.id === 'plan').state, 'waiting');
+  assert.ok(view.runs.findIndex((r) => r.key === 'GW-6') < view.runs.findIndex((r) => r.key === 'GW-2'));
 });

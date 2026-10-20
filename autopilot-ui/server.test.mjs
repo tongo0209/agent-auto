@@ -9,7 +9,12 @@ process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-srv-'
 const { createServer } = await import('./server.mjs');
 const { listFlows } = await import('../tools/lib/autopilot/flows.mjs');
 const spawned = [];
-const server = createServer({ allowWrites: true, spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
+const execd = [];
+const execCli = async (args) => {
+  execd.push(args);
+  return args[1] === 'GW-404' ? { code: 1, stdout: '', stderr: 'Chưa có run nào cho GW-404\n' } : { code: 0, stdout: '{"key":"GW-1","cwd":"/wt","args":["x"],"env":{}}\n', stderr: '' };
+};
+const server = createServer({ allowWrites: true, execCli, spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
 after(() => server.close());
@@ -73,4 +78,18 @@ test('bản thử: nút autopilot chạy được (run nằm trong worktree + sa
   assert.strictEqual((await fetch(`${url}/api/state`)).status, 200);
   assert.strictEqual(spawned.length, before + 1);
   lab.close();
+});
+
+test('POST open chạy CLI đồng bộ, trả nguyên JSON để UI mở tab; CLI lỗi → 400 kèm lý do', async () => {
+  const post = (body) => fetch(`${base}/api/autopilot/open`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const ok = await post({ input: 'GW-1', flow: 'feature' });
+  assert.strictEqual(ok.status, 200);
+  assert.deepStrictEqual(await ok.json(), { key: 'GW-1', cwd: '/wt', args: ['x'], env: {} });
+  assert.deepStrictEqual(execd.at(-1), ['open', 'GW-1', '--flow', 'feature']);
+  const bad = await post({ key: 'GW-404', resume: true });
+  assert.strictEqual(bad.status, 400);
+  assert.match((await bad.json()).error, /GW-404/);
+  const before = spawned.length;
+  assert.strictEqual((await fetch(`${base}/api/autopilot/done`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"key":"GW-1"}' })).status, 200);
+  assert.deepStrictEqual([spawned.length - before, spawned.at(-1)], [1, ['done', 'GW-1']]);
 });

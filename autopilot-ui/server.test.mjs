@@ -6,7 +6,7 @@ import path from 'node:path';
 import http from 'node:http';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-srv-'));
-const { createServer } = await import('./server.mjs');
+const { createServer, spawnDetached } = await import('./server.mjs');
 const { listFlows } = await import('../tools/lib/autopilot/flows.mjs');
 const { saveRun } = await import('../tools/lib/autopilot/store.mjs');
 const { acquire } = await import('../tools/lib/autopilot/lock.mjs');
@@ -18,7 +18,7 @@ const execCli = async (args) => {
   execd.push(args);
   return args[1] === 'GW-404' ? { code: 1, stdout: '', stderr: 'Chưa có run nào cho GW-404\n' } : { code: 0, stdout: '{"key":"GW-1","cwd":"/wt","args":["x"],"env":{}}\n', stderr: '' };
 };
-const server = createServer({ allowWrites: true, execCli, openEditor: async (dir) => { opened.push(dir); }, spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
+const server = createServer({ allowWrites: true, execCli, openEditor: async (dir) => { opened.push(dir); }, spawnCli: async (args) => (spawned.push(args), args[1] === 'GW-REFUSED' ? { pid: 1, log: 'x.log', code: 1, error: 'GW-REFUSED đang stopped, không có gì để approve.' } : { pid: 1, log: 'x.log' }) });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
 after(() => server.close());
@@ -142,4 +142,18 @@ test('retry/skip/goto/pick/break: soát trước khi spawn; GET /runs có action
   assert.deepStrictEqual(execd.at(-1), ['route', 'GW-1', '--json', '--flow', 'feature']);
   assert.strictEqual((await fetch(`${base}/api/autopilot/preview?input=--x`)).status, 400);
   assert.strictEqual((await fetch(`${base}/api/autopilot/preview?input=GW-404`)).status, 400);
+});
+
+test('CLI tách nền bị từ chối ngay (thoát ≠0 trong vài giây) → 400 kèm lý do', async () => {
+  const res = await fetch(`${base}/api/autopilot/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'GW-REFUSED' }) });
+  assert.strictEqual(res.status, 400);
+  assert.match((await res.json()).error, /đang stopped/);
+});
+
+test('spawnDetached: CLI thoát lỗi sớm → trả code + đuôi log; còn chạy quá hạn chờ → chỉ pid + log', async () => {
+  const failed = await spawnDetached(['approve', 'GW-404']);
+  assert.strictEqual(failed.code, 1);
+  assert.match(failed.error, /Chưa có run nào cho GW-404/);
+  const slow = await spawnDetached(['setTimeout(() => {}, 400)'], { waitMs: 50, cli: '-e' });
+  assert.deepStrictEqual([slow.code, typeof slow.pid], [undefined, 'number']);
 });

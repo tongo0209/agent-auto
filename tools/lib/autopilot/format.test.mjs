@@ -93,3 +93,9 @@ test('parseOptions: heading thụt tới 3 khoảng trắng vẫn nhận', () =>
   const out = parseOptions('   ## Phương án\n   ### A · Một\n   x\n   ### B · Hai\n');
   assert.deepStrictEqual(out.map((o) => o.id), ['A', 'B']);
 });
+
+test('formatStatus: dừng ở điểm dừng 📍 → stage kế hiện ⏸ chờ, không phải ✗ trượt', () => {
+  const halted = { ...run, status: 'stopped', stage: 'review', stopReason: 'breakpoint:plan', receipts: [run.receipts[0]] };
+  assert.match(formatStatus(halted, flow), /✓ plan → ⏸ review → · ok/);
+  assert.match(formatStatus({ ...halted, stopReason: 'fail:review' }, flow), /✓ plan → ✗ review/);
+});

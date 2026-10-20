@@ -541,6 +541,13 @@ test('run bị ngắt (running, không process giữ lock) → retry chạy lạ
   assert.deepStrictEqual([after.status, after.stage, after.receipts.length], ['paused', 'approve-plan', run.receipts.length + 1]);
 });
 
+test('approve khi run đã bỏ cổng → in cảnh báo số cổng + tên + lý do', () => {
+  const { cli, campaign } = sandbox();
+  cli('run', 'GW-42', '--flow', 'landing-fix', '--campaign', campaign, '--skip', 'gates', '--skip-reason', 'build hỏng sẵn');
+  cli('approve', 'GW-42');
+  assert.match(cli('approve', 'GW-42').out, /Đã bỏ 1 cổng: gates \(build hỏng sẵn\)/);
+});
+
 const overBudgetAt = (runs, key, stage) => {
   const run = lastRun(runs, key);
   fs.writeFileSync(path.join(runs, key, run.runId, 'run.json'), JSON.stringify({ ...run, status: 'stopped', stage, stopReason: 'budget', budget: { usd: -1 } }));

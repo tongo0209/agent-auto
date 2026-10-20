@@ -49,10 +49,11 @@ const receiptLine = (r) =>
 export function formatStatus(run, flow) {
   const t = totals(run);
   const status = run.status === 'stopped' ? `stopped (${run.stopReason})` : run.status;
+  const atBreakpoint = run.status === 'stopped' && run.stopReason?.startsWith('breakpoint:');
   return [
     `${run.key} · ${run.flow} · ${status} · run ${run.runId}`,
     `Luồng: ${run.routerReason ?? '—'}`,
-    stageCells(run, flow).map((c) => `${SYMBOL[c.state]} ${c.id}`).join(' → '),
+    stageCells(run, flow).map((c) => `${atBreakpoint && c.id === run.stage ? SYMBOL.waiting : SYMBOL[c.state]} ${c.id}`).join(' → '),
     ...run.receipts.map(receiptLine),
     `Tổng: ${t.runs} lượt claude · ${t.minutes} phút · $${t.usd}`,
   ].join('\n');

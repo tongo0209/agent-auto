@@ -282,6 +282,8 @@ function cmdDecide(opts, type) {
       return reopenRun(run, flow, opts.note, Date.now());
     }
     if (!['paused', 'attached'].includes(run.status)) die(`${run.key} đang ${run.status}, không có gì để ${type}.`);
+    const skipped = run.gateSkipped ?? [];
+    if (type === 'approve' && skipped.length) console.log(`⚠ Đã bỏ ${skipped.length} cổng: ${skipped.map((g) => `${g.stage} (${g.reason})`).join(', ')}`);
     return applyEvent(run, flow, { type, note: opts.note }, Date.now());
   });
 }

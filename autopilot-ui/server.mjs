@@ -21,14 +21,27 @@ try {
   process.loadEnvFile(path.join(CONSOLE, '.env'));
 } catch {}
 
-// CLI chạy tách nền vì 1 lượt duyệt kéo theo nhiều stage claude — trang tự poll thấy mốc dừng kế tiếp
-function spawnDetached(args) {
+const EARLY_EXIT_MS = 2000;
+const logTail = (log) => fs.readFileSync(log, 'utf8').trim().split('\n').slice(-5).join('\n');
+
+// CLI chạy tách nền vì 1 lượt duyệt kéo theo nhiều stage claude — trang tự poll thấy mốc dừng kế tiếp.
+// CLI từ chối (lock, campaign, trạng thái) thì thoát ngay: chờ một chút để UI nhận lỗi thay vì ok
+export function spawnDetached(args, { waitMs = EARLY_EXIT_MS, cli = CLI } = {}) {
   fs.mkdirSync(runsDir(), { recursive: true });
   const log = path.join(runsDir(), `ui-${Date.now()}.log`);
   const out = fs.openSync(log, 'a');
-  const child = spawn(process.execPath, [CLI, ...args], { cwd: path.dirname(CLI), detached: true, stdio: ['ignore', out, out] });
-  child.unref();
-  return { pid: child.pid, log };
+  const child = spawn(process.execPath, [cli, ...args], { cwd: path.dirname(CLI), detached: true, stdio: ['ignore', out, out] });
+  fs.closeSync(out);
+  return new Promise((resolve) => {
+    const stillRunning = setTimeout(() => {
+      child.unref();
+      resolve({ pid: child.pid, log });
+    }, waitMs);
+    child.on('exit', (code) => {
+      clearTimeout(stillRunning);
+      resolve(code ? { pid: child.pid, log, code, error: logTail(log) || `exit ${code}` } : { pid: child.pid, log });
+    });
+  });
 }
 
 // open phải chờ CLI in JSON (worktree + lệnh claude) thì UI mới mở được tab
@@ -89,7 +102,10 @@ async function handleAutopilot(req, res, { spawnCli, execCli, openEditor }) {
         const args = actionArgs(parts[2], body);
         checkAction(parts[2], body);
         console.log(`${new Date().toISOString()} ${args.join(' ')}`);
-        if (args[0] !== 'open') return send(res, 200, { ok: true, ...spawnCli(args) });
+        if (args[0] !== 'open') {
+          const started = await spawnCli(args);
+          return started.code ? send(res, 400, { error: started.error }) : send(res, 200, { ok: true, ...started });
+        }
         const out = await execCli(args);
         if (out.code) return send(res, 400, { error: out.stderr.trim() || `exit ${out.code}` });
         const launch = JSON.parse(out.stdout);

@@ -71,11 +71,18 @@ export function mount(el, ctx) {
     return !realMilestones(issue).length || Boolean(forecastOf(key, issue));
   }
 
-  function timelineEntries() {
-    const kept = Object.entries(st.state.issues ?? {}).filter(onCalendar);
+  function taskGroups() {
+    const issues = st.state.issues ?? {};
+    const kept = Object.entries(issues).filter(onCalendar);
     const keptKeys = new Set(kept.map(([k]) => k));
-    const tops = kept.filter(([, i]) => !keptKeys.has(i.parent)).sort(byLifecycle);
-    return tops.flatMap((top) => [top, ...kept.filter(([, i]) => i.parent === top[0]).sort(byLifecycle)]);
+    const taskKeys = new Set(kept.map(([key, i]) => (issues[i.parent] ? i.parent : key)));
+    return [...taskKeys]
+      .map((key) => ({
+        top: [key, issues[key]],
+        subs: kept.filter(([, i]) => i.parent === key).sort(byLifecycle),
+        context: !keptKeys.has(key),
+      }))
+      .sort((a, b) => byLifecycle(a.top, b.top));
   }
 
   function forecastOf(key, issue) {
@@ -128,7 +135,7 @@ export function mount(el, ctx) {
   }
 
   function renderTimeline() {
-    const entries = timelineEntries();
+    const entries = taskGroups().flatMap((g) => [{ entry: g.top, context: g.context }, ...g.subs.map((entry) => ({ entry, isSub: true }))]);
     if (!entries.length) return note('ph-calendar-blank', 'Không có ticket nào còn mốc phía trước.');
     const days = Array.from({ length: DAY_COUNT }, (_, i) => {
       const d = new Date(`${addDays(st.today, i)}T00:00:00`);
@@ -138,12 +145,8 @@ export function mount(el, ctx) {
     const head = `<div class="lc-row lc-head" style="grid-row:1"><span class="lc-label lc-corner">Ticket</span>${days.map((d, i) => `<span class="lc-day ${dayCls(d)}" style="grid-column:${i + 2}">
       <em>${i === 0 || d.dom === 1 ? `Th${d.month}` : ''}</em><small>${d.today ? 'Hôm nay' : WEEKDAY[d.dow]}</small><b class="mono">${d.dom}</b></span>`).join('')}</div>`;
     const cols = days.map((d, i) => `<span class="lc-col ${dayCls(d)}" style="grid-column:${i + 2}"></span>`).join('');
-    const keys = new Set(entries.map(([k]) => k));
-    const rows = entries.map(([key, issue], i) => {
-      const isSub = keys.has(issue.parent);
-      return `<div class="lc-row vw-in ${issue.phase === DONE_FE ? 'dim' : ''} ${isSub ? 'sub' : ''}" style="grid-row:${i + 2}; --i:${i}" data-key="${esc(key)}" tabindex="0" role="button" aria-label="Mở ${esc(key)}">
-        <span class="lc-label">${rowLabel(key, issue, isSub)}</span>${rowTrack(key, issue)}</div>`;
-    }).join('');
+    const rows = entries.map(({ entry: [key, issue], context, isSub }, i) => `<div class="lc-row vw-in ${issue.phase === DONE_FE || context ? 'dim' : ''} ${context ? 'ctx' : ''} ${isSub ? 'sub' : ''}" style="grid-row:${i + 2}; --i:${i}" data-key="${esc(key)}" tabindex="0" role="button" aria-label="Mở ${esc(key)}">
+        <span class="lc-label">${rowLabel(key, issue, isSub)}</span>${context ? '' : rowTrack(key, issue)}</div>`).join('');
     const legend = `<div class="lc-legend">
       <span><i class="lc-lg key"></i>HTML / Giao HTML</span><span><i class="lc-lg"></i>Mốc khác</span><span><i class="lc-lg fc"></i>Dự báo xong phase</span>
       <span class="t-crit"><i class="lc-lg sw"></i>≤ 4 ngày</span><span class="t-warn"><i class="lc-lg sw"></i>≤ 8 ngày</span><span class="t-ok"><i class="lc-lg sw"></i>xa hơn</span>
@@ -151,23 +154,27 @@ export function mount(el, ctx) {
     return `${legend}<div class="lc-frame"><div class="lc-grid" style="--days:${DAY_COUNT}; grid-template-rows:repeat(${entries.length + 1}, auto)">${cols}${head}${rows}</div></div>`;
   }
 
-  function boardCard([key, issue], i) {
+  function boardCard([key, issue], i, role = '') {
     const next = nextMilestone(issue, st.today);
     const fc = forecastOf(key, issue);
     const due = next ? pill(toneByDays(next.days), `${esc(MILESTONE[next.name] ?? next.name)} ${shortDate(next.date)} · ${next.days ? `${next.days}d` : 'hôm nay'}`) : '<span class="tk-none">chưa có mốc</span>';
-    return `<div class="lc-card vw-in" style="--i:${i}" data-key="${esc(key)}" tabindex="0" role="button" aria-label="Mở ${esc(key)}">
-      <span class="lc-name"><b class="mono">${esc(key)}</b>${issue.parent ? `<small class="mono">thuộc ${esc(issue.parent)}</small>` : ''}</span>
+    const phase = phaseOf(issue.phase);
+    const tag = role === 'sub' ? `<small class="mono">bổ sung của ${esc(issue.parent)}</small>${pill(phase.tone, esc(phase.label))}` : role === 'ctx' ? '<small>task chính</small>' : '';
+    return `<div class="lc-card vw-in ${role}" style="--i:${i}" data-key="${esc(key)}" tabindex="0" role="button" aria-label="Mở ${esc(key)}">
+      <span class="lc-name"><b class="mono">${esc(key)}</b>${tag}</span>
       <span class="lc-csum">${esc(issue.summary || '--')}</span>
       <span class="lc-cmeta">${due}${fc ? `<span class="lc-fcnote ${fc.late ? 't-crit' : 't-mute'}" title="${fc.samples} mẫu"><i class="ph ph-crystal-ball"></i>${shortDate(fc.date)}</span>` : ''}</span></div>`;
   }
 
   function renderBoard() {
-    const issues = Object.entries(st.state.issues ?? {}).filter(onCalendar);
+    const groups = taskGroups();
+    const laneOf = (g) => [g.top, ...g.subs].map(([, i]) => i.phase).find((p) => PHASE_ORDER.includes(p));
     let n = 0;
+    const cardsOf = (g) => boardCard(g.top, n++, g.context ? 'ctx' : '') + g.subs.map((e) => boardCard(e, n++, 'sub')).join('');
     return `<div class="lc-frame"><div class="lc-board">${PHASE_ORDER.map((id) => {
-      const items = issues.filter(([, i]) => i.phase === id).sort(byLifecycle);
+      const items = groups.filter((g) => laneOf(g) === id);
       return `<section class="lc-lane t-${PHASE[id].tone}"><h2><i class="ph ${PHASE[id].icon}"></i>${esc(PHASE[id].label)}<span class="mono">${items.length}</span></h2>
-        <div class="lc-cards">${items.length ? items.map((e) => boardCard(e, n++)).join('') : '<span class="lc-blank">Trống</span>'}</div></section>`;
+        <div class="lc-cards">${items.length ? items.map(cardsOf).join('') : '<span class="lc-blank">Trống</span>'}</div></section>`;
     }).join('')}</div></div>`;
   }
 

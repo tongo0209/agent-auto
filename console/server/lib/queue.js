@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { ownerKey } = require('./debt');
+const { parentKeyOf, foldSubtask } = require('./vocab');
 
 const URGENT_ALERTS = ['html-overdue', 'html-urgent', 'bug-reopened'];
 const WAITING_MESSAGE = {
@@ -31,9 +32,10 @@ function nextMilestoneDate(issue, today) {
 }
 
 function alertItem(alert) {
-  const base = { source: 'alert', code: alert.code, key: alert.key, level: alert.level, text: alert.text };
+  const base = { source: 'alert', code: alert.code, key: alert.key, sub: alert.sub, level: alert.level, text: alert.text };
   if (WAITING_MESSAGE[alert.code]) {
-    return { ...base, group: 'waiting', action: { kind: 'copy', message: WAITING_MESSAGE[alert.code](alert.key) } };
+    const message = WAITING_MESSAGE[alert.code](alert.sub || alert.key);
+    return { ...base, id: itemId({ ...base, dedup: alert.dedup }), group: 'waiting', action: { kind: 'copy', message } };
   }
   const urgent = URGENT_ALERTS.includes(alert.code);
   const action =
@@ -176,8 +178,10 @@ function buildQueue({ today, issues, alerts, doctor, board, debt, review, bugs, 
     ...reviewItems(review),
     ...needItems(board),
   ]
-    .map((i) => ({ ...i, id: i.id || itemId(i), due: nextMilestoneDate(issues[i.key], today) }))
-    .concat(debtItems(debt).map((i) => ({ ...i, id: itemId(i), due: null })));
+    .map((i) => ({ ...i, id: i.id || itemId(i) }))
+    .map((i) => (i.source === 'need' ? { ...i, key: parentKeyOf(issues, i.key) || i.key } : foldSubtask(issues, i)))
+    .map((i) => ({ ...i, due: nextMilestoneDate(issues[i.key], today) }))
+    .concat(debtItems(debt).map((i) => ({ ...i, id: itemId(i), key: parentKeyOf(issues, i.key) || i.key, due: null })));
 
   const out = { now: [], waiting: [], debt: [], snoozed: [] };
   for (const item of all) {

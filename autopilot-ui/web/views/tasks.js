@@ -126,10 +126,10 @@ export function mount(el, ctx) {
     if (!st) return;
     const q = filter.trim().toLowerCase();
     const textOf = ([key, i]) => `${key} ${i.summary ?? ''} ${i.note ?? ''}`.toLowerCase();
-    const rows = nest(Object.entries(st.state.issues ?? {}))
-      .filter((r) => !q || [[r.key, r.issue], ...r.subs].some((e) => textOf(e).includes(q)));
+    const tasks = nest(Object.entries(st.state.issues ?? {}));
+    const rows = tasks.filter((r) => !q || [[r.key, r.issue], ...r.subs].some((e) => textOf(e).includes(q)));
     const tracked = rows.filter((r) => !phaseOf(r.shownPhase).folded).length;
-    $('#tkSub').textContent = `${tracked} đang theo · ${Object.keys(st.state.issues ?? {}).length} ticket trong state · ${st.today}`;
+    $('#tkSub').textContent = `${tracked} đang theo · ${tasks.length} task trong state · ${st.today}`;
     if (!rows.length) return ($('#tkList').innerHTML = note(q ? 'ph-magnifying-glass' : 'ph-tray', q ? 'Không có task nào khớp bộ lọc.' : 'Chưa có task nào trong state. Chạy <code>/daily</code> để quét Jira.'));
     const soonest = (r) => nextMilestone(r.issue, st.today)?.days ?? Infinity;
     const groups = GROUP_ORDER.map((label) => ({ label, items: rows.filter((r) => phaseOf(r.shownPhase).group === label).sort((x, y) => soonest(x) - soonest(y)) })).filter((g) => g.items.length);

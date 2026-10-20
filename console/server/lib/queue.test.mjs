@@ -226,3 +226,48 @@ test('nhiều lý do cùng ticket gộp MỘT dòng: lý do gấp nhất đứng
   assert.ok(q.now.some((i) => i.source === 'need'), 'dòng "Cần bạn" là checkbox riêng, không gộp');
   assert.strictEqual(q.now.find((i) => i.key === 'GW-2').reasons, undefined);
 });
+
+const WITH_SUBS = { ...ISSUES, 'GW-5': { parent: 'GW-1', phase: 'bugfix', milestones: {} }, 'GW-6': { parent: 'GW-3', phase: 'waiting-design' } };
+
+test('subtask gộp vào dòng của task chính: review của subtask đứng chung dòng alert task chính, id giữ mã subtask', () => {
+  const q = buildQueue(
+    base({
+      issues: WITH_SUBS,
+      alerts: [{ key: 'GW-1', code: 'html-urgent', level: 'crit', text: 'còn 1 ngày' }],
+      review: [{ key: 'GW-5', dirty: 2 }],
+    })
+  );
+  assert.strictEqual(q.now.length, 1);
+  assert.strictEqual(q.now[0].key, 'GW-1');
+  assert.deepStrictEqual(ids(q.now), ['alert:html-urgent:GW-1', 'review:GW-5']);
+  assert.match(q.now[0].reasons[1].text, /^bổ sung GW-5: 2 file chưa commit/);
+});
+
+test('nhóm chờ: alert subtask nằm dưới key task chính nhưng giữ tin nhắn riêng — mỗi dòng là 1 lời xin khác người', () => {
+  const q = buildQueue(
+    base({
+      issues: WITH_SUBS,
+      alerts: [
+        { key: 'GW-3', code: 'qc-test-no-buglist', level: 'warn', text: 'chưa có buglist' },
+        { key: 'GW-3', sub: 'GW-6', code: 'design-overdue', level: 'crit', text: 'bổ sung GW-6: mốc design đã qua', dedup: 'GW-6:design-overdue' },
+      ],
+    })
+  );
+  assert.deepStrictEqual(q.waiting.map((i) => i.key), ['GW-3', 'GW-3']);
+  const design = q.waiting.find((i) => i.code === 'design-overdue');
+  assert.strictEqual(design.id, 'alert:design-overdue:GW-3:GW-6:design-overdue');
+  assert.match(design.action.message, /^Ticket GW-6 /);
+});
+
+test('doctor và nợ mang mã subtask quy về task chính', () => {
+  const q = buildQueue(
+    base({
+      issues: WITH_SUBS,
+      doctor: { errors: [{ code: 'E1', key: 'GW-5', text: 'sai' }], warns: [] },
+      debt: { groups: [{ key: 'GW-6', items: [{ date: '2026-09-28', index: 0, text: 'việc nợ', staleDays: 3 }] }] },
+    })
+  );
+  assert.strictEqual(q.now[0].key, 'GW-1');
+  assert.strictEqual(q.now[0].sub, 'GW-5');
+  assert.strictEqual(q.debt[0].key, 'GW-3');
+});

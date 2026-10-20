@@ -7,6 +7,8 @@ const {
   QC_TEST_PHASES,
   isOffMyPlate,
   isHandedOver,
+  parentKeyOf,
+  foldSubtask,
 } = require('./vocab');
 const { sheetState, isOpenScanFresh } = require('./bugs');
 
@@ -61,6 +63,7 @@ const label = (key, text) => ({ key, text });
  */
 function buildAlerts(state, today, activity = {}, debt = null, nowMs = Date.now()) {
   const out = [];
+  const issues = state.issues || {};
 
   for (const [key, issue] of Object.entries(state.issues || {})) {
     // Không còn việc của mình thì im — phase THÔI là không đủ (xem vocab::isOffMyPlate):
@@ -165,12 +168,15 @@ function buildAlerts(state, today, activity = {}, debt = null, nowMs = Date.now(
 
   // Ticket đã sang tay QC mà chưa ai giao buglist — chỗ bug sắp về nhưng không có gì để theo dõi
   // Loại `not-buglist`: đó là link BRIEF gắn mã task (GW-723, GW-629), không phải buglist
+  // Buglist thuộc task chính — buglist gắn mã subtask cũng là của task chính
   const watchedKeys = new Set(
     Object.values(state.bugWatch || {})
       .filter((e) => sheetState(e) !== 'not-buglist')
       .flatMap((e) => e.keys || [])
+      .map((k) => parentKeyOf(issues, k) || k)
   );
-  for (const [key, issue] of Object.entries(state.issues || {})) {
+  for (const [key, issue] of Object.entries(issues)) {
+    if (parentKeyOf(issues, key)) continue;
     if (isHandedOver(issue) || !QC_TEST_PHASES.includes(issue.phase) || watchedKeys.has(key)) continue;
     out.push({
       ...label(key, 'đang ở giai đoạn QC test mà chưa có buglist nào — đòi link từ QC/PM'),
@@ -180,7 +186,10 @@ function buildAlerts(state, today, activity = {}, debt = null, nowMs = Date.now(
   }
 
   const rank = { crit: 0, warn: 1 };
-  return out.sort((a, b) => rank[a.level] - rank[b.level] || a.key.localeCompare(b.key));
+  return out
+    .map((a) => foldSubtask(issues, a))
+    .map((a) => (a.sub && !a.dedup ? { ...a, dedup: `${a.sub}:${a.code}` } : a))
+    .sort((a, b) => rank[a.level] - rank[b.level] || a.key.localeCompare(b.key));
 }
 
 module.exports = { buildAlerts };

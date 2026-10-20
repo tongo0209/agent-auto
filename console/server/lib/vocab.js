@@ -35,6 +35,17 @@ const isOffMyPlate = (issue) =>
 const isHandedOver = (issue) =>
   Boolean(issue && (idsWhere('offMyPlate').includes(issue.phase) || issue.assigneeNow));
 
+/** Subtask = issue có `parent` nằm trong state — nó đi cùng task chính, không phải task riêng */
+const parentKeyOf = (issues, key) => {
+  const parent = issues[key]?.parent;
+  return parent && issues[parent] ? parent : null;
+};
+
+const foldSubtask = (issues, item) => {
+  const parent = parentKeyOf(issues, item.key);
+  return parent ? { ...item, key: parent, sub: item.key, text: `bổ sung ${item.key}: ${item.text}` } : item;
+};
+
 module.exports = {
   vocab,
   PHASE_IDS: vocab.phases.map((p) => p.id),
@@ -68,4 +79,6 @@ module.exports = {
   isDoneStatus,
   isOffMyPlate,
   isHandedOver,
+  parentKeyOf,
+  foldSubtask,
 };

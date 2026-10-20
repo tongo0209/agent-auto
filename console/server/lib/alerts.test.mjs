@@ -493,3 +493,59 @@ test('mốc gấp của ticket đã đóng status vẫn im — các cảnh báo 
   const state = { issues: { 'GW-1': { phase: 'coding', status: 'Done', milestones: { html: '2026-08-04' } } } };
   assert.deepEqual(buildAlerts(state, TODAY, {}, null, NOW_MS), []);
 });
+
+/* ─────────────────── Subtask đi cùng task chính ─────────────────── */
+
+const withSub = (sub, parent = { phase: 'wait-test', status: 'COMPLETED' }, bugWatch = {}) => ({
+  issues: { 'GW-890': parent, 'GW-963': { parent: 'GW-890', ...sub } },
+  bugWatch,
+});
+
+test('ca thật GW-963: subtask wait-test KHÔNG sinh qc-test-no-buglist riêng — chỉ task chính', () => {
+  const alerts = buildAlerts(withSub({ phase: 'wait-test', status: 'To Do' }), TODAY, {}, null, NOW_MS).filter(
+    (a) => a.code === 'qc-test-no-buglist'
+  );
+  assert.deepEqual(alerts.map((a) => a.key), ['GW-890']);
+});
+
+test('buglist gắn mã subtask cũng tính là task chính đã có buglist', () => {
+  const state = withSub({ phase: 'wait-test' }, undefined, { s1: { follow: true, keys: ['GW-963'] } });
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS).filter((a) => a.code === 'qc-test-no-buglist');
+  assert.equal(alerts.length, 0);
+});
+
+test('mốc riêng của subtask gắn vào key task chính, text mở đầu "bổ sung <SUB>: ", có field sub', () => {
+  const alerts = buildAlerts(withSub({ phase: 'coding', milestones: { duedate: '2026-08-04' } }), TODAY, {}, null, NOW_MS);
+  const ms = milestoneAlerts(alerts);
+  assert.equal(ms.length, 1);
+  assert.equal(ms[0].key, 'GW-890');
+  assert.equal(ms[0].sub, 'GW-963');
+  assert.match(ms[0].text, /^bổ sung GW-963: /);
+});
+
+test('task chính đã done mà subtask còn mốc gấp → VẪN cảnh báo (subtask là việc bổ sung sau)', () => {
+  const state = withSub({ phase: 'coding', milestones: { duedate: '2026-08-04' } }, { phase: 'done-fe', status: 'Done' });
+  const ms = milestoneAlerts(buildAlerts(state, TODAY, {}, null, NOW_MS));
+  assert.deepEqual(ms.map((a) => [a.key, a.sub]), [['GW-890', 'GW-963']]);
+});
+
+test('subtask bản thân đã đóng → im như cũ', () => {
+  const state = withSub({ phase: 'coding', status: 'Done', milestones: { duedate: '2026-08-04' } });
+  assert.equal(milestoneAlerts(buildAlerts(state, TODAY, {}, null, NOW_MS)).length, 0);
+});
+
+test('alert của subtask có dedup riêng — không bị gộp chung khoá nhắc với alert cùng mã của task chính', () => {
+  const state = withSub(
+    { phase: 'coding', milestones: { duedate: '2026-08-04' } },
+    { phase: 'coding', milestones: { html: '2026-08-04' } }
+  );
+  const ms = milestoneAlerts(buildAlerts(state, TODAY, {}, null, NOW_MS));
+  assert.equal(ms.length, 2);
+  assert.notEqual(ms[0].dedup, ms[1].dedup);
+});
+
+test('issue có parent KHÔNG nằm trong state → vẫn là task riêng như cũ', () => {
+  const state = { issues: { 'GW-963': { parent: 'GW-1', phase: 'wait-test' } }, bugWatch: {} };
+  const alerts = buildAlerts(state, TODAY, {}, null, NOW_MS);
+  assert.deepEqual(alerts.map((a) => [a.key, a.code, a.sub]), [['GW-963', 'qc-test-no-buglist', undefined]]);
+});

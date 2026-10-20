@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { createRun, nextAction, applyEvent, resumeRun, roundOf, reopenRun, finalApproval } from './engine.mjs';
+import { createRun, nextAction, applyEvent, resumeRun, roundOf, reopenRun, finalApproval, allowedActions, chooseAction } from './engine.mjs';
 
 const FLOW = {
   id: 'mini',
@@ -198,4 +198,110 @@ test('reopenRun: run done bị trả về sau review → fix với note, quay v�
   assert.deepStrictEqual([run.reviewedAt, run.reopenedAt, run.loops], [null, T0 + 1, {}]);
   const back = applyEvent(run, REVIEW_FLOW, { type: 'pass' }, T0);
   assert.strictEqual(back.stage, 'gates-final');
+});
+
+const PICK_FLOW = {
+  id: 'pick', budget: {},
+  stages: [
+    { id: 'plan', kind: 'claude', next: 'approve-plan' },
+    { id: 'approve-plan', kind: 'pause', next: 'implement' },
+    { id: 'implement', kind: 'claude', next: 'gates' },
+    { id: 'gates', kind: 'gate', next: null },
+  ],
+};
+const OPTS = [{ id: 'A', title: 'Một' }, { id: 'B', title: 'Hai' }];
+const types = (actions) => actions.map((a) => a.type);
+const ofType = (actions, type) => actions.find((a) => a.type === type);
+
+function stoppedAtGates() {
+  let run = fresh();
+  for (let i = 0; i < 2; i++) run = step(run, 'pass');
+  run = applyEvent(run, FLOW, { type: 'approve' }, T0);
+  for (let i = 0; i < 2; i++) run = step(run, 'pass');
+  return { ...run, status: 'stopped', stopReason: 'fail:gates', loops: { implement: 1, review: 2, gates: 1 }, sessions: { implement: 's1' } };
+}
+
+test('allowedActions: running chỉ có break', () => {
+  assert.deepStrictEqual(types(allowedActions(fresh(), FLOW)), ['break']);
+});
+
+test('allowedActions: stopped ở gates có retry, skip needsReason=true, goto [plan, plan-review, implement, review]', () => {
+  const actions = allowedActions(stoppedAtGates(), FLOW);
+  assert.ok(ofType(actions, 'retry'));
+  assert.strictEqual(ofType(actions, 'skip').needsReason, true);
+  assert.deepStrictEqual(ofType(actions, 'goto').stages, ['plan', 'plan-review', 'implement', 'review']);
+});
+
+test('allowedActions: approve-plan có 2 phương án → pick [A,B]; 1 phương án → không có pick', () => {
+  const run = applyEvent(createRun({ key: 'K', runId: 'r', flow: PICK_FLOW, repo: '/r', campaignDir: '/c', now: T0 }), PICK_FLOW, { type: 'pass' }, T0);
+  assert.deepStrictEqual(ofType(allowedActions(run, PICK_FLOW, { options: OPTS }), 'pick').options, ['A', 'B']);
+  assert.strictEqual(ofType(allowedActions(run, PICK_FLOW, { options: OPTS.slice(0, 1) }), 'pick'), undefined);
+});
+
+test('chooseAction retry: reset loop + xoá session, status running', () => {
+  const run = chooseAction(stoppedAtGates(), FLOW, { type: 'retry', note: 'thử lại' }, { now: T0 });
+  assert.deepStrictEqual([run.status, run.stopReason, run.stage, run.loops.gates, run.rejectNote], ['running', null, 'gates', 0, 'thử lại']);
+  assert.strictEqual(run.sessions.implement, 's1');
+  assert.strictEqual(chooseAction({ ...stoppedAtGates(), sessions: { gates: 'g' } }, FLOW, { type: 'retry' }, { now: T0 }).sessions.gates, undefined);
+});
+
+test('chooseAction goto implement: xoá sessions.implement, loops từ implement trở đi về 0', () => {
+  const run = chooseAction(stoppedAtGates(), FLOW, { type: 'goto', stage: 'implement', note: 'làm lại' }, { now: T0 });
+  assert.deepStrictEqual([run.stage, run.status, run.rejectNote], ['implement', 'running', 'làm lại']);
+  assert.strictEqual(run.sessions.implement, undefined);
+  assert.deepStrictEqual([run.loops.implement, run.loops.review, run.loops.gates].map((n) => n ?? 0), [0, 0, 0]);
+});
+
+test('chooseAction goto plan: choice về null', () => {
+  const run = chooseAction({ ...stoppedAtGates(), choice: { id: 'A', title: 'x', note: null } }, FLOW, { type: 'goto', stage: 'plan' }, { now: T0 });
+  assert.strictEqual(run.choice, null);
+});
+
+test('chooseAction goto stage chưa qua → ném "chưa đi qua"', () => {
+  assert.throws(() => chooseAction(stoppedAtGates(), FLOW, { type: 'goto', stage: 'final' }, { now: T0 }), /chưa đi qua/);
+});
+
+test('chooseAction skip gates thiếu reason → ném "cần lý do"; có reason → gateSkipped, receipt skipped-by-user, stage = next', () => {
+  assert.throws(() => chooseAction(stoppedAtGates(), FLOW, { type: 'skip' }, { now: T0 }), /cần lý do/);
+  const run = chooseAction(stoppedAtGates(), FLOW, { type: 'skip', reason: 'QC chấp nhận' }, { now: T0 });
+  assert.strictEqual(run.gateSkipped.length, 1);
+  assert.deepStrictEqual([run.gateSkipped[0].stage, run.gateSkipped[0].reason], ['gates', 'QC chấp nhận']);
+  const last = run.receipts.at(-1);
+  assert.deepStrictEqual([last.stage, last.verdict, last.note], ['gates', 'skipped-by-user', 'QC chấp nhận']);
+  assert.deepStrictEqual([run.stage, run.status], ['design-gap-check', 'running']);
+});
+
+test('applyEvent skip không by:user giữ nguyên: không gateSkipped', () => {
+  let run = { ...fresh(), stage: 'gates' };
+  run = applyEvent(run, FLOW, { type: 'skip' }, T0);
+  assert.deepStrictEqual(run.gateSkipped, []);
+});
+
+test('chooseAction pick A → choice.id A, stage = implement', () => {
+  const run = applyEvent(createRun({ key: 'K', runId: 'r', flow: PICK_FLOW, repo: '/r', campaignDir: '/c', now: T0 }), PICK_FLOW, { type: 'pass' }, T0);
+  const picked = chooseAction(run, PICK_FLOW, { type: 'pick', option: 'A', note: 'ok' }, { options: OPTS, now: T0 });
+  assert.deepStrictEqual(picked.choice, { id: 'A', title: 'Một', note: 'ok' });
+  assert.strictEqual(picked.stage, 'implement');
+});
+
+test('chooseAction pick khi không có phương án → ném', () => {
+  const run = applyEvent(createRun({ key: 'K', runId: 'r', flow: PICK_FLOW, repo: '/r', campaignDir: '/c', now: T0 }), PICK_FLOW, { type: 'pass' }, T0);
+  assert.throws(() => chooseAction(run, PICK_FLOW, { type: 'pick', option: 'A' }, { options: [], now: T0 }));
+});
+
+test('chooseAction break: toggle breakpoint, không đổi status', () => {
+  const once = chooseAction(fresh(), FLOW, { type: 'break', stage: 'gates' }, { now: T0 });
+  assert.deepStrictEqual([once.plan.breakpoints, once.status], [['gates'], 'running']);
+  assert.deepStrictEqual(chooseAction(once, FLOW, { type: 'break', stage: 'gates' }, { now: T0 }).plan.breakpoints, []);
+});
+
+test('chooseAction trên run running (không break) → ném "đang chạy"', () => {
+  assert.throws(() => chooseAction(fresh(), FLOW, { type: 'retry' }, { now: T0 }), /đang chạy/);
+});
+
+test('createRun thiếu disabled/breakpoints → plan {disabled:[],breakpoints:[]}, choice null, gateSkipped []', () => {
+  const run = fresh();
+  assert.deepStrictEqual(run.plan, { disabled: [], breakpoints: [], skipReason: null });
+  assert.strictEqual(run.choice, null);
+  assert.deepStrictEqual(run.gateSkipped, []);
 });

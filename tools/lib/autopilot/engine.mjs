@@ -1,7 +1,7 @@
 const FINISHED = ['done', 'stopped'];
 const STATUS_BY_KIND = { pause: 'paused', attached: 'attached' };
 
-export function createRun({ key, runId, flow, routerReason, repo, campaignDir, handoffDir = null, cloneSource = null, sheetUrl = null, sheetKind = null, campaignDirs = [campaignDir], repos = [repo], now }) {
+export function createRun({ key, runId, flow, routerReason, repo, campaignDir, handoffDir = null, cloneSource = null, sheetUrl = null, sheetKind = null, campaignDirs = [campaignDir], repos = [repo], disabled = [], breakpoints = [], skipReason = null, now }) {
   return {
     key, runId, flow: flow.id, routerReason, repo, campaignDir, handoffDir, cloneSource, sheetUrl, sheetKind,
     campaignDirs: campaignDirs.filter(Boolean),
@@ -18,8 +18,13 @@ export function createRun({ key, runId, flow, routerReason, repo, campaignDir, h
     budget: { ...flow.budget },
     startedAt: now,
     receipts: [],
+    plan: { disabled, breakpoints, skipReason },
+    choice: null,
+    gateSkipped: [],
   };
 }
+
+export const isGateLike = (stage) => stage.kind === 'gate';
 
 export const stageOf = (flow, id) => flow.stages.find((s) => s.id === id);
 
@@ -94,6 +99,10 @@ export function applyEvent(run, flow, event, now) {
   }
   if (event.sessionId && stage.keepSession) next = { ...next, sessions: { ...next.sessions, [stage.id]: event.sessionId } };
 
+  if (event.type === 'skip' && event.by === 'user' && isGateLike(stage)) {
+    next = { ...next, gateSkipped: [...(next.gateSkipped ?? []), { stage: stage.id, reason: event.reason, at: new Date(now).toISOString() }] };
+  }
+
   next = transition(next, flow, stage, event);
   return next.status !== 'done' && next.status !== 'stopped' && overBudget(next) ? stop(next, 'budget') : next;
 }
@@ -120,4 +129,74 @@ export const finalApproval = (flow) => flow.stages.find((s) => s.onReject && sta
 export function reopenRun(run, flow, note, now) {
   const reopened = { ...run, status: 'running', loops: {}, reviewedAt: null, reopenedAt: now };
   return transition(reopened, flow, finalApproval(flow), { type: 'reject', note });
+}
+
+const RUNNABLE_KINDS = ['claude', 'gate'];
+const hasReceipt = (run, id) => run.receipts.some((r) => r.stage === id);
+const planOf = (run) => run.plan ?? { disabled: [], breakpoints: [] };
+
+export function allowedActions(run, flow, { options = [] } = {}) {
+  if (run.status === 'done' || run.status === 'aborted') return [];
+  const actions = [];
+  const stage = stageOf(flow, run.stage);
+  const breakable = flow.stages.filter((s) => RUNNABLE_KINDS.includes(s.kind) && !hasReceipt(run, s.id)).map((s) => s.id);
+  if (run.status === 'running') return [{ type: 'break', stages: breakable }];
+
+  const retryable = run.status === 'stopped' && RUNNABLE_KINDS.includes(stage.kind);
+  if (retryable) actions.push({ type: 'retry' });
+  if (run.status === 'paused' || run.status === 'stopped') {
+    const passed = flow.stages.filter((s) => s.id !== run.stage && hasReceipt(run, s.id)).map((s) => s.id);
+    if (passed.length) actions.push({ type: 'goto', stages: passed });
+  }
+  if (retryable) actions.push({ type: 'skip', needsReason: isGateLike(stage) });
+  if (run.status === 'paused' && run.stage === 'approve-plan' && options.length >= 2) {
+    actions.push({ type: 'pick', options: options.map((o) => o.id) });
+  }
+  actions.push({ type: 'break', stages: breakable });
+  return actions;
+}
+
+const forgetFrom = (run, flow, startId) => {
+  const dropped = flow.stages.slice(flow.stages.findIndex((s) => s.id === startId)).map((s) => s.id);
+  const loops = { ...run.loops };
+  const sessions = { ...run.sessions };
+  for (const id of dropped) { delete loops[id]; delete sessions[id]; }
+  return { ...run, loops, sessions };
+};
+
+export function chooseAction(run, flow, action, { options = [], now } = {}) {
+  const allowed = allowedActions(run, flow, { options }).find((a) => a.type === action.type);
+  if (!allowed) {
+    throw new Error(run.status === 'running' ? `run đang chạy, chỉ đặt được điểm dừng (không làm được "${action.type}")` : `không làm được "${action.type}" ở trạng thái ${run.status}, stage ${run.stage}`);
+  }
+  const resumed = { ...run, status: 'running', stopReason: null };
+
+  switch (action.type) {
+    case 'retry': {
+      const { [run.stage]: _dropped, ...sessions } = run.sessions;
+      return { ...resumed, loops: { ...run.loops, [run.stage]: 0 }, sessions, rejectNote: action.note ?? null };
+    }
+    case 'goto': {
+      if (!allowed.stages.includes(action.stage)) throw new Error(`stage "${action.stage}" chưa đi qua, không quay lại được`);
+      const rewound = { ...forgetFrom(resumed, flow, action.stage), stage: action.stage, rejectNote: action.note ?? null };
+      return action.stage === flow.stages[0].id ? { ...rewound, choice: null } : rewound;
+    }
+    case 'skip': {
+      if (allowed.needsReason && !action.reason) throw new Error(`bỏ qua stage "${run.stage}" cần lý do`);
+      const receipt = { stage: run.stage, verdict: 'skipped-by-user', note: action.reason ?? '', blocking: 0, advisory: 0, turns: 0, costUsd: 0, ms: 0 };
+      return applyEvent(resumed, flow, { type: 'skip', by: 'user', reason: action.reason, receipt }, now);
+    }
+    case 'pick': {
+      const option = options.find((o) => o.id === action.option);
+      if (!allowed.options.includes(action.option)) throw new Error(`phương án "${action.option}" không có trong danh sách`);
+      const chosen = { ...run, choice: { id: option.id, title: option.title, note: action.note ?? null } };
+      return applyEvent(chosen, flow, { type: 'approve' }, now);
+    }
+    case 'break': {
+      if (!allowed.stages.includes(action.stage) && !planOf(run).breakpoints.includes(action.stage)) throw new Error(`stage "${action.stage}" đã chạy xong, không đặt điểm dừng được`);
+      const plan = planOf(run);
+      const toggled = plan.breakpoints.includes(action.stage) ? plan.breakpoints.filter((id) => id !== action.stage) : [...plan.breakpoints, action.stage];
+      return { ...run, plan: { ...plan, breakpoints: toggled } };
+    }
+  }
 }

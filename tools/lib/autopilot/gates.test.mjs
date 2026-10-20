@@ -119,3 +119,8 @@ test('chưa có campaignDir → error, không ném', async () => {
   const r = await runGates(['build'], { repo: '/r', campaignDir: null, key: 'GW-1', files: [], exec: fakeExec().exec });
   assert.deepStrictEqual([r.pass, r.error], [false, 'build']);
 });
+
+test('commitMessage bỏ tiền tố (type): có sẵn trong tiêu đề plan', async () => {
+  const { commitMessage } = await import('./gates.mjs');
+  assert.match(commitMessage('landing-fix', '(feat): NTH mã mây (GW-912)'), /^\(fix\): nth mã mây \(gw-912\)\n/);
+});

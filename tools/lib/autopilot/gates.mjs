@@ -63,7 +63,7 @@ function changedFiles(ctx) {
 }
 
 export function commitMessage(flowId, planTitle) {
-  const title = planTitle.trim().replace(/\.+$/, '').toLowerCase();
+  const title = planTitle.trim().replace(/^\(\w+\):\s*/, '').replace(/\.+$/, '').toLowerCase();
   return `(${COMMIT_TYPE[flowId] ?? 'fix'}): ${title}\n\nCo-Authored-By: Claude Code <noreply@anthropic.com>`;
 }
 

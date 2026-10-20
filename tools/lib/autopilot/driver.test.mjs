@@ -281,3 +281,15 @@ test('G4: write-sheet chọn writer theo sheetKind (excel → bug-sheet-tick)', 
   assert.strictEqual(run.stage, 'write-sheet');
   assert.match(notified.at(-1), /bug-sheet-tick/);
 });
+
+test('G5: design-intake dừng ở block hỏi PM, approve là xong — không code, không commit', async () => {
+  const flow = loadFlow('design-intake');
+  const { runClaude, calls } = fakeClaude({});
+  const gates = fakeGates();
+  let run = await drive({ ...newRun('design-intake'), repo: null, repos: [], campaignDir: null }, flow, base({ runClaude, runGates: gates.runGates }));
+  assert.deepStrictEqual([run.status, run.stage], ['paused', 'pm-block']);
+  assert.deepStrictEqual(calls.map((c) => c.stageId), ['fetch-design', 'check-design']);
+  run = applyEvent(run, flow, { type: 'approve' }, Date.now());
+  assert.strictEqual(run.status, 'done');
+  assert.strictEqual(gates.calls.length, 0);
+});

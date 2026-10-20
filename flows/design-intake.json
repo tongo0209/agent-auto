@@ -1,0 +1,43 @@
+{
+  "id": "design-intake",
+  "label": "Nhận design: tải → soát đủ chưa → block hỏi PM",
+  "budget": {
+    "usd": 6,
+    "minutes": 45
+  },
+  "usesRepo": false,
+  "ask": [
+    {
+      "need": [
+        "key"
+      ],
+      "question": "Ticket Jira (GW-…) nào đang chờ design?"
+    }
+  ],
+  "stages": [
+    {
+      "id": "fetch-design",
+      "kind": "claude",
+      "prompt": "design-intake.md",
+      "toolset": "intake",
+      "model": "sonnet",
+      "next": "check-design"
+    },
+    {
+      "id": "check-design",
+      "kind": "claude",
+      "prompt": "check-design.md",
+      "toolset": "review",
+      "model": "opus",
+      "next": "pm-block"
+    },
+    {
+      "id": "pm-block",
+      "kind": "pause",
+      "show": [
+        "check-design-r*.json"
+      ],
+      "next": null
+    }
+  ]
+}

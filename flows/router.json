@@ -8,6 +8,8 @@
       "questions": ["Link buglist (Google Sheet/Excel) của task con này ở đâu?", "Kế thừa paths của {parentKey} có đúng folder cần fix không?"]
     },
     { "flow": "buglist", "all": ["phase=bugfix"] },
+    { "flow": "design-intake", "all": ["phase=waiting-design"], "needsCampaign": false },
+    { "flow": "design-intake", "all": ["designLinkPending"], "needsCampaign": false },
     { "flow": "landing-clone", "all": ["cloneSource"] },
     { "flow": "landing-new", "all": ["hasRawDesign", "!hasCutAssets", "!campaignExists"] },
     { "flow": "landing-fix", "all": ["hasDesign", "campaignExists"] },

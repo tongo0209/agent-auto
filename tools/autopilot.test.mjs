@@ -127,3 +127,10 @@ test('G1: route task con chưa có buglist → in ask + câu hỏi; run từ ch�
   assert.strictEqual(run.status, 1);
   assert.match(run.stderr, /Kế thừa paths của GW-1/);
 });
+
+test('G5: design-intake không đụng repo — không tạo worktree, không giữ campaign', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-12', '--flow', 'design-intake', '--campaign', campaign);
+  const run = lastRun(runs, 'GW-12');
+  assert.deepStrictEqual([run.stage, run.repo, run.campaignDir, run.worktrees], ['pm-block', null, null, {}]);
+});

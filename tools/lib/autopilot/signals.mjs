@@ -5,6 +5,7 @@ const HANDOFF_REPO = 'gt-promotion-template';
 const SHEET_INPUT = /docs\.google\.com\/spreadsheets|sharepoint\.com|\.xlsx(\?|$)/i;
 const GOOGLE_SHEET = /docs\.google\.com\/spreadsheets/i;
 const NO_BUG_ID_NOTE = /không có cột BugID/i;
+const DESIGN_DOWNLOADED = /^đã-giao-(đã-tải|tải-một-phần)$/;
 const RAW_DESIGN = /\.(psd|psb)$/i;
 const IMAGE = /\.(png|jpe?g|webp)$/i;
 
@@ -61,6 +62,7 @@ export function gatherSignals({ input, agentRoot, campaign }) {
     repos: [...new Set([target, ...known].filter(Boolean).map((p) => repos[p.repo]))],
     designDir,
     hasRawDesign,
+    designLinkPending: Boolean(issue.designLink) && !DESIGN_DOWNLOADED.test(issue.design?.status ?? ''),
     hasDesign: hasRawDesign || designFiles.some((f) => IMAGE.test(f)),
     hasCutAssets: designFiles.some((f) => f.split(path.sep).includes('_auto-export')),
     briefText: briefText.trim(),

@@ -141,3 +141,23 @@ test('G4: sheetKind google|excel + sheetNoBugId từ note/bugWatch radar mù', (
   assert.deepStrictEqual([sig('GW-2').sheetKind, sig('GW-2').sheetNoBugId], ['excel', false]);
   assert.strictEqual(sig('GW-3').sheetNoBugId, true);
 });
+
+test('G5: phase waiting-design → design-intake, không cần campaign', () => {
+  assert.strictEqual(route({ ...base, phase: 'waiting-design', campaignDir: null }, RULES).flow, 'design-intake');
+});
+
+test('G5: link design chưa tải → design-intake dù phase coding', () => {
+  assert.strictEqual(route({ ...base, designLinkPending: true, hasDesign: true }, RULES).flow, 'design-intake');
+});
+
+test('G5: designLinkPending = có link design mà status chưa tải xong', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-sig-'));
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ repos: {} }));
+  const issues = {
+    'GW-1': { designLink: 'https://x.sharepoint.com/f', design: { status: 'đã-giao-chưa-tải' } },
+    'GW-2': { designLink: 'https://x.sharepoint.com/f', design: { status: 'đã-giao-đã-tải' } },
+  };
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues }));
+  assert.strictEqual(gatherSignals({ input: 'GW-1', agentRoot: root }).designLinkPending, true);
+  assert.strictEqual(gatherSignals({ input: 'GW-2', agentRoot: root }).designLinkPending, false);
+});

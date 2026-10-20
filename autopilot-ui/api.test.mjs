@@ -58,6 +58,9 @@ test('actionArgs: dựng đúng lệnh CLI, chặn đầu vào xấu', () => {
   assert.deepStrictEqual(actionArgs('open', { input: 'GW-9', flow: 'feature' }), ['open', 'GW-9', '--flow', 'feature']);
   assert.deepStrictEqual(actionArgs('open', { key: 'GW-9', resume: true }), ['open', 'GW-9', '--resume']);
   assert.deepStrictEqual(actionArgs('done', { key: 'GW-9' }), ['done', 'GW-9']);
+  assert.deepStrictEqual(actionArgs('reviewed', { key: 'GW-9' }), ['reviewed', 'GW-9']);
+  assert.deepStrictEqual(actionArgs('open', { key: 'GW-9', followup: true, note: 'đổi màu' }), ['open', 'GW-9', '--followup', '--note', 'đổi màu']);
+  assert.deepStrictEqual(actionArgs('open', { key: 'GW-9', followup: true }), ['open', 'GW-9', '--followup']);
   assert.throws(() => actionArgs('open', { input: '--resume' }), /input/);
   assert.throws(() => actionArgs('open', { key: '../x', resume: true }), /key/);
 });
@@ -116,4 +119,12 @@ test('listArtifacts: bỏ thư mục con (wt/ của worktree) — chỉ liệt k
   writeArtifact({ ...run, key: 'GW-7' }, 'brief.md', '# x');
   fs.mkdirSync(path.join(process.env.AUTOPILOT_RUNS_DIR, 'GW-7', run.runId, 'wt', 'repo'), { recursive: true });
   assert.deepStrictEqual(listArtifacts('GW-7', run.runId), ['brief.md']);
+});
+
+test('listView: run done có worktree mà chưa review → awaitingReview; đã review hoặc không có worktree thì không', async () => {
+  saveRun({ ...run, key: 'GW-40', status: 'done', stage: null, worktrees: { '/r': '/r-wt' } });
+  saveRun({ ...run, key: 'GW-41', status: 'done', stage: null, worktrees: { '/r': '/r-wt' }, reviewedAt: 1 });
+  const view = await listView();
+  const flag = (key) => view.runs.find((r) => r.key === key).awaitingReview;
+  assert.deepStrictEqual([flag('GW-40'), flag('GW-41'), flag('GW-2'), flag('GW-1')], [true, false, false, false]);
 });

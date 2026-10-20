@@ -25,3 +25,14 @@ test('worktree mượn node_modules của campaign và thư mục cha (git khôn
   assert.ok(fs.lstatSync(path.join(dir, 'products/x/node_modules')).isSymbolicLink());
   assert.strictEqual(git('status', '--porcelain').stdout, '');
 });
+
+test('addWorktree trả base = commit gốc lúc tách nhánh', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-wt-'));
+  const repo = path.join(root, 'repo');
+  fs.mkdirSync(repo);
+  const git = (...a) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
+  git('init', '-q');
+  git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init');
+  const { base } = addWorktree({ repo, parentDir: path.join(root, 'wt'), branch: 'ap/y' });
+  assert.strictEqual(base, git('rev-parse', 'HEAD').stdout.trim());
+});

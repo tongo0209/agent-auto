@@ -4,15 +4,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { createRun, applyEvent, resumeRun, stageOf, roundOf } from './lib/autopilot/engine.mjs';
+import { createRun, applyEvent, resumeRun, reopenRun, finalApproval, stageOf, roundOf } from './lib/autopilot/engine.mjs';
 import { drive, isolate, runGateStage, WHEN } from './lib/autopilot/driver.mjs';
 import { runGates } from './lib/autopilot/gates.mjs';
-import { briefOf, briefFile, chatLaunch } from './lib/autopilot/chat.mjs';
+import { briefOf, briefFile, chatLaunch, followupBriefOf } from './lib/autopilot/chat.mjs';
+import { runChanges } from './lib/autopilot/review.mjs';
 import { loadFlow, listFlows, validateFlow, PROMPTS_DIR } from './lib/autopilot/flows.mjs';
 import { gatherSignals } from './lib/autopilot/signals.mjs';
 import { route, loadRules } from './lib/autopilot/router.mjs';
 import { newRunId, loadRun, listRuns, saveRun, runsDir, runDir, pauseFile, childFile, writeArtifact } from './lib/autopilot/store.mjs';
-import { addWorktree, removeWorktree } from './lib/autopilot/worktree.mjs';
+import { addWorktree, removeWorktree, branchOf } from './lib/autopilot/worktree.mjs';
 import { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted } from './lib/autopilot/lock.mjs';
 import { formatStatus } from './lib/autopilot/format.mjs';
 
@@ -26,10 +27,12 @@ const USAGE = `Dùng:
   autopilot open <KEY> --resume                             (mở lại tab: nối phiên claude mới nhất của worktree)
   autopilot mark <KEY> <bước> <doing|pass|fail|ask> [--note "…"]
   autopilot gates <KEY> [check…]   (mặc định mọi cổng của luồng trừ commit)
+  autopilot open <KEY> --followup [--note "…"]             (run đã xong: mở tab chat sửa tiếp trên chính worktree đó)
   autopilot done <KEY>             (run chat xong, giữ worktree + nhánh để review)
+  autopilot reviewed <KEY>         (run đã xong: đánh dấu đã review code)
   autopilot status [KEY]
   autopilot approve <KEY> [--note "…"]
-  autopilot reject <KEY> --note "…"
+  autopilot reject <KEY> --note "…"   (run đã xong: trả về sửa, chạy lại fix → cổng → commit chồng lên nhánh)
   autopilot pause <KEY>    (dừng ngay bước claude đang chạy; resume nối tiếp đúng phiên)
   autopilot resume <KEY> [--note "…"] [--budget-usd n] [--budget-minutes n]   (--note: nhắn vào bước bị dừng giữa chừng)
   autopilot abort <KEY>
@@ -45,7 +48,7 @@ function describeDecision({ flow, target, reason, questions = [] }) {
 function parseArgs(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i++) {
-    if (['--bg', '--validate', '--resume'].includes(argv[i])) opts[argv[i].slice(2)] = true;
+    if (['--bg', '--validate', '--resume', '--followup'].includes(argv[i])) opts[argv[i].slice(2)] = true;
     else if (argv[i].startsWith('--')) opts[argv[i].slice(2)] = argv[++i];
     else opts._.push(argv[i]);
   }
@@ -127,12 +130,29 @@ async function cmdRun(opts, argv) {
 function cmdOpen(opts) {
   const input = opts._[1] ?? die(USAGE);
   if (opts.resume) return console.log(JSON.stringify(chatLaunch(mustLoadChat(input), { resume: true })));
+  if (opts.followup) return openFollowup(mustLoadDone(input), opts.note);
   const { run: created, flow } = newRun(opts, input);
   if (created.campaignDir) holdCampaign(created.campaignDir, { key: created.key, runId: created.runId });
   const run = { ...isolate(created, { addWorktree }), mode: 'chat', status: 'chat', chatState: null };
   saveRun(run);
   fs.writeFileSync(briefFile(run), briefOf(run, flow, input));
   console.log(JSON.stringify(chatLaunch(run)));
+}
+
+function openFollowup(done, note) {
+  holdAgain(done);
+  const run = { ...done, mode: 'chat', status: 'chat', stage: finalApproval(loadFlow(done.flow)).onReject, chatState: null, reviewedAt: null };
+  saveRun(run);
+  fs.writeFileSync(briefFile(run), followupBriefOf(run, runChanges(run), note));
+  console.log(JSON.stringify(chatLaunch(run)));
+}
+
+// Run xong đã nhả campaign; mở lại thì phải giữ lại, trừ khi run khác đã lấy
+function holdAgain(run) {
+  if (!run.campaignDir) return;
+  const holder = heldCampaigns()[run.campaignDir];
+  if (holder && holder.key !== run.key) die(`${run.campaignDir} đang bị ${holder.key}/${holder.runId} giữ — xong/abort run đó trước.`);
+  holdCampaign(run.campaignDir, run);
 }
 
 const MARKS = ['doing', 'pass', 'fail', 'ask'];
@@ -194,6 +214,18 @@ function mustLoad(key) {
   return loadRun(key) ?? die(`Chưa có run nào cho ${key}`);
 }
 
+function mustLoadDone(key) {
+  const run = mustLoad(key);
+  if (run.status !== 'done') die(`${key} chưa xong (${run.status}) — chỉ review/sửa tiếp run đã xong.`);
+  return run;
+}
+
+function cmdReviewed(opts) {
+  const run = mustLoadDone(opts._[1] ?? die(USAGE));
+  saveRun({ ...run, reviewedAt: Date.now() });
+  console.log(`${run.key} đã review.`);
+}
+
 function mustLoadChat(key) {
   const run = mustLoad(key);
   if (run.mode !== 'chat' || run.status !== 'chat') die(`${key} không phải run chat đang mở (${run.mode ?? 'auto'} · ${run.status}).`);
@@ -202,9 +234,13 @@ function mustLoadChat(key) {
 
 async function cmdDecide(opts, type) {
   const run = mustLoad(opts._[1] ?? die(USAGE));
-  if (!['paused', 'attached'].includes(run.status)) die(`${run.key} đang ${run.status}, không có gì để ${type}.`);
   if (type === 'reject' && !opts.note) die('reject cần --note "…" để stage sau biết sửa gì.');
   const flow = loadFlow(run.flow);
+  if (type === 'reject' && run.status === 'done') {
+    holdAgain(run);
+    return continueRun(reopenRun(run, flow, opts.note, Date.now()));
+  }
+  if (!['paused', 'attached'].includes(run.status)) die(`${run.key} đang ${run.status}, không có gì để ${type}.`);
   await continueRun(applyEvent(run, flow, { type, note: opts.note }, Date.now()));
 }
 
@@ -243,7 +279,7 @@ function cmdAbort(opts) {
   saveRun({ ...run, status: 'stopped', stopReason: 'aborted' });
   killStage(run);
   releaseCampaign(run);
-  for (const [top, dir] of Object.entries(run.worktrees ?? {})) removeWorktree({ top, dir, branch: `autopilot/${run.key}-${run.runId}` });
+  for (const [top, dir] of Object.entries(run.worktrees ?? {})) removeWorktree({ top, dir, branch: branchOf(run) });
   fs.rmSync(runDir(run.key, run.runId), { recursive: true, force: true });
   const keyDir = path.dirname(runDir(run.key, run.runId));
   if (!fs.readdirSync(keyDir).length) fs.rmdirSync(keyDir);
@@ -281,6 +317,7 @@ const COMMANDS = {
   mark: () => cmdMark(opts),
   gates: () => cmdGates(opts),
   done: () => cmdDone(opts),
+  reviewed: () => cmdReviewed(opts),
   status: () => cmdStatus(opts),
   approve: () => cmdDecide(opts, 'approve'),
   reject: () => cmdDecide(opts, 'reject'),

@@ -20,6 +20,8 @@ function linkNodeModules(top, dir, campaignDir) {
   }
 }
 
+export const branchOf = (run) => `autopilot/${run.key}-${run.runId}`;
+
 export function addWorktree({ repo, parentDir, branch, linkDirs = [] }) {
   const top = git(['-C', repo, 'rev-parse', '--show-toplevel']);
   const dir = path.join(parentDir, path.basename(top));
@@ -27,7 +29,7 @@ export function addWorktree({ repo, parentDir, branch, linkDirs = [] }) {
   for (const campaignDir of linkDirs.filter((d) => d && fs.existsSync(d)).map((d) => fs.realpathSync(d))) {
     if (campaignDir.startsWith(top)) linkNodeModules(top, dir, campaignDir);
   }
-  return { top, dir };
+  return { top, dir, base: git(['-C', dir, 'rev-parse', 'HEAD']) };
 }
 
 export function removeWorktree({ top, dir, branch }) {

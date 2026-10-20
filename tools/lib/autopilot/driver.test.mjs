@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-drive-'));
 const { drive } = await import('./driver.mjs');
-const { createRun, applyEvent, resumeRun } = await import('./engine.mjs');
+const { createRun, applyEvent, resumeRun, reopenRun } = await import('./engine.mjs');
 const { loadFlow } = await import('./flows.mjs');
 const { runDir, loadRun, saveRun, pauseFile } = await import('./store.mjs');
 const { holdCampaign, heldCampaigns } = await import('./lock.mjs');
@@ -37,7 +37,7 @@ function fakeGates(byRound = {}) {
 }
 
 const notified = [];
-const fakeWorktree = ({ repo, parentDir }) => ({ top: repo, dir: path.join(parentDir, path.basename(repo)) });
+const fakeWorktree = ({ repo, parentDir }) => ({ top: repo, dir: path.join(parentDir, path.basename(repo)), base: 'b0' });
 const base = (extra = {}) => ({ now: () => Date.now(), notify: (t, m) => notified.push(m), addWorktree: fakeWorktree, ...extra });
 const newRun = (flowId) =>
   createRun({ key: 'GW-1', runId: `r${Math.random().toString(36).slice(2, 8)}`, flow: loadFlow(flowId), routerReason: 't', repo: '/repo', campaignDir: '/repo/products/x/landing/a', now: Date.now() });
@@ -397,4 +397,43 @@ test('chạy tiếp sau dừng ngay → nối đúng phiên đang dở, xong th�
   assert.doesNotMatch(calls[1].prompt, /thêm tab sự kiện/);
   assert.strictEqual(calls[1].resumeSessionId, null);
   assert.deepStrictEqual([run.cutSession, run.resumeNote], [undefined, undefined]);
+});
+
+test('isolate lưu base của từng worktree để review so đúng điểm tách', async () => {
+  const { repo, git } = tmpGitRepo();
+  const start = { ...newRun('landing-fix'), repo, repos: [repo], campaignDir: path.join(repo, 'products/x/landing/a'), campaignDirs: [path.join(repo, 'products/x/landing/a')] };
+  const run = await drive(start, loadFlow('landing-fix'), { now: () => Date.now(), notify: () => {}, runClaude: fakeClaude({}).runClaude, runGates: fakeGates().runGates });
+  assert.deepStrictEqual(run.bases, { [repo]: git('rev-parse', 'HEAD').stdout.trim() });
+});
+
+const committingGates = async (checks, ctx) => {
+  if (checks.includes('commit')) {
+    fs.writeFileSync(path.join(ctx.campaignDir, 'index.html'), `<p>${Date.now()}</p>`);
+    spawnSync('git', ['-C', ctx.repo, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'ap'], { encoding: 'utf8' });
+  }
+  return { pass: true, error: null, results: checks.map((check) => ({ check, status: 'pass', blocking: [], note: '' })) };
+};
+
+test('done: báo chờ review kèm số file + repo đã sửa', async () => {
+  const { repo } = tmpGitRepo();
+  const flow = loadFlow('landing-fix');
+  const start = { ...newRun('landing-fix'), repo, repos: [repo], campaignDir: path.join(repo, 'products/x/landing/a'), campaignDirs: [path.join(repo, 'products/x/landing/a')] };
+  const deps = { now: () => Date.now(), notify: (t, m) => notified.push(m), runClaude: fakeClaude({}).runClaude, runGates: committingGates };
+  let run = await drive(start, flow, deps);
+  for (let i = 0; i < 3 && run.status === 'paused'; i++) run = await drive(applyEvent(run, flow, { type: 'approve' }, Date.now()), flow, deps);
+  assert.strictEqual(run.status, 'done');
+  assert.match(notified.at(-1), /chờ review · 1 file ở ap-wt-/);
+});
+
+test('run trả về sau review: fix → cổng → bỏ mốc duyệt kết quả → commit lại → done', async () => {
+  const flow = loadFlow('landing-new');
+  const done = { ...newRun('landing-new'), status: 'done', stage: null, worktrees: {} };
+  const { runClaude, calls } = fakeClaude({});
+  const gates = fakeGates();
+  const run = await drive(reopenRun(done, flow, 'nút lệch 4px', Date.now()), flow, base({ runClaude, runGates: gates.runGates }));
+  assert.strictEqual(run.status, 'done');
+  assert.deepStrictEqual(calls.map((c) => c.stageId), ['fix']);
+  assert.match(calls[0].prompt, /nút lệch 4px/);
+  assert.deepStrictEqual(gates.calls.map((c) => c.checks.at(-1)), ['layout-gate', 'commit']);
+  assert.ok(!run.receipts.some((r) => r.stage === 'approve-result'));
 });

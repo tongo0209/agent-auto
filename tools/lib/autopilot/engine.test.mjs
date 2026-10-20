@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { createRun, nextAction, applyEvent, resumeRun, roundOf } from './engine.mjs';
+import { createRun, nextAction, applyEvent, resumeRun, roundOf, reopenRun, finalApproval } from './engine.mjs';
 
 const FLOW = {
   id: 'mini',
@@ -173,4 +173,29 @@ test('reject ở pause sang fix → fix xong quay về rejectReturnTo', () => {
 test('halt dừng run với lý do, vẫn ghi receipt', () => {
   const run = applyEvent(fresh(), FLOW, { type: 'halt', reason: 'runner:plan', receipt: receipt('plan') }, T0);
   assert.deepStrictEqual([run.status, run.stopReason, run.receipts.length], ['stopped', 'runner:plan', 1]);
+});
+
+const REVIEW_FLOW = {
+  id: 'rv',
+  stages: [
+    { id: 'gates', kind: 'gate', loop: { back: 'fix', max: 2 }, next: 'gates-final' },
+    { id: 'gates-final', kind: 'gate', loop: { back: 'fix', max: 2 }, next: 'result' },
+    { id: 'fix', kind: 'claude', returnTo: 'caller' },
+    { id: 'result', kind: 'pause', onReject: 'fix', rejectReturnTo: 'gates-final', next: 'commit' },
+    { id: 'commit', kind: 'gate', checks: ['commit'], next: null },
+  ],
+};
+
+test('finalApproval = mốc duyệt ngay trước stage commit', () => {
+  assert.strictEqual(finalApproval(REVIEW_FLOW).id, 'result');
+  assert.strictEqual(finalApproval(FLOW), undefined);
+});
+
+test('reopenRun: run done bị trả về sau review → fix với note, quay về gate cuối, vòng lặp đếm lại', () => {
+  const done = { ...createRun({ key: 'K', runId: 'r', flow: REVIEW_FLOW, repo: '/r', campaignDir: '/c', now: T0 }), status: 'done', stage: null, loops: { 'gates-final': 2 }, reviewedAt: T0 };
+  const run = reopenRun(done, REVIEW_FLOW, 'nút lệch 4px', T0 + 1);
+  assert.deepStrictEqual([run.status, run.stage, run.callerOfFix, run.rejectNote], ['running', 'fix', 'gates-final', 'nút lệch 4px']);
+  assert.deepStrictEqual([run.reviewedAt, run.reopenedAt, run.loops], [null, T0 + 1, {}]);
+  const back = applyEvent(run, REVIEW_FLOW, { type: 'pass' }, T0);
+  assert.strictEqual(back.stage, 'gates-final');
 });

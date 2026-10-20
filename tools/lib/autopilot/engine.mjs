@@ -113,3 +113,11 @@ export function resumeRun(run, overrides = {}) {
     budget: resumedBudget(overrides),
   };
 }
+
+export const finalApproval = (flow) => flow.stages.find((s) => s.onReject && stageOf(flow, s.next)?.checks?.includes('commit'));
+
+// Trả về sau review = trả về ở mốc duyệt kết quả; vòng lặp đếm lại vì đây là lượt sửa mới
+export function reopenRun(run, flow, note, now) {
+  const reopened = { ...run, status: 'running', loops: {}, reviewedAt: null, reopenedAt: now };
+  return transition(reopened, flow, finalApproval(flow), { type: 'reject', note });
+}

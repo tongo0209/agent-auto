@@ -91,3 +91,25 @@ export function chatLaunch(run, { resume = false } = {}) {
   const start = session ? ['--resume', session.id] : [`Đọc ${briefFile(run)} rồi bắt đầu bước đầu tiên. Vướng gì cần quyết thì hỏi tôi, đừng tự đoán.`];
   return { key: run.key, runId: run.runId, cwd, args: [...start, ...sandboxArgs()], env: { AUTOPILOT_RUN: `${run.key}/${run.runId}` } };
 }
+
+export function followupBriefOf(run, changes, note) {
+  const repoBlocks = changes.map((c) => `### ${c.name} · nhánh \`${c.branch}\` · \`${c.worktree}\`
+${c.commits.map((x) => `- commit ${x.sha.slice(0, 9)} ${x.subject}`).join('\n') || '- chưa có commit'}
+${c.files.map((f) => `- ${f.status} \`${f.path}\``).join('\n')}`);
+  return `# ${run.key} · sửa tiếp sau review
+
+Run đã xong và commit trên nhánh riêng; user review rồi muốn sửa thêm. Sửa tiếp ngay trên worktree \`${chatCwd(run)}\`, commit chồng lên cùng nhánh. Repo gốc bị sandbox chặn ghi. Không push.
+
+## Lời nhắn của user
+${note?.trim() || '_(chưa ghi — hỏi user cần sửa gì)_'}
+
+## Đã sửa ở các lượt trước
+${repoBlocks.join('\n\n')}
+
+## Cổng + commit
+Sửa xong: \`node ${CLI} gates ${run.key}\`, đạt thì commit chồng lên nhánh: \`node ${CLI} gates ${run.key} commit\`.
+Báo tiến độ: \`node ${CLI} mark ${run.key} ${run.stage} <doing|pass|fail|ask> --note "…"\`.
+
+Xong thì nhắc user bấm "Xong" trên board để review lại.
+`;
+}

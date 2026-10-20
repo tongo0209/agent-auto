@@ -4,7 +4,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, execFile } from 'node:child_process';
-import { listView, listArtifacts, artifactFile, actionArgs, liveLog } from './api.mjs';
+import { listView, listArtifacts, artifactFile, actionArgs, liveLog, changesOf, worktreeOf } from './api.mjs';
 import { runsDir } from '../tools/lib/autopilot/store.mjs';
 import { attachTerminal } from './terminal.mjs';
 import { CONSOLE, consoleRequire } from './console-root.mjs';
@@ -35,6 +35,8 @@ const runCliAndWait = (args) =>
   new Promise((resolve) =>
     execFile(process.execPath, [CLI, ...args], { cwd: path.dirname(CLI) }, (err, stdout, stderr) => resolve({ code: err ? err.code ?? 1 : 0, stdout, stderr })));
 
+const openInVsCode = (dir) => new Promise((resolve) => execFile('code', [dir], (err) => resolve(err?.message)));
+
 const send = (res, status, body, type = 'application/json; charset=utf-8') => {
   res.writeHead(status, { 'Content-Type': type });
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
@@ -47,7 +49,7 @@ const readBody = (req) =>
     req.on('end', () => resolve(raw));
   });
 
-async function handleAutopilot(req, res, { spawnCli, execCli }) {
+async function handleAutopilot(req, res, { spawnCli, execCli, openEditor }) {
     const { pathname } = new URL(req.originalUrl, 'http://x');
     const parts = pathname.split('/').filter(Boolean).map(decodeURIComponent);
 
@@ -55,6 +57,10 @@ async function handleAutopilot(req, res, { spawnCli, execCli }) {
     if (req.method === 'GET' && parts[2] === 'runs' && parts[5] === 'live') {
       const live = liveLog(parts[3], parts[4], parts[6]);
       return live ? send(res, 200, live) : send(res, 204, '');
+    }
+    if (req.method === 'GET' && parts[2] === 'runs' && parts[5] === 'changes') {
+      const changes = changesOf(parts[3], parts[4]);
+      return changes ? send(res, 200, changes) : send(res, 404, { error: 'không có run' });
     }
     if (req.method === 'GET' && parts[2] === 'runs' && parts[5] === 'artifacts') {
       if (parts.length === 6) return send(res, 200, listArtifacts(parts[3], parts[4]));
@@ -64,7 +70,12 @@ async function handleAutopilot(req, res, { spawnCli, execCli }) {
     if (req.method === 'POST' && parts.length === 3) {
       if (!String(req.headers['content-type']).startsWith('application/json')) return send(res, 415, { error: 'cần JSON' });
       try {
-        const args = actionArgs(parts[2], JSON.parse((await readBody(req)) || '{}'));
+        const body = JSON.parse((await readBody(req)) || '{}');
+        if (parts[2] === 'code') {
+          const error = await openEditor(worktreeOf(body));
+          return error ? send(res, 400, { error }) : send(res, 200, { ok: true });
+        }
+        const args = actionArgs(parts[2], body);
         console.log(`${new Date().toISOString()} ${args.join(' ')}`);
         if (args[0] !== 'open') return send(res, 200, { ok: true, ...spawnCli(args) });
         const out = await execCli(args);
@@ -76,11 +87,11 @@ async function handleAutopilot(req, res, { spawnCli, execCli }) {
     send(res, 404, { error: 'không có' });
 }
 
-export function createServer({ spawnCli = spawnDetached, execCli = runCliAndWait, allowWrites = process.env.AUTOPILOT_LAB_WRITES === '1' } = {}) {
+export function createServer({ spawnCli = spawnDetached, execCli = runCliAndWait, openEditor = openInVsCode, allowWrites = process.env.AUTOPILOT_LAB_WRITES === '1' } = {}) {
   const app = express();
   app.use((req, res, next) => (LOCAL_HOST.test(req.headers.host ?? '') ? next() : send(res, 403, { error: 'host lạ' })));
   // autopilot đi trước cổng chặn ghi: run chạy trong worktree, hook sandbox chặn ghi ra source gốc
-  app.use('/api/autopilot', (req, res) => handleAutopilot(req, res, { spawnCli, execCli }));
+  app.use('/api/autopilot', (req, res) => handleAutopilot(req, res, { spawnCli, execCli, openEditor }));
   app.use('/api', (req, res, next) =>
     allowWrites || req.method === 'GET' ? next() : send(res, 403, { error: 'Bản thử (agent-auto-lab) chặn ghi dữ liệu thật. Chạy với AUTOPILOT_LAB_WRITES=1 nếu thật sự muốn ghi.' }));
   app.use(express.json());

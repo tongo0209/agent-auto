@@ -1,7 +1,8 @@
 // View thuần cho trang /autopilot — đọc runs/ qua store của tools/lib/autopilot, không tự ghi run.json
 import fs from 'node:fs';
 import path from 'node:path';
-import { listRuns, runDir } from '../tools/lib/autopilot/store.mjs';
+import { listRuns, runDir, loadRun } from '../tools/lib/autopilot/store.mjs';
+import { runChanges } from '../tools/lib/autopilot/review.mjs';
 import { loadFlow, listFlows } from '../tools/lib/autopilot/flows.mjs';
 import { stageOf } from '../tools/lib/autopilot/engine.mjs';
 import { stageCells, totals } from '../tools/lib/autopilot/format.mjs';
@@ -42,6 +43,7 @@ function viewOf(saved) {
   return {
     ...run,
     interrupted: isInterrupted(run),
+    awaitingReview: run.status === 'done' && !run.reviewedAt && Object.keys(run.worktrees ?? {}).length > 0,
     flowLabel: flow.label,
     cells: stageCells(run, flow).map((c) => {
       const stage = stageOf(flow, c.id);
@@ -73,17 +75,30 @@ export function artifactFile(key, runId, name) {
   return fs.existsSync(file) ? file : null;
 }
 
-export function actionArgs(action, { key, note, input, flow, resume } = {}) {
-  if (action === 'run' || (action === 'open' && !resume)) {
+const runOf = (key, runId) => (SAFE_SEGMENT.test(key ?? '') && SAFE_SEGMENT.test(runId ?? '') ? loadRun(key, runId) : null);
+
+export function changesOf(key, runId) {
+  const run = runOf(key, runId);
+  return run ? runChanges(run) : null;
+}
+
+export function worktreeOf({ key, runId, dir }) {
+  if (!Object.values(runOf(key, runId)?.worktrees ?? {}).includes(dir)) throw new Error('không phải worktree của run');
+  return dir;
+}
+
+export function actionArgs(action, { key, note, input, flow, resume, followup } = {}) {
+  if (action === 'run' || (action === 'open' && !resume && !followup)) {
     if (!input || input.startsWith('-')) throw new Error('input không hợp lệ');
     if (flow && !listFlows().includes(flow)) throw new Error('flow không có');
     return [action, input, ...(flow ? ['--flow', flow] : [])];
   }
-  if (!['approve', 'reject', 'pause', 'resume', 'abort', 'done', 'open'].includes(action)) throw new Error(`action lạ: ${action}`);
+  if (!['approve', 'reject', 'pause', 'resume', 'abort', 'done', 'reviewed', 'open'].includes(action)) throw new Error(`action lạ: ${action}`);
   if (!KEY.test(key ?? '')) throw new Error('key không hợp lệ');
-  if (action === 'open') return ['open', key, '--resume'];
-  if (action === 'reject' && !note?.trim()) throw new Error('reject cần note');
-  return [action, key, ...(note?.trim() ? ['--note', note.trim()] : [])];
+  const noteArgs = note?.trim() ? ['--note', note.trim()] : [];
+  if (action === 'open') return resume ? ['open', key, '--resume'] : ['open', key, '--followup', ...noteArgs];
+  if (action === 'reject' && !noteArgs.length) throw new Error('reject cần note');
+  return [action, key, ...noteArgs];
 }
 
 const TAIL_BYTES = 256 * 1024;

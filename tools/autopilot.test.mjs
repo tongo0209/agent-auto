@@ -293,3 +293,58 @@ test('abort run chat: dọn worktree + thư mục run như run tự động', ()
   assert.strictEqual(fs.existsSync(launch.cwd), false);
   assert.strictEqual(fs.existsSync(path.join(runs, 'GW-20')), false);
 });
+
+function doneRun(key) {
+  const box = sandbox();
+  box.cli('run', key, '--flow', 'landing-fix', '--campaign', box.campaign);
+  for (let i = 0; i < 5 && lastRun(box.runs, key).status === 'paused'; i++) box.cli('approve', key);
+  assert.strictEqual(lastRun(box.runs, key).status, 'done');
+  return box;
+}
+
+test('reviewed: chỉ nhận run done, ghi reviewedAt', () => {
+  const { cli, runs, campaign } = doneRun('GW-30');
+  assert.strictEqual(cli('reviewed', 'GW-30').code, 0);
+  assert.ok(lastRun(runs, 'GW-30').reviewedAt > 0);
+  cli('run', 'GW-31', '--flow', 'landing-fix', '--campaign', campaign);
+  assert.match(cli('reviewed', 'GW-31').out, /chưa xong/);
+});
+
+test('reject run done: mở lại ở fix với note, chạy lại tới commit trên cùng worktree, giữ lại campaign khi chạy', () => {
+  const { cli, runs } = doneRun('GW-32');
+  const before = lastRun(runs, 'GW-32');
+  cli('reviewed', 'GW-32');
+  const r = cli('reject', 'GW-32', '--note', 'nút lệch 4px');
+  assert.strictEqual(r.code, 0, r.out);
+  const run = lastRun(runs, 'GW-32');
+  assert.deepStrictEqual([run.runId, run.status, run.rejectNote, run.reviewedAt], [before.runId, 'done', 'nút lệch 4px', null]);
+  assert.deepStrictEqual(run.receipts.slice(before.receipts.length).map((x) => x.stage), ['fix', 'gates', 'ui-check', 'commit']);
+  assert.deepStrictEqual(run.worktrees, before.worktrees);
+  assert.match(cli('reject', 'GW-32').out, /--note/);
+});
+
+test('reject run done khi campaign đang bị run khác giữ → từ chối', () => {
+  const { cli, runs, campaign } = doneRun('GW-33');
+  fs.writeFileSync(path.join(runs, '.held.json'), JSON.stringify({ [campaign]: { key: 'GW-99', runId: 'x' } }));
+  const r = cli('reject', 'GW-33', '--note', 'x');
+  assert.strictEqual(r.code, 1);
+  assert.match(r.out, /GW-99/);
+  assert.strictEqual(lastRun(runs, 'GW-33').status, 'done');
+});
+
+test('open --followup: chat tiếp trên chính worktree của run done, brief kèm thay đổi + lời nhắn', () => {
+  const { cli, runs, campaign } = doneRun('GW-34');
+  const before = lastRun(runs, 'GW-34');
+  const r = cli('open', 'GW-34', '--followup', '--note', 'đổi màu nút');
+  assert.strictEqual(r.code, 0, r.out);
+  const launch = JSON.parse(r.out);
+  const run = lastRun(runs, 'GW-34');
+  assert.deepStrictEqual([run.runId, run.mode, run.status, run.stage, run.worktrees], [before.runId, 'chat', 'chat', 'fix', before.worktrees]);
+  assert.ok(launch.cwd.startsWith(Object.values(before.worktrees)[0]));
+  const brief = fs.readFileSync(path.join(runs, 'GW-34', run.runId, 'brief.md'), 'utf8');
+  assert.match(brief, /đổi màu nút/);
+  assert.match(brief, /autopilot\/GW-34-/);
+  assert.match(brief, /autopilot\.mjs gates GW-34 commit/);
+  assert.strictEqual(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8'))[campaign].key, 'GW-34');
+  assert.match(cli('open', 'GW-34', '--followup').out, /chưa xong/);
+});

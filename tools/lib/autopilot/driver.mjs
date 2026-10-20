@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { nextAction, applyEvent, roundOf } from './engine.mjs';
+import { nextAction, applyEvent, roundOf, finalApproval } from './engine.mjs';
 import { parseVerdict } from './verdict.mjs';
 import { renderPrompt } from './prompts.mjs';
 import { PROMPTS_DIR } from './flows.mjs';
@@ -9,7 +9,8 @@ import { acquire, release, holdCampaign, heldCampaigns } from './lock.mjs';
 import { runClaude as realRunClaude, guardCode } from './claude-runner.mjs';
 import { runGates as realRunGates } from './gates.mjs';
 import { notify as realNotify } from './notify.mjs';
-import { addWorktree as realAddWorktree, toWorktree, isInWorktree, labWritesOn } from './worktree.mjs';
+import { addWorktree as realAddWorktree, toWorktree, isInWorktree, labWritesOn, branchOf } from './worktree.mjs';
+import { runChanges } from './review.mjs';
 
 const UI_FILE = /\.(twig|html|scss|css)$/;
 const CLI = 'node ~/VNG/agent-auto/tools/autopilot.mjs';
@@ -154,7 +155,14 @@ function announce(run, stage, deps) {
   if (run.status === 'paused') deps.notify(title, `chờ bạn ở ${stage.id} — duyệt: ${CLI} approve ${run.key} · trả về: ${CLI} reject ${run.key} --note "…"`);
   if (run.status === 'attached') deps.notify(title, `chạy trong phiên Claude: ${commandFor(stage, run)} — xong thì: ${CLI} approve ${run.key}`);
   if (run.status === 'stopped') deps.notify(title, `dừng: ${run.stopReason} — xem: ${CLI} status ${run.key}`);
-  if (run.status === 'done') deps.notify(title, 'xong — đã commit, push vẫn chờ bạn');
+  if (run.status === 'done') deps.notify(title, `xong, chờ review · ${changedSummary(run)} — push vẫn chờ bạn`);
+}
+
+function changedSummary(run) {
+  const touched = runChanges(run).filter((c) => c.files.length);
+  if (!touched.length) return 'không có file nào đổi';
+  const fileCount = touched.reduce((n, c) => n + c.files.length, 0);
+  return `${fileCount} file ở ${touched.map((c) => c.name).join(', ')}`;
 }
 
 async function withStageLock(run, stage, fn) {
@@ -183,11 +191,13 @@ export function isolate(run, deps) {
   const pending = (run.repos ?? [run.repo]).filter((r) => r && !isInWorktree(run.worktrees, toWorktree(run.worktrees, r)));
   if (!pending.length) return run;
   const worktrees = { ...run.worktrees };
+  const bases = { ...run.bases };
   for (const repo of pending) {
-    const { top, dir } = deps.addWorktree({ repo, parentDir: path.join(runDir(run.key, run.runId), 'wt'), branch: `autopilot/${run.key}-${run.runId}`, linkDirs: campaignsOf(run) });
+    const { top, dir, base } = deps.addWorktree({ repo, parentDir: path.join(runDir(run.key, run.runId), 'wt'), branch: branchOf(run), linkDirs: campaignsOf(run) });
     worktrees[top] = dir;
+    bases[top] = base;
   }
-  return { ...run, worktrees };
+  return { ...run, worktrees, bases };
 }
 
 export async function drive(startRun, flow, overrides = {}) {
@@ -200,6 +210,11 @@ export async function drive(startRun, flow, overrides = {}) {
     const action = nextAction(run, flow);
     if (action.type === 'attached' && action.stage.realWrite && !labWritesOn()) {
       run = applyEvent(run, flow, { type: 'skip' }, deps.now());
+      continue;
+    }
+    // Run trả về sau review: user xem lại ở "Chờ review" sau commit, không dừng duyệt kết quả lần nữa
+    if (run.reopenedAt && action.stage === finalApproval(flow)) {
+      run = applyEvent(run, flow, { type: 'approve' }, deps.now());
       continue;
     }
     if (!['claude', 'gate'].includes(action.type)) {

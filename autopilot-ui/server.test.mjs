@@ -8,13 +8,15 @@ import http from 'node:http';
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-srv-'));
 const { createServer } = await import('./server.mjs');
 const { listFlows } = await import('../tools/lib/autopilot/flows.mjs');
+const { saveRun } = await import('../tools/lib/autopilot/store.mjs');
+const opened = [];
 const spawned = [];
 const execd = [];
 const execCli = async (args) => {
   execd.push(args);
   return args[1] === 'GW-404' ? { code: 1, stdout: '', stderr: 'Chưa có run nào cho GW-404\n' } : { code: 0, stdout: '{"key":"GW-1","cwd":"/wt","args":["x"],"env":{}}\n', stderr: '' };
 };
-const server = createServer({ allowWrites: true, execCli, spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
+const server = createServer({ allowWrites: true, execCli, openEditor: async (dir) => { opened.push(dir); }, spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
 after(() => server.close());
@@ -92,4 +94,18 @@ test('POST open chạy CLI đồng bộ, trả nguyên JSON để UI mở tab; C
   const before = spawned.length;
   assert.strictEqual((await fetch(`${base}/api/autopilot/done`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"key":"GW-1"}' })).status, 200);
   assert.deepStrictEqual([spawned.length - before, spawned.at(-1)], [1, ['done', 'GW-1']]);
+});
+
+test('GET changes đọc git của run; POST code chỉ mở worktree của chính run đó', async () => {
+  const done = { key: 'GW-50', runId: '20261020-100000', flow: 'landing-fix', status: 'done', stage: null, receipts: [], worktrees: { '/khong-co-repo': '/khong-co-repo-wt' } };
+  saveRun(done);
+  const changes = await (await fetch(`${base}/api/autopilot/runs/GW-50/20261020-100000/changes`)).json();
+  assert.deepStrictEqual(changes.map((c) => [c.name, c.worktree, c.commits.length]), [['khong-co-repo', '/khong-co-repo-wt', 0]]);
+  assert.strictEqual((await fetch(`${base}/api/autopilot/runs/GW-50/khong-co/changes`)).status, 404);
+
+  const post = (body) => fetch(`${base}/api/autopilot/code`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.strictEqual((await post({ key: 'GW-50', runId: '20261020-100000', dir: '/khong-co-repo-wt' })).status, 200);
+  assert.deepStrictEqual(opened, ['/khong-co-repo-wt']);
+  assert.strictEqual((await post({ key: 'GW-50', runId: '20261020-100000', dir: '/etc' })).status, 400);
+  assert.deepStrictEqual(opened, ['/khong-co-repo-wt']);
 });

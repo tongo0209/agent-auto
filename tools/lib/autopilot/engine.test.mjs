@@ -286,7 +286,7 @@ test('chooseAction pick A → choice.id A, stage = implement', () => {
 
 test('chooseAction pick khi không có phương án → ném', () => {
   const run = applyEvent(createRun({ key: 'K', runId: 'r', flow: PICK_FLOW, repo: '/r', campaignDir: '/c', now: T0 }), PICK_FLOW, { type: 'pass' }, T0);
-  assert.throws(() => chooseAction(run, PICK_FLOW, { type: 'pick', option: 'A' }, { options: [], now: T0 }));
+  assert.throws(() => chooseAction(run, PICK_FLOW, { type: 'pick', option: 'A' }, { options: [], now: T0 }), /không làm được/);
 });
 
 test('chooseAction break: toggle breakpoint, không đổi status', () => {
@@ -304,4 +304,31 @@ test('createRun thiếu disabled/breakpoints → plan {disabled:[],breakpoints:[
   assert.deepStrictEqual(run.plan, { disabled: [], breakpoints: [], skipReason: null });
   assert.strictEqual(run.choice, null);
   assert.deepStrictEqual(run.gateSkipped, []);
+});
+
+const UI_FLOW = {
+  id: 'ui', budget: {},
+  stages: [
+    { id: 'cut', kind: 'claude', next: 'plan' },
+    { id: 'plan', kind: 'claude', next: 'ui-check' },
+    { id: 'ui-check', kind: 'claude', next: null },
+  ],
+};
+const stoppedAtUiCheck = () => {
+  let run = createRun({ key: 'K', runId: 'r', flow: UI_FLOW, repo: '/r', campaignDir: '/c', now: T0 });
+  for (let i = 0; i < 2; i++) run = applyEvent(run, UI_FLOW, { type: 'pass', receipt: receipt(run.stage) }, T0);
+  return { ...run, status: 'stopped', stopReason: 'fail:ui-check' };
+};
+
+test('ui-check (kind claude) vẫn là gate-like: skip cần lý do và ghi gateSkipped', () => {
+  assert.strictEqual(ofType(allowedActions(stoppedAtUiCheck(), UI_FLOW), 'skip').needsReason, true);
+  assert.throws(() => chooseAction(stoppedAtUiCheck(), UI_FLOW, { type: 'skip', reason: '   ' }, { now: T0 }), /cần lý do/);
+  const run = chooseAction(stoppedAtUiCheck(), UI_FLOW, { type: 'skip', reason: 'bỏ qua' }, { now: T0 });
+  assert.deepStrictEqual([run.gateSkipped[0].stage, run.gateSkipped[0].reason], ['ui-check', 'bỏ qua']);
+});
+
+test('chooseAction goto stage trước plan (flow không bắt đầu bằng plan) → choice về null', () => {
+  const run = { ...stoppedAtUiCheck(), choice: { id: 'A', title: 'x', note: null } };
+  assert.strictEqual(chooseAction(run, UI_FLOW, { type: 'goto', stage: 'cut' }, { now: T0 }).choice, null);
+  assert.strictEqual(chooseAction(run, UI_FLOW, { type: 'goto', stage: 'plan' }, { now: T0 }).choice, null);
 });

@@ -24,7 +24,7 @@ export function createRun({ key, runId, flow, routerReason, repo, campaignDir, h
   };
 }
 
-export const isGateLike = (stage) => stage.kind === 'gate';
+export const isGateLike = (stage) => stage.kind === 'gate' || stage.id === 'ui-check';
 
 export const stageOf = (flow, id) => flow.stages.find((s) => s.id === id);
 
@@ -179,10 +179,11 @@ export function chooseAction(run, flow, action, { options = [], now } = {}) {
     case 'goto': {
       if (!allowed.stages.includes(action.stage)) throw new Error(`stage "${action.stage}" chưa đi qua, không quay lại được`);
       const rewound = { ...forgetFrom(resumed, flow, action.stage), stage: action.stage, rejectNote: action.note ?? null };
-      return action.stage === flow.stages[0].id ? { ...rewound, choice: null } : rewound;
+      const planIndex = flow.stages.findIndex((s) => s.id === 'plan');
+      return flow.stages.findIndex((s) => s.id === action.stage) <= planIndex ? { ...rewound, choice: null } : rewound;
     }
     case 'skip': {
-      if (allowed.needsReason && !action.reason) throw new Error(`bỏ qua stage "${run.stage}" cần lý do`);
+      if (allowed.needsReason && !action.reason?.trim()) throw new Error(`bỏ qua stage "${run.stage}" cần lý do`);
       const receipt = { stage: run.stage, verdict: 'skipped-by-user', note: action.reason ?? '', blocking: 0, advisory: 0, turns: 0, costUsd: 0, ms: 0 };
       return applyEvent(resumed, flow, { type: 'skip', by: 'user', reason: action.reason, receipt }, now);
     }

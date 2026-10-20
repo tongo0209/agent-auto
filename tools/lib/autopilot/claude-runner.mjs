@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { labWritesOn } from './worktree.mjs';
 
 const REVIEW = ['Read', 'Grep', 'Glob', 'Write', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git status:*)', 'Bash(node:*)'];
 const IMPLEMENT = [...REVIEW, 'Edit', 'Skill', 'Agent', 'Bash(npm run:*)', 'Bash(npm ci:*)', 'Bash(npx:*)', 'Bash(ls:*)', 'Bash(python3:*)'];
@@ -28,7 +27,8 @@ const sandboxSettings = (writable) => {
 const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 const FAKE_PASS = '```autopilot-verdict\n{"verdict":"pass"}\n```';
 
-export const sandboxArgs = (writable = []) => (labWritesOn() ? [] : ['--settings', sandboxSettings(writable)]);
+// AUTOPILOT_LAB_WRITES chỉ mở POST + stage ghi thật, không bao giờ tắt sandbox
+export const sandboxArgs = (writable = []) => ['--settings', sandboxSettings(writable)];
 
 export const tokensOf = (usage = {}) =>
   (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);

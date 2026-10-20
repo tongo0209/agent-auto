@@ -38,6 +38,9 @@ function feedbackFile(run) {
 
 const campaignsOf = (run) => (run.campaignDirs?.length ? run.campaignDirs : [run.campaignDir].filter(Boolean));
 
+// Stage ghi code trong repo của run + báo cáo vào thư mục run; phần còn lại của agent-auto-lab chỉ đọc
+export const writableOf = (run) => [...Object.keys(run.workBranch ?? {}), runDir(run.key, run.runId)];
+
 export function stageVars(run, stage, input) {
   const wt = (p) => toWorktree(run.worktrees, p) ?? '';
   return {
@@ -86,7 +89,7 @@ async function runClaudeStage(run, stage, deps) {
     prompt: cut ? continuePrompt(run, marker) : renderPrompt(template, stageVars(run, stage, deps.input), marker),
     resumeSessionId: cut ? cut.sessionId : stage.resume ? run.sessions[stage.resume] : null,
     cwd: run.repo ? toWorktree(run.worktrees, run.repo) : deps.agentRoot,
-    writable: Object.keys(run.workBranch ?? {}),
+    writable: writableOf(run),
     logFile: path.join(runDir(run.key, run.runId), `${stage.id}-r${round}${cut ? '-tiep' : ''}.log`),
     childFile: childFile(run.key, run.runId),
   };
@@ -117,17 +120,18 @@ async function runClaudeStage(run, stage, deps) {
 
 const repoFor = (run, dir) => (run.repos ?? []).find((r) => dir.startsWith(`${r}${path.sep}`)) ?? run.repo;
 
+// Mỗi phần tử là nhóm thư mục chạy chung 1 lượt gate; cổng commit gom theo repo để 1 commit/repo phủ mọi campaign
 function gateTargets(run, stage) {
-  if (stage.scope === 'handoff') return [run.handoffDir];
-  if (stage.checks.includes('commit')) return [...campaignsOf(run), run.handoffDir].filter(Boolean);
-  return run.campaignDir ? campaignsOf(run) : [null];
+  if (stage.scope === 'handoff') return [[run.handoffDir]];
+  if (stage.checks.includes('commit')) return Object.values(Object.groupBy([...campaignsOf(run), run.handoffDir].filter(Boolean), (dir) => repoFor(run, dir)));
+  return (run.campaignDir ? campaignsOf(run) : [null]).map((dir) => [dir]);
 }
 
-async function gatesOn(run, stage, deps, dir) {
+async function gatesOn(run, stage, deps, [dir, ...rest]) {
   const real = dir ? repoFor(run, dir) : run.repo;
   const repo = toWorktree(run.worktrees, real);
   const result = await deps.runGates(stage.checks, {
-    repo, campaignDir: toWorktree(run.worktrees, dir), dirty: run.dirtyAtStart?.[real] ?? [],
+    repo, campaignDir: toWorktree(run.worktrees, dir), scopes: [dir, ...rest].map((d) => toWorktree(run.worktrees, d)), dirty: run.dirtyAtStart?.[real] ?? [],
     key: run.key, flowId: run.flow, files: run.files ?? [], planTitle: planTitle(run),
   });
   return { ...result, repo };
@@ -137,20 +141,23 @@ export async function runGateStage(run, stage, deps) {
   const round = roundOf(run, stage.id);
   const started = deps.now();
   const parts = [];
-  for (const dir of gateTargets(run, stage)) {
-    parts.push(await gatesOn(run, stage, deps, dir));
+  for (const dirs of gateTargets(run, stage)) {
+    parts.push(await gatesOn(run, stage, deps, dirs));
     if (parts.at(-1).error) break;
   }
   const result = { pass: parts.every((p) => p.pass), error: parts.find((p) => p.error)?.error ?? null, results: parts.flatMap((p) => p.results) };
   writeArtifact(run, `${stage.id}-r${round}.json`, result);
   const commits = parts.flatMap((p) => p.results.filter((r) => r.commit).map((r) => ({ repo: p.repo, sha: r.commit })));
   if (commits.length) run.commits = [...(run.commits ?? []), ...commits];
+  const commitResults = result.results.filter((r) => r.check === 'commit');
+  if (commitResults.length) run.pullPending = commitResults.some((r) => r.pullPending);
   const failed = result.results.filter((r) => r.status === 'fail');
   const receipt = {
     stage: stage.id, verdict: result.pass ? 'pass' : 'revise', turns: 0, costUsd: 0, ms: deps.now() - started,
     blocking: failed.reduce((n, r) => n + r.blocking.length, 0), advisory: 0,
   };
-  if (result.error) return { type: 'halt', reason: `gate-error:${result.error}`, receipt };
+  const errorNote = result.results.find((r) => r.status === 'error')?.note;
+  if (result.error) return { type: 'halt', reason: `gate-error:${result.error}${errorNote ? ` — ${errorNote}` : ''}`, receipt };
   return { type: result.pass ? 'pass' : 'revise', receipt };
 }
 

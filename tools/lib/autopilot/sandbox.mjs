@@ -1,11 +1,15 @@
-// Hook PreToolUse cho claude của autopilot khi chưa bật AUTOPILOT_LAB_WRITES: chỉ được ghi trong repo của run (writable)
+// Hook PreToolUse cho claude của autopilot (luôn bật): chỉ được ghi trong repo của run (writable)
 import path from 'node:path';
 
-const PROTECTED = ['VNG/git-vng', 'VNG/agent-auto', '.claude'];
+const PROTECTED = ['VNG/git-vng', 'VNG/agent-auto', 'VNG/agent-auto-lab', '.claude'];
 const WRITE_TOOLS = { Edit: 'file_path', Write: 'file_path', MultiEdit: 'file_path', NotebookEdit: 'notebook_path' };
 const WRITES_EVERY_ARG = new Set(['rm', 'mv', 'tee', 'touch', 'mkdir', 'chmod', 'truncate']);
 const WRITES_LAST_ARG = new Set(['cp', 'ln', 'rsync']);
-const GIT_WRITES = new Set(['commit', 'add', 'checkout', 'reset', 'push', 'pull', 'merge', 'rebase', 'stash', 'apply', 'restore', 'clean', 'switch', 'worktree', 'tag', 'rm', 'mv', 'cherry-pick', 'revert', 'am']);
+const GIT_WRITES = new Set(['commit', 'add', 'checkout', 'reset', 'push', 'pull', 'merge', 'rebase', 'stash', 'apply', 'restore', 'clean', 'switch', 'worktree', 'tag', 'rm', 'mv', 'cherry-pick', 'revert', 'am',
+  'checkout-index', 'read-tree', 'update-index', 'update-ref', 'symbolic-ref']);
+const WRAPPERS = new Set(['env', 'command', 'exec', 'nohup', 'time']);
+const XARGS_VALUE_FLAGS = new Set(['-n', '-I', '-L', '-P', '-d', '-s', '-E']);
+const SHELLS = new Set(['sh', 'bash', 'zsh']);
 const READ_ONLY_TOOLS = ['pm-gate.mjs', 'layout-gate.mjs', 'landing-parity.mjs', 'handoff-drift.mjs'];
 const PROJECT_NOTE_READS = ['path', 'show', 'get'];
 const INLINE_WRITE_SIGN = /['"][wa]\+?['"]|writeFile|appendFile|rmSync|unlink|rename|mkdir/;
@@ -55,10 +59,36 @@ function redirectTargets(tokens) {
   return targets;
 }
 
-function gitWriteDir(args, cwd) {
-  let dir = cwd;
+// Bỏ lớp bọc (A=1, env, command, xargs, /usr/bin/git) để thấy chương trình thật
+function unwrap(rawTokens) {
+  const env = {};
+  let tokens = rawTokens;
+  for (;;) {
+    const assignment = tokens[0]?.match(/^(\w+)=(.*)$/);
+    if (assignment && tokens.length > 1) {
+      env[assignment[1]] = assignment[2];
+      tokens = tokens.slice(1);
+    } else if (WRAPPERS.has(tokens[0])) {
+      tokens = tokens.slice(1);
+      while (tokens[0]?.startsWith('-')) tokens = tokens.slice(1);
+    } else if (tokens[0] === 'xargs') {
+      let i = 1;
+      while (tokens[i]?.startsWith('-')) i += XARGS_VALUE_FLAGS.has(tokens[i]) ? 2 : 1;
+      tokens = tokens.slice(i);
+    } else break;
+  }
+  if (tokens[0]) tokens[0] = path.basename(tokens[0]);
+  return { tokens, env };
+}
+
+function gitWriteDir(args, cwd, env = {}) {
+  const envDir = env.GIT_WORK_TREE ?? env.GIT_DIR;
+  let dir = envDir ? path.resolve(cwd, envDir) : cwd;
   for (let i = 0; i < args.length; i++) {
+    const gitDirFlag = args[i].match(/^--(git-dir|work-tree)(?:=(.*))?$/);
     if (args[i] === '-C') dir = path.resolve(dir, args[++i]);
+    else if (args[i] === '-c') i++;
+    else if (gitDirFlag) dir = path.resolve(cwd, gitDirFlag[2] ?? args[++i]);
     else if (!args[i].startsWith('-')) {
       const writes = GIT_WRITES.has(args[i]) || (args[i] === 'branch' && args.some((a) => /^-[dDmMf]$/.test(a)));
       return writes ? dir : null;
@@ -95,22 +125,46 @@ function segmentWriteTargets([program, ...args], cwd, home, writable) {
 }
 
 // Repo gốc có file dở của phiên khác: git ghi (checkout/reset/stash/clean/commit…) chỉ cổng commit được làm
-function ownRepoGit(tokens, cwd, writable) {
-  const dir = tokens[0] === 'git' && gitWriteDir(tokens.slice(1), cwd);
+function ownRepoGit(tokens, env, cwd, writable) {
+  const dir = tokens[0] === 'git' && gitWriteDir(tokens.slice(1), cwd, env);
   return dir && writable.some((root) => isInside(dir, root)) ? tokens.join(' ') : null;
+}
+
+// Repo gốc chỉ được xoá từng file — xoá đệ quy có thể cuốn cả file dở của phiên khác
+function ownRepoBulkDelete([program, ...args], cwd, writable) {
+  const paths = (list) => list.filter((a) => !a.startsWith('-')).map((a) => path.resolve(cwd, a));
+  let targets = [];
+  if (program === 'rm' && args.some((a) => /^-[a-zA-Z]*[rR]/.test(a) || a === '--recursive')) targets = paths(args);
+  if (program === 'find' && args.some((a) => a === '-delete' || a === 'rm')) {
+    const firstFlag = args.findIndex((a) => a.startsWith('-'));
+    targets = paths(args.slice(0, firstFlag < 0 ? args.length : firstFlag));
+    if (!targets.length) targets = [cwd];
+  }
+  return targets.some((t) => writable.some((root) => isInside(t, root))) ? [program, ...args].join(' ') : null;
+}
+
+function innerScript([program, ...args]) {
+  if (program === 'eval') return args.join(' ');
+  return SHELLS.has(program) && args.includes('-c') ? args[args.indexOf('-c') + 1] : undefined;
 }
 
 function bashDenial(command, cwd, home, writable) {
   const vars = {};
   for (const rawTokens of splitSegments(expandHome(command, home))) {
-    const tokens = rawTokens.map((t) => t.replace(/\$\{?(\w+)\}?/g, (m, name) => vars[name] ?? m));
+    const tokens = rawTokens.map((t) => t.replace(/^\(+|\)+$/g, '').replace(/\$\{?(\w+)\}?/g, (m, name) => vars[name] ?? m)).filter(Boolean);
     const assignment = tokens.length === 1 && tokens[0].match(/^(\w+)=(.*)$/);
     if (assignment) vars[assignment[1]] = assignment[2];
     else if (tokens[0] === 'cd') cwd = path.resolve(cwd, tokens[1] ?? home);
     else {
-      const git = ownRepoGit(tokens, cwd, writable);
+      const { tokens: program, env } = unwrap(tokens);
+      const script = innerScript(program);
+      const inner = script && bashDenial(script, cwd, home, writable);
+      if (inner) return inner;
+      const git = ownRepoGit(program, env, cwd, writable);
       if (git) return `autopilot: không chạy \`${git}\` trên repo gốc — commit chỉ qua cổng commit của autopilot, không checkout/reset/stash/clean`;
-      const root = segmentWriteTargets(tokens, cwd, home, writable).map((t) => protectedRootOf(t, home, writable)).find(Boolean);
+      const bulk = ownRepoBulkDelete(program, cwd, writable);
+      if (bulk) return `autopilot: không chạy \`${bulk}\` — trong repo gốc chỉ xoá từng file, không xoá cả thư mục`;
+      const root = segmentWriteTargets(program, cwd, home, writable).map((t) => protectedRootOf(t, home, writable)).find(Boolean);
       if (root) return `autopilot: lệnh ghi vào ${root} — chỉ đọc được, mọi thay đổi làm trong ${writable.length ? writable.join(', ') : cwd}`;
     }
   }

@@ -195,3 +195,83 @@ test('G6: check-promotion trên campaign chưa bàn giao đọc dist/*.html', as
   await runGates(['check-promotion'], ctx(f, exec));
   assert.match(calls[0].line, /check-promotion\.mjs .*dist\/index\.html$/);
 });
+
+test('I1: repo đang merge dở (MERGE_HEAD) → error "merge dở — xử lý tay", không commit, không tự merge --abort', async () => {
+  const f = gitRepo();
+  fs.writeFileSync(path.join(f.repo, '.git', 'MERGE_HEAD'), f.git('rev-parse', 'HEAD').stdout);
+  const before = f.git('rev-parse', 'HEAD').stdout;
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: ['products/x/landing/a/index.html'], planTitle: 'x' });
+  assert.deepStrictEqual([r.pass, r.error, r.results[0].status], [false, 'commit', 'error']);
+  assert.match(r.results[0].note, /merge dở — xử lý tay/);
+  assert.strictEqual(f.git('rev-parse', 'HEAD').stdout, before);
+  assert.ok(fs.existsSync(path.join(f.repo, '.git', 'MERGE_HEAD')));
+});
+
+test('I1: file UU trong status → error merge dở', async () => {
+  const f = fixture();
+  const { exec, calls } = fakeExec({}, 'UU products/x/landing/a/index.html\0');
+  const r = await runGates(['commit'], ctx(f, exec, { files: ['products/x/landing/a/index.html'] }));
+  assert.match(r.results[0].note, /merge dở/);
+  assert.ok(!calls.some((c) => /git (add|commit|merge)/.test(c.line)));
+});
+
+const cdnRepo = () => {
+  const repo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ap-cdn-')), 'cdn-source');
+  const campaignDir = path.join(repo, 'products/x/landing/a');
+  fs.mkdirSync(campaignDir, { recursive: true });
+  return { repo, campaignDir };
+};
+
+test('I1: cdn-source pull lỗi → error kèm commit + pullPending, note nói commit đã có', async () => {
+  const { exec } = fakeExec({ 'git pull': 1, 'rev-parse HEAD': 0 }, ' M products/x/landing/a/index.html\0');
+  const r = await runGates(['commit'], ctx(cdnRepo(), exec, { files: ['products/x/landing/a/index.html'] }));
+  const [res] = r.results;
+  assert.deepStrictEqual([r.error, res.status, res.pullPending, Boolean(res.commit)], ['commit', 'error', true, true]);
+  assert.match(res.note, /đã có, pull lỗi/);
+});
+
+test('I1: cdn-source index có file phiên khác đã stage → không pull, error pullPending liệt kê file', async () => {
+  const { exec, calls } = fakeExec({}, 'M  products/y/khac.scss\0 M products/x/landing/a/index.html\0');
+  const r = await runGates(['commit'], ctx(cdnRepo(), exec, { files: ['products/x/landing/a/index.html'] }));
+  const [res] = r.results;
+  assert.deepStrictEqual([res.status, res.pullPending, res.blocking], ['error', true, ['products/y/khac.scss']]);
+  assert.ok(!calls.some((c) => c.line.startsWith('git pull')));
+});
+
+test('I1: resume sau pull lỗi (không còn file để commit) → cdn-source vẫn pull lại, đạt', async () => {
+  const { exec, calls } = fakeExec({}, '');
+  const r = await runGates(['commit'], ctx(cdnRepo(), exec, { files: ['products/x/landing/a/index.html'] }));
+  assert.strictEqual(r.results[0].status, 'pass');
+  assert.ok(calls.some((c) => c.line === 'git pull --no-rebase --no-edit origin master'));
+  assert.ok(!calls.some((c) => c.line.startsWith('git commit')));
+});
+
+test('I2: run chỉ sửa file dở có từ trước / ngoài campaign → error liệt kê file + lý do, không skipped im', async () => {
+  const f = fixture();
+  const porcelain = ' M products/x/landing/a/index.html\0 M products/y/ngoai.scss\0';
+  const files = ['products/x/landing/a/index.html', 'products/y/ngoai.scss'];
+  const r = await runGates(['commit'], ctx(f, fakeExec({}, porcelain).exec, { files, dirty: ['products/x/landing/a/index.html'] }));
+  const [res] = r.results;
+  assert.strictEqual(res.status, 'error');
+  assert.deepStrictEqual(res.blocking, ['products/x/landing/a/index.html (dở từ trước khi run bắt đầu)', 'products/y/ngoai.scss (ngoài campaign)']);
+});
+
+test('I2: có file commit được + file bị loại → đạt, note kể file bị loại', async () => {
+  const f = fixture();
+  const porcelain = ' M products/x/landing/a/index.html\0 M products/x/landing/a/b.css\0';
+  const files = ['products/x/landing/a/index.html', 'products/x/landing/a/b.css'];
+  const r = await runGates(['commit'], ctx(f, fakeExec({}, porcelain).exec, { files, dirty: ['products/x/landing/a/b.css'] }));
+  assert.strictEqual(r.results[0].status, 'pass');
+  assert.match(r.results[0].note, /bỏ: products\/x\/landing\/a\/b\.css \(dở từ trước/);
+});
+
+test('scopes: run 2 campaign cùng repo, chỉ campaign thứ 2 có sửa → 1 commit đủ file, không dừng', async () => {
+  const f = gitRepo();
+  const second = path.join(f.repo, 'products/x/landing/b');
+  fs.mkdirSync(second, { recursive: true });
+  fs.writeFileSync(path.join(second, 'index.html'), 'b');
+  const files = ['products/x/landing/b/index.html'];
+  const r = await runGates(['commit'], { ...f, scopes: [f.campaignDir, second], key: 'GW-1', flowId: 'landing-fix', files, planTitle: 'Sửa b' });
+  assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
+  assert.strictEqual(f.git('show', '--name-only', '--format=', 'HEAD').stdout.trim(), files[0]);
+});

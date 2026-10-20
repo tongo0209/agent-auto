@@ -20,6 +20,18 @@ function linkNodeModules(top, dir, campaignDir) {
   }
 }
 
+// status --porcelain -z: rename/copy kèm thêm 1 token đường dẫn cũ, không có mã trạng thái
+export function statusEntries(stdout) {
+  const tokens = stdout.split('\0').filter(Boolean);
+  const entries = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const code = tokens[i].slice(0, 2);
+    entries.push({ code, path: tokens[i].slice(3) });
+    if (/[RC]/.test(code)) entries.push({ code, path: tokens[++i] });
+  }
+  return entries;
+}
+
 // Repo gốc mà run làm thẳng trên đó: giữ đường dẫn như người gọi đưa khi nó chính là gốc repo
 export function repoState(dir) {
   const real = git(['-C', dir, 'rev-parse', '--show-toplevel']);
@@ -29,7 +41,7 @@ export function repoState(dir) {
     top,
     branch: git(['-C', top, 'rev-parse', '--abbrev-ref', 'HEAD']),
     head: git(['-C', top, 'rev-parse', 'HEAD']),
-    dirty: status.split('\0').filter(Boolean).map((line) => line.slice(3)),
+    dirty: statusEntries(status).map((e) => e.path),
   };
 }
 

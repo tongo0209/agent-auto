@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-drive-'));
-const { drive } = await import('./driver.mjs');
+const { drive, runGateStage } = await import('./driver.mjs');
 const { createRun, applyEvent, resumeRun, reopenRun, chooseAction } = await import('./engine.mjs');
 const { loadFlow } = await import('./flows.mjs');
 const { runDir, loadRun, saveRun, pauseFile } = await import('./store.mjs');
@@ -102,7 +102,7 @@ test('gate error → stopped gate-error:<check>', async () => {
   let run = await drive(newRun('landing-fix'), flow, base({ runClaude, runGates: fakeGates().runGates }));
   run = applyEvent(run, flow, { type: 'approve' }, Date.now());
   run = await drive(run, flow, base({ runClaude, runGates: fakeGates({ 'build,pm-gate,fe-gate,landing-parity,layout-gate': ['error'] }).runGates }));
-  assert.strictEqual(run.stopReason, 'gate-error:build');
+  assert.match(run.stopReason, /^gate-error:build( — |$)/);
 });
 
 test('feature: ui-check bị bỏ khi không chạm file giao diện', async () => {
@@ -176,7 +176,7 @@ test('R19: stage claude + gate chạy thẳng trên repo gốc, nhánh đang che
   run = applyEvent(run, flow, { type: 'approve' }, Date.now());
   run = await drive(run, flow, realDeps({ runClaude, runGates: gates.runGates }));
 
-  assert.ok(calls.every((c) => c.cwd === repo && c.writable.join() === repo), calls.map((c) => c.cwd).join(','));
+  assert.ok(calls.every((c) => c.cwd === repo && c.writable[0] === repo && c.writable[1] === runDir(run.key, run.runId)), calls.map((c) => c.cwd).join(','));
   assert.deepStrictEqual([gates.calls[0].ctx.repo, gates.calls[0].ctx.campaignDir], [repo, path.join(repo, 'products/x/landing/a')]);
   assert.deepStrictEqual(run.worktrees, {});
   assert.deepStrictEqual(run.workBranch, { [repo]: git('rev-parse', '--abbrev-ref', 'HEAD').stdout.trim() });
@@ -604,4 +604,17 @@ test('cổng tắt nhưng tự bỏ theo luật when → không tính vào gateS
   const deps = base({ runClaude: fakeClaude({}).runClaude, runGates: fakeGates().runGates });
   const run = await atApproveResult(flow, deps, { disabled: ['handoff-gates'], skipReason: 'không cần' });
   assert.deepStrictEqual(run.gateSkipped, []);
+});
+
+test('I1: cổng commit lỗi pull → stopped kèm lý do của cổng, run.pullPending; lần sau đạt thì xoá pullPending', async () => {
+  const flow = loadFlow('landing-fix');
+  const stage = flow.stages.find((s) => s.checks?.includes('commit'));
+  const run = { ...newRun('landing-fix'), receipts: [] };
+  const failing = async () => ({ pass: false, error: 'commit', results: [{ check: 'commit', status: 'error', blocking: ['CONFLICT'], note: 'commit abc đã có, pull lỗi', commit: 'abc', pullPending: true }] });
+  const ev = await runGateStage(run, stage, { now: Date.now, runGates: failing });
+  assert.strictEqual(ev.reason, 'gate-error:commit — commit abc đã có, pull lỗi');
+  assert.strictEqual(run.pullPending, true);
+  const ok = async () => ({ pass: true, error: null, results: [{ check: 'commit', status: 'pass', blocking: [], note: 'đã pull' }] });
+  await runGateStage(run, stage, { now: Date.now, runGates: ok });
+  assert.strictEqual(run.pullPending, false);
 });

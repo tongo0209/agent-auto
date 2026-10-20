@@ -4,7 +4,7 @@ import { sandboxDenial } from './sandbox.mjs';
 
 const HOME = '/Users/u';
 const WT = `${HOME}/VNG/agent-auto-lab/runs/GW-1/r1/wt/cdn-source`;
-const deny = (tool_name, tool_input) => sandboxDenial({ tool_name, tool_input, cwd: WT }, HOME);
+const deny = (tool_name, tool_input) => sandboxDenial({ tool_name, tool_input, cwd: WT }, HOME, [WT]);
 
 test('ghi file trong worktree → cho qua', () => {
   assert.strictEqual(deny('Edit', { file_path: `${WT}/products/a/index.html` }), null);
@@ -19,7 +19,7 @@ test('ghi file vào repo gốc, agent-auto, ~/.claude → chặn', () => {
 });
 
 const RUN = `${HOME}/VNG/agent-auto-lab/runs/GW-963/r1`;
-const denyIn = (cwd, command) => sandboxDenial({ tool_name: 'Bash', tool_input: { command }, cwd }, HOME);
+const denyIn = (cwd, command) => sandboxDenial({ tool_name: 'Bash', tool_input: { command }, cwd }, HOME, [WT]);
 
 test('Bash ghi vào source gốc (đường tuyệt đối, ~, $HOME, ../, biến, cd) → chặn', () => {
   for (const command of [
@@ -71,7 +71,7 @@ test('Bash chỉ đọc source gốc, hoặc ghi trong worktree → cho qua', ()
     [WT, 'node ~/VNG/agent-auto/tools/project-note.mjs show x; node ~/VNG/agent-auto/tools/layout-gate.mjs a'],
     [WT, 'cp ~/VNG/git-vng/cdn-source/a.html ./a.html && echo y > ./local.txt'],
     [WT, 'npm run build && git diff --stat'],
-    [WT, 'git commit -am x && rm -rf .claude/tmp'],
+    [WT, 'npm run build && rm .claude/tmp/a'],
     [WT, `ls ${HOME}/VNG/agent-auto-lab/runs > /dev/null`],
   ]) assert.strictEqual(denyIn(cwd, command), null, command);
 });
@@ -101,4 +101,38 @@ test('R19: trên repo gốc của run agent không được chạy git ghi (chec
   assert.match(own(`git -C ${CDN} restore .`, '/tmp') ?? '', /repo gốc/);
   assert.match(own('cd products/a && git checkout .') ?? '', /repo gốc/);
   assert.strictEqual(own('git log -3 && git show HEAD --stat'), null);
+});
+
+test('R19: git ghi đội lốt (-c, env, /usr/bin/git, sh -c, bash -c, xargs, plumbing) trên repo gốc → chặn', () => {
+  const CDN = `${HOME}/VNG/git-vng/cdn-source`;
+  const own = (command) => sandboxDenial({ tool_name: 'Bash', tool_input: { command }, cwd: CDN }, HOME, [CDN]);
+  for (const cmd of [
+    'git -c core.x=1 checkout -- .', 'env git stash', 'env A=1 git reset --hard', 'A=1 git clean -fd', '/usr/bin/git restore .', 'command git switch x',
+    'sh -c "git checkout -- ."', "bash -c 'cd products && git stash'", 'ls | xargs git checkout --', 'xargs -n 1 git rm',
+    'git checkout-index -a -f', 'git read-tree HEAD', 'git update-index --assume-unchanged a',
+  ]) assert.match(own(cmd) ?? '', /repo gốc/, cmd);
+  assert.strictEqual(own('git -c color.ui=never log -3'), null);
+  assert.strictEqual(own('sh -c "git status"'), null);
+});
+
+test('R20: rm -r / find -delete trong repo của run → chặn; agent-auto-lab cũng là vùng chỉ đọc', () => {
+  const CDN = `${HOME}/VNG/git-vng/cdn-source`;
+  const own = (command) => sandboxDenial({ tool_name: 'Bash', tool_input: { command }, cwd: CDN }, HOME, [CDN]);
+  for (const cmd of ['rm -rf products/a', 'rm -r products', 'rm -fr dist', 'rm -R x', 'rm --recursive x', 'find . -name x -delete', '(rm -rf products)'])
+    assert.match(own(cmd) ?? '', /xoá/, cmd);
+  assert.strictEqual(own('rm products/a/old.png'), null);
+  assert.strictEqual(own('rm -f products/a/old.png'), null);
+  const LAB = `${HOME}/VNG/agent-auto-lab`;
+  assert.match(sandboxDenial({ tool_name: 'Edit', tool_input: { file_path: `${LAB}/tools/lib/autopilot/gates.mjs` }, cwd: CDN }, HOME, [CDN]) ?? '', /agent-auto-lab/);
+  assert.match(own(`echo x > ${LAB}/runs/GW-1/r1/run.json`) ?? '', /agent-auto-lab/);
+});
+
+test('R19: subshell và GIT_DIR= trên repo gốc → chặn', () => {
+  const CDN = `${HOME}/VNG/git-vng/cdn-source`;
+  const own = (command) => sandboxDenial({ tool_name: 'Bash', tool_input: { command }, cwd: '/tmp' }, HOME, [CDN]);
+  assert.match(own(`(cd ${CDN} && git stash)`) ?? '', /repo gốc/);
+  assert.match(own(`GIT_DIR=${CDN}/.git git reset --hard`) ?? '', /repo gốc/);
+  assert.match(own(`git --git-dir=${CDN}/.git checkout -- .`) ?? '', /repo gốc/);
+  assert.match(own(`git -C ${CDN} update-ref refs/heads/tont HEAD~1`) ?? '', /repo gốc/);
+  assert.strictEqual(own(`git -C ${CDN} log -1`), null);
 });

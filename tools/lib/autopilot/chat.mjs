@@ -7,7 +7,7 @@ import { runDir } from './store.mjs';
 import { toWorktree } from './worktree.mjs';
 import { PROMPTS_DIR } from './flows.mjs';
 import { fillVars } from './prompts.mjs';
-import { stageVars, commandFor } from './driver.mjs';
+import { stageVars, commandFor, writableOf } from './driver.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
 const CLI = path.join(REPO_ROOT, 'tools', 'autopilot.mjs');
@@ -99,7 +99,7 @@ Xong hết và user đồng ý thì chạy \`node ${CLI} done ${run.key}\`.
 `;
 }
 
-const launchOf = (run, start) => ({ key: run.key, runId: run.runId, cwd: chatCwd(run), args: [...start, ...sandboxArgs(Object.keys(run.workBranch ?? {}))], env: { AUTOPILOT_RUN: `${run.key}/${run.runId}` } });
+const launchOf = (run, start) => ({ key: run.key, runId: run.runId, cwd: chatCwd(run), args: [...start, ...sandboxArgs(writableOf(run))], env: { AUTOPILOT_RUN: `${run.key}/${run.runId}` } });
 
 export function chatLaunch(run, { resume = false } = {}) {
   const session = resume ? latestSession(chatCwd(run)) : null;

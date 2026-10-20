@@ -17,14 +17,14 @@ test('review không được Edit; không toolset nào có git commit/push', () 
   for (const tools of Object.values(TOOLSETS)) assert.doesNotMatch(tools, /git (commit|push)/);
 });
 
-test('chưa bật AUTOPILOT_LAB_WRITES → gắn hook sandbox chặn ghi ra ngoài worktree', () => {
+test('hook sandbox luôn gắn, kể cả khi bật AUTOPILOT_LAB_WRITES (biến đó chỉ mở POST + stage ghi thật)', () => {
   const settingsOf = (args) => JSON.parse(args[args.indexOf('--settings') + 1]);
   const hook = settingsOf(buildClaudeArgs({ prompt: 'p', toolset: 'implement' })).hooks.PreToolUse[0];
   assert.match(hook.matcher, /Edit/);
   assert.match(hook.hooks[0].command, /sandbox-hook\.mjs/);
   process.env.AUTOPILOT_LAB_WRITES = '1';
   try {
-    assert.ok(!buildClaudeArgs({ prompt: 'p', toolset: 'implement' }).includes('--settings'));
+    assert.ok(buildClaudeArgs({ prompt: 'p', toolset: 'implement' }).includes('--settings'));
   } finally {
     delete process.env.AUTOPILOT_LAB_WRITES;
   }

@@ -295,3 +295,14 @@ test('M5: rev-parse MERGE_HEAD lỗi không bị coi là merge dở', async () =
   assert.notStrictEqual(r.results[0].note, undefined);
   assert.doesNotMatch(r.results[0].note, /merge dở/);
 });
+
+test('commit: run làm mất file đã track (vd build-dev xoá dist/fonts) → dừng liệt kê, không commit', async () => {
+  const f = gitRepo();
+  fs.writeFileSync(path.join(f.campaignDir, 'index.html'), 'sửa');
+  fs.rmSync(path.join(f.campaignDir, 'package.json'));
+  const head = f.git('rev-parse', 'HEAD').stdout;
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa' });
+  assert.strictEqual(r.results[0].status, 'error');
+  assert.match(r.results[0].blocking.join('\n'), /package\.json/);
+  assert.strictEqual(f.git('rev-parse', 'HEAD').stdout, head);
+});

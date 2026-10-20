@@ -102,13 +102,16 @@ function runCommit(ctx) {
   const merging = () => mergeHead() || status().some((e) => UNMERGED.test(e.code));
   if (merging()) return stop(MERGE_STOP);
 
-  const changed = new Set(status().map((e) => e.path));
+  const entries = status();
+  const changed = new Set(entries.map((e) => e.path));
   const dirtyAtStart = new Set(ctx.dirty ?? []);
   const scopes = (ctx.scopes ?? [ctx.campaignDir]).map((d) => path.relative(ctx.repo, path.resolve(ctx.repo, d)));
   const inScope = (f) => scopes.some((s) => s === '' || f === s || f.startsWith(`${s}/`));
   // campaign đã bị run khoá: mọi file đổi trong đó (trừ file dở từ trước) là của run, kể cả file agent quên khai
   const files = [...changed].filter((f) => inScope(f) && !dirtyAtStart.has(f));
   const left = ctx.files.filter((f) => changed.has(f) && !files.includes(f)).map((f) => `${f} (${dirtyAtStart.has(f) ? 'dở từ trước khi run bắt đầu' : 'ngoài campaign'})`);
+  const deleted = entries.filter((e) => e.code.includes('D') && files.includes(e.path)).map((e) => e.path);
+  if (deleted.length) return stop('run làm mất file đã track (thường do build-dev ghi đè dist) — build lại bản production hoặc git restore, rồi resume', deleted);
   if (!files.length && left.length) return stop('run có sửa file nhưng không file nào commit tự động được — commit tay hoặc skip cổng commit', left);
 
   let commit = null;

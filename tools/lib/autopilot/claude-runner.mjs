@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const REVIEW = ['Read', 'Grep', 'Glob', 'Write', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git status:*)', 'Bash(node:*)'];
-const IMPLEMENT = [...REVIEW, 'Edit', 'Skill', 'Agent', 'Bash(npm run:*)', 'Bash(npm ci:*)', 'Bash(npx:*)', 'Bash(ls:*)', 'Bash(python3:*)'];
+const IMPLEMENT = [...REVIEW, 'Edit', 'Skill', 'Agent', 'Bash(npm run:*)', 'Bash(npm ci:*)', 'Bash(npx:*)', 'Bash(ls:*)', 'Bash(python3:*)', 'Bash(cp:*)', 'Bash(mkdir:*)', 'Bash(sips:*)'];
 
 export const TOOLSETS = {
   review: REVIEW.join(','),

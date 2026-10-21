@@ -178,3 +178,10 @@ test('review 67e9228: file điều khiển của run (run.json, .pause, .child) 
   assert.ok(inRun(`echo 1 > ${RUNS}/GW-1/r1/.child`));
   assert.strictEqual(sandboxDenial({ tool_name: 'Write', tool_input: { file_path: `${RUNS}/GW-1/r1/plan.md` }, cwd: CDN2 }, HOME, [CDN2, `${RUNS}/GW-1/r1`]), null);
 });
+
+test('sips: --out/-o hoặc sửa tại chỗ ra ngoài repo của run → chặn; thay ảnh trong worktree → cho qua', () => {
+  for (const command of ['sips -z 115 115 a.png --out ~/VNG/git-vng/cdn-source/b.png', 'sips -Z 100 ~/VNG/git-vng/cdn-source/a.png', 'sips -s format png a.jpg -o ~/VNG/agent-auto/x.png'])
+    assert.ok(deny('Bash', { command }), command);
+  for (const command of ['sips -z 115 115 frame4/images/top3-2.png --out frame4/images/row-4.png', `sips -g pixelWidth ${HOME}/VNG/git-vng/cdn-source/a.png`])
+    assert.strictEqual(denyIn(WT, command), null, command);
+});

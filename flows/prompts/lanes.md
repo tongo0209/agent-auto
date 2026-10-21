@@ -9,3 +9,4 @@ Ticket nhiều campaign (mỗi dòng 1 folder):
 {{campaignDirs}}
 Từ 2 campaign trở lên: mỗi campaign 1 lane Agent riêng, tập file rời nhau, tối đa 5 lane song song; build chung do stage gates chạy từng campaign.
 Tìm chữ QC trích luôn bằng `grep -rin` + thử bản bỏ dấu, trong cả campaign lẫn bản bàn giao, rồi mới được kết luận "text do BE sinh" — chép câu này vào brief từng lane.
+Thay/ghi đè ảnh trong repo (bug asset đã chốt, ảnh nằm trong campaign) là việc của lane, không route GS: chép bản gốc sang `{{runDir}}/asset-backup/` trước, rồi dùng lệnh đơn `cp`/`sips`/`python3` (không ghép `cd …;`, `set -e`, `$(…)` — auto-mode chặn lệnh ghép ghi đè binary không có bản lưu).

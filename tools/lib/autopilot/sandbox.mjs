@@ -129,6 +129,13 @@ function nodeToolIsReadOnly(args, toolsDir) {
   return path.basename(script) === 'project-note.mjs' && PROJECT_NOTE_READS.includes(args[scriptIndex + 1]);
 }
 
+// sips không có --out thì sửa ảnh tại chỗ; -g chỉ đọc thuộc tính
+function sipsWriteTargets(args) {
+  const out = optionValue(args, ['--out', '-o']);
+  if (out) return [out];
+  return args.some((a) => a === '-g' || a === '--getProperty') ? [] : args.filter((a) => !a.startsWith('-'));
+}
+
 function segmentWriteTargets([program, ...args], cwd, home, writable) {
   const writeTargets = redirectTargets(args);
   if (WRITES_EVERY_ARG.has(program)) writeTargets.push(...args);
@@ -142,6 +149,7 @@ function segmentWriteTargets([program, ...args], cwd, home, writable) {
   if (program === 'tar') writeTargets.push(optionValue(args, ['-C', '--directory']));
   if (program === 'unzip') writeTargets.push(optionValue(args, ['-d']));
   if (program === 'cp' || program === 'mv') writeTargets.push(optionValue(args, ['-t', '--target-directory']));
+  if (program === 'sips') writeTargets.push(...sipsWriteTargets(args));
   if (/^(node|python3?)$/.test(program)) {
     const inlineScript = args.find((a, i) => /^-[ce]$/.test(args[i - 1]));
     const mentionedPath = inlineScript?.match(new RegExp(`${home}/[^'"\\s]*`))?.[0];

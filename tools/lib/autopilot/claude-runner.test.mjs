@@ -42,6 +42,12 @@ test('intake mở Chrome của user (SharePoint/Sheets cần phiên đã đăng 
   assert.ok(!buildClaudeArgs({ prompt: 'p', toolset: 'implement' }).includes('--chrome'));
 });
 
+test('toolset sửa code được thay ảnh bằng lệnh đơn (rule allow → auto-mode không chặn oan; hook sandbox vẫn giữ ranh giới)', () => {
+  for (const toolset of ['implement', 'browser', 'cut', 'intake'])
+    for (const rule of ['Bash(cp:*)', 'Bash(mkdir:*)', 'Bash(sips:*)']) assert.ok(TOOLSETS[toolset].split(',').includes(rule), `${toolset} ${rule}`);
+  assert.ok(!TOOLSETS.review.includes('Bash(cp:*)'));
+});
+
 test('toolset lạ → ném lỗi', () => {
   assert.throws(() => buildClaudeArgs({ prompt: 'p', toolset: 'root' }), /toolset/);
 });

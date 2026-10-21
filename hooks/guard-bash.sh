@@ -113,18 +113,9 @@ fi
 
 # ---------- ASK: việc của con người, không phải của agent ----------
 
-# G-GIT-2 · PUSH (14/8/2026: user gỡ cổng cho `git commit`)
-# Vì sao tách commit ra khỏi luật này: commit là việc CÒN SỬA ĐƯỢC (amend/reset/revert, chưa ai
-# thấy), hỏi từng lần chỉ tổ ngắt luồng; còn push là bước ĐI RA NGOÀI — người khác pull về,
-# CI/CD chạy — nên vẫn phải do người bấm.
-# Ở bypassPermissions không còn prompt để mà hỏi ⇒ hạ xuống deny, user tự gõ lệnh.
-# 12/10/2026: user cho tự push repo cá nhân ~/Code-Personal (force-push vẫn bị G-GIT-1 chặn ở trên)
-push_cwd=$(printf '%s' "$input" | jq -r '.cwd // ""' 2>/dev/null | tr 'A-Z' 'a-z')
-if [[ $low =~ (^|[[:space:];&|])git[[:space:]]+push([[:space:]]|$) ]] && [[ "$push_cwd $low" != *"$(printf '%s' "$HOME/Code-Personal" | tr 'A-Z' 'a-z')"* ]]; then
-  if [ "$pmode" = "bypassPermissions" ]; then
-    decide deny G-GIT-2 "dang o bypassPermissions - khong con prompt de duyet. Ban tu chay lenh push, hoac doi mode neu muon agent lam ho"
-  fi
-  decide ask G-GIT-2 "push la buoc di ra ngoai - phai do ban duyet tung lan"
+# G-GIT-2 · FORCE-PUSH nhánh riêng (21/10/2026: user gỡ cổng cho push thường — chỉ còn force hỏi)
+if [[ $low =~ (^|[[:space:];&|])git[[:space:]]+push([[:space:]]|$) ]] && [[ $low =~ [[:space:]](--force|--force-with-lease|-f)([[:space:]=]|$) ]]; then
+  decide ask G-GIT-2 "force-push ghi de lich su nhanh - phai do ban duyet"
 fi
 
 # G-GIT-3 · xoá diff chưa commit — cả 3 skill đều để user tự review diff, mất là mất thật

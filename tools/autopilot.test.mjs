@@ -523,6 +523,16 @@ test('retry sau loop-exhausted:plan-review → chạy lại plan-review', () => 
   assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-plan']);
 });
 
+test('retry --bg trả lời ngay rồi chạy nền tới mốc dừng kế', async () => {
+  const { cli, campaign, runs } = sandbox({ 'plan-review': [{ result: verdict('revise', { blocking: ['x'] }) }, { result: verdict('revise', { blocking: ['x'] }) }, { result: verdict('revise', { blocking: ['x'] }) }, { result: verdict('revise', { blocking: ['x'] }) }, { result: verdict('pass') }] });
+  cli('run', 'GW-38', '--flow', 'landing-fix', '--campaign', campaign);
+  const r = cli('retry', 'GW-38', '--bg');
+  assert.strictEqual(r.code, 0);
+  assert.match(r.out, /Chạy nền PID/);
+  for (let i = 0; i < 100 && lastRun(runs, 'GW-38').stage !== 'approve-plan'; i++) await new Promise((ok) => setTimeout(ok, 100));
+  assert.deepStrictEqual([lastRun(runs, 'GW-38').status, lastRun(runs, 'GW-38').stage], ['paused', 'approve-plan']);
+});
+
 test('break bật/tắt điểm dừng không chạy run; --off tắt; run done → từ chối', () => {
   const { cli, campaign, runs } = sandbox();
   cli('run', 'GW-37', '--flow', 'landing-fix', '--campaign', campaign);

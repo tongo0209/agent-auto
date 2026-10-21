@@ -38,6 +38,7 @@ const USAGE = `Dùng:
   autopilot resume <KEY> [--note "…"] [--budget-usd n] [--budget-minutes n]   (--note: nhắn vào bước bị dừng giữa chừng)
   autopilot abort <KEY>
   autopilot retry <KEY> [--note "…"]         (run dừng: chạy lại đúng stage đang dừng)
+                                   (--bg chạy nền được cho run/approve/reject/resume/retry/goto/skip/pick)
   autopilot goto <KEY> <stage> --note "…"    (quay về stage đã đi qua, chạy lại từ đó)
   autopilot skip <KEY> [--reason "…"]        (run dừng: bỏ qua stage đang dừng; cổng bắt buộc --reason)
   autopilot pick <KEY> <A|B|C> [--note "…"]  (ở approve-plan: chọn phương án trong plan.md rồi chạy tiếp)
@@ -150,7 +151,6 @@ function newRun(opts, input) {
 
 async function cmdRun(opts, argv) {
   const input = opts._[1] ?? die(USAGE);
-  if (opts.bg) return startBackground(argv);
   const { run, flow, reason } = newRun(opts, input);
   if (opts['budget-usd']) run.budget.usd = Number(opts['budget-usd']);
   console.log(`▶ ${run.key} → ${flow.id} (${reason})`);
@@ -453,4 +453,6 @@ const COMMANDS = {
   pick: () => cmdChoose(opts, 'pick'),
   break: () => cmdBreak(opts),
 };
-await (COMMANDS[opts._[0]] ?? (() => die(USAGE)))();
+const RUN_ONWARD = ['run', 'approve', 'reject', 'resume', 'retry', 'goto', 'skip', 'pick'];
+if (opts.bg && RUN_ONWARD.includes(opts._[0])) startBackground(argv);
+else await (COMMANDS[opts._[0]] ?? (() => die(USAGE)))();

@@ -120,6 +120,8 @@ check deny "cd $HOME/Code-Personal/arcade && git push --force origin main"
 out=$(jq -nc --arg d "$HOME/Code-Personal/arcade" '{tool_name:"Bash",cwd:$d,tool_input:{command:"git push origin main"}}' | bash "$HOOK")
 if [ -z "$out" ]; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL  push trong cwd Code-Personal phai allow"; fi
 check ask 'git push --force-with-lease origin feature/gw-660'
+out=$(jq -nc '{tool_name:"Bash",permission_mode:"bypassPermissions",tool_input:{command:"git push origin tont"}}' | bash "$HOOK")
+if printf '%s' "$out" | grep -q '"permissionDecision":"ask"'; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL  push o bypassPermissions phai ask, khong deny"; fi
 check ask 'git reset --hard HEAD'
 check ask 'git clean -fd'
 check ask 'git stash drop'

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Cổng hợp đồng pm__ (R-PM-7/8) theo ai-template-kit — luật từng mã PG-* ở tools/pm-gate/checks.mjs.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname, basename } from 'node:path';
+import { join, dirname, basename, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { scanHtml, tokensOf } from './pm-gate/scan.mjs';
@@ -122,9 +122,14 @@ if (!HOOKS_AT.includes(lock.hooksAt)) usageError(`hooks-at "${lock.hooksAt}" kh�
 if (lock.gameplay && !GAMEPLAYS.includes(lock.gameplay)) usageError(`gameplay "${lock.gameplay}" không hợp lệ — chọn ${GAMEPLAYS.join(' | ')}`);
 if (lock.gameplay && !existsSync(kitFileFor(KIT_DIR, lock.gameplay))) usageError(`không thấy ${kitFileFor(KIT_DIR, lock.gameplay)} — kiểm PM_KIT_DIR hoặc pull gt-promotion-template`);
 
-const contract = lock.gameplay && loadContract(lock.gameplay, { kitDir: KIT_DIR, overridesPath: OVERRIDES, refDir: lock.ref });
+// ref trỏ chính folder bàn giao (note khoá ref = folder gt của landing) → so file với bản BE của nó, ra hàng trăm PG-REF oan
+const refIsSelf = Boolean(lock.ref) && targets.some((f) => resolve(f).startsWith(resolve(lock.ref) + sep));
+const selfRefWarn = { code: 'PG-REF-SELF', msg: `ref ${lock.ref} là chính folder chứa file — bỏ so ref; khai ref = landing mẫu khác trong file dự án`, token: '', lines: [] };
+const contract = lock.gameplay && loadContract(lock.gameplay, { kitDir: KIT_DIR, overridesPath: OVERRIDES, refDir: refIsSelf ? '' : lock.ref });
 const elsewhereOf = opts.page ? siblingTokens(targets) : () => [];
-const results = targets.map((file) => (contract ? gateFile(file, contract, lock, opts, elsewhereOf(file)) : unlockedResult(file, lock, opts)));
+const results = targets
+  .map((file) => (contract ? gateFile(file, contract, lock, opts, elsewhereOf(file)) : unlockedResult(file, lock, opts)))
+  .map((r) => (refIsSelf ? { ...r, warns: [selfRefWarn, ...r.warns] } : r));
 
 const singleFile = !opts.page && results.length === 1 && !statSync(opts.files[0]).isDirectory();
 if (opts.json) console.log(JSON.stringify(singleFile ? results[0] : results, null, 2));

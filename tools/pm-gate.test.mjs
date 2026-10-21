@@ -168,6 +168,16 @@ function refDir() {
 
 const deferredWarn = (code) => (r) => r.exit === 0 && noRed(r) && r.json.warns.some((f) => f.code === code && f.msg.includes('hooks-at: handoff'));
 
+function selfRefCase() {
+  const ref = mkdtempSync(join(root, 'ref-'));
+  mkdirSync(join(ref, 'promotion'));
+  mkdirSync(join(ref, 'mainsite'));
+  writeFileSync(join(ref, 'promotion', 'index.html'), '<body><a href="#" class="pm__btn-history"></a><div id="popup_history" class="pm__history-module"></div></body>');
+  const file = join(ref, 'mainsite', 'index.html');
+  writeFileSync(file, '<body><div id="popup_history" class="pm__history-module"></div></body>');
+  return run([file, '--gameplay', 'none', '--ref', ref, '--baseline', 'none']);
+}
+
 const refCase = () => refCaseWith('<a href="#" class="pm__btn-history"></a><div id="popup_history" class="pm__history-module"></div>');
 
 function pageCase(g, pages) {
@@ -322,6 +332,9 @@ const CASES = [
   ]],
   ['29 --gameplay none --ref: ref có hook mà file thiếu → PG-REF', () => [
     ['none', refCase(), red('PG-REF')],
+  ]],
+  ['29b ref là chính folder chứa file (bản bàn giao của landing) → bỏ PG-REF, chỉ cảnh báo', () => [
+    ['none', selfRefCase(), (r) => redWithout('PG-REF')(r) && codes(r.json.warns).includes('PG-REF-SELF')],
   ]],
   ['30 P: pm__btn-share ra ngoài form id → PG-NEST 🔴', () => [
     ['P', gate(P, once(once(base(P), SHARE_BUTTON, ''), '<form id="pm__invite-form">', `${SHARE_BUTTON}\n        <form id="pm__invite-form">`)), red('PG-NEST')],

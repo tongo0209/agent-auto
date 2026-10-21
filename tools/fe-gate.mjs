@@ -13,6 +13,7 @@
  * Exit code: 0 = sạch · 1 = có ERROR (hoặc có WARN khi --strict) · 2 = sai tham số.
  * Không dependency ngoài (cdn-source cấm thêm dep; script phải chạy được ở mọi repo).
  */
+import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -99,8 +100,25 @@ function maxMtime(root, exts = null) {
   return max;
 }
 
+/**
+ * Lần đổi nội dung mới nhất của folder: file sạch tính theo giờ commit, file đang sửa/chưa track theo mtime.
+ * mtime trần sai sau `git pull` — checkout làm source "mới" hơn dist dù dist build cùng commit (GW-723).
+ */
+function lastContentChange(root, exts = null) {
+  const git = (...args) => spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
+  const top = git('rev-parse', '--show-toplevel');
+  if (top.status !== 0 || !git('ls-files', '--', '.').stdout.trim()) return maxMtime(root, exts);
+  const specs = exts ? exts.map((e) => `:(glob)**/*${e}`) : ['.'];
+  const committedAt = Number(git('log', '-1', '--format=%ct', '--', ...specs).stdout.trim()) * 1000;
+  const dirty = git('status', '--porcelain', '-z', '--untracked-files=all', '--', ...specs).stdout
+    .split('\0').filter((entry) => entry.length > 3).map((entry) => path.join(top.stdout.trim(), entry.slice(3)));
+  const dirtyAt = dirty.filter((f) => fs.existsSync(f)).map((f) => fs.statSync(f).mtimeMs);
+  return Math.max(committedAt || 0, ...dirtyAt);
+}
+
 /* ─────────────────────────── phát hiện ref ─────────────────────────── */
 
+const HAS_FILE_EXT = /\.[a-z0-9]{2,5}(?:[?#]|$)/i;
 const EXTERNAL = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i; // http:, https:, data:, blob:, //cdn…
 const CSS_COMMENT = /\/\*[\s\S]*?\*\//g;
 
@@ -148,7 +166,7 @@ const FONT_KEYWORDS = new Set([
   'ui-sans-serif', 'ui-monospace', 'ui-rounded', 'math', 'emoji', 'fangsong',
   '-apple-system', 'blinkmacsystemfont', 'segoe ui', 'roboto', 'helvetica', 'helvetica neue',
   'arial', 'arial black', 'tahoma', 'verdana', 'georgia', 'times', 'times new roman',
-  'courier', 'courier new', 'menlo', 'monaco', 'consolas', 'sf mono', 'sf pro text',
+  'courier', 'courier new', 'menlo', 'monaco', 'consolas', 'sf mono', 'sfmono-regular', 'sf pro text',
   'apple color emoji', 'segoe ui emoji', 'segoe ui symbol', 'noto color emoji',
   'microsoft yahei', 'pingfang sc', 'hiragino sans gb', 'wenquanyi micro hei',
   'liberation sans', 'dejavu sans', 'inter', 'sans', 'small-caption', 'icon', 'menu',
@@ -219,9 +237,15 @@ function parseHtmlRefs(html) {
   const push = (u) => refs.push(u);
   let m;
 
-  // src / href / poster / data-src / data-background
-  const reAttr = /\b(?:src|href|poster|data-src|data-bg|data-background|data-image)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi;
+  const reAttr = /\b(?:src|href|poster)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi;
   while ((m = reAttr.exec(html))) push(m[1].replace(/^['"]|['"]$/g, ''));
+
+  // data-image="AA" của nút pm__ là mã quà gửi BE, không phải ảnh (GW-777) — chỉ nhận giá trị có đuôi file
+  const reDataAttr = /\bdata-(?:src|bg|background|image)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi;
+  while ((m = reDataAttr.exec(html))) {
+    const value = m[1].replace(/^['"]|['"]$/g, '');
+    if (HAS_FILE_EXT.test(value)) push(value);
+  }
 
   // srcset: "a.png 1x, b.png 2x"
   const reSet = /\bsrcset\s*=\s*("[^"]*"|'[^']*')/gi;
@@ -369,7 +393,7 @@ function readCut(file) {
   cut.rows = list.map((r) => {
     const p = path.join(path.dirname(file), r.file);
     return { cut, name: r.name ?? r.file, path: p, real: isFile(p) ? pngSize(p) : null,
-             w: r.w ?? r.width, h: r.h ?? r.height, flags: r.flags ?? [] };
+             w: r.w ?? r.width, h: r.h ?? r.height, flags: r.flags ?? [], textInside: r.textInside };
   });
   return cut;
 }
@@ -441,8 +465,13 @@ const FLAG_RULES = {
   BAKE: ['WARN', 'đã nướng kèm nền bên dưới vì blend lạ — chỉ đúng khi đặt đúng toạ độ trên đúng nền'],
   'CỤC': ['WARN', 'gộp nhiều vật rời trong 1 ảnh — nên tách'],
 };
+// DATA-ZONE chỉ có nghĩa khi ảnh còn nướng chữ: khung đã tắt chữ (textInside rỗng) hay nhãn nút tĩnh thì dùng được
+const BUTTON_NAME = /^(?:btn|button|nut|close)(?:-|$)/;
+const bakesDataText = (row) => !(Array.isArray(row.textInside) && !row.textInside.length) && !BUTTON_NAME.test(row.name);
+const flagApplies = (row, flag, cleanPixels) =>
+  FLAG_RULES[flag] && !(flag === 'FONT-SUBST' && cleanPixels) && !(flag === 'DATA-ZONE' && !bakesDataText(row));
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const flaggedCopies = copies.filter((c) => c.rows.some((r) => r.flags.some((fl) => FLAG_RULES[fl])));
+const flaggedCopies = copies.filter((c) => c.rows.some((r) => r.flags.some((fl) => flagApplies(r, fl, false))));
 const codeFiles = flaggedCopies.length
   ? [...walk(DIST, CODE_EXT), ...srcDirs.flatMap((d) => walk(d, CODE_EXT))].map((f) => ({ f, lines: read(f).split('\n') }))
   : [];
@@ -455,7 +484,7 @@ for (const { img, rows, byContent } of flaggedCopies) {
   const usedAt = new RegExp(`(?<![\\w-])${escRe(base)}|sprite\\(\\s*\\$${escRe(stem)}\\s*\\)|MS__sprite-${escRe(stem)}(?![\\w-])`);
   const wheres = codeFiles.flatMap(({ f, lines }) => lines.flatMap((l, i) => (usedAt.test(l) ? [`${rel(f)}:${i + 1}`] : [])));
   for (const row of rows) {
-    for (const flag of row.flags.filter((fl) => FLAG_RULES[fl] && !(fl === 'FONT-SUBST' && cleanPixels))) {
+    for (const flag of row.flags.filter((fl) => flagApplies(row, fl, cleanPixels))) {
       const [level, meaning] = FLAG_RULES[flag];
       // Không thấy dòng tham chiếu vẫn báo: sprite gộp nguyên thư mục, dist chép là đã ship
       for (const where of wheres.length ? wheres : [rel(img)]) {
@@ -525,8 +554,8 @@ for (const cut of cuts.filter((c) => c.gateStatus === 'FAIL')) {
 
 /* ── check 6: dist cũ hơn source ── */
 if (srcDirs.length) {
-  const srcM = Math.max(...srcDirs.map((d) => maxMtime(d, CODE_EXT)));
-  const distM = maxMtime(DIST);
+  const srcM = Math.max(...srcDirs.map((d) => lastContentChange(d, CODE_EXT)));
+  const distM = lastContentChange(DIST);
   if (srcM && distM && srcM > distM) {
     const hrs = ((srcM - distM) / 3600000).toFixed(1);
     add('ERROR', 'dist-stale', `dist/ cũ hơn source ${hrs}h — build lại trước khi kiểm/giao`);

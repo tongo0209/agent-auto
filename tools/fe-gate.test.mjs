@@ -126,6 +126,36 @@ console.log('\nfe-gate self-test\n');
   expect('  dist mới hơn source → không báo', !checks(r2).includes('dist-stale'), JSON.stringify(checks(r2)));
 }
 
+/* ── ca 6b: repo git vừa pull — mtime source mới hơn nhưng nội dung đã commit cùng dist (GW-723) ── */
+{
+  const camp = path.join(ROOT, 'stale-git');
+  const dist = cleanFixture('stale-git');
+  const src = w(path.join(camp, 'assets/main.scss'), '.a{}');
+  const git = (...args) => execFileSync('git', ['-C', camp, ...args], { encoding: 'utf8' });
+  git('init', '-q');
+  git('add', '.');
+  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'build');
+  const future = new Date(Date.now() + 3 * 3600 * 1000);
+  fs.utimesSync(src, future, future);
+  const r = runGate(dist);
+  expect('source sạch theo git dù mtime mới hơn dist → không báo dist-stale', !checks(r).includes('dist-stale'), JSON.stringify(checks(r)));
+
+  fs.writeFileSync(src, '.a{color:red}');
+  fs.utimesSync(src, future, future);
+  const r2 = runGate(dist);
+  expect('  sửa source chưa build lại → vẫn ERROR dist-stale', checks(r2).includes('dist-stale'), JSON.stringify(checks(r2)));
+}
+
+/* ── ca 6c: data-image là mã quà gửi BE (GW-777 data-image="AA"), không phải ảnh ── */
+{
+  const dist = cleanFixture('data-image-code');
+  fs.appendFileSync(path.join(dist, 'index.html'), '\n<a class="pm__btn-claim" data-image="AA" data-item="1"></a><div data-bg="images/thieu.png"></div>');
+  const r = runGate(dist);
+  const missing = r.findings.filter((x) => x.check === 'asset-missing').map((x) => x.message);
+  expect('data-image="AA" không bị coi là ảnh thiếu', !missing.some((m) => m.endsWith(': AA')), JSON.stringify(missing));
+  expect('  data-bg trỏ file .png thiếu → vẫn ERROR', missing.some((m) => m.includes('images/thieu.png')), JSON.stringify(missing));
+}
+
 /* ── ca 7: font design giao mà không dùng ── */
 {
   const dist = cleanFixture('design-unused');
@@ -209,7 +239,7 @@ const flagged = (r) => r.findings.filter((x) => x.check === 'flagged-asset-used'
   w(path.join(cut, 'score.png'), png(60, 20, 'score'));
   w(path.join(cut, 'frame-3.png'), png(100, 100, 'frame'));
   writeCut(cut, { runId: 'r1', gateStatus: 'PASS', assets: [
-    row('1-misc', 120, 40, ['TEXT', 'DATA-ZONE']), row('score', 60, 20, ['FONT-SUBST']), row('frame-3', 100, 100)] });
+    row('1-misc', 120, 40, ['TEXT', 'DATA-ZONE'], { textInside: ['1234567'] }), row('score', 60, 20, ['FONT-SUBST']), row('frame-3', 100, 100)] });
   writeSrc(path.join(camp, 'assets/sec/images/sprite/point-1.png'), png(120, 40, 'misc'));
   writeSrc(path.join(camp, 'assets/sec/scss/sec.scss'), '.a{}\n.b{}\n.point{ @include sprite($point-1); }\n');
   w(path.join(dist, 'images/score.png'), png(60, 20, 'score'));
@@ -227,6 +257,21 @@ const flagged = (r) => r.findings.filter((x) => x.check === 'flagged-asset-used'
   expect('  và gate FAIL', r.pass === false);
 }
 
+/* ── ca 11d: DATA-ZONE mà ảnh không còn chữ (đã tắt layer chữ) hoặc là nhãn nút tĩnh → dùng được (GW-912, GW-886) ── */
+{
+  const dist = cleanFixture('flag-no-text');
+  const cut = path.join(ROOT, 'flag-no-text-src/assets');
+  w(path.join(cut, 'winners-tab-on.png'), png(115, 40, 'tab'));
+  w(path.join(cut, 'btn-history.png'), png(216, 75, 'btn'));
+  writeCut(cut, { runId: 'r1', gateStatus: 'PASS', assets: [
+    row('winners-tab-on', 115, 40, ['DATA-ZONE', 'ẨN']), row('btn-history', 216, 75, ['DATA-ZONE'], { textInside: ['lịch Sử'] })] });
+  w(path.join(dist, 'images/winners-tab-on.png'), png(115, 40, 'tab'));
+  w(path.join(dist, 'images/btn-history.png'), png(216, 75, 'btn'));
+  fs.appendFileSync(path.join(dist, 'index.html'), '\n<img src="images/winners-tab-on.png"><img src="images/btn-history.png">');
+  const r = runGate(dist, ['--quiet', '--design', path.join(ROOT, 'flag-no-text-src')]);
+  expect('DATA-ZONE khung không chữ + nhãn nút → không ERROR', !flagged(r).length, JSON.stringify(flagged(r)));
+}
+
 /* ── ca 11c: cùng md5 với một bản cắt KHÔNG cờ FONT-SUBST ⇒ pixel đã được chứng minh sạch (GW-901 title-vn) ── */
 {
   const dist = cleanFixture('flag-clean-twin');
@@ -237,7 +282,7 @@ const flagged = (r) => r.findings.filter((x) => x.check === 'flagged-asset-used'
   w(path.join(cut, 'bxh-khung.png'), png(50, 50, 'bxh'));
   writeCut(cut, { runId: 'r1', gateStatus: 'PASS', assets: [
     row('group-2', 80, 30, ['BAKE', 'FONT-SUBST']), row('f3-title-text', 80, 30, ['BAKE']),
-    row('bxh', 50, 50, ['DATA-ZONE']), row('bxh-khung', 50, 50)] });
+    row('bxh', 50, 50, ['DATA-ZONE'], { textInside: ['Top 1 Nickname'] }), row('bxh-khung', 50, 50)] });
   w(path.join(dist, 'images/title-vn.png'), png(80, 30, 'tieu-de'));
   w(path.join(dist, 'images/bxh-copy.png'), png(50, 50, 'bxh'));
   fs.appendFileSync(path.join(dist, 'index.html'), '\n<img src="images/title-vn.png"><img src="images/bxh-copy.png">');

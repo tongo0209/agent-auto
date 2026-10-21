@@ -103,11 +103,14 @@ function runCommit(ctx) {
   if (merging()) return stop(MERGE_STOP);
   // stage trước (ui-check) hay build-dev; dist được track nên phải là bản production lúc commit
   for (const scope of ctx.scopes ?? [ctx.campaignDir]) {
-    const found = !isTemplateFile(scope) && findBuildScript(path.resolve(ctx.repo, scope), ctx.repo);
+    const dir = path.resolve(ctx.repo, scope);
+    const found = fs.existsSync(dir) && !isTemplateFile(dir) && findBuildScript(dir, ctx.repo);
     if (!found) continue;
     const r = ctx.exec('npm', ['run', found.script], { cwd: found.dir });
     if (r.code !== 0) return stop(`build ${found.script} lỗi — dist phải là bản production trước khi commit`, tail(r));
   }
+  // build production mất vài phút, user có thể đã huỷ run trong lúc đó
+  if (ctx.aborted?.()) return stop('run đã bị huỷ trong lúc build — không commit');
 
   const entries = status();
   const changed = new Set(entries.map((e) => e.path));
@@ -119,7 +122,7 @@ function runCommit(ctx) {
   const left = ctx.files.filter((f) => changed.has(f) && !files.includes(f)).map((f) => `${f} (${dirtyAtStart.has(f) ? 'dở từ trước khi run bắt đầu' : 'ngoài campaign'})`);
   const deleted = entries.filter((e) => e.code.includes('D') && files.includes(e.path)).map((e) => e.path);
   if (deleted.length) return stop('run làm mất file đã track (thường do build-dev ghi đè dist) — build lại bản production hoặc git restore, rồi resume', deleted);
-  if (left.some((f) => f.endsWith('(ngoài campaign)'))) return stop('run sửa file ngoài campaign — commit tay (git add -- <file> && git commit --only) rồi skip cổng commit, hoặc goto fix để hoàn tác', left);
+  if (left.some((f) => f.endsWith('(ngoài campaign)'))) return stop('run sửa file ngoài campaign — commit tay (git add -- <file> && git commit --only) rồi retry để cổng commit nốt file campaign, hoặc goto fix để hoàn tác', left);
   if (!files.length && left.length) return stop('run có sửa file nhưng không file nào commit tự động được — commit tay hoặc skip cổng commit', left);
 
   let commit = null;

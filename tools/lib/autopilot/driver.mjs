@@ -132,7 +132,7 @@ async function gatesOn(run, stage, deps, [dir, ...rest]) {
   const repo = toWorktree(run.worktrees, real);
   const result = await deps.runGates(stage.checks, {
     repo, campaignDir: toWorktree(run.worktrees, dir), scopes: [dir, ...rest].map((d) => toWorktree(run.worktrees, d)), dirty: run.dirtyAtStart?.[real] ?? [],
-    key: run.key, flowId: run.flow, files: run.files ?? [], planTitle: planTitle(run),
+    key: run.key, flowId: run.flow, files: run.files ?? [], planTitle: planTitle(run), aborted: () => isAbortedOnDisk(run),
   });
   return { ...result, repo };
 }

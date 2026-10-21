@@ -328,3 +328,18 @@ test('I2: run sửa file ngoài campaign → dừng liệt kê, không commit im
   assert.match(r.results[0].blocking.join('\n'), /shared\/lib\.scss \(ngoài campaign\)/);
   assert.strictEqual(f.git('rev-parse', 'HEAD').stdout, head);
 });
+
+test('huỷ run trong lúc commit đang build production → dừng, không commit', async () => {
+  const f = gitRepo({ 'build-pro': 'echo pro > dist.txt' });
+  const head = f.git('rev-parse', 'HEAD').stdout;
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa', aborted: () => true });
+  assert.deepStrictEqual([r.results[0].status, f.git('rev-parse', 'HEAD').stdout], ['error', head]);
+});
+
+test('scope không còn trên đĩa (handoff đã skip) → bỏ qua khi build, không crash', async () => {
+  const f = gitRepo();
+  const scopes = [f.campaignDir, path.join(f.repo, 'products/khong-co')];
+  const r = await runGates(['commit'], { ...f, scopes, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa' });
+  assert.notStrictEqual(r.results[0].status, 'crash');
+  assert.ok(['pass', 'skipped'].includes(r.results[0].status), r.results[0].note);
+});

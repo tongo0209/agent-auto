@@ -1,6 +1,6 @@
 // Hợp đồng pm__ của 1 gameplay: AI-RULES + MASTER của ai-template-kit, đã áp override production.
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { join, extname, resolve } from 'node:path';
 import { scanHtml, ancestorsOf, tokensOf, isPattern, matcherFor } from './scan.mjs';
 import { placementViolations, MODULE_MARKER, POPUP_ID, FIELD_TAGS } from './checks.mjs';
 
@@ -17,8 +17,8 @@ export function kitFileFor(kitDir, gameplay) {
   return gameplay === 'none' ? join(kitDir, 'components', 'common', 'popups') : rulesPath(kitDir, gameplay);
 }
 
-export function loadContract(gameplay, { kitDir, overridesPath, refDir }) {
-  const overrides = readOverrides(overridesPath, gameplay);
+export function loadContract(gameplay, { kitDir, overridesPath, refDir, paths = [] }) {
+  const overrides = readOverrides(overridesPath, gameplay, paths);
   const aliases = overrides.alias;
   const read = (path) => applyAliases(readFileSync(path, 'utf8'), aliases);
   // none = luật chung: gộp AI-RULES + MASTER của cả 2 gameplay; luật chỉ ăn khi trang có hook đó, không đòi hook bắt buộc.
@@ -73,6 +73,7 @@ export function loadContract(gameplay, { kitDir, overridesPath, refDir }) {
     pairs: withoutDroppedPairs(masterPairs(master, bareJs), overrides.drop),
     openers,
     idHooks,
+    classIdHooks: allowed('class'),
     retired: dropped,
     foreign: gameplay === 'none'
       ? new Set()
@@ -87,12 +88,14 @@ export function loadContract(gameplay, { kitDir, overridesPath, refDir }) {
 }
 
 // Cột kind của pm-kit-overrides.tsv → { alias: [[kit, production]], drop: …, when: …, anyof: …, allow: …, fix: …, known: … }.
-function readOverrides(path, gameplay) {
+// Cột scope: * · tên gameplay · @<đoạn đường dẫn> = chỉ landing có file nằm dưới đường dẫn đó
+function readOverrides(path, gameplay, paths) {
+  const inScope = (scope) => scope === '*' || scope === gameplay || (scope.startsWith('@') && paths.some((p) => resolve(p).includes(scope.slice(1))));
   const byKind = { alias: [], drop: [], when: [], anyof: [], allow: [], fix: [], known: [] };
   readFileSync(path, 'utf8').trim().split('\n').slice(1)
     .filter((line) => line.trim() && !line.startsWith('#'))
     .map((line) => line.split('\t'))
-    .filter(([scope]) => scope === '*' || scope === gameplay)
+    .filter(([scope]) => inScope(scope))
     .forEach(([, kit, production, kind]) => {
       if (!byKind[kind]) throw new Error(`rules/pm-kit-overrides.tsv: kind lạ "${kind}" ở dòng ${kit} — dùng ${Object.keys(byKind).join('|')}`);
       byKind[kind].push([kit, production]);

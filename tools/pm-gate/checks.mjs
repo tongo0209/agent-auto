@@ -154,7 +154,7 @@ function checkDont({ els, contract, add, explained }) {
 function checkFormIds({ els, contract, add, explained }) {
   for (const id of contract.idHooks) {
     const usedAsClass = els.flatMap((el, i) => (el.classes.includes(id) ? [i] : []));
-    if (!usedAsClass.length || els.some((el) => el.id === id)) continue;
+    if (!usedAsClass.length || els.some((el) => el.id === id) || contract.classIdHooks.has(id)) continue;
     add('PG-FORM', id, `\`${id}\` là id — JS tìm theo #${id}, đổi sang class là mất (§3.3)`, usedAsClass);
     explained.add(id);
   }

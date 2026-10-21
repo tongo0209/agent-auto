@@ -125,7 +125,7 @@ if (lock.gameplay && !existsSync(kitFileFor(KIT_DIR, lock.gameplay))) usageError
 // ref trỏ chính folder bàn giao (note khoá ref = folder gt của landing) → so file với bản BE của nó, ra hàng trăm PG-REF oan
 const refIsSelf = Boolean(lock.ref) && targets.some((f) => resolve(f).startsWith(resolve(lock.ref) + sep));
 const selfRefWarn = { code: 'PG-REF-SELF', msg: `ref ${lock.ref} là chính folder chứa file — bỏ so ref; khai ref = landing mẫu khác trong file dự án`, token: '', lines: [] };
-const contract = lock.gameplay && loadContract(lock.gameplay, { kitDir: KIT_DIR, overridesPath: OVERRIDES, refDir: refIsSelf ? '' : lock.ref });
+const contract = lock.gameplay && loadContract(lock.gameplay, { kitDir: KIT_DIR, overridesPath: OVERRIDES, refDir: refIsSelf ? '' : lock.ref, paths: targets });
 const elsewhereOf = opts.page ? siblingTokens(targets) : () => [];
 const results = targets
   .map((file) => (contract ? gateFile(file, contract, lock, opts, elsewhereOf(file)) : unlockedResult(file, lock, opts)))

@@ -292,6 +292,13 @@ const CASES = [
   ]],
   ['17 id sso-login-form → class → PG-FORM', () => [L, P].map((g) => [g,
     gate(g, once(base(g), 'id="sso-login-form"', 'class="sso-login-form"')), red('PG-FORM')])],
+  ['17b form class chỉ được override ở landing khai @đường dẫn → landing khác vẫn PG-FORM', () => {
+    const asClass = once(base(P), 'id="pm__profile-form"', 'class="pm__profile-form"');
+    return [
+      ['@A49-CFL', gate(P, asClass, 'A49-CFL/offlinetournament-52017/mainsite/index.html'), redWithout('PG-FORM')],
+      ['khác', gate(P, asClass, 'A1-X/khac/mainsite/index.html'), red('PG-FORM')],
+    ];
+  }],
   ['18 pm__login chuyển vào popup_login → PG-NEST', () => [
     ['L', gate(L, once(once(base(L), 'class="pm__login pm__anchor"', 'class="pm__anchor"'),
       '<div class="pm__login_popup_title"></div>', '<div class="pm__login_popup_title"></div><a href="#" class="pm__login pm__anchor"></a>')), red('PG-NEST')],

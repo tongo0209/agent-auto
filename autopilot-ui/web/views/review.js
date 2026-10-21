@@ -49,7 +49,13 @@ export function mount(el, ctx) {
   function gateBadge(key, gates) {
     const g = gates[key];
     if (!g) return `<button class="vw-pill t-mute" data-gate="${esc(key)}" title="Chưa chạy fe-gate, bấm để chạy"><i class="ph ph-play"></i>chạy cổng</button>`;
+    if (g.stale) return rerunButton(key);
     return g.pass ? pill('ok', `<i class="ph ph-shield-check"></i>gate pass · ${g.warn} warn`, stamp(g.at)) : pill('crit', `<i class="ph ph-shield-warning"></i>gate FAIL · ${g.error} lỗi`, stamp(g.at));
+  }
+
+  // dist build lại sau lần chấm: số lỗi cũ không còn đúng, chỉ cho chấm lại
+  function rerunButton(key) {
+    return `<button class="vw-pill t-mute" data-gate="${esc(key)}" title="dist đã build lại sau lần chấm, bấm để chấm lại"><i class="ph ph-arrow-clockwise"></i>cũ · chấm lại</button>`;
   }
 
   function part(p) {
@@ -93,7 +99,7 @@ export function mount(el, ctx) {
     const clean = items.filter((i) => !i.dirty && !i.unpushed);
     const sum = (k) => work.reduce((n, i) => n + (i[k] ?? 0), 0);
     $('#rvSub').textContent = `${work.length} task còn việc · ${clean.length} sạch · ${review.value.cached ? 'từ cache 5s' : 'vừa đọc git'}`;
-    const failed = Object.values(gates).filter((g) => !g.pass).length;
+    const failed = Object.values(gates).filter((g) => !g.pass && !g.stale).length;
     $('#rvKpis').innerHTML = [
       ['ph-pencil-simple-line', 'File chưa commit', sum('dirty'), 'warn'],
       ['ph-arrow-fat-up', 'Commit chưa push', sum('unpushed'), 'crit'],
@@ -110,9 +116,9 @@ export function mount(el, ctx) {
     const items = r.value.items;
     $('#rvGateCount').textContent = items.length || '';
     $('#rvGates').innerHTML = items.length
-      ? `<ul class="rv-gatelist">${items.map((g, i) => `<li class="vw-in" style="--i:${i}"><span class="td-lvl t-${g.pass ? 'ok' : 'crit'}"></span>
+      ? `<ul class="rv-gatelist">${items.map((g, i) => `<li class="vw-in" style="--i:${i}"><span class="td-lvl t-${g.stale ? 'mute' : g.pass ? 'ok' : 'crit'}"></span>
           <button class="vw-key" data-ticket="${esc(g.key.match(/^[A-Z]+-\d+/)?.[0] ?? g.key)}">${esc(g.key)}</button>
-          <span class="mono">${g.pass ? 'pass' : `${g.error} lỗi`} · ${g.warn}w</span><span class="mono dim">${esc(stamp(g.at).slice(5))}</span></li>`).join('')}</ul>`
+          ${g.stale ? rerunButton(g.key) : `<span class="mono">${g.pass ? 'pass' : `${g.error} lỗi`} · ${g.warn}w</span>`}<span class="mono dim">${esc(stamp(g.at).slice(5))}</span></li>`).join('')}</ul>`
       : note('ph-shield', 'Chưa ticket nào chạy fe-gate.');
   }
 

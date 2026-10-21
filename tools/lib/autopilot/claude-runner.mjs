@@ -16,8 +16,10 @@ export const TOOLSETS = {
     'mcp__claude_ai_Google_Drive__read_file_content',
     'mcp__claude_ai_Google_Drive__get_file_metadata',
     'mcp__claude_ai_Microsoft_365__read_resource',
+    'mcp__claude-in-chrome__*',
   ].join(','),
 };
+const NEEDS_CHROME = new Set(['intake']);
 
 // writable = repo của run: hook cho ghi ở đó, chặn agent-auto, ~/.claude và repo khác
 const sandboxSettings = (writable) => {
@@ -37,6 +39,7 @@ export function buildClaudeArgs({ prompt, model, toolset, resumeSessionId, writa
   if (!TOOLSETS[toolset]) throw new Error(`toolset lạ: ${toolset}`);
   const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--allowedTools', TOOLSETS[toolset]];
   if (model) args.push('--model', model);
+  if (NEEDS_CHROME.has(toolset)) args.push('--chrome');
   if (resumeSessionId) args.push('--resume', resumeSessionId);
   return [...args, ...sandboxArgs(writable)];
 }

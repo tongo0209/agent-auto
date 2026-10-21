@@ -35,6 +35,13 @@ test('tokensOf cộng cả 4 loại token của usage, thiếu usage → 0', () 
   assert.strictEqual(tokensOf(undefined), 0);
 });
 
+test('intake mở Chrome của user (SharePoint/Sheets cần phiên đã đăng nhập), toolset khác không', () => {
+  const intake = buildClaudeArgs({ prompt: 'p', toolset: 'intake' });
+  assert.ok(intake.includes('--chrome'));
+  assert.match(intake[intake.indexOf('--allowedTools') + 1], /mcp__claude-in-chrome__\*/);
+  assert.ok(!buildClaudeArgs({ prompt: 'p', toolset: 'implement' }).includes('--chrome'));
+});
+
 test('toolset lạ → ném lỗi', () => {
   assert.throws(() => buildClaudeArgs({ prompt: 'p', toolset: 'root' }), /toolset/);
 });

@@ -225,10 +225,14 @@ Token đầu của `$ARGUMENTS`:
   (1) Soát nợ, CHỈ đọc máy: `delta-scan` → `unpushed[KEY]` (cấm suy "chưa push" từ board — 14/10 báo
   oan GW-886), folder gt-promotion `<game>/<slug>-<nexusId>/` có chưa (task có kênh promotion), mốc
   tương lai còn lại trong `milestones`.
-  (2) Trình 1 câu AskUserQuestion: nợ vừa soát + "chuyển COMPLETED?" — user gật mới ghi (đổi status
+  (2) Trình 1 câu AskUserQuestion: nợ vừa soát + "chuyển COMPLETED?" + nháp comment bàn giao — user gật mới ghi (đổi status
   là PM/QC thấy ngay; gõ lệnh ≠ đã thấy nợ).
+  Comment bàn giao (mẫu user chốt 21/10, rút từ 10 ticket COMPLETED cũ): `@UyenTK Em push HTML rồi nha chị`
+  (giao qua gt-promotion; giao code thì `Em push code rồi nha chị`) + dòng trống + `cc: anh @<người BE/dự án>`
+  — NTH/TLBB/Thiên Dụ cc Nguyễn Hữu Định, PWM/X5 cc Lê Bửu Anh Huy; game chưa rõ → hỏi. Đăng bằng
+  `addCommentToJiraIssue` ADF (node `mention` có accountId, tra `lookupJiraAccountId`), không thêm folder/MR.
   (3) `getTransitionsForJiraIssue` → transition tên `COMPLETED` (GW: id 31; tra lại, đừng gõ cứng)
-  → `searchJiraIssuesUsingJql key = <KEY>` đọc ngược status (R-EV-1).
+  → `searchJiraIssuesUsingJql key = <KEY>` đọc ngược status (R-EV-1) → đăng comment bàn giao đã duyệt ở (2).
   (4) State (`writeMerged`, backup trước): `status`, `lastSeenUpdated`, `lastAction`; phase
   `coding`/`deliver` → `wait-test` (code xong ≠ hết việc — `autoclose` tự đóng khi qua mốc cuối);
   dòng `history/phases.jsonl` reason `user done`; `node tools/board-log.mjs "<KEY> Jira → COMPLETED"`.

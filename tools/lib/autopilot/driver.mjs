@@ -5,7 +5,7 @@ import { parseVerdict } from './verdict.mjs';
 import { renderPrompt } from './prompts.mjs';
 import { PROMPTS_DIR } from './flows.mjs';
 import { dataRoot, runDir, saveRun, loadRun, writeArtifact, pauseFile, childFile } from './store.mjs';
-import { acquire, release, holdCampaign, heldCampaigns, holdRepo } from './lock.mjs';
+import { acquire, release, holdCampaign, heldCampaigns, holdRepo, releaseRepos } from './lock.mjs';
 import { runClaude as realRunClaude, guardCode } from './claude-runner.mjs';
 import { runGates as realRunGates } from './gates.mjs';
 import { notify as realNotify } from './notify.mjs';
@@ -244,6 +244,8 @@ export async function drive(startRun, flow, overrides = {}) {
       continue;
     }
     if (!['claude', 'gate'].includes(action.type)) {
+      // run đã dừng chờ user — yêu cầu pause đến muộn coi như đã đáp, không để treo sang lần drive sau
+      fs.rmSync(pauseFile(run.key, run.runId), { force: true });
       saveRun(run);
       announce(run, action.stage, deps);
       return run;
@@ -261,11 +263,17 @@ export async function drive(startRun, flow, overrides = {}) {
       saveRun(run);
       continue;
     }
+    const savedBeforeClaim = Boolean(loadRun(run.key, run.runId));
     try {
       run = claimRepos(run, deps);
     } catch (e) {
       run = applyEvent(run, flow, { type: 'halt', reason: `repo: ${e.message}` }, deps.now());
       continue;
+    }
+    // claimRepos chạy git status vài giây — abort rơi vào khoảng đó thì không được ghi đè run.json
+    if (savedBeforeClaim && isAbortedOnDisk(run)) {
+      releaseRepos(run);
+      return { ...run, status: 'stopped', stopReason: 'aborted' };
     }
     saveRun(run);
     const event = await runStage(run, stage, deps);

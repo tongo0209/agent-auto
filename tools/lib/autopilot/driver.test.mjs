@@ -618,3 +618,36 @@ test('I1: cổng commit lỗi pull → stopped kèm lý do của cổng, run.pul
   await runGateStage(run, stage, { now: Date.now, runGates: ok });
   assert.strictEqual(run.pullPending, false);
 });
+
+test('abort rơi vào lúc claimRepos chạy git status → không ghi lại run.json, không chạy stage', async () => {
+  const key = 'GW-ABORT-CLAIM';
+  let calls = 0;
+  const run0 = createRun({ key, runId: 'r1', flow: loadFlow('landing-fix'), routerReason: 't', repo: '/repo', campaignDir: '/repo/c', now: Date.now() });
+  saveRun(run0);
+  const repoState = (repo) => {
+    if (++calls === 1) fs.rmSync(runDir(key, 'r1'), { recursive: true, force: true });
+    return fakeRepoState(repo);
+  };
+  const claude = fakeClaude({});
+  const out = await drive(run0, loadFlow('landing-fix'), { notify: () => {}, repoState, runClaude: claude.runClaude, runGates: fakeGates().runGates });
+  assert.strictEqual(out.stopReason, 'aborted');
+  assert.strictEqual(claude.calls.length, 0);
+  assert.strictEqual(loadRun(key, 'r1'), null);
+});
+
+test('pause bấm trong stage cuối trước mốc chờ user → mốc đó xoá .pause, approve xong chạy tiếp không bị halt oan', async () => {
+  const key = 'GW-STALE-PAUSE';
+  const flow = loadFlow('landing-fix');
+  let run = { ...createRun({ key, runId: 'r1', flow, routerReason: 't', repo: '/repo', campaignDir: '/repo/c', handoffDir: '/repo/h', now: Date.now() }), stage: 'handoff-gates' };
+  saveRun(run);
+  const runGates = async (checks) => {
+    if (checks.includes('check-promotion')) fs.writeFileSync(pauseFile(key, 'r1'), '');
+    return { pass: true, error: null, results: [] };
+  };
+  const deps = { notify: () => {}, repoState: fakeRepoState, runClaude: fakeClaude({}).runClaude, runGates };
+  run = await drive(run, flow, deps);
+  assert.strictEqual(run.stage, 'approve-result');
+  assert.ok(!fs.existsSync(pauseFile(key, 'r1')));
+  run = await drive(applyEvent(run, flow, { type: 'approve' }, Date.now()), flow, deps);
+  assert.strictEqual(run.status, 'done');
+});

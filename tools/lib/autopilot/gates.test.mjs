@@ -135,8 +135,8 @@ test('commit không có file giao → skipped', async () => {
   assert.strictEqual(r.results[0].status, 'skipped');
 });
 
-function gitRepo() {
-  const f = fixture();
+function gitRepo(scripts = { 'build-pro': 'true' }) {
+  const f = fixture({ scripts });
   const git = (...args) => spawnSync('git', args, { cwd: f.repo, encoding: 'utf8' });
   git('init', '-q');
   // package.json là file có sẵn của campaign; index.html chưa track = phần run vừa dựng
@@ -304,5 +304,27 @@ test('commit: run làm mất file đã track (vd build-dev xoá dist/fonts) → 
   const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa' });
   assert.strictEqual(r.results[0].status, 'error');
   assert.match(r.results[0].blocking.join('\n'), /package\.json/);
+  assert.strictEqual(f.git('rev-parse', 'HEAD').stdout, head);
+});
+
+test('C1: commit build lại bản production (build-optimize > build-pro > build-dev) trước khi commit; build lỗi → dừng, không commit', async () => {
+  const f = gitRepo({ 'build-dev': 'echo dev > dist.txt', 'build-pro': 'echo pro > dist.txt' });
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa' });
+  assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
+  assert.strictEqual(f.git('show', 'HEAD:products/x/landing/a/dist.txt').stdout.trim(), 'pro');
+  const g = gitRepo({ 'build-pro': 'exit 3' });
+  const head = g.git('rev-parse', 'HEAD').stdout;
+  const bad = await runGates(['commit'], { ...g, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa' });
+  assert.deepStrictEqual([bad.results[0].status, g.git('rev-parse', 'HEAD').stdout], ['error', head]);
+});
+
+test('I2: run sửa file ngoài campaign → dừng liệt kê, không commit im rồi done', async () => {
+  const f = gitRepo();
+  fs.mkdirSync(path.join(f.repo, 'shared'), { recursive: true });
+  fs.writeFileSync(path.join(f.repo, 'shared/lib.scss'), 'x');
+  const head = f.git('rev-parse', 'HEAD').stdout;
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: ['shared/lib.scss', 'products/x/landing/a/index.html'], planTitle: 'Sửa' });
+  assert.strictEqual(r.results[0].status, 'error');
+  assert.match(r.results[0].blocking.join('\n'), /shared\/lib\.scss \(ngoài campaign\)/);
   assert.strictEqual(f.git('rev-parse', 'HEAD').stdout, head);
 });

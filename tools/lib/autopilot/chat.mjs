@@ -21,14 +21,15 @@ const isLegacy = (run) => Object.keys(run.worktrees ?? {}).length > 0;
 export const chatCwd = (run) => (isLegacy(run) ? toWorktree(run.worktrees, run.repo) : run.repo) ?? REPO_ROOT;
 
 function placeOf(run) {
-  if (isLegacy(run)) return `Worktree riêng (run cũ): \`${chatCwd(run)}\`. Không push.`;
+  if (isLegacy(run)) return `Worktree riêng (run cũ): \`${chatCwd(run)}\`. ${PUSH_RULE}`;
   const branch = run.workBranch?.[run.repo] ?? Object.values(run.workBranch ?? {})[0] ?? '(đang checkout)';
-  return `Làm thẳng trên repo gốc \`${chatCwd(run)}\`, nhánh \`${branch}\` — không checkout/reset/stash/clean, không đổi nhánh; file dở của phiên khác để nguyên. Không push.`;
+  return `Làm thẳng trên repo gốc \`${chatCwd(run)}\`, nhánh \`${branch}\` — không checkout/reset/stash/clean, không đổi nhánh; file dở của phiên khác để nguyên. ${PUSH_RULE}`;
 }
 export const briefFile = (run) => path.join(runDir(run.key, run.runId), 'brief.md');
 export const attachFile = (run) => path.join(runDir(run.key, run.runId), 'attach.md');
 
-const SOURCE_RULE = 'KHÔNG push. Commit chỉ qua cổng `gates <KEY> commit` (add đúng file run đổi, cdn-source tự pull master sau commit) — không tự `git add -A`/commit tay.';
+const PUSH_RULE = 'Mặc định dừng ở commit, KHÔNG tự push; user ra lệnh "push" thì liệt kê commit chưa push (`git log origin/<nhánh>..HEAD`) và chờ user xác nhận mới chạy (cdn-source: `git mr`, dừng ở tạo MR).';
+const SOURCE_RULE = PUSH_RULE + ' Commit chỉ qua cổng `gates <KEY> commit` (add đúng file run đổi, cdn-source tự pull master sau commit) — không tự `git add -A`/commit tay.';
 
 // Claude Code lưu phiên ở ~/.claude/projects/<cwd, mọi ký tự ngoài chữ-số thành '-'>
 export function latestSession(cwd) {

@@ -395,7 +395,7 @@ test('open --attach run done: không đổi run, phiên mới trên repo, brief 
   assert.match(brief, /gates-r1\.json/);
   for (const cmd of ['reviewed GW-35', 'reject GW-35 --note', 'open GW-35 --followup', 'abort GW-35', 'status GW-35']) assert.ok(brief.includes(cmd), cmd);
   for (const cmd of ['pause GW-35', 'resume GW-35', 'approve GW-35']) assert.ok(!brief.includes(cmd), cmd);
-  assert.match(brief, /KHÔNG push/);
+  assert.match(brief, /KHÔNG tự push/);
 });
 
 test('open --attach run dừng / chờ duyệt: lệnh theo trạng thái, kèm lý do dừng', () => {

@@ -479,11 +479,11 @@ button.bd-box:hover { color: var(--ok); } button.bd-box:active { transform: scal
 .lc-lane h2 { display: flex; align-items: center; gap: 6px; margin: 0 2px 2px; font-size: 12.5px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
 .lc-lane h2 i { color: var(--c); }
 .lc-lane h2 .mono { margin-left: auto; color: var(--text-3); font-weight: 500; }
-.lc-lane.empty { padding: 8px 0; opacity: .55; }
-.lc-lane.empty { align-self: start; }
-.lc-lane.empty h2 { flex-direction: column; gap: 8px; margin: 0; writing-mode: vertical-rl; }
-.lc-lane.empty h2 i { display: none; }
-.lc-lane.empty h2 .mono { margin: 0; }
+.lc-lane.is-empty { padding: 8px 0; opacity: .55; }
+.lc-lane.is-empty { align-self: start; }
+.lc-lane.is-empty h2 { flex-direction: column; gap: 8px; margin: 0; writing-mode: vertical-rl; }
+.lc-lane.is-empty h2 i { display: none; }
+.lc-lane.is-empty h2 .mono { margin: 0; }
 .lc-cards { display: grid; gap: 6px; }
 .lc-card { display: grid; min-width: 0; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg-2); transition: border-color .2s; }
 .lc-card:hover, .lc-card.open { border-color: var(--text-3); }

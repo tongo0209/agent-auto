@@ -207,7 +207,7 @@ export function mount(el, ctx) {
     const lanes = PHASE_ORDER.map((id) => ({ id, items: groups.filter((g) => laneOf(g) === id) }));
     const cols = lanes.map((l) => (l.items.length ? 'minmax(190px, 1fr)' : '44px')).join(' ');
     return `<div class="lc-frame"><div class="lc-board" style="grid-template-columns:${cols}">${lanes.map(({ id, items }) =>
-      `<section class="lc-lane t-${PHASE[id].tone} ${items.length ? '' : 'empty'}" title="${items.length ? '' : `${esc(PHASE[id].label)}: trống`}"><h2><i class="ph ${PHASE[id].icon}"></i><span class="lc-lname">${esc(PHASE[id].label)}</span><span class="mono">${items.length}</span></h2>
+      `<section class="lc-lane t-${PHASE[id].tone} ${items.length ? '' : 'is-empty'}" title="${items.length ? '' : `${esc(PHASE[id].label)}: trống`}"><h2><i class="ph ${PHASE[id].icon}"></i><span class="lc-lname">${esc(PHASE[id].label)}</span><span class="mono">${items.length}</span></h2>
         ${items.length ? `<div class="lc-cards">${items.map(boardCard).join('')}</div>` : ''}</section>`).join('')}</div></div>`;
   }
 

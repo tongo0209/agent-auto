@@ -16,7 +16,7 @@ const GAMEPLAY_CHANGE_NOTE = /đổi cơ chế|đổi gameplay/i;
 const RAW_DESIGN = /\.(psd|psb)$/i;
 const IMAGE = /\.(png|jpe?g|webp)$/i;
 
-const readJson = (file) => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {});
+export const readJson = (file) => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {});
 const readText = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '');
 
 function listFiles(dir) {

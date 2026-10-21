@@ -57,6 +57,7 @@ export function stageVars(run, stage, input) {
     sheetKind: run.sheetKind ?? '',
     round: String(roundOf(run, stage.id)),
     rejectNote: run.rejectNote ?? '',
+    jiraUpdate: run.jiraUpdate ? JSON.stringify(run.jiraUpdate, null, 2) : '',
     callerOfFix: run.callerOfFix ?? '',
     feedbackFile: feedbackFile(run),
     choice: run.choice ? `${run.choice.id} · ${run.choice.title}${run.choice.note ? `\n${run.choice.note}` : ''}` : '',

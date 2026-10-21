@@ -14,3 +14,9 @@ test('thay biến, biến thiếu thành rỗng', () => {
 test('kết thúc bằng footer verdict', () => {
   assert.ok(renderPrompt('x', {}, 'm').endsWith(VERDICT_FOOTER));
 });
+
+test('có ảnh chụp Jira mới hơn lần quét cuối → nối vào prompt; không có → không thêm gì', () => {
+  const out = renderPrompt('x', { jiraUpdate: '{"updated":"2026-10-21T10:47"}' }, 'm');
+  assert.match(out, /Jira đổi sau lần quét \/daily cuối[\s\S]*10:47/);
+  assert.doesNotMatch(renderPrompt('x', {}, 'm'), /Jira đổi/);
+});

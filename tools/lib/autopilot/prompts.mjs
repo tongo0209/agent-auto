@@ -14,4 +14,7 @@ export const fillVars = (template, vars) => template.replace(/\{\{(\w+)\}\}/g, (
 // Prompt không chừa chỗ cho note (goto/retry vào stage bất kỳ) thì nối note vào cuối
 const noteBlock = (template, note) => (note && !template.includes('{{rejectNote}}') ? `\nGhi chú của user khi quay lại: ${note}\n` : '');
 
-export const renderPrompt = (template, vars, marker) => `AUTOPILOT_RUN: ${marker}\n${fillVars(template, vars)}${noteBlock(template, vars.rejectNote)}\n${VERDICT_FOOTER}`;
+const jiraBlock = (snapshot) => (snapshot ? `\nJira đổi sau lần quét /daily cuối — tin ảnh chụp này hơn state.json/board:\n\`\`\`json\n${snapshot}\n\`\`\`\n` : '');
+
+export const renderPrompt = (template, vars, marker) =>
+  `AUTOPILOT_RUN: ${marker}\n${fillVars(template, vars)}${noteBlock(template, vars.rejectNote)}${jiraBlock(vars.jiraUpdate)}\n${VERDICT_FOOTER}`;

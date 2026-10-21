@@ -10,7 +10,8 @@ import { runGates } from './lib/autopilot/gates.mjs';
 import { briefOf, briefFile, chatLaunch, followupBriefOf, attachBriefOf, attachFile, attachLaunch } from './lib/autopilot/chat.mjs';
 import { runChanges } from './lib/autopilot/review.mjs';
 import { loadFlow, listFlows, validateFlow, PROMPTS_DIR } from './lib/autopilot/flows.mjs';
-import { gatherSignals } from './lib/autopilot/signals.mjs';
+import { gatherSignals, readJson } from './lib/autopilot/signals.mjs';
+import { fetchJiraSnapshot, jiraChangedSince } from './lib/autopilot/jira-snapshot.mjs';
 import { route, loadRules } from './lib/autopilot/router.mjs';
 import { newRunId, loadRun, listRuns, saveRun, runsDir, runDir, pauseFile, childFile, writeArtifact, planOptions } from './lib/autopilot/store.mjs';
 import { repoState, removeWorktree, branchOf } from './lib/autopilot/worktree.mjs';
@@ -149,9 +150,26 @@ function newRun(opts, input) {
   return { run, flow, reason: decided.reason };
 }
 
+// Không ghi state.json (chỉ /daily ghi); gọi Jira lỗi thì cảnh báo, run vẫn chạy bằng state
+function snapshotJira(run) {
+  if (!/^[A-Z]+-\d+$/.test(run.key)) return;
+  try {
+    const snapshot = fetchJiraSnapshot(run.key, readJson(path.join(DATA_ROOT, 'config.json')).cloudId);
+    if (!snapshot) return;
+    writeArtifact(run, 'jira.json', snapshot);
+    const lastSeen = readJson(path.join(DATA_ROOT, 'state.json')).issues?.[run.key]?.lastSeenUpdated;
+    if (!jiraChangedSince(snapshot, lastSeen)) return;
+    console.log(`⚠ Jira đổi sau lần quét cuối (${lastSeen ?? 'chưa quét'} → ${snapshot.updated}) — ảnh chụp đã đưa vào prompt các stage`);
+    run.jiraUpdate = snapshot;
+  } catch (e) {
+    console.log(`⚠ không đọc được Jira ${run.key} (${e.message.split('\n')[0]}) — chạy tiếp theo state.json`);
+  }
+}
+
 async function cmdRun(opts, argv) {
   const input = opts._[1] ?? die(USAGE);
   const { run, flow, reason } = newRun(opts, input);
+  snapshotJira(run);
   if (opts['budget-usd']) run.budget.usd = Number(opts['budget-usd']);
   console.log(`▶ ${run.key} → ${flow.id} (${reason})`);
   await continueRun(run, input);

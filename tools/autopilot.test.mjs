@@ -604,3 +604,24 @@ test('run --break mốc duyệt → từ chối; route --json --flow lạ → b�
   assert.notStrictEqual(r.code, 0);
   assert.match(r.out, /flow không có: ghost/);
 });
+
+test('run chụp Jira vào jira.json: đổi sau lần quét cuối → cảnh báo + đưa vào run; lỗi gọi Jira không chặn run', () => {
+  const { campaign, runs } = sandbox();
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-data-'));
+  fs.writeFileSync(path.join(data, 'state.json'), JSON.stringify({ issues: { 'GW-50': { lastSeenUpdated: '2026-10-21T10:14:00.000+0700' } } }));
+  const jira = path.join(data, 'jira.json');
+  fs.writeFileSync(jira, JSON.stringify({ key: 'GW-50', updated: '2026-10-21T10:47:12.000+0700', description: 'mới' }));
+  const env = { ...process.env, AUTOPILOT_RUNS_DIR: runs, AUTOPILOT_DATA_ROOT: data, AUTOPILOT_FAKE: path.join(data, 'none.json'), AUTOPILOT_FAKE_GATES: 'pass', AUTOPILOT_NO_NOTIFY: '1' };
+  fs.writeFileSync(env.AUTOPILOT_FAKE, '{}');
+  const cli = (key, fakeJira, dir = campaign) => spawnSync(process.execPath, [CLI, 'run', key, '--flow', 'landing-fix', '--campaign', dir], { env: { ...env, AUTOPILOT_FAKE_JIRA: fakeJira }, encoding: 'utf8' });
+
+  const changed = cli('GW-50', jira);
+  assert.match(changed.stdout, /Jira đổi sau lần quét cuối/);
+  const run = lastRun(runs, 'GW-50');
+  assert.strictEqual(run.jiraUpdate.description, 'mới');
+  assert.ok(fs.existsSync(path.join(runs, 'GW-50', run.runId, 'jira.json')));
+
+  const broken = cli('GW-51', path.join(data, 'missing.json'), sandbox().campaign);
+  assert.match(broken.stdout + broken.stderr, /không đọc được Jira/);
+  assert.strictEqual(lastRun(runs, 'GW-51').jiraUpdate, undefined);
+});

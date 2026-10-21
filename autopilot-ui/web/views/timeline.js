@@ -1,5 +1,5 @@
 import { esc } from '../lib.js';
-import { PHASE, phaseOf, MILESTONE, daysUntil, shortDate, toneByDays, realMilestones, nextMilestone, settler, skeleton, note, errNote, pill } from './_kit.js';
+import { JIRA, PHASE, phaseOf, MILESTONE, daysUntil, shortDate, toneByDays, realMilestones, nextMilestone, settler, skeleton, note, errNote, pill } from './_kit.js';
 
 const DAYS_AHEAD = 28;
 const DAY_COUNT = DAYS_AHEAD + 1;
@@ -49,6 +49,7 @@ export function mount(el, ctx) {
   let st = null;
   let stateError = null;
   let forecasts = {};
+  const opened = new Set();
 
   async function load() {
     const [state, learn] = await Promise.allSettled([ctx.api('state'), ctx.api('learn')]);
@@ -94,10 +95,8 @@ export function mount(el, ctx) {
 
   function rowLabel(key, issue, isSub) {
     const phase = phaseOf(issue.phase);
-    const fc = forecastOf(key, issue);
     return `<span class="lc-name">${isSub ? '<i class="ph ph-arrow-elbow-down-right lc-subicon"></i>' : ''}<b class="mono">${esc(key)}</b>${pill(phase.tone, `<i class="ph ${phase.icon}"></i>${esc(phase.label)}`)}</span>
-      <span class="lc-sum" title="${esc(issue.summary ?? '')}">${esc(issue.summary || '--')}</span>
-      ${fc?.late ? `<span class="lc-fcnote t-crit" title="Dự báo từ lead time thật, ${fc.samples} mẫu"><i class="ph ph-crystal-ball"></i>dự báo xong phase ${shortDate(fc.date)}, trễ hơn mốc kế</span>` : ''}`;
+      <span class="lc-sum" title="${esc(issue.summary ?? '')}">${esc(issue.summary || '--')}</span>`;
   }
 
   function rowTrack(key, issue) {
@@ -145,37 +144,71 @@ export function mount(el, ctx) {
     const head = `<div class="lc-row lc-head" style="grid-row:1"><span class="lc-label lc-corner">Ticket</span>${days.map((d, i) => `<span class="lc-day ${dayCls(d)}" style="grid-column:${i + 2}">
       <em>${i === 0 || d.dom === 1 ? `Th${d.month}` : ''}</em><small>${d.today ? 'Hôm nay' : WEEKDAY[d.dow]}</small><b class="mono">${d.dom}</b></span>`).join('')}</div>`;
     const cols = days.map((d, i) => `<span class="lc-col ${dayCls(d)}" style="grid-column:${i + 2}"></span>`).join('');
-    const rows = entries.map(({ entry: [key, issue], context, isSub }, i) => `<div class="lc-row vw-in ${issue.phase === DONE_FE || context ? 'dim' : ''} ${context ? 'ctx' : ''} ${isSub ? 'sub' : ''}" style="grid-row:${i + 2}; --i:${i}" data-key="${esc(key)}" tabindex="0" role="button" aria-label="Mở ${esc(key)}">
-        <span class="lc-label">${rowLabel(key, issue, isSub)}</span>${context ? '' : rowTrack(key, issue)}</div>`).join('');
+    let gridRow = 1;
+    const rows = entries.map(({ entry: [key, issue], context, isSub }, i) => {
+      const open = opened.has(key);
+      const row = `<div class="lc-row vw-in ${issue.phase === DONE_FE || context ? 'dim' : ''} ${context ? 'ctx' : ''} ${isSub ? 'sub' : ''} ${open ? 'open' : ''}" style="grid-row:${++gridRow}; --i:${i}" data-key="${esc(key)}" tabindex="0" role="button" aria-expanded="${open}">
+        <span class="lc-label">${rowLabel(key, issue, isSub)}</span>${context ? '' : rowTrack(key, issue)}</div>`;
+      return open ? `${row}<div class="lc-row lc-detail-row" style="grid-row:${++gridRow}">${detail(key, issue)}</div>` : row;
+    }).join('');
     const legend = `<div class="lc-legend">
       <span><i class="lc-lg key"></i>HTML / Giao HTML</span><span><i class="lc-lg"></i>Mốc khác</span><span><i class="lc-lg fc"></i>Dự báo xong phase</span>
       <span class="t-crit"><i class="lc-lg sw"></i>≤ 4 ngày</span><span class="t-warn"><i class="lc-lg sw"></i>≤ 8 ngày</span><span class="t-ok"><i class="lc-lg sw"></i>xa hơn</span>
       <span><i class="lc-lg bar"></i>Thanh màu theo phase</span></div>`;
-    return `${legend}<div class="lc-frame"><div class="lc-grid" style="--days:${DAY_COUNT}; grid-template-rows:repeat(${entries.length + 1}, auto)">${cols}${head}${rows}</div></div>`;
+    return `${legend}<div class="lc-frame"><div class="lc-grid" style="--days:${DAY_COUNT}; grid-template-rows:repeat(${gridRow}, auto)">${cols}${head}${rows}</div></div>`;
   }
 
-  function boardCard([key, issue], i, role = '') {
-    const next = nextMilestone(issue, st.today);
+  function detail(key, issue) {
+    const marks = futureMilestones(issue).sort((x, y) => x[1].localeCompare(y[1]));
+    const design = issue.design?.status;
     const fc = forecastOf(key, issue);
-    const due = next ? pill(toneByDays(next.days), `${esc(MILESTONE[next.name] ?? next.name)} ${shortDate(next.date)} · ${next.days ? `${next.days}d` : 'hôm nay'}`) : '<span class="tk-none">chưa có mốc</span>';
+    return `<div class="lc-detail">
+      <p class="lc-dsum">${esc(issue.summary || '--')}</p>
+      <div class="lc-dmarks">${marks.length ? marks.map(([name, date]) => pill(toneByDays(daysUntil(date, st.today)), `${esc(MILESTONE[name] ?? name)} ${shortDate(date)}`)).join('') : '<span class="tk-none">không còn mốc phía trước</span>'}</div>
+      ${issue.lastAction ? `<p class="lc-dline"><i class="ph ph-clock-counter-clockwise"></i>${esc(issue.lastAction)}</p>` : ''}
+      ${design ? `<p class="lc-dline"><i class="ph ph-paint-brush"></i>design: ${esc(design)}</p>` : ''}
+      ${fc ? `<p class="lc-dline ${fc.late ? 't-crit' : ''}"><i class="ph ph-crystal-ball"></i>dự báo xong phase ${shortDate(fc.date)}${fc.late ? ', trễ hơn mốc kế' : ''} (${fc.samples} mẫu)</p>` : ''}
+      <div class="lc-dact">
+        <button class="btn ghost vw-sm" data-open-task="${esc(key)}"><i class="ph ph-arrow-square-out"></i>Mở trang task</button>
+        ${key.startsWith('ADHOC') ? '' : `<a class="btn ghost vw-sm" href="${JIRA}/browse/${esc(key)}" target="_blank" rel="noopener"><i class="ph ph-link"></i>Jira</a>`}
+      </div>
+    </div>`;
+  }
+
+  function dueOf(issue) {
+    const next = nextMilestone(issue, st.today);
+    return next ? pill(toneByDays(next.days), `${esc(MILESTONE[next.name] ?? next.name)} ${shortDate(next.date)}`) : '<span class="tk-none">--</span>';
+  }
+
+  function boardSub([key, issue]) {
     const phase = phaseOf(issue.phase);
-    const tag = role === 'sub' ? `<small class="mono">bổ sung của ${esc(issue.parent)}</small>${pill(phase.tone, esc(phase.label))}` : role === 'ctx' ? '<small>task chính</small>' : '';
-    return `<div class="lc-card vw-in ${role}" style="--i:${i}" data-key="${esc(key)}" tabindex="0" role="button" aria-label="Mở ${esc(key)}">
-      <span class="lc-name"><b class="mono">${esc(key)}</b>${tag}</span>
-      <span class="lc-csum">${esc(issue.summary || '--')}</span>
-      <span class="lc-cmeta">${due}${fc ? `<span class="lc-fcnote ${fc.late ? 't-crit' : 't-mute'}" title="${fc.samples} mẫu"><i class="ph ph-crystal-ball"></i>${shortDate(fc.date)}</span>` : ''}</span></div>`;
+    const open = opened.has(key);
+    return `<div class="lc-subrow ${open ? 'open' : ''}" data-key="${esc(key)}" tabindex="0" role="button" aria-expanded="${open}">
+        <span class="lc-crow"><span class="lc-dot t-${phase.tone}" title="${esc(phase.label)}"></span><b class="mono">${esc(key)}</b>${dueOf(issue)}</span>
+      </div>${open ? detail(key, issue) : ''}`;
+  }
+
+  function boardCard(group, i) {
+    const [key, issue] = group.top;
+    const open = opened.has(key);
+    return `<div class="lc-card vw-in ${group.context ? 'ctx' : ''} ${open ? 'open' : ''}" style="--i:${i}">
+      <div class="lc-chead" data-key="${esc(key)}" tabindex="0" role="button" aria-expanded="${open}">
+        <span class="lc-crow"><b class="mono">${esc(key)}</b>${group.context ? '<small>task chính</small>' : dueOf(issue)}</span>
+        ${open ? '' : `<span class="lc-csum" title="${esc(issue.summary ?? '')}">${esc(issue.summary || '--')}</span>`}
+      </div>
+      ${open ? detail(key, issue) : ''}
+      ${group.subs.map(boardSub).join('')}
+    </div>`;
   }
 
   function renderBoard() {
     const groups = taskGroups();
     const laneOf = (g) => [g.top, ...g.subs].map(([, i]) => i.phase).find((p) => PHASE_ORDER.includes(p));
-    let n = 0;
-    const cardsOf = (g) => boardCard(g.top, n++, g.context ? 'ctx' : '') + g.subs.map((e) => boardCard(e, n++, 'sub')).join('');
-    return `<div class="lc-frame"><div class="lc-board">${PHASE_ORDER.map((id) => {
-      const items = groups.filter((g) => laneOf(g) === id);
-      return `<section class="lc-lane t-${PHASE[id].tone}"><h2><i class="ph ${PHASE[id].icon}"></i>${esc(PHASE[id].label)}<span class="mono">${items.length}</span></h2>
-        <div class="lc-cards">${items.length ? items.map(cardsOf).join('') : '<span class="lc-blank">Trống</span>'}</div></section>`;
-    }).join('')}</div></div>`;
+    const lanes = PHASE_ORDER.map((id) => ({ id, items: groups.filter((g) => laneOf(g) === id) }));
+    const cols = lanes.map((l) => (l.items.length ? 'minmax(190px, 1fr)' : '44px')).join(' ');
+    return `<div class="lc-frame"><div class="lc-board" style="grid-template-columns:${cols}">${lanes.map(({ id, items }) =>
+      `<section class="lc-lane t-${PHASE[id].tone} ${items.length ? '' : 'empty'}" title="${items.length ? '' : `${esc(PHASE[id].label)}: trống`}"><h2><i class="ph ${PHASE[id].icon}"></i><span class="lc-lname">${esc(PHASE[id].label)}</span><span class="mono">${items.length}</span></h2>
+        ${items.length ? `<div class="lc-cards">${items.map(boardCard).join('')}</div>` : ''}</section>`).join('')}</div></div>`;
   }
 
   function render() {
@@ -200,12 +233,25 @@ export function mount(el, ctx) {
       return render();
     }
     if (e.target.closest('#lcReload')) return load();
+    const openTask = e.target.closest('[data-open-task]');
+    if (openTask) return ctx.go('tasks', openTask.dataset.openTask);
+    if (e.target.closest('.lc-detail')) return;
     const item = e.target.closest('[data-key]');
-    if (item) ctx.go('tasks', item.dataset.key);
+    if (item) toggle(item.dataset.key);
   });
   el.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && e.target.matches('[data-key]')) ctx.go('tasks', e.target.dataset.key);
+    if (e.key === 'Enter' && e.target.matches('[data-key]')) toggle(e.target.dataset.key);
+    if (e.key === 'Escape' && opened.size) {
+      opened.clear();
+      render();
+    }
   });
+
+  function toggle(key) {
+    if (!opened.delete(key)) opened.add(key);
+    render();
+    el.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+  }
 
   load();
   const timer = setInterval(load, REFRESH_MS);

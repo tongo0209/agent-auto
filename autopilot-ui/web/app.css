@@ -304,5 +304,3 @@ pre.raw { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word
 .group.aborted .item { opacity: .6; }
 .head .btn { padding: 4px 12px; font-size: 13px; }
 .lc-row.ctx .lc-label { opacity: .55; }
-.lc-card.ctx { opacity: .55; }
-.lc-card.sub { margin: -4px 0 0 16px; border-style: dashed; }

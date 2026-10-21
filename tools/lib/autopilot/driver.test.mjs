@@ -663,6 +663,12 @@ test('commit xong chỉ còn lỗi pull → nhả repo cho run khác; lỗi comm
   await runGateStage(pulling, stage, { now: Date.now, runGates: gates({ commit: 'abc', pullPending: true }) });
   assert.strictEqual(holdRepo('/repo-pull', other).ok, true);
 
+  const conflicted = { ...newRun('landing-fix'), runId: 'conflict-1', receipts: [] };
+  saveRun(conflicted);
+  holdRepo('/repo-conflict', conflicted);
+  await runGateStage(conflicted, stage, { now: Date.now, runGates: gates({ commit: 'abc', pullPending: true, midMerge: true }) });
+  assert.strictEqual(holdRepo('/repo-conflict', other).ok, false);
+
   const broken = { ...newRun('landing-fix'), runId: 'broken-1', receipts: [] };
   saveRun(broken);
   holdRepo('/repo-broken', broken);

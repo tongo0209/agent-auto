@@ -139,7 +139,10 @@ function runCommit(ctx) {
     const staged = status().filter((e) => !' ?'.includes(e.code[0])).map((e) => e.path);
     if (staged.length) return stop(`${done}chưa pull: index có file phiên khác đã stage, pull sẽ bị từ chối — xử lý tay rồi resume`, staged, { commit, pullPending: true });
     const r = git(['pull', '--no-rebase', '--no-edit', 'origin', 'master']);
-    if (r.code !== 0) return stop(`${done}pull lỗi${merging() ? ` — ${MERGE_STOP}` : ''}`, tail(r), { commit, pullPending: true });
+    if (r.code !== 0) {
+      const midMerge = merging();
+      return stop(`${done}pull lỗi${midMerge ? ` — ${MERGE_STOP}` : ''}`, tail(r), { commit, pullPending: true, midMerge });
+    }
   }
   const dropped = left.length ? ` · bỏ: ${left.join(', ')}` : '';
   if (!commit) return { check: 'commit', status: cdn ? 'pass' : 'skipped', blocking: [], note: `không có file nào vừa sửa trong campaign${cdn ? ' · đã pull origin master' : ''}` };

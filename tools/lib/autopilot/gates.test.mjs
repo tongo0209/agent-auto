@@ -228,7 +228,7 @@ test('I1: cdn-source pull lỗi → error kèm commit + pullPending, note nói c
   const { exec } = fakeExec({ 'git pull': 1, 'rev-parse HEAD': 0 }, ' M products/x/landing/a/index.html\0');
   const r = await runGates(['commit'], ctx(cdnRepo(), exec, { files: ['products/x/landing/a/index.html'] }));
   const [res] = r.results;
-  assert.deepStrictEqual([r.error, res.status, res.pullPending, Boolean(res.commit)], ['commit', 'error', true, true]);
+  assert.deepStrictEqual([r.error, res.status, res.pullPending, Boolean(res.commit), res.midMerge], ['commit', 'error', true, true, false]);
   assert.match(res.note, /đã có, pull lỗi/);
 });
 

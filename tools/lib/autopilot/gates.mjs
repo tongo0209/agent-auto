@@ -3,14 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { statusEntries } from './worktree.mjs';
 import { dataRoot } from './store.mjs';
-import { noteForAnyFile, readLock } from '../project-lock.mjs';
-import { resolveType } from '../../check-promotion.mjs';
 
 const AGENT_ROOT = path.resolve(import.meta.dirname, '../../..');
 const BUILD_SCRIPTS = ['build-optimize', 'build-pro', 'build-dev', 'build'];
 const BLOCKING_TAIL = 30;
 const COMMIT_TYPE = { 'landing-new': 'feat', 'landing-clone': 'feat', 'gameplay-change': 'feat', feature: 'feat', 'landing-fix': 'fix', buglist: 'fix' };
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.git']);
+const FRESH_LANDING_FLOWS = new Set(['landing-new', 'landing-clone']);
 
 const defaultExec = (cmd, args, { cwd, env } = {}) => {
   const r = spawnSync(cmd, args, { cwd, env: env && { ...process.env, ...env }, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -75,12 +74,12 @@ const CHECKS = {
     const files = handoffHtml(campaignDir);
     return files.length ? { cmd: 'node', args: [tool('pm-gate.mjs'), ...files, '--baseline', 'none'], env: pmGateEnv() } : { skip: 'chưa có mainsite/*.html' };
   },
-  'check-promotion': ({ campaignDir }) => {
-    const files = deliverableHtml(campaignDir);
-    if (!files.length) return { skip: 'chưa có mainsite/ hay dist/ *.html' };
-    const type = readLock(noteForAnyFile(files[0], path.join(dataRoot(), 'projects')))?.type;
-    if (type && !resolveType(type)) return { skip: `type "${type}" của file dự án không thuộc 39 loại promotion — không có checklist để soát` };
-    return { cmd: 'node', args: [tool('check-promotion.mjs'), ...(type ? [type] : []), ...files] };
+  // tool tự đọc loại từ file dự án (gameplay mới → popup chung + ref); landing cũ chỉ chặn lỗi so với HEAD lúc trước run
+  'check-promotion': ({ campaignDir, flowId }) => {
+    const files = deliverableHtml(campaignDir).filter((f) => fs.readFileSync(f, 'utf8').includes('id="popup'));
+    if (!files.length) return { skip: 'chưa có mainsite/ hay dist/ *.html có popup' };
+    const baseline = FRESH_LANDING_FLOWS.has(flowId) ? [] : ['--baseline', 'HEAD'];
+    return { cmd: 'node', args: [tool('check-promotion.mjs'), ...files, ...baseline], env: pmGateEnv() };
   },
 };
 

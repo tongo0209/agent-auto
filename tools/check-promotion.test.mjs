@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveType, checkHtml } from './check-promotion.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { resolveType, checkHtml, typeFromNote, newGameplayType, withoutDebt } from './check-promotion.mjs';
 
 const page = (popups) => `<html><body>${popups}</body></html>`;
 
@@ -108,4 +112,79 @@ test('vote: popup_mrmiss_reg là popup đăng ký, thiếu input file ảnh → 
 test('popup production khai kind=known (popup_getlist) không bị báo thừa', () => {
   const r = checkHtml(page(INFORM_OK + '<section id="popup_getlist"></section>'), resolveType('5'));
   assert.ok(!r.extra.some((x) => x.popup === 'popup_getlist'));
+});
+
+test('type trong file dự án dạng <STT>-<slug> → đúng loại; slug ngoài bảng → null', () => {
+  assert.equal(typeFromNote('2-lucky-draw').stt, 2);
+  assert.equal(typeFromNote('01-dang-ky-truoc').stt, 1);
+  assert.equal(typeFromNote('22-moi-ban-be-nhan-qua').stt, 22);
+  assert.equal(typeFromNote('vong-quay').stt, 39);
+  assert.equal(typeFromNote('dang-ky-thi-dau-va-to-chuc-su-kien'), null);
+});
+
+test('gameplay mới: bộ popup chung + popup của landing mẫu, không báo thừa, icon tối đa ◐', () => {
+  const type = newGameplayType('tournament');
+  const ref = page('<section id="popup_dangkytochuc"></section><section id="popup_login"></section>');
+  const html = page(LUCKY_DRAW_FULL.replace(/<\/?(html|body)>/g, '') + '<section id="popup_riengmoi"></section>');
+  const missing = checkHtml(html, type, { refHtmls: [ref] });
+  assert.ok(missing.failed.some((f) => f.includes('popup_dangkytochuc')));
+  assert.equal(missing.extra.length, 0);
+  const full = checkHtml(html.replace('popup_riengmoi', 'popup_dangkytochuc'), type, { refHtmls: [ref] });
+  assert.deepEqual(full.failed, []);
+  assert.equal(full.icon, '◐');
+});
+
+test('landing cũ: lỗi có từ bản trước run thành nợ, chỉ lỗi mới chặn', () => {
+  const type = resolveType('2');
+  const before = checkHtml(page(INFORM_OK), type);
+  const after = checkHtml(page(INFORM_OK.replace('pm__inform-text', 'x')), type);
+  const r = withoutDebt(after, before, type);
+  assert.ok(r.debt.includes('popup_history'));
+  assert.ok(!r.failed.includes('popup_history'));
+  assert.ok(r.failed.some((f) => f.startsWith('popup_inform')));
+});
+
+function cliFixture(type, ref = '') {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-cli-'));
+  const dir = path.join(root, 'gt/A1-X/event-1');
+  fs.mkdirSync(path.join(dir, 'mainsite'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'projects/x'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'projects/x/event.md'), `# x\n\n## 1. Khoá\n- gameplay: none\n- type: ${type}\n- ref: ${ref}\n\n## 2. Nơi code\n- gt-promotion: ${dir}\n`);
+  const git = (...args) => spawnSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
+  git('init', '-q');
+  const run = (...args) => spawnSync('node', [path.join(import.meta.dirname, 'check-promotion.mjs'), ...args], {
+    encoding: 'utf8', env: { ...process.env, PM_PROJECTS_DIR: path.join(root, 'projects') },
+  });
+  return { dir, git, run, file: (name, html) => { fs.writeFileSync(path.join(dir, 'mainsite', name), html); return path.join(dir, 'mainsite', name); } };
+}
+
+test('CLI: không truyền loại → lấy từ file dự án, soát MỌI file truyền vào', () => {
+  const f = cliFixture('2-lucky-draw');
+  const ok = f.file('index.html', LUCKY_DRAW_FULL);
+  const bad = f.file('index-en.html', page(INFORM_OK));
+  const r = f.run(ok, bad);
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /index\.html[\s\S]*STT 2[\s\S]*index-en\.html[\s\S]*❌ Thiếu/);
+});
+
+test('CLI: gameplay mới lấy popup của ref; --baseline HEAD chỉ chặn lỗi mới', () => {
+  const ref = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-ref-'));
+  fs.writeFileSync(path.join(ref, 'index.html'), page('<section id="popup_dangkytochuc"></section>'));
+  const f = cliFixture('to-chuc-giai-dau', ref);
+  const file = f.file('index.html', page(INFORM_OK));
+  const fresh = f.run(file);
+  assert.equal(fresh.status, 1);
+  assert.match(fresh.stdout, /gameplay mới[\s\S]*popup_dangkytochuc/);
+  f.git('add', '.');
+  f.git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base');
+  assert.equal(f.run(file, '--baseline', 'HEAD').status, 0);
+  f.file('index.html', page(INFORM_OK.replace('pm__inform-text', 'x')));
+  const broke = f.run(file, '--baseline', 'HEAD');
+  assert.equal(broke.status, 1);
+  assert.match(broke.stdout, /Lỗi có sẵn trước run[\s\S]*popup_register/);
+});
+
+test('CLI: không truyền loại và file dự án chưa có type → exit 2', () => {
+  const f = cliFixture('');
+  assert.equal(f.run(f.file('index.html', LUCKY_DRAW_FULL)).status, 2);
 });

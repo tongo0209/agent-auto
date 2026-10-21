@@ -167,7 +167,7 @@ test('commitMessage bỏ tiền tố (type): có sẵn trong tiêu đề plan', 
   assert.match(commitMessage('landing-fix', '(feat): NTH mã mây (GW-912)'), /^\(fix\): nth mã mây \(gw-912\)\n/);
 });
 
-function handoffFixture(html = '<div class="pm__login"></div>') {
+function handoffFixture(html = '<div class="pm__login"></div><section id="popup_login"></section>') {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-gt-'));
   const campaignDir = path.join(repo, '688-TLBBVNG/event-62839');
   fs.mkdirSync(path.join(campaignDir, 'mainsite'), { recursive: true });
@@ -181,7 +181,7 @@ test('G2: pm-gate-handoff chạy pm-gate --baseline none trên mainsite/*.html',
   const r = await runGates(['pm-gate-handoff', 'check-promotion'], ctx(f, exec));
   assert.strictEqual(r.pass, true);
   assert.match(calls[0].line, /pm-gate\.mjs .*mainsite\/index\.html --baseline none$/);
-  assert.match(calls[1].line, /check-promotion\.mjs .*mainsite\/index\.html$/);
+  assert.match(calls[1].line, /check-promotion\.mjs \S*mainsite\/index\.html --baseline HEAD$/);
 });
 
 test('G2: chưa có mainsite/*.html → handoff checks skipped', async () => {
@@ -189,36 +189,30 @@ test('G2: chưa có mainsite/*.html → handoff checks skipped', async () => {
   assert.deepStrictEqual(r.results.map((x) => x.status), ['skipped', 'skipped']);
 });
 
-function withLockedNote(campaignDir, type) {
-  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-data-'));
-  fs.mkdirSync(path.join(data, 'projects', 'g'), { recursive: true });
-  fs.writeFileSync(path.join(data, 'projects', 'g', 's.md'), `# g/s\n\n## 1. Khoá\n- gameplay: none\n- type: ${type}\n\n## 2. Nơi code\n- gt-promotion: ${campaignDir}\n`);
-  process.env.AUTOPILOT_DATA_ROOT = data;
-}
-
-test('check-promotion lấy loại từ file dự án; loại ngoài bảng 39 → skipped kèm lý do, không dừng run', async () => {
+test('check-promotion: loại do tool tự đọc từ file dự án, mỗi file có popup 1 lần soát; trang phụ không popup bị bỏ', async () => {
   const f = handoffFixture();
-  try {
-    withLockedNote(f.campaignDir, 'vong-quay');
-    const { exec, calls } = fakeExec();
-    await runGates(['check-promotion'], ctx(f, exec));
-    assert.match(calls[0].line, /check-promotion\.mjs vong-quay .*mainsite\/index\.html$/);
-    withLockedNote(f.campaignDir, 'dang-ky-thi-dau-va-to-chuc-su-kien');
-    const r = await runGates(['check-promotion'], ctx(f, fakeExec().exec));
-    assert.strictEqual(r.results[0].status, 'skipped');
-    assert.match(r.results[0].note, /dang-ky-thi-dau-va-to-chuc-su-kien/);
-  } finally {
-    delete process.env.AUTOPILOT_DATA_ROOT;
-  }
+  fs.writeFileSync(path.join(f.campaignDir, 'mainsite/index-en.html'), '<section id="popup_login"></section>');
+  fs.writeFileSync(path.join(f.campaignDir, 'mainsite/huong-dan.html'), '<div class="pm__x"></div>');
+  const { exec, calls } = fakeExec();
+  await runGates(['check-promotion'], ctx(f, exec));
+  assert.strictEqual(calls.length, 1);
+  assert.match(calls[0].line, /check-promotion\.mjs \S*index-en\.html \S*index\.html --baseline HEAD$/);
+});
+
+test('check-promotion: landing mới (landing-new/clone) soát đủ, không trừ lỗi cũ', async () => {
+  const f = handoffFixture();
+  const { exec, calls } = fakeExec();
+  await runGates(['check-promotion'], ctx(f, exec, { flowId: 'landing-new' }));
+  assert.match(calls[0].line, /mainsite\/index\.html$/);
 });
 
 test('G6: check-promotion trên campaign chưa bàn giao đọc dist/*.html', async () => {
   const f = fixture();
   fs.mkdirSync(path.join(f.campaignDir, 'dist'));
-  fs.writeFileSync(path.join(f.campaignDir, 'dist/index.html'), '<div class="pm__login"></div>');
+  fs.writeFileSync(path.join(f.campaignDir, 'dist/index.html'), '<section id="popup_login"></section>');
   const { exec, calls } = fakeExec();
   await runGates(['check-promotion'], ctx(f, exec));
-  assert.match(calls[0].line, /check-promotion\.mjs .*dist\/index\.html$/);
+  assert.match(calls[0].line, /check-promotion\.mjs \S*dist\/index\.html --baseline HEAD$/);
 });
 
 test('I1: repo đang merge dở (MERGE_HEAD) → error "merge dở — xử lý tay", không commit, không tự merge --abort', async () => {

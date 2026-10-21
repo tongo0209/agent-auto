@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Soát popup landing theo loại promotion — phần máy móc của skill /check-promotion.
 // Luật đọc lúc chạy từ bảng 39 loại trong SKILL.md + reference/*.md, không chép sang đây.
-import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { join, dirname, basename, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { scanHtml, ancestorsOf } from './pm-gate/scan.mjs';
 import { noteForAnyFile, readLock } from './lib/project-lock.mjs';
 
@@ -66,6 +67,17 @@ export function resolveType(input, types = loadTypes()) {
   const aux = AUX_CHECKLISTS[key];
   return aux ? { stt: null, name: aux.replace('.md', ''), aliases: [], checklists: [aux], structureOnly: false, aux: true } : null;
 }
+
+// File dự án ghi type dạng "<STT>-<slug>" (2-lucky-draw); không có STT thì thử như tên/alias
+export function typeFromNote(noteType) {
+  const stt = noteType.match(/^(\d+)-/)?.[1];
+  return resolveType(stt ? String(Number(stt)) : noteType);
+}
+
+// Gameplay chưa có trong 39 loại: soát bộ popup chung + popup của landing mẫu (ref), chưa kết luận đủ
+export const newGameplayType = (noteType) => ({
+  stt: null, name: `gameplay mới "${noteType}"`, aliases: [], checklists: [AUX_CHECKLISTS.event], structureOnly: false, aux: true, newGameplay: true,
+});
 
 function parseItems(file) {
   const list = sectionAfter(read(join(REF_DIR, file)), /^## required_popups\s*$/m);
@@ -187,20 +199,25 @@ function informChecks(els, popup) {
   return [{ check: 'vùng chữ thông báo (pm__inform-text hoặc <p> trong .MS__content)', status: ok ? PASS : `${FAIL} — không có vùng chữ thông báo` }];
 }
 
-function summaryIcon({ failed, structureOnly, warnings }) {
+function summaryIcon({ failed, structureOnly, newGameplay, warnings }) {
   if (failed.length) return '❌';
-  if (structureOnly) return '◐';
+  if (structureOnly || newGameplay) return '◐';
   return warnings.length ? '⚠️' : '✅';
 }
 
-export function checkHtml(html, type, { gameplay } = {}) {
-  const els = scanHtml(html).elements;
-  const aliasPairs = overridesOfKind('alias');
-  const productionPopups = new Set(overridesOfKind('known').map(([kit]) => kit));
+function popupIndexes(els) {
   const popups = new Map();
   els.forEach((el, i) => {
     if ((el.tag === 'section' || el.tag === 'div') && /^popup/.test(el.id) && !popups.has(el.id)) popups.set(el.id, i);
   });
+  return popups;
+}
+
+export function checkHtml(html, type, { gameplay, refHtmls = [] } = {}) {
+  const els = scanHtml(html).elements;
+  const aliasPairs = overridesOfKind('alias');
+  const productionPopups = new Set(overridesOfKind('known').map(([kit]) => kit));
+  const popups = popupIndexes(els);
 
   const items = type.structureOnly ? [] : mergeItems(type.checklists);
   const required = [];
@@ -228,7 +245,13 @@ export function checkHtml(html, type, { gameplay } = {}) {
     }
   }
 
-  const checksExtra = !type.structureOnly && !type.checklists.includes(AUX_CHECKLISTS.milestone);
+  const refPopups = new Set(refHtmls.flatMap((ref) => [...popupIndexes(scanHtml(ref).elements).keys()]));
+  for (const id of refPopups) {
+    if (popups.has(id) || required.some((row) => row.popup === id)) continue;
+    required.push({ popup: id, status: `${FAIL}`, note: 'có ở landing mẫu (ref) mà landing này thiếu' });
+  }
+
+  const checksExtra = !type.structureOnly && !type.newGameplay && !type.checklists.includes(AUX_CHECKLISTS.milestone);
   const extra = !checksExtra
     ? []
     : [...popups.keys()]
@@ -264,7 +287,15 @@ export function checkHtml(html, type, { gameplay } = {}) {
   const counted = [...required, ...structure].filter((row) => row.status === PASS || row.status.startsWith(FAIL));
   const failed = counted.filter((row) => row.status.startsWith(FAIL)).map((row) => row.check ? `${row.popup}: ${row.check}` : row.popup);
   const result = { required, extra, structure, warnings, failed, passed: counted.length - failed.length, total: counted.length };
-  return { ...result, icon: summaryIcon({ failed, structureOnly: type.structureOnly, warnings }) };
+  return { ...result, icon: summaryIcon({ failed, structureOnly: type.structureOnly, newGameplay: type.newGameplay, warnings }) };
+}
+
+// Landing cũ: lỗi đã có ở bản trước run là nợ (R-PM-8), chỉ lỗi run mới gây ra mới chặn
+export function withoutDebt(result, before, type) {
+  const old = new Set(before.failed);
+  const failed = result.failed.filter((f) => !old.has(f));
+  const debt = result.failed.filter((f) => old.has(f));
+  return { ...result, failed, debt, icon: summaryIcon({ failed, structureOnly: type.structureOnly, newGameplay: type.newGameplay, warnings: result.warnings }) };
 }
 
 function table(header, rows) {
@@ -283,33 +314,68 @@ export function formatReport(file, input, type, r) {
   out.push('## Cấu trúc Popup Quan Trọng', r.structure.length ? table(['Popup', 'Check', 'Status'], r.structure.map((x) => [x.popup, x.check, x.status])) : 'Không có popup đăng ký / điều kiện / thông báo trong file.', '');
   out.push(`## Tổng kết: ${r.passed}/${r.total} Passed ${r.icon}`);
   if (type.structureOnly) out.push('◐ Chỉ kiểm cấu trúc — loại này chưa có checklist popup bắt buộc, CHƯA kết luận đủ popup');
+  if (type.newGameplay) out.push('◐ Gameplay mới — soát bộ popup chung + popup của landing mẫu (ref), chưa có checklist riêng');
   if (r.failed.length) out.push(`❌ Thiếu: ${r.failed.join('; ')}`);
+  if (r.debt?.length) out.push(`📎 Lỗi có sẵn trước run (không chặn, ghi Nợ): ${r.debt.join('; ')}`);
   if (r.warnings.length) out.push(`⚠️ Warning: ${r.warnings.join('; ')}`);
   return out.join('\n');
 }
 
-function main(argv) {
-  const json = argv.includes('--json');
-  const tokens = argv.filter((a) => a !== '--json');
-  const file = tokens.find((t) => t.endsWith('.html') || t.includes('/'));
-  const input = tokens.filter((t) => t !== file).join(' ');
-  const type = input ? resolveType(input) : null;
+const htmlFilesIn = (dir) => (existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.html')).map((f) => join(dir, f)) : []);
+
+// ref là folder bàn giao (mainsite/), campaign cdn-source (dist/) hoặc 1 file html
+function refHtmlsOf(ref, file) {
+  if (!ref || !existsSync(ref)) return [];
+  const root = resolve(ref);
+  if (resolve(file).startsWith(root + sep)) return [];
+  if (!statSync(root).isDirectory()) return [read(root)];
+  const files = [join(root, 'mainsite'), join(root, 'dist'), root].map(htmlFilesIn).find((list) => list.length) ?? [];
+  return files.map(read);
+}
+
+function typeFor(input, lock) {
+  if (input) return { type: resolveType(input), label: input };
+  if (!lock?.type) return { type: null, label: '(file dự án chưa khoá type)' };
+  return { type: typeFromNote(lock.type) ?? newGameplayType(lock.type), label: `type "${lock.type}" của file dự án` };
+}
+
+function htmlAt(revision, file) {
+  const r = spawnSync('git', ['-C', dirname(file), 'show', `${revision}:./${basename(file)}`], { encoding: 'utf8' });
+  return r.status === 0 ? r.stdout : null;
+}
+
+function checkFile(file, input, { json, baseline }) {
+  const lock = readLock(noteForAnyFile(file));
+  const { type, label } = typeFor(input, lock);
   if (!type) {
-    console.error(`LOAI_KHONG_KHOP: "${input}" — in bảng 39 loại (SKILL.md Bước 0) và chờ user nhập`);
+    console.error(`LOAI_KHONG_KHOP: ${label} — in bảng 39 loại (SKILL.md Bước 0) và chờ user nhập`);
     return 2;
   }
   if (!type.checklists.length || !type.checklists.every((f) => existsSync(join(REF_DIR, f)))) {
     console.error(`KHONG_CO_CHECKLIST: STT ${type.stt} — ${type.name} không có popup flow hoặc thiếu file checklist`);
     return 2;
   }
-  if (!file || !existsSync(file)) {
-    console.error(`THIEU_FILE: ${file || '(chưa truyền)'} — xác định file theo SKILL.md Bước 1`);
+  const options = { gameplay: lock?.gameplay, refHtmls: type.newGameplay ? refHtmlsOf(lock.ref, file) : [] };
+  const result = checkHtml(read(file), type, options);
+  const before = baseline && htmlAt(baseline, file);
+  const final = before ? withoutDebt(result, checkHtml(before, type, options), type) : result;
+  console.log(json ? JSON.stringify({ file, type, gameplay: options.gameplay, ...final }, null, 2) : formatReport(file, label, type, final));
+  return final.failed.length ? 1 : 0;
+}
+
+function main(argv) {
+  const json = argv.includes('--json');
+  const at = argv.indexOf('--baseline');
+  const baseline = at >= 0 ? argv[at + 1] : null;
+  const tokens = argv.filter((a, i) => a !== '--json' && (at < 0 || (i !== at && i !== at + 1)));
+  const files = tokens.filter((t) => t.endsWith('.html') || t.includes('/'));
+  const input = tokens.filter((t) => !files.includes(t)).join(' ');
+  const missing = files.find((f) => !existsSync(f));
+  if (!files.length || missing) {
+    console.error(`THIEU_FILE: ${missing || '(chưa truyền)'} — xác định file theo SKILL.md Bước 1`);
     return 2;
   }
-  const gameplay = readLock(noteForAnyFile(file))?.gameplay;
-  const result = checkHtml(read(file), type, { gameplay });
-  console.log(json ? JSON.stringify({ file, type, gameplay, ...result }, null, 2) : formatReport(file, input, type, result));
-  return result.failed.length ? 1 : 0;
+  return Math.max(...files.map((file) => checkFile(file, input, { json, baseline })));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = main(process.argv.slice(2));

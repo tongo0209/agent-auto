@@ -167,8 +167,10 @@ KHÔNG Read file HTML — script ở Bước 2 tự đọc. Path không tồn t�
 ### Bước 2 — Chạy script (thay cho soát tay)
 
 ```bash
-node ~/VNG/agent-auto/tools/check-promotion.mjs <loại user gõ> <path>
+node ~/VNG/agent-auto/tools/check-promotion.mjs <loại user gõ> <path> [<path>...] [--baseline HEAD]
 ```
+
+Bỏ trống `<loại>` → script lấy `type` của file dự án (`2-lucky-draw` → STT 2). Type ngoài 39 loại = **gameplay mới**: soát `event.md` + popup có ở landing mẫu `ref` mà landing thiếu, kết quả tối đa ◐. `--baseline HEAD` (landing cũ): lỗi đã có ở bản commit trước thành dòng 📎 Nợ, chỉ lỗi mới gây exit 1.
 
 In NGUYÊN VĂN stdout ra chat — đó đã là report đúng format Spec ③. Script đọc bảng 39 loại ở trên + `reference/*.md` + `pm-kit-overrides.tsv` lúc chạy, gameplay payment lấy từ file dự án ⇒ sửa checklist là sửa ở `reference/`, KHÔNG sửa script. Các mục "Spec script ①-③" bên dưới là **spec script thực thi**, model KHÔNG soát tay lại.
 

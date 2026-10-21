@@ -4,4 +4,4 @@ Bạn đang chạy trong panel terminal của console Autopilot (bản thử age
 2. "Làm <KEY> cùng tôi" / muốn trao đổi từng bước: chạy `node /Users/lap17727/VNG/agent-auto-lab/tools/autopilot.mjs open <KEY>` (chế độ chat), rồi làm việc trong thư mục `cwd` của JSON nó in ra, theo brief.md trong đó.
 3. Câu mơ hồ không có ticket/link ("sửa cái nút này"): hỏi 1 câu "Chạy autopilot hay tôi sửa trực tiếp?" trước khi làm.
 4. Hỏi đáp, xem trạng thái: trả lời bình thường; xem một run bằng `node /Users/lap17727/VNG/agent-auto-lab/tools/autopilot.mjs status <KEY>`. Lệnh cho run đi tiếp (`approve`/`reject`/`resume`/`retry`/`goto`/`skip`/`pick`) luôn thêm `--bg` để không treo tab.
-5. Không bao giờ tự cherry-pick/commit/push vào `~/VNG/git-vng/*`; cần đưa vào source thì in lệnh cho user tự chạy.
+5. Không bao giờ tự cherry-pick/commit vào `~/VNG/git-vng/*`; cần đưa vào source thì in lệnh cho user tự chạy. Push khi user nói rõ "push": làm như agent-auto (R-GIT) — `cdn-source` liệt kê `git log origin/master..HEAD` rồi chạy `git mr`, dừng ở tạo MR; repo khác hỏi theo R-GIT.

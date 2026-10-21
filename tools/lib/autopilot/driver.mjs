@@ -5,7 +5,7 @@ import { parseVerdict } from './verdict.mjs';
 import { renderPrompt } from './prompts.mjs';
 import { PROMPTS_DIR } from './flows.mjs';
 import { dataRoot, runDir, saveRun, loadRun, writeArtifact, pauseFile, childFile } from './store.mjs';
-import { acquire, release, holdCampaign, heldCampaigns, holdRepo, releaseRepos } from './lock.mjs';
+import { release, claimCampaign, holdRepo, releaseRepos, waitLock } from './lock.mjs';
 import { runClaude as realRunClaude, guardCode } from './claude-runner.mjs';
 import { runGates as realRunGates } from './gates.mjs';
 import { notify as realNotify } from './notify.mjs';
@@ -106,9 +106,8 @@ async function runClaudeStage(run, stage, deps) {
   if (!res.ok) return { type: 'halt', reason: `runner:${stage.id}`, receipt };
 
   if (v.campaignDir && !run.campaignDir) {
-    const holder = heldCampaigns()[v.campaignDir];
-    if (holder && holder.key !== run.key) return { type: 'halt', reason: `campaign-held:${holder.key}/${holder.runId}`, receipt };
-    holdCampaign(v.campaignDir, { key: run.key, runId: run.runId });
+    const held = claimCampaign(v.campaignDir, run);
+    if (!held.ok) return { type: 'halt', reason: `campaign-held:${held.holder.key}/${held.holder.runId}`, receipt };
     run.campaignDir = v.campaignDir;
     run.campaignDirs = [v.campaignDir];
     run.repo = deps.repoOf(v.campaignDir);
@@ -181,15 +180,19 @@ function changedSummary(run) {
   return `${fileCount} file ở ${touched.map((c) => c.name).join(', ')}`;
 }
 
+// Tài nguyên chỉ 1 run dùng được tại 1 thời điểm: cổng commit (build + add/commit + pull trên cây chung),
+// trình duyệt của browserpilot, Photoshop. Run song song chờ tới lượt, không dừng nhau
+const stageLockOf = (stage) => stage.lock ?? (stage.checks?.includes('commit') ? 'commit' : stage.toolset === 'browser' ? 'browser' : null);
+
 async function withStageLock(run, stage, fn) {
-  if (!stage.lock) return fn();
+  const name = stageLockOf(stage);
+  if (!name) return fn();
   const owner = { key: run.key, runId: run.runId };
-  const got = acquire(stage.lock, owner);
-  if (!got.ok) return { type: 'halt', reason: `lock:${stage.lock} đang bị ${got.holder.key} giữ` };
+  if (!(await waitLock(name, owner, { isAborted: () => isAbortedOnDisk(run) }))) return { type: 'halt', reason: 'aborted' };
   try {
     return await fn();
   } finally {
-    release(stage.lock, owner);
+    release(name, owner);
   }
 }
 
@@ -202,13 +205,13 @@ async function runStage(run, stage, deps) {
   }
 }
 
-// Run làm thẳng trên repo gốc: mỗi repo chỉ 1 run, nhánh chốt lúc bắt đầu và không được đổi giữa chừng
+// Run làm thẳng trên repo gốc: run đã có campaign chung repo với run khác, chưa có thì giữ riêng; nhánh chốt lúc bắt đầu
 export function claimRepos(run, deps) {
   if (Object.keys(run.worktrees ?? {}).length) return run;
   const next = { ...run, workBranch: { ...run.workBranch }, startHead: { ...run.startHead }, dirtyAtStart: { ...run.dirtyAtStart } };
   for (const repo of (run.repos ?? [run.repo]).filter(Boolean)) {
     const { top, branch, head, dirty } = deps.repoState(repo);
-    const held = holdRepo(top, run);
+    const held = holdRepo(top, run, { shared: campaignsOf(run).length > 0 });
     if (!held.ok) throw new Error(`repo đang có run ${held.holder.key} (${top})`);
     const want = next.workBranch[top];
     if (!want) {

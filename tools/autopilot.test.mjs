@@ -38,6 +38,7 @@ for (const flow of ['landing-fix', 'feature', 'landing-new']) {
     for (let i = 0; i < 5 && lastRun(runs, 'GW-1').status === 'paused'; i++) cli('approve', 'GW-1');
     assert.strictEqual(lastRun(runs, 'GW-1').status, 'done');
     assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8')), {});
+    assert.deepStrictEqual(fs.readdirSync(runs).filter((f) => f.startsWith('.lock-run')), []);
   });
 }
 
@@ -68,13 +69,16 @@ test('reject có note → plan vòng sau nhận note rồi xoá (note dùng 1 l�
   assert.strictEqual(run.stage, 'approve-plan');
 });
 
-test('run thứ 2 khi lock đang bị giữ bởi PID sống → từ chối', () => {
+test('run khác đang có process chạy không chặn run mới; chính run đó đang chạy thì resume bị từ chối', () => {
   const { cli, campaign, runs } = sandbox();
   fs.mkdirSync(runs, { recursive: true });
-  fs.writeFileSync(path.join(runs, '.lock-run'), JSON.stringify({ pid: process.pid, key: 'GW-9', runId: 'x' }));
-  const r = cli('run', 'GW-5', '--flow', 'landing-fix', '--campaign', campaign);
+  fs.writeFileSync(path.join(runs, '.lock-run-GW-9-x'), JSON.stringify({ pid: process.pid, key: 'GW-9', runId: 'x' }));
+  assert.strictEqual(cli('run', 'GW-5', '--flow', 'landing-fix', '--campaign', campaign).code, 0);
+  const run = lastRun(runs, 'GW-5');
+  lockRun(runs, run, process.pid);
+  const r = cli('approve', 'GW-5');
   assert.strictEqual(r.code, 1);
-  assert.match(r.out, /GW-9/);
+  assert.match(r.out, /process khác/);
 });
 
 test('resume sau loop-exhausted chạy tiếp', () => {
@@ -101,13 +105,13 @@ test('R19 abort: nhả campaign + repo, xoá thư mục run; không đụng repo
   assert.doesNotMatch(r.out, /cu\.txt/);
 });
 
-test('R19 run thứ 2 trên cùng repo khi run đầu chưa xong → dừng "repo đang có run"', () => {
+test('2 run cùng repo khác campaign → chạy song song, cả 2 tới mốc duyệt plan', () => {
   const { cli, campaign, runs } = sandbox();
   const other = path.join(campaign, '../b');
   fs.mkdirSync(other);
   cli('run', 'GW-8', '--flow', 'landing-fix', '--campaign', campaign);
   cli('run', 'GW-9', '--flow', 'landing-fix', '--campaign', other);
-  assert.match(lastRun(runs, 'GW-9').stopReason, /repo đang có run GW-8/);
+  assert.deepStrictEqual([lastRun(runs, 'GW-8').stage, lastRun(runs, 'GW-9').stage], ['approve-plan', 'approve-plan']);
 });
 
 test('route --validate báo mọi luồng hợp lệ', () => {
@@ -153,7 +157,7 @@ test('G5: design-intake không đụng repo — không tạo worktree, không gi
   assert.deepStrictEqual([run.stage, run.repo, run.campaignDir, run.worktrees], ['pm-block', null, null, {}]);
 });
 
-const lockRun = (runs, run, pid) => fs.writeFileSync(path.join(runs, '.lock-run'), JSON.stringify({ pid, key: run.key, runId: run.runId }));
+const lockRun = (runs, run, pid) => fs.writeFileSync(path.join(runs, `.lock-run-${run.key}-${run.runId}`), JSON.stringify({ pid, key: run.key, runId: run.runId }));
 
 test('pause: chỉ nhận run đang chạy có process giữ; ghi .pause, không đụng run.json', () => {
   const { cli, campaign, runs } = sandbox();
@@ -342,6 +346,8 @@ test('reject run done: mở lại ở fix với note, chạy lại tới commit 
 test('reject run done khi campaign đang bị run khác giữ → từ chối', () => {
   const { cli, runs, campaign } = doneRun('GW-33');
   fs.writeFileSync(path.join(runs, '.held.json'), JSON.stringify({ [campaign]: { key: 'GW-99', runId: 'x' } }));
+  fs.mkdirSync(path.join(runs, 'GW-99', 'x'), { recursive: true });
+  fs.writeFileSync(path.join(runs, 'GW-99', 'x', 'run.json'), JSON.stringify({ key: 'GW-99', runId: 'x', status: 'paused' }));
   const r = cli('reject', 'GW-33', '--note', 'x');
   assert.strictEqual(r.code, 1);
   assert.match(r.out, /GW-99/);

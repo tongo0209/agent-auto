@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-lock-'));
-const { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted, holdRepo, releaseRepos } = await import('./lock.mjs');
+const { acquire, release, holdCampaign, claimCampaign, releaseCampaign, heldCampaigns, isInterrupted, holdRepo, releaseRepos, runLock, waitLock } = await import('./lock.mjs');
 const { saveRun } = await import('./store.mjs');
 
 const A = { key: 'GW-1', runId: 'r1' };
@@ -54,17 +54,39 @@ test('cùng owner nhưng PID khác còn sống → không chiếm (2 process cù
   assert.strictEqual(acquire('run', A).ok, false);
 });
 
-test('isInterrupted: run running mà không process nào giữ lock run của nó', () => {
+test('isInterrupted: run running mà không process nào giữ lock run của chính nó', () => {
   const running = { ...A, status: 'running' };
+  const file = path.join(dir, `.lock-${runLock(A)}`);
   assert.strictEqual(isInterrupted(running), true);
-  fs.writeFileSync(path.join(dir, '.lock-run'), JSON.stringify({ pid: 999999, ...A }));
+  fs.writeFileSync(file, JSON.stringify({ pid: 999999, ...A }));
   assert.strictEqual(isInterrupted(running), true);
-  fs.writeFileSync(path.join(dir, '.lock-run'), JSON.stringify({ pid: process.pid, ...B }));
-  assert.strictEqual(isInterrupted(running), true);
-  fs.writeFileSync(path.join(dir, '.lock-run'), JSON.stringify({ pid: process.pid, ...A }));
+  fs.writeFileSync(file, JSON.stringify({ pid: process.pid, ...A }));
   assert.strictEqual(isInterrupted(running), false);
-  fs.rmSync(path.join(dir, '.lock-run'));
+  fs.rmSync(file);
   assert.strictEqual(isInterrupted({ ...A, status: 'paused' }), false);
+});
+
+test('lock run tách theo từng run: 2 run khác nhau giữ lock cùng lúc được', () => {
+  assert.deepStrictEqual(acquire(runLock(A), A), { ok: true });
+  assert.deepStrictEqual(acquire(runLock(B), B), { ok: true });
+});
+
+test('claimCampaign: campaign đang bị run khác (chưa xong) giữ → từ chối; run cũ xong/bị xoá thì nhường', () => {
+  saveRun({ ...A, status: 'paused' });
+  assert.deepStrictEqual(claimCampaign('/c1', A), { ok: true });
+  const refused = claimCampaign('/c1', B);
+  assert.deepStrictEqual([refused.ok, refused.holder.key], [false, 'GW-1']);
+  assert.deepStrictEqual(claimCampaign('/c2', B), { ok: true });
+  saveRun({ ...A, status: 'done' });
+  assert.deepStrictEqual(claimCampaign('/c1', B), { ok: true });
+});
+
+test('waitLock: chờ tới khi chủ cũ nhả; isAborted → trả false không giữ', async () => {
+  acquire('commit', A);
+  setTimeout(() => release('commit', A), 120);
+  assert.strictEqual(await waitLock('commit', B, { pollMs: 20 }), true);
+  assert.strictEqual(acquire('commit', A).ok, false);
+  assert.strictEqual(await waitLock('commit', A, { pollMs: 20, isAborted: () => true }), false);
 });
 
 test('nhiều process cùng acquire một lúc → đúng 1 process được', async () => {
@@ -85,18 +107,32 @@ test('nhiều process cùng acquire một lúc → đúng 1 process được', a
   }
 });
 
-test('holdRepo: 1 repo chỉ 1 run; run khác bị từ chối kèm holder; chủ cũ xong/bị xoá hoặc nhả thì nhường', () => {
+test('holdRepo: run có campaign dùng chung repo; run chưa có campaign giữ riêng; chủ cũ xong/bị xoá hoặc nhả thì nhường', () => {
+  const C = { key: 'GW-3', runId: 'r3' };
   saveRun({ ...A, status: 'paused' });
-  assert.deepStrictEqual(holdRepo('/repo', A), { ok: true });
-  assert.deepStrictEqual(holdRepo('/repo', A), { ok: true });
-  const refused = holdRepo('/repo', B);
-  assert.deepStrictEqual([refused.ok, refused.holder.key], [false, 'GW-1']);
-  assert.deepStrictEqual(holdRepo('/other', B), { ok: true });
-  saveRun({ ...A, status: 'done' });
-  assert.deepStrictEqual(holdRepo('/repo', B), { ok: true });
+  saveRun({ ...B, status: 'paused' });
+  assert.deepStrictEqual(holdRepo('/repo', A, { shared: true }), { ok: true });
+  assert.deepStrictEqual(holdRepo('/repo', A, { shared: true }), { ok: true });
+  assert.deepStrictEqual(holdRepo('/repo', B, { shared: true }), { ok: true });
+  const exclusive = holdRepo('/repo', C);
+  assert.deepStrictEqual([exclusive.ok, exclusive.holder.key], [false, 'GW-1']);
+  releaseRepos(A);
   releaseRepos(B);
-  saveRun({ ...A, status: 'paused' });
-  assert.deepStrictEqual(holdRepo('/repo', A), { ok: true });
+  saveRun({ ...C, status: 'paused' });
+  assert.deepStrictEqual(holdRepo('/repo', C), { ok: true });
+  const refused = holdRepo('/repo', A, { shared: true });
+  assert.deepStrictEqual([refused.ok, refused.holder.key], [false, 'GW-3']);
+  assert.deepStrictEqual(holdRepo('/other', A, { shared: true }), { ok: true });
+  saveRun({ ...C, status: 'done' });
+  assert.deepStrictEqual(holdRepo('/repo', A, { shared: true }), { ok: true });
   fs.rmSync(path.join(dir, 'GW-1'), { recursive: true });
-  assert.deepStrictEqual(holdRepo('/repo', B), { ok: true });
+  assert.deepStrictEqual(holdRepo('/repo', C), { ok: true });
+});
+
+test('holdRepo đọc được file .repos.json định dạng cũ (1 chủ/repo)', () => {
+  saveRun({ ...A, status: 'paused' });
+  fs.writeFileSync(path.join(dir, '.repos.json'), JSON.stringify({ '/repo': A }));
+  assert.strictEqual(holdRepo('/repo', B, { shared: true }).ok, false);
+  releaseRepos(A);
+  assert.deepStrictEqual(holdRepo('/repo', B, { shared: true }), { ok: true });
 });

@@ -14,7 +14,7 @@ import { gatherSignals } from './lib/autopilot/signals.mjs';
 import { route, loadRules } from './lib/autopilot/router.mjs';
 import { newRunId, loadRun, listRuns, saveRun, runsDir, runDir, pauseFile, childFile, writeArtifact, planOptions } from './lib/autopilot/store.mjs';
 import { repoState, removeWorktree, branchOf } from './lib/autopilot/worktree.mjs';
-import { acquire, release, holdCampaign, releaseCampaign, heldCampaigns, isInterrupted, releaseRepos } from './lib/autopilot/lock.mjs';
+import { acquire, release, claimCampaign, releaseCampaign, heldCampaigns, isInterrupted, releaseRepos, runLock } from './lib/autopilot/lock.mjs';
 import { formatStatus } from './lib/autopilot/format.mjs';
 
 const AGENT_ROOT = path.resolve(import.meta.dirname, '..');
@@ -78,14 +78,15 @@ function driveDeps(input) {
   return { repoOf, input, ...(process.env.AUTOPILOT_FAKE_GATES ? { runGates: fakeGates } : {}) };
 }
 
-// Chạy tiếp một run dưới lock 'run'; xong/dừng thì nhả campaign, xong thì nhả repo
+// Chạy tiếp một run dưới lock riêng của nó (run khác chạy song song được); xong/dừng thì nhả campaign, xong thì nhả repo
 async function continueRun(start, input) {
   const owner = { key: start.key, runId: start.runId };
-  const lock = acquire('run', owner);
-  if (!lock.ok) die(`Đang có run khác chạy: ${lock.holder.key}/${lock.holder.runId} — chờ nó tới mốc dừng.`);
+  const lock = acquire(runLock(owner), owner);
+  if (!lock.ok) die(`${owner.key} đang được 1 process khác chạy — chờ nó tới mốc dừng.`);
   try {
     const run = start.prepare ? start.prepare(loadRun(owner.key, owner.runId)) : start;
-    if (run.campaignDir) holdCampaign(run.campaignDir, owner);
+    const claimed = run.campaignDir ? claimCampaign(run.campaignDir, owner) : { ok: true };
+    if (!claimed.ok) die(`${run.campaignDir} đang bị ${claimed.holder.key}/${claimed.holder.runId} giữ — xong/abort run đó trước.`);
     const flow = loadFlow(run.flow);
     const after = await drive(run, flow, driveDeps(input));
     if (['done', 'stopped'].includes(after.status)) releaseCampaign(owner);
@@ -93,13 +94,13 @@ async function continueRun(start, input) {
     console.log(formatStatus(after, flow));
     return after;
   } finally {
-    release('run', owner);
+    release(runLock(owner), owner);
   }
 }
 
 function startBackground(argv) {
   fs.mkdirSync(runsDir(), { recursive: true });
-  const log = path.join(runsDir(), `bg-${newRunId(new Date())}.log`);
+  const log = path.join(runsDir(), `bg-${newRunId(new Date())}-${process.pid}.log`);
   const out = fs.openSync(log, 'a');
   const child = spawn(process.execPath, [import.meta.filename, ...argv.filter((a) => a !== '--bg')], { detached: true, stdio: ['ignore', out, out] });
   child.unref();
@@ -140,7 +141,8 @@ function newRun(opts, input) {
   const now = new Date();
   const runId = newRunId(now);
   const run = createRun({
-    key: signals.key ?? `ADHOC-${runId}`, runId, flow, routerReason: decided.reason,
+    // nhiều task không có mã Jira khởi động cùng giây → pid tách key, không đè run của nhau
+    key: signals.key ?? `ADHOC-${runId}-${process.pid}`, runId, flow, routerReason: decided.reason,
     repo, campaignDir: target.campaignDir, campaignDirs: target.campaignDirs, handoffDir: target.handoffDir, cloneSource: signals.cloneSource, sheetUrl: signals.sheetUrl, sheetKind: signals.sheetKind, repos: [repo, ...target.repos], ...plan, now: now.getTime(),
   });
   return { run, flow, reason: decided.reason };
@@ -161,7 +163,8 @@ function cmdOpen(opts) {
   if (opts.followup) return openFollowup(mustLoadDone(input), opts.note);
   const { run: created, flow } = newRun(opts, input);
   const claimed = claimOrDie(created);
-  if (created.campaignDir) holdCampaign(created.campaignDir, { key: created.key, runId: created.runId });
+  const held = created.campaignDir ? claimCampaign(created.campaignDir, created) : { ok: true };
+  if (!held.ok) die(`${created.campaignDir} đang bị ${held.holder.key}/${held.holder.runId} giữ — xong/abort run đó trước.`);
   const run = { ...claimed, mode: 'chat', status: 'chat', chatState: null };
   saveRun(run);
   fs.writeFileSync(briefFile(run), briefOf(run, flow, input));
@@ -194,9 +197,8 @@ function openFollowup(done, note) {
 // Run xong đã nhả campaign; mở lại thì phải giữ lại, trừ khi run khác đã lấy
 function holdAgain(run) {
   if (!run.campaignDir) return;
-  const holder = heldCampaigns()[run.campaignDir];
-  if (holder && holder.key !== run.key) die(`${run.campaignDir} đang bị ${holder.key}/${holder.runId} giữ — xong/abort run đó trước.`);
-  holdCampaign(run.campaignDir, run);
+  const held = claimCampaign(run.campaignDir, run);
+  if (!held.ok) die(`${run.campaignDir} đang bị ${held.holder.key}/${held.holder.runId} giữ — xong/abort run đó trước.`);
 }
 
 const MARKS = ['doing', 'pass', 'fail', 'ask'];

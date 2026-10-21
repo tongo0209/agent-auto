@@ -8,7 +8,7 @@ process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-api-'
 process.env.AUTOPILOT_CLAUDE_PROJECTS = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-proj-'));
 const { listView, artifactFile, listArtifacts, actionArgs, checkAction, liveLog, worktreeOf } = await import('./api.mjs');
 const { saveRun, writeArtifact } = await import('../tools/lib/autopilot/store.mjs');
-const { acquire } = await import('../tools/lib/autopilot/lock.mjs');
+const { acquire, runLock } = await import('../tools/lib/autopilot/lock.mjs');
 
 const run = {
   key: 'GW-1', runId: '20261020-100000', flow: 'landing-fix', status: 'paused', stage: 'approve-plan', stopReason: null,
@@ -161,7 +161,7 @@ test('actionArgs: goto/skip/pick/break và run có kế hoạch', () => {
 
 test('checkAction: run đang chạy không skip được; run đã xong qua plan cho goto', () => {
   saveRun({ ...run, key: 'GW-5', status: 'running', stage: 'plan', receipts: [] });
-  acquire('run', { key: 'GW-5', runId: run.runId });
+  acquire(runLock({ key: 'GW-5', runId: run.runId }), { key: 'GW-5', runId: run.runId });
   assert.throws(() => checkAction('skip', { key: 'GW-5' }), /đang chạy/);
   assert.doesNotThrow(() => checkAction('break', { key: 'GW-5', stage: 'fix' }));
   assert.doesNotThrow(() => checkAction('approve', { key: 'GW-5' }));

@@ -61,43 +61,75 @@ export function release(name, owner) {
   });
 }
 
+// Mỗi run 1 lock process riêng: nhiều task chạy song song, nhưng 1 run không bị 2 process cùng drive
+export const runLock = (owner) => `run-${owner.key}-${owner.runId}`;
+
+// Chờ lock bận (vd cổng commit của run khác đang build/pull) thay vì dừng run
+export async function waitLock(name, owner, { pollMs = 2000, isAborted = () => false } = {}) {
+  for (;;) {
+    if (isAborted()) return false;
+    if (acquire(name, owner).ok) return true;
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+}
+
 // running trên đĩa mà không process nào còn giữ lock run của nó = bị tắt ngang
 export function isInterrupted(run) {
   if (run.status !== 'running') return false;
-  const holder = readJson(lockFile('run'), null);
+  const holder = readJson(lockFile(runLock(run)), null);
   return !(holder && sameOwner(holder, run) && isAlive(holder.pid));
 }
 
 export const heldCampaigns = () => readJson(heldFile(), {});
 
-export function holdCampaign(campaignDir, owner) {
-  writeJsonAtomic(heldFile(), { ...heldCampaigns(), [campaignDir]: { key: owner.key, runId: owner.runId } });
-}
-
-export function releaseCampaign(owner) {
-  const kept = Object.entries(heldCampaigns()).filter(([, o]) => !sameOwner(o, owner));
-  writeJsonAtomic(heldFile(), Object.fromEntries(kept));
-}
-
-// Run làm thẳng trên repo gốc nên mỗi repo chỉ 1 run; giữ tới khi run xong/abort (qua cả lúc chờ duyệt, không theo pid)
+// Giữ tới khi run xong/bị xoá (qua cả lúc chờ duyệt, không theo pid)
 const isOver = (owner) => {
   const run = loadRun(owner.key, owner.runId);
   return !run || run.status === 'done';
 };
 
-export function holdRepo(top, owner) {
+export function holdCampaign(campaignDir, owner) {
+  withMutex('held', () => writeJsonAtomic(heldFile(), { ...heldCampaigns(), [campaignDir]: { key: owner.key, runId: owner.runId } }));
+}
+
+// Kiểm và giữ trong 1 mutex: 2 run song song không cùng nhận được 1 campaign
+export function claimCampaign(campaignDir, owner) {
+  return withMutex('held', () => {
+    const held = heldCampaigns();
+    const holder = held[campaignDir];
+    if (holder && holder.key !== owner.key && !isOver(holder)) return { ok: false, holder };
+    writeJsonAtomic(heldFile(), { ...held, [campaignDir]: { key: owner.key, runId: owner.runId } });
+    return { ok: true };
+  });
+}
+
+export function releaseCampaign(owner) {
+  withMutex('held', () => {
+    const kept = Object.entries(heldCampaigns()).filter(([, o]) => !sameOwner(o, owner));
+    writeJsonAtomic(heldFile(), Object.fromEntries(kept));
+  });
+}
+
+// File cũ ghi 1 chủ/repo dạng {key, runId}; mới là danh sách chủ, mỗi chủ shared hoặc giữ riêng
+const repoHolders = (entry) => (Array.isArray(entry) ? entry : entry ? [{ ...entry, shared: false }] : []);
+
+// Run đã có campaign thì chung repo với run khác (campaign đã khoá riêng); run chưa có campaign giữ cả repo
+export function holdRepo(top, owner, { shared = false } = {}) {
   return withMutex('repos', () => {
     const held = readJson(reposFile(), {});
-    const holder = held[top];
-    if (holder && !sameOwner(holder, owner) && !isOver(holder)) return { ok: false, holder };
-    writeJsonAtomic(reposFile(), { ...held, [top]: { key: owner.key, runId: owner.runId } });
+    const others = repoHolders(held[top]).filter((h) => !sameOwner(h, owner) && !isOver(h));
+    const blocker = others.find((h) => !shared || !h.shared);
+    if (blocker) return { ok: false, holder: blocker };
+    writeJsonAtomic(reposFile(), { ...held, [top]: [...others, { key: owner.key, runId: owner.runId, shared }] });
     return { ok: true };
   });
 }
 
 export function releaseRepos(owner) {
   withMutex('repos', () => {
-    const kept = Object.entries(readJson(reposFile(), {})).filter(([, o]) => !sameOwner(o, owner));
-    writeJsonAtomic(reposFile(), Object.fromEntries(kept));
+    const entries = Object.entries(readJson(reposFile(), {}))
+      .map(([top, entry]) => [top, repoHolders(entry).filter((h) => !sameOwner(h, owner))])
+      .filter(([, holders]) => holders.length);
+    writeJsonAtomic(reposFile(), Object.fromEntries(entries));
   });
 }

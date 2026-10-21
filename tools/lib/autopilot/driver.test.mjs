@@ -210,15 +210,18 @@ test('R19: nhánh repo bị đổi giữa chừng → stopped nói rõ, không t
   assert.strictEqual(git('rev-parse', '--abbrev-ref', 'HEAD').stdout.trim(), 'khac');
 });
 
-test('R19: repo đang có run khác (chưa xong) → run thứ 2 bị từ chối "repo đang có run <KEY>"', async () => {
+test('2 run cùng repo, khác campaign → chạy song song; run chưa có campaign thì giữ riêng repo', async () => {
   const { repo } = tmpGitRepo();
   const flow = loadFlow('landing-fix');
   const deps = realDeps({ runClaude: fakeClaude({}).runClaude, runGates: fakeGates().runGates });
   const first = await drive(onRepo(repo), flow, deps);
   assert.strictEqual(first.status, 'paused');
-  const second = await drive(onRepo(repo, { key: 'GW-2' }), flow, deps);
-  assert.match(second.stopReason, /repo đang có run GW-1/);
-  assert.strictEqual(second.receipts.length, 0);
+  const other = path.join(repo, 'products/x/landing/b');
+  const second = await drive(onRepo(repo, { key: 'GW-2', campaignDir: other, campaignDirs: [other] }), flow, deps);
+  assert.strictEqual(second.status, 'paused', second.stopReason);
+  const whole = await drive(onRepo(repo, { key: 'GW-3', campaignDir: null, campaignDirs: [] }), flow, deps);
+  assert.match(whole.stopReason, /repo đang có run GW-1/);
+  assert.strictEqual(whole.receipts.length, 0);
 });
 
 test('G0: write-sheet (ghi thật) tự bỏ qua khi chưa có AUTOPILOT_LAB_WRITES', async () => {
@@ -674,4 +677,47 @@ test('commit xong chỉ còn lỗi pull → nhả repo cho run khác; lỗi comm
   holdRepo('/repo-broken', broken);
   await runGateStage(broken, stage, { now: Date.now, runGates: gates({}) });
   assert.strictEqual(holdRepo('/repo-broken', other).ok, false);
+});
+
+test('cổng commit chờ lượt khi run khác đang commit, tới lượt thì chạy; huỷ trong lúc chờ thì không commit', async () => {
+  const { acquire, release } = await import('./lock.mjs');
+  const flow = loadFlow('landing-fix');
+  const stage = flow.stages.find((s) => s.checks?.includes('commit'));
+  const other = { key: 'GW-COMMITTING', runId: 'c1' };
+  const gates = fakeGates();
+  const deps = { notify: () => {}, repoState: fakeRepoState, runClaude: fakeClaude({}).runClaude, runGates: gates.runGates };
+
+  const waiting = { ...createRun({ key: 'GW-WAIT', runId: 'w1', flow, routerReason: 't', repo: '/repo', campaignDir: '/repo/c', now: Date.now() }), stage: stage.id };
+  saveRun(waiting);
+  acquire('commit', other);
+  const started = Date.now();
+  setTimeout(() => release('commit', other), 300);
+  await drive(waiting, flow, deps);
+  assert.ok(Date.now() - started >= 300);
+  assert.ok(gates.calls.some((c) => c.checks.includes('commit')));
+
+  const cancelled = { ...createRun({ key: 'GW-CANCEL', runId: 'k1', flow, routerReason: 't', repo: '/repo', campaignDir: '/repo/d', now: Date.now() }), stage: stage.id };
+  saveRun(cancelled);
+  acquire('commit', other);
+  gates.calls.length = 0;
+  setTimeout(() => saveRun({ ...loadRun('GW-CANCEL', 'k1'), status: 'stopped', stopReason: 'aborted' }), 100);
+  const out = await drive(cancelled, flow, deps);
+  release('commit', other);
+  assert.strictEqual(out.stopReason, 'aborted');
+  assert.ok(!gates.calls.some((c) => c.checks.includes('commit')));
+});
+
+test('stage dùng trình duyệt (ui-check) chờ khi run khác đang giữ trình duyệt, không gọi claude', async () => {
+  const { acquire, release } = await import('./lock.mjs');
+  const flow = loadFlow('landing-fix');
+  const other = { key: 'GW-BROWSING', runId: 'b1' };
+  const claude = fakeClaude({});
+  const run = { ...createRun({ key: 'GW-UI', runId: 'u1', flow, routerReason: 't', repo: '/repo', campaignDir: '/repo/e', now: Date.now() }), stage: 'ui-check' };
+  saveRun(run);
+  acquire('browser', other);
+  setTimeout(() => saveRun({ ...loadRun('GW-UI', 'u1'), status: 'stopped', stopReason: 'aborted' }), 100);
+  const out = await drive(run, flow, { notify: () => {}, repoState: fakeRepoState, runClaude: claude.runClaude, runGates: fakeGates().runGates });
+  release('browser', other);
+  assert.strictEqual(out.stopReason, 'aborted');
+  assert.strictEqual(claude.calls.length, 0);
 });

@@ -141,7 +141,8 @@ export async function runGateStage(run, stage, deps) {
   const round = roundOf(run, stage.id);
   const started = deps.now();
   const parts = [];
-  for (const dirs of gateTargets(run, stage)) {
+  const targets = gateTargets(run, stage);
+  for (const dirs of targets) {
     parts.push(await gatesOn(run, stage, deps, dirs));
     if (parts.at(-1).error) break;
   }
@@ -151,6 +152,8 @@ export async function runGateStage(run, stage, deps) {
   if (commits.length) run.commits = [...(run.commits ?? []), ...commits];
   const commitResults = result.results.filter((r) => r.check === 'commit');
   if (commitResults.length) run.pullPending = commitResults.some((r) => r.pullPending);
+  // mọi repo đã commit, chỉ còn chờ pull (mất mạng/VPN) → nhả repo để task khác chạy; retry sẽ giữ lại
+  if (run.pullPending && parts.length === targets.length && commitResults.every((r) => r.status === 'pass' || r.pullPending)) releaseRepos(run);
   const failed = result.results.filter((r) => r.status === 'fail');
   const receipt = {
     stage: stage.id, verdict: result.pass ? 'pass' : 'revise', turns: 0, costUsd: 0, ms: deps.now() - started,

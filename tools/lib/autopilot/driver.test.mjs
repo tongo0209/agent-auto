@@ -10,7 +10,7 @@ const { drive, runGateStage } = await import('./driver.mjs');
 const { createRun, applyEvent, resumeRun, reopenRun, chooseAction } = await import('./engine.mjs');
 const { loadFlow } = await import('./flows.mjs');
 const { runDir, loadRun, saveRun, pauseFile } = await import('./store.mjs');
-const { holdCampaign, heldCampaigns } = await import('./lock.mjs');
+const { holdCampaign, heldCampaigns, holdRepo } = await import('./lock.mjs');
 
 const verdict = (v, extra = {}) => '```autopilot-verdict\n' + JSON.stringify({ verdict: v, ...extra }) + '\n```';
 
@@ -650,4 +650,22 @@ test('pause bấm trong stage cuối trước mốc chờ user → mốc đó xo
   assert.ok(!fs.existsSync(pauseFile(key, 'r1')));
   run = await drive(applyEvent(run, flow, { type: 'approve' }, Date.now()), flow, deps);
   assert.strictEqual(run.status, 'done');
+});
+
+test('commit xong chỉ còn lỗi pull → nhả repo cho run khác; lỗi commit thật thì vẫn giữ', async () => {
+  const stage = loadFlow('landing-fix').stages.find((s) => s.checks?.includes('commit'));
+  const gates = (extra) => async () => ({ pass: false, error: 'commit', results: [{ check: 'commit', status: 'error', blocking: [], note: 'x', ...extra }] });
+  const other = { key: 'GW-OTHER', runId: 'o1' };
+
+  const pulling = { ...newRun('landing-fix'), runId: 'pull-1', receipts: [] };
+  saveRun(pulling);
+  holdRepo('/repo-pull', pulling);
+  await runGateStage(pulling, stage, { now: Date.now, runGates: gates({ commit: 'abc', pullPending: true }) });
+  assert.strictEqual(holdRepo('/repo-pull', other).ok, true);
+
+  const broken = { ...newRun('landing-fix'), runId: 'broken-1', receipts: [] };
+  saveRun(broken);
+  holdRepo('/repo-broken', broken);
+  await runGateStage(broken, stage, { now: Date.now, runGates: gates({}) });
+  assert.strictEqual(holdRepo('/repo-broken', other).ok, false);
 });

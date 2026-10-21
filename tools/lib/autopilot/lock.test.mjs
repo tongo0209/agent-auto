@@ -129,8 +129,12 @@ test('holdRepo: run có campaign dùng chung repo; run chưa có campaign giữ 
   assert.deepStrictEqual(holdRepo('/repo', C), { ok: true });
 });
 
-test('holdRepo đọc được file .repos.json định dạng cũ (1 chủ/repo)', () => {
-  saveRun({ ...A, status: 'paused' });
+test('holdRepo đọc được file .repos.json định dạng cũ: run cũ có campaign thì dùng chung, chưa có thì giữ riêng', () => {
+  saveRun({ ...A, status: 'paused', campaignDir: '/repo/c' });
+  fs.writeFileSync(path.join(dir, '.repos.json'), JSON.stringify({ '/repo': A }));
+  assert.strictEqual(holdRepo('/repo', B, { shared: true }).ok, true);
+  releaseRepos(B);
+  saveRun({ ...A, status: 'paused', campaignDir: null });
   fs.writeFileSync(path.join(dir, '.repos.json'), JSON.stringify({ '/repo': A }));
   assert.strictEqual(holdRepo('/repo', B, { shared: true }).ok, false);
   releaseRepos(A);

@@ -110,8 +110,13 @@ export function releaseCampaign(owner) {
   });
 }
 
-// File cũ ghi 1 chủ/repo dạng {key, runId}; mới là danh sách chủ, mỗi chủ shared hoặc giữ riêng
-const repoHolders = (entry) => (Array.isArray(entry) ? entry : entry ? [{ ...entry, shared: false }] : []);
+// File cũ ghi 1 chủ/repo dạng {key, runId} (giữ riêng); run cũ đã có campaign thì nay coi là dùng chung
+const repoHolders = (entry) => {
+  if (Array.isArray(entry)) return entry;
+  if (!entry) return [];
+  const run = loadRun(entry.key, entry.runId);
+  return [{ ...entry, shared: Boolean(run?.campaignDir || run?.campaignDirs?.length) }];
+};
 
 // Run đã có campaign thì chung repo với run khác (campaign đã khoá riêng); run chưa có campaign giữ cả repo
 export function holdRepo(top, owner, { shared = false } = {}) {

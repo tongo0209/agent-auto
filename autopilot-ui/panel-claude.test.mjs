@@ -32,5 +32,7 @@ test('đoạn dặn: việc có ticket thì route rồi run --bg (run thường 
   assert.match(text, /autopilot\.mjs open <KEY>/);
   assert.match(text, /autopilot\.mjs status <KEY>/);
   assert.match(text, /Chạy autopilot hay tôi sửa trực tiếp\?/);
-  assert.match(text, /~\/VNG\/git-vng/);
+  assert.match(text, /TỰ commit theo R-GIT/);
+  assert.match(text, /KHÔNG tự push/);
+  assert.match(text, /CẤM `--autostash`\/`--amend`/);
 });

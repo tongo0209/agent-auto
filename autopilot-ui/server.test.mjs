@@ -71,9 +71,10 @@ test('artifact không có → 404', async () => {
   assert.strictEqual((await fetch(`${base}/api/autopilot/runs/GW-1/r1/artifacts/x.md`)).status, 404);
 });
 
-test('bản thử: nút autopilot chạy được (run nằm trong worktree + sandbox), lệnh ghi của console vẫn chặn', async () => {
-  const lab = createServer({ spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
+test('bản thử: nút autopilot chạy được (run nằm trong worktree + sandbox), lệnh ghi của console vẫn chặn', async (t) => {
+  const lab = createServer({ allowWrites: false, spawnCli: (args) => (spawned.push(args), { pid: 1, log: 'x.log' }) });
   await new Promise((r) => lab.listen(0, '127.0.0.1', r));
+  t.after(() => lab.close());
   const url = `http://127.0.0.1:${lab.address().port}`;
   const before = spawned.length;
   const post = (p) => fetch(`${url}${p}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"key":"GW-1"}' });
@@ -81,7 +82,6 @@ test('bản thử: nút autopilot chạy được (run nằm trong worktree + sa
   assert.strictEqual((await post('/api/board/check')).status, 403);
   assert.strictEqual((await fetch(`${url}/api/state`)).status, 200);
   assert.strictEqual(spawned.length, before + 1);
-  lab.close();
 });
 
 test('POST open chạy CLI đồng bộ, trả JSON kèm lệnh gõ vào tab (claude có đoạn dặn panel); CLI lỗi → 400 kèm lý do', async () => {

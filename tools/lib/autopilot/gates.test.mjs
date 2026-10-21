@@ -189,6 +189,29 @@ test('G2: chưa có mainsite/*.html → handoff checks skipped', async () => {
   assert.deepStrictEqual(r.results.map((x) => x.status), ['skipped', 'skipped']);
 });
 
+function withLockedNote(campaignDir, type) {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-data-'));
+  fs.mkdirSync(path.join(data, 'projects', 'g'), { recursive: true });
+  fs.writeFileSync(path.join(data, 'projects', 'g', 's.md'), `# g/s\n\n## 1. Khoá\n- gameplay: none\n- type: ${type}\n\n## 2. Nơi code\n- gt-promotion: ${campaignDir}\n`);
+  process.env.AUTOPILOT_DATA_ROOT = data;
+}
+
+test('check-promotion lấy loại từ file dự án; loại ngoài bảng 39 → skipped kèm lý do, không dừng run', async () => {
+  const f = handoffFixture();
+  try {
+    withLockedNote(f.campaignDir, 'vong-quay');
+    const { exec, calls } = fakeExec();
+    await runGates(['check-promotion'], ctx(f, exec));
+    assert.match(calls[0].line, /check-promotion\.mjs vong-quay .*mainsite\/index\.html$/);
+    withLockedNote(f.campaignDir, 'dang-ky-thi-dau-va-to-chuc-su-kien');
+    const r = await runGates(['check-promotion'], ctx(f, fakeExec().exec));
+    assert.strictEqual(r.results[0].status, 'skipped');
+    assert.match(r.results[0].note, /dang-ky-thi-dau-va-to-chuc-su-kien/);
+  } finally {
+    delete process.env.AUTOPILOT_DATA_ROOT;
+  }
+});
+
 test('G6: check-promotion trên campaign chưa bàn giao đọc dist/*.html', async () => {
   const f = fixture();
   fs.mkdirSync(path.join(f.campaignDir, 'dist'));

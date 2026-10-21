@@ -24,11 +24,10 @@ export function notePathFor(fileOrDir) {
 }
 
 // File bàn giao (gt-promotion, Twig new-mainsite) không mang tên campaign → dò mục "2. Nơi code" của mọi note.
-export function noteForAnyFile(file) {
+export function noteForAnyFile(file, root = projectsRoot()) {
   const direct = notePathFor(file);
-  if (direct) return direct;
+  if (direct && existsSync(direct)) return direct;
   const target = resolve(file);
-  const root = projectsRoot();
   if (!existsSync(root)) return null;
   for (const game of readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory())) {
     for (const name of readdirSync(join(root, game.name)).filter((n) => n.endsWith('.md'))) {

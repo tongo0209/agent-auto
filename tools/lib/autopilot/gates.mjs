@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { statusEntries } from './worktree.mjs';
 import { dataRoot } from './store.mjs';
+import { noteForAnyFile, readLock } from '../project-lock.mjs';
+import { resolveType } from '../../check-promotion.mjs';
 
 const AGENT_ROOT = path.resolve(import.meta.dirname, '../../..');
 const BUILD_SCRIPTS = ['build-optimize', 'build-pro', 'build-dev', 'build'];
@@ -75,7 +77,10 @@ const CHECKS = {
   },
   'check-promotion': ({ campaignDir }) => {
     const files = deliverableHtml(campaignDir);
-    return files.length ? { cmd: 'node', args: [tool('check-promotion.mjs'), ...files] } : { skip: 'chưa có mainsite/ hay dist/ *.html' };
+    if (!files.length) return { skip: 'chưa có mainsite/ hay dist/ *.html' };
+    const type = readLock(noteForAnyFile(files[0], path.join(dataRoot(), 'projects')))?.type;
+    if (type && !resolveType(type)) return { skip: `type "${type}" của file dự án không thuộc 39 loại promotion — không có checklist để soát` };
+    return { cmd: 'node', args: [tool('check-promotion.mjs'), ...(type ? [type] : []), ...files] };
   },
 };
 

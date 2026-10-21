@@ -114,7 +114,7 @@ check_cwd allow "$CDN" $'python3 - <<\'PY\'\nprint("CAM git pull --autostash va 
 check_cwd allow "$CDN" "grep -rn 'autostash' ~/.claude/CLAUDE.md"
 
 # --- Phải ASK: việc của con người, agent không tự quyết ---
-check allow 'git push origin feature/gw-660'
+check ask 'git push origin feature/gw-660'
 check allow "cd $HOME/Code-Personal/arcade && git push origin main"
 check deny "cd $HOME/Code-Personal/arcade && git push --force origin main"
 out=$(jq -nc --arg d "$HOME/Code-Personal/arcade" '{tool_name:"Bash",cwd:$d,tool_input:{command:"git push origin main"}}' | bash "$HOOK")

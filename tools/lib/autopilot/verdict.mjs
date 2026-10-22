@@ -1,7 +1,7 @@
 const BLOCK = /```autopilot-verdict\s*\n([\s\S]*?)```/g;
 const VERDICTS = ['pass', 'revise', 'fail'];
 
-const malformed = (note) => ({ verdict: 'fail', blocking: [], advisory: [], files: [], note, campaignDir: null, malformed: true });
+const malformed = (note) => ({ verdict: 'fail', blocking: [], advisory: [], files: [], note, campaignDir: null, evidence: [], malformed: true });
 
 export function parseVerdict(text = '') {
   const last = [...text.matchAll(BLOCK)].at(-1);
@@ -18,5 +18,5 @@ export function parseVerdict(text = '') {
   const blocking = raw.blocking ?? [];
   // review "revise" mà không nêu lỗi chặn nào thì không có gì để sửa
   const verdict = raw.verdict === 'revise' && blocking.length === 0 ? 'pass' : raw.verdict;
-  return { verdict, blocking, advisory: raw.advisory ?? [], files: raw.files ?? [], note: raw.note ?? '', campaignDir: raw.campaignDir ?? null, malformed: false };
+  return { verdict, blocking, advisory: raw.advisory ?? [], files: raw.files ?? [], note: raw.note ?? '', campaignDir: raw.campaignDir ?? null, evidence: raw.evidence ?? [], malformed: false };
 }

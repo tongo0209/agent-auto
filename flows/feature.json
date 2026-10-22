@@ -89,12 +89,26 @@
       "prompt": "ui-check.md",
       "toolset": "browser",
       "model": "sonnet",
-      "next": "approve-result",
+      "next": "design-compare",
       "loop": {
         "back": "fix",
         "max": 3
       },
       "when": "touchesUi"
+    },
+    {
+      "id": "design-compare",
+      "kind": "claude",
+      "prompt": "design-compare.md",
+      "toolset": "browser",
+      "model": "opus",
+      "requireEvidence": true,
+      "loop": {
+        "back": "fix",
+        "max": 3
+      },
+      "when": "hasDesign",
+      "next": "approve-result"
     },
     {
       "id": "fix",
@@ -110,7 +124,8 @@
       "kind": "pause",
       "show": [
         "diff",
-        "receipts"
+        "receipts",
+        "design-compare-r*.json"
       ],
       "onReject": "fix",
       "rejectReturnTo": "gates",

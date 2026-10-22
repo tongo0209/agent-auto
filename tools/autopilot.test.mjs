@@ -31,9 +31,17 @@ const lastRun = (runs, key) => {
   return JSON.parse(fs.readFileSync(path.join(dir, id, 'run.json'), 'utf8'));
 };
 
+// design-compare chỉ pass khi có ảnh ghép đã mở: kịch bản giả khai ảnh + ghi log có lượt Read ảnh đó
+function seenCrop() {
+  const crop = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ap-cli-crop-')), 'pc-01.png');
+  fs.writeFileSync(crop, 'png');
+  const log = JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: crop } }] } });
+  return { 'design-compare': [{ result: '```autopilot-verdict\n' + JSON.stringify({ verdict: 'pass', evidence: [crop] }) + '\n```', log }] };
+}
+
 for (const flow of ['landing-fix', 'feature', 'landing-new']) {
   test(`${flow}: run → approve từng mốc → done`, () => {
-    const { cli, campaign, runs } = sandbox();
+    const { cli, campaign, runs } = sandbox(seenCrop());
     assert.strictEqual(cli('run', 'GW-1', '--flow', flow, '--campaign', campaign).code, 0);
     for (let i = 0; i < 5 && lastRun(runs, 'GW-1').status === 'paused'; i++) cli('approve', 'GW-1');
     assert.strictEqual(lastRun(runs, 'GW-1').status, 'done');

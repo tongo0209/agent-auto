@@ -1,6 +1,7 @@
 # Stage ui-check — {{KEY}} (vòng {{round}})
 
-Chạy skill `/ui-check` trên bản build của `{{campaignDir}}` (đọc mục `## Chạy dưới autopilot` của skill): Lớp 1 + `text-stress.js`, PC 1920×1080 + MB 768×1024, so với design `~/VNG/agent-auto/designs/{{KEY}}/` khi có `coords.json`.
+Chạy skill `/ui-check` trên bản build của `{{campaignDir}}` (đọc mục `## Chạy dưới autopilot` của skill): Lớp 1 + `text-stress.js`, PC 1920×1080 + MB 768×1024.
+Lớp 2 (so ảnh design) là việc của stage `design-compare` ngay sau — ở đây KHÔNG ghi "chưa so design" thành advisory.
 KHÔNG sửa code.
 
 Ghi `{{runDir}}/ui-check-r{{round}}.json` dạng `{"blocking":[...],"advisory":[...]}`, mỗi lỗi có selector/vị trí + viewport.

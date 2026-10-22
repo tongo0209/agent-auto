@@ -46,9 +46,10 @@ export function buildClaudeArgs({ prompt, model, toolset, resumeSessionId, writa
 
 export const guardCode = (text = '') => text.match(/\bG-[A-Z]+-\d+\b/)?.[0] ?? null;
 
-function runFake({ stageId, round }) {
+function runFake({ stageId, round, logFile }) {
   const script = JSON.parse(fs.readFileSync(process.env.AUTOPILOT_FAKE, 'utf8'));
   const entry = script[stageId]?.[round - 1] ?? script[stageId]?.at(-1) ?? { result: FAKE_PASS };
+  if (entry.log && logFile) fs.writeFileSync(logFile, entry.log);
   return {
     ok: entry.ok ?? true,
     sessionId: `fake-${stageId}-${round}`,
@@ -62,7 +63,7 @@ function runFake({ stageId, round }) {
 }
 
 export function runClaude({ stageId, round, prompt, model, toolset, resumeSessionId, writable, cwd, marker, timeoutMs = DEFAULT_TIMEOUT_MS, logFile, childFile }) {
-  if (process.env.AUTOPILOT_FAKE) return Promise.resolve(runFake({ stageId, round }));
+  if (process.env.AUTOPILOT_FAKE) return Promise.resolve(runFake({ stageId, round, logFile }));
 
   const args = buildClaudeArgs({ prompt, model, toolset, resumeSessionId, writable });
   const started = Date.now();

@@ -20,6 +20,7 @@ function fakeClaude(script) {
     calls.push(opts);
     const list = script[opts.stageId] ?? [{ result: verdict('pass') }];
     const entry = list[opts.round - 1] ?? list.at(-1);
+    if (entry.log) fs.writeFileSync(opts.logFile, entry.log);
     return { ok: entry.ok ?? true, sessionId: `s-${opts.stageId}`, turns: 2, costUsd: entry.costUsd ?? 0.1, ms: 1000, result: entry.result ?? verdict('pass'), error: entry.ok === false ? 'boom' : null };
   };
   return { runClaude, calls };
@@ -94,6 +95,55 @@ test('output không verdict mà có mã hook G- → stopped guard', async () => 
   const { runClaude } = fakeClaude({ plan: [{ result: 'bị chặn G-GIT-4' }] });
   const run = await drive(newRun('landing-fix'), loadFlow('landing-fix'), base({ runClaude, runGates: fakeGates().runGates }));
   assert.strictEqual(run.stopReason, 'guard:G-GIT-4');
+});
+
+const evidenceFlow = {
+  id: 'evidence-test',
+  ask: [{ need: ['campaignDir'], question: '?' }],
+  stages: [{ id: 'design-compare', kind: 'claude', prompt: 'design-compare.md', toolset: 'browser', model: 'opus', requireEvidence: true, next: null }],
+};
+const evidenceRun = () => createRun({ key: 'GW-1', runId: `e${Math.random().toString(36).slice(2, 8)}`, flow: evidenceFlow, routerReason: 't', repo: '/repo', campaignDir: '/repo/products/x/landing/a', now: Date.now() });
+const cropFile = () => {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ap-crop-')), 'pc-01.png');
+  fs.writeFileSync(file, 'png');
+  return file;
+};
+const readEvent = (file) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: file } }] } });
+
+test('requireEvidence: pass mà chưa mở ảnh nào → nhắc 1 lần trong cùng phiên, vẫn thiếu → stopped evidence', async () => {
+  const crop = cropFile();
+  const calls = [];
+  const runClaude = async (opts) => {
+    calls.push(opts);
+    return { ok: true, sessionId: 's-dc', turns: 1, costUsd: 0, ms: 1, result: verdict('pass', { evidence: [crop] }) };
+  };
+  const run = await drive(evidenceRun(), evidenceFlow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.deepStrictEqual([run.status, run.stopReason], ['stopped', 'evidence:design-compare']);
+  assert.strictEqual(calls.length, 2);
+  assert.strictEqual(calls[1].resumeSessionId, 's-dc');
+  assert.match(calls[1].prompt, /chưa mở bằng Read/);
+});
+
+test('requireEvidence: lượt nhắc mở đủ ảnh → pass, run done', async () => {
+  const crop = cropFile();
+  let n = 0;
+  const runClaude = async (opts) => {
+    if (++n === 2) fs.writeFileSync(opts.logFile, readEvent(crop) + '\n');
+    return { ok: true, sessionId: 's-dc', turns: 1, costUsd: 0, ms: 1, result: verdict('pass', { evidence: [crop] }) };
+  };
+  const run = await drive(evidenceRun(), evidenceFlow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.strictEqual(run.status, 'done');
+});
+
+test('requireEvidence: revise không cần bằng chứng (đã có lỗi để sửa)', async () => {
+  const calls = [];
+  const runClaude = async (opts) => {
+    calls.push(opts);
+    return { ok: true, sessionId: 's-dc', turns: 1, costUsd: 0, ms: 1, result: verdict('fail', { blocking: ['lệch'] }) };
+  };
+  const run = await drive(evidenceRun(), evidenceFlow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.strictEqual(calls.length, 1);
+  assert.strictEqual(run.stopReason, 'fail:design-compare');
 });
 
 test('gate error → stopped gate-error:<check>', async () => {
@@ -459,13 +509,15 @@ test('done: báo chờ review kèm số file + repo đã sửa', async () => {
 test('run trả về sau review: fix → cổng → bỏ mốc duyệt kết quả → commit lại → done', async () => {
   const flow = loadFlow('landing-new');
   const done = { ...newRun('landing-new'), status: 'done', stage: null, worktrees: {} };
-  const { runClaude, calls } = fakeClaude({});
+  const crop = cropFile();
+  const { runClaude, calls } = fakeClaude({ 'design-compare': [{ result: verdict('pass', { evidence: [crop] }), log: readEvent(crop) }] });
   const gates = fakeGates();
   const run = await drive(reopenRun(done, flow, 'nút lệch 4px', Date.now()), flow, base({ runClaude, runGates: gates.runGates }));
   assert.strictEqual(run.status, 'done');
-  assert.deepStrictEqual(calls.map((c) => c.stageId), ['fix']);
+  // sửa sau review phải qua lại cả so design, không chỉ cổng máy
+  assert.deepStrictEqual(calls.map((c) => c.stageId), ['fix', 'ui-check', 'design-compare', 'clean-code']);
   assert.match(calls[0].prompt, /nút lệch 4px/);
-  assert.deepStrictEqual(gates.calls.map((c) => c.checks.at(-1)), ['layout-gate', 'commit']);
+  assert.deepStrictEqual(gates.calls.map((c) => c.checks.at(-1)), ['layout-gate', 'layout-gate', 'commit']);
   assert.ok(!run.receipts.some((r) => r.stage === 'approve-result'));
 });
 
@@ -738,4 +790,17 @@ test('stage khai timeoutMinutes → runner nhận timeoutMs tương ứng', asyn
   await drive(newRun('landing-fix'), flow, base({ runClaude, runGates: fakeGates().runGates }));
   assert.strictEqual(calls.find((c) => c.stageId === 'plan').timeoutMs, 45 * 60_000);
   assert.strictEqual(calls.find((c) => c.stageId !== 'plan').timeoutMs, undefined);
+});
+
+test('WHEN.hasDesign: chỉ khi run sửa file UI VÀ designs/<KEY> có ảnh', async () => {
+  const { WHEN } = await import('./driver.mjs');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-data-'));
+  process.env.AUTOPILOT_DATA_ROOT = root;
+  const ui = { key: 'GW-7', files: ['products/x/landing/a/assets/main/main.scss'] };
+  assert.strictEqual(WHEN.hasDesign(ui), false);
+  fs.mkdirSync(path.join(root, 'designs', 'GW-7', '_src'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'designs', 'GW-7', '_src', 'web.png'), 'png');
+  assert.strictEqual(WHEN.hasDesign(ui), true);
+  assert.strictEqual(WHEN.hasDesign({ key: 'GW-7', files: ['tools/x.mjs'] }), false);
+  delete process.env.AUTOPILOT_DATA_ROOT;
 });

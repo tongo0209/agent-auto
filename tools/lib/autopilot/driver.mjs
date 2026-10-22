@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { nextAction, applyEvent, roundOf, finalApproval } from './engine.mjs';
 import { parseVerdict } from './verdict.mjs';
+import { missingEvidence } from './evidence.mjs';
 import { renderPrompt } from './prompts.mjs';
 import { PROMPTS_DIR } from './flows.mjs';
 import { dataRoot, runDir, saveRun, loadRun, writeArtifact, pauseFile, childFile } from './store.mjs';
@@ -21,7 +22,13 @@ export const WHEN = {
   touchesUi: (run) => (run.files ?? []).some((f) => UI_FILE.test(f)),
   touchesPm: (run) => (run.files ?? []).some((f) => UI_FILE.test(f) && readIfExists(path.join(toWorktree(run.worktrees, run.repo), f)).includes('pm__')),
   hasHandoff: (run) => Boolean(run.handoffDir),
+  hasDesign: (run) => WHEN.touchesUi(run) && hasDesignImage(path.join(dataRoot(), 'designs', run.key)),
 };
+
+function hasDesignImage(dir) {
+  if (!fs.existsSync(dir)) return false;
+  return fs.readdirSync(dir, { recursive: true }).some((f) => /\.(png|jpe?g)$/i.test(f));
+}
 
 function planTitle(run) {
   const plan = path.join(runDir(run.key, run.runId), 'plan.md');
@@ -87,6 +94,12 @@ function retryOpts(opts, failed, marker) {
   return { ...opts, logFile, resumeSessionId: failed.sessionId, prompt: continuePrompt(marker, `vì ${failed.error ?? 'runner lỗi'}`) };
 }
 
+const readLogs = (files) => files.filter((f) => fs.existsSync(f)).map((f) => fs.readFileSync(f, 'utf8'));
+
+function evidencePrompt(marker, missing) {
+  return `AUTOPILOT_RUN: ${marker}\nVerdict pass của bước này chưa có bằng chứng đã NHÌN:\n- ${missing.join('\n- ')}\nMở từng ảnh ghép bằng Read, soát lại checklist trên từng ảnh, rồi trả lại khối autopilot-verdict với evidence = đường dẫn tuyệt đối các ảnh đã mở.`;
+}
+
 async function runClaudeStage(run, stage, deps) {
   const round = roundOf(run, stage.id);
   const template = fs.readFileSync(path.join(PROMPTS_DIR, stage.prompt), 'utf8');
@@ -106,13 +119,25 @@ async function runClaudeStage(run, stage, deps) {
   let res = await deps.runClaude(opts);
   if (stopRequested(run)) return { type: 'halt', reason: 'paused', cutSession: { stage: stage.id, sessionId: res.sessionId ?? cut?.sessionId ?? null } };
   if (!res.ok) res = await deps.runClaude(retryOpts(opts, res, marker));
-  const v = parseVerdict(res.result);
-  writeArtifact(run, `${stage.id}-r${round}.json`, v);
+  let v = parseVerdict(res.result);
+
+  const logs = [opts.logFile, retryOpts(opts, res, marker).logFile];
+  const unproven = () => (stage.requireEvidence && v.verdict === 'pass' ? missingEvidence(v.evidence, readLogs(logs)) : []);
+  let missing = res.ok ? unproven() : [];
+  if (missing.length) {
+    const ask = { ...opts, logFile: opts.logFile.replace(/\.log$/, '-bangchung.log'), resumeSessionId: res.sessionId, prompt: evidencePrompt(marker, missing) };
+    logs.push(ask.logFile);
+    res = await deps.runClaude(ask);
+    v = parseVerdict(res.result);
+    missing = unproven();
+  }
+  writeArtifact(run, `${stage.id}-r${round}.json`, missing.length ? { ...v, missingEvidence: missing } : v);
   const receipt = receiptOf(stage, v, res);
 
   const guard = v.malformed ? guardCode(`${res.result}\n${res.error ?? ''}`) : null;
   if (guard) return { type: 'halt', reason: `guard:${guard}`, receipt };
   if (!res.ok) return { type: 'halt', reason: `runner:${stage.id}`, receipt };
+  if (missing.length) return { type: 'halt', reason: `evidence:${stage.id}`, receipt };
 
   if (v.campaignDir && !run.campaignDir) {
     const held = claimCampaign(v.campaignDir, run);

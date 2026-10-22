@@ -89,11 +89,25 @@
       "prompt": "ui-check.md",
       "toolset": "browser",
       "model": "sonnet",
-      "next": "handoff",
+      "next": "design-compare",
       "loop": {
         "back": "fix",
         "max": 3
       }
+    },
+    {
+      "id": "design-compare",
+      "kind": "claude",
+      "prompt": "design-compare.md",
+      "toolset": "browser",
+      "model": "opus",
+      "requireEvidence": true,
+      "loop": {
+        "back": "fix",
+        "max": 3
+      },
+      "when": "hasDesign",
+      "next": "handoff"
     },
     {
       "id": "handoff",
@@ -133,7 +147,8 @@
       "kind": "pause",
       "show": [
         "diff",
-        "receipts"
+        "receipts",
+        "design-compare-r*.json"
       ],
       "onReject": "fix",
       "rejectReturnTo": "gates",

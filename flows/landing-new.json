@@ -130,11 +130,24 @@
       "prompt": "ui-check.md",
       "toolset": "browser",
       "model": "sonnet",
-      "next": "clean-code",
+      "next": "design-compare",
       "loop": {
         "back": "fix",
         "max": 3
       }
+    },
+    {
+      "id": "design-compare",
+      "kind": "claude",
+      "prompt": "design-compare.md",
+      "toolset": "browser",
+      "model": "opus",
+      "requireEvidence": true,
+      "loop": {
+        "back": "fix",
+        "max": 3
+      },
+      "next": "clean-code"
     },
     {
       "id": "clean-code",
@@ -198,10 +211,11 @@
       "kind": "pause",
       "show": [
         "diff",
-        "receipts"
+        "receipts",
+        "design-compare-r*.json"
       ],
       "onReject": "fix",
-      "rejectReturnTo": "gates-final",
+      "rejectReturnTo": "gates",
       "next": "commit"
     },
     {

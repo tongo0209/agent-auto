@@ -17,16 +17,16 @@ test('review không được Edit; không toolset nào có git commit/push', () 
   for (const tools of Object.values(TOOLSETS)) assert.doesNotMatch(tools, /git (commit|push)/);
 });
 
-test('hook sandbox luôn gắn, kể cả khi bật AUTOPILOT_LAB_WRITES (biến đó chỉ mở POST + stage ghi thật)', () => {
-  const settingsOf = (args) => JSON.parse(args[args.indexOf('--settings') + 1]);
-  const hook = settingsOf(buildClaudeArgs({ prompt: 'p', toolset: 'implement' })).hooks.PreToolUse[0];
-  assert.match(hook.matcher, /Edit/);
-  assert.match(hook.hooks[0].command, /sandbox-hook\.mjs/);
-  process.env.AUTOPILOT_LAB_WRITES = '1';
+test('sandbox mặc định TẮT (user 22/10: xử lý linh động); AUTOPILOT_SANDBOX=1 mới gắn hook', () => {
+  assert.ok(!buildClaudeArgs({ prompt: 'p', toolset: 'implement' }).includes('--settings'));
+  process.env.AUTOPILOT_SANDBOX = '1';
   try {
-    assert.ok(buildClaudeArgs({ prompt: 'p', toolset: 'implement' }).includes('--settings'));
+    const args = buildClaudeArgs({ prompt: 'p', toolset: 'implement' });
+    const hook = JSON.parse(args[args.indexOf('--settings') + 1]).hooks.PreToolUse[0];
+    assert.match(hook.matcher, /Edit/);
+    assert.match(hook.hooks[0].command, /sandbox-hook\.mjs/);
   } finally {
-    delete process.env.AUTOPILOT_LAB_WRITES;
+    delete process.env.AUTOPILOT_SANDBOX;
   }
 });
 
@@ -132,8 +132,10 @@ test('đường thật: ghi PID ra childFile, bị tắt giữa chừng vẫn tr
   }
 });
 
-test('R19: hook sandbox nhận danh sách repo của run được ghi', () => {
+test('R19: hook sandbox (khi bật) nhận danh sách repo của run được ghi', () => {
+  process.env.AUTOPILOT_SANDBOX = '1';
   const args = buildClaudeArgs({ prompt: 'p', toolset: 'implement', writable: ['/Users/u/VNG/git-vng/cdn-source'] });
   const command = JSON.parse(args[args.indexOf('--settings') + 1]).hooks.PreToolUse[0].hooks[0].command;
+  delete process.env.AUTOPILOT_SANDBOX;
   assert.match(command, /sandbox-hook\.mjs" "\/Users\/u\/VNG\/git-vng\/cdn-source"$/);
 });

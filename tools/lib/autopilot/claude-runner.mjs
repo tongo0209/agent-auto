@@ -29,8 +29,8 @@ const sandboxSettings = (writable) => {
 const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 const FAKE_PASS = '```autopilot-verdict\n{"verdict":"pass"}\n```';
 
-// AUTOPILOT_LAB_WRITES chỉ mở POST + stage ghi thật, không bao giờ tắt sandbox
-export const sandboxArgs = (writable = []) => ['--settings', sandboxSettings(writable)];
+// Mặc định tắt để agent xử lý linh động (user 22/10/2026); hook toàn cục ~/.claude vẫn chạy
+export const sandboxArgs = (writable = []) => (process.env.AUTOPILOT_SANDBOX === '1' ? ['--settings', sandboxSettings(writable)] : []);
 
 export const tokensOf = (usage = {}) =>
   (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);

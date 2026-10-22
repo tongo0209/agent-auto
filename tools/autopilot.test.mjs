@@ -233,7 +233,7 @@ test('R19 open: tạo run chat làm thẳng trên repo gốc + brief.md, in JSON
   assert.strictEqual(launch.cwd, path.dirname(campaign));
   assert.ok(fs.existsSync(launch.cwd));
   assert.deepStrictEqual(launch.env, { AUTOPILOT_RUN: `GW-20/${run.runId}` });
-  assert.ok(launch.args.includes('--settings'));
+  assert.ok(!launch.args.includes('--settings'));
   const brief = path.join(runs, 'GW-20', run.runId, 'brief.md');
   assert.match(launch.args[0], new RegExp(brief.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   const text = fs.readFileSync(brief, 'utf8');
@@ -241,7 +241,6 @@ test('R19 open: tạo run chat làm thẳng trên repo gốc + brief.md, in JSON
   assert.match(text, /autopilot\.mjs mark GW-20 <bước> <doing\|pass\|fail\|ask>/);
   assert.match(text, /autopilot\.mjs gates GW-20/);
   assert.ok(text.includes(`campaignDir: \`${campaign}\``));
-  assert.ok(launch.args.some((a) => a.includes(`sandbox-hook.mjs\\" \\"${repo}`)));
   assert.strictEqual(Object.values(JSON.parse(fs.readFileSync(path.join(runs, '.held.json'), 'utf8')))[0].key, 'GW-20');
   assert.ok(campaign);
 });
@@ -378,7 +377,7 @@ const attach = (cli, runs, key) => {
   const run = lastRun(runs, key);
   const brief = path.join(runs, key, run.runId, 'attach.md');
   assert.ok(launch.args[0].includes(brief));
-  assert.ok(launch.args.includes('--settings'));
+  assert.ok(!launch.args.includes('--settings'));
   return { launch, run, brief: fs.readFileSync(brief, 'utf8') };
 };
 

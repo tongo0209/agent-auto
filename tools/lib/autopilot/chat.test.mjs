@@ -46,7 +46,10 @@ test('R19 chatCwd: run mới mở thẳng ở repo gốc; run chưa có repo →
 
 test('R19 chatLaunch: sandbox mở ghi đúng repo của run; brief nói làm thẳng trên nhánh, cấm checkout/reset/stash/clean', () => {
   const run = { key: 'GW-51', runId: 'r1', flow: 'landing-fix', status: 'chat', stage: 'plan', receipts: [], worktrees: {}, repo: '/x/repo', workBranch: { '/x/repo': 'tont' } };
+  assert.ok(!chatLaunch(run).args.includes('--settings'));
+  process.env.AUTOPILOT_SANDBOX = '1';
   const launch = chatLaunch(run);
+  delete process.env.AUTOPILOT_SANDBOX;
   assert.strictEqual(launch.cwd, '/x/repo');
   assert.ok(launch.args.some((a) => a.includes('sandbox-hook.mjs\\" \\"/x/repo')), launch.args.join(' '));
   const brief = briefOf(run, loadFlow('landing-fix'));

@@ -75,9 +75,16 @@ const isAbortedOnDisk = (run) => {
 };
 const stopRequested = (run) => fs.existsSync(pauseFile(run.key, run.runId)) || isAbortedOnDisk(run);
 
-function continuePrompt(run, marker) {
-  const note = run.resumeNote ? `\nNgười dùng nhắn khi dừng: ${run.resumeNote}\n` : '';
-  return `AUTOPILOT_RUN: ${marker}\nBước này bị dừng giữa chừng theo lệnh người dùng. Làm tiếp từ chỗ dở (kiểm lại file đang sửa dở trong repo), rồi trả verdict như yêu cầu ban đầu.${note}`;
+function continuePrompt(marker, why, note) {
+  const said = note ? `\nNgười dùng nhắn khi dừng: ${note}\n` : '';
+  return `AUTOPILOT_RUN: ${marker}\nBước này bị dừng giữa chừng ${why}. Làm tiếp từ chỗ dở (kiểm lại file đang sửa dở trong repo), rồi trả verdict như yêu cầu ban đầu.${said}`;
+}
+
+// Lượt bị cắt (hết giờ, sập) đã có phiên thì resume phiên đó — mở phiên mới là mất sạch context đã đọc
+function retryOpts(opts, failed, marker) {
+  const logFile = opts.logFile.replace(/\.log$/, '-lai.log');
+  if (!failed.sessionId) return { ...opts, logFile };
+  return { ...opts, logFile, resumeSessionId: failed.sessionId, prompt: continuePrompt(marker, `vì ${failed.error ?? 'runner lỗi'}`) };
 }
 
 async function runClaudeStage(run, stage, deps) {
@@ -87,17 +94,18 @@ async function runClaudeStage(run, stage, deps) {
   const cut = run.cutSession?.stage === stage.id ? run.cutSession : null;
   const opts = {
     stageId: stage.id, round, model: stage.model, toolset: stage.toolset, marker,
-    prompt: cut ? continuePrompt(run, marker) : renderPrompt(template, stageVars(run, stage, deps.input), marker),
+    prompt: cut ? continuePrompt(marker, 'theo lệnh người dùng', run.resumeNote) : renderPrompt(template, stageVars(run, stage, deps.input), marker),
     resumeSessionId: cut ? cut.sessionId : stage.resume ? run.sessions[stage.resume] : null,
     cwd: run.repo ? toWorktree(run.worktrees, run.repo) : deps.agentRoot,
     writable: writableOf(run),
     logFile: path.join(runDir(run.key, run.runId), `${stage.id}-r${round}${cut ? '-tiep' : ''}.log`),
     childFile: childFile(run.key, run.runId),
+    timeoutMs: stage.timeoutMinutes ? stage.timeoutMinutes * 60_000 : undefined,
   };
 
   let res = await deps.runClaude(opts);
   if (stopRequested(run)) return { type: 'halt', reason: 'paused', cutSession: { stage: stage.id, sessionId: res.sessionId ?? cut?.sessionId ?? null } };
-  if (!res.ok) res = await deps.runClaude(opts);
+  if (!res.ok) res = await deps.runClaude(retryOpts(opts, res, marker));
   const v = parseVerdict(res.result);
   writeArtifact(run, `${stage.id}-r${round}.json`, v);
   const receipt = receiptOf(stage, v, res);

@@ -92,6 +92,7 @@
       "prompt": "implement.md",
       "toolset": "implement",
       "model": "opus",
+      "timeoutMinutes": 60,
       "next": "code-review",
       "keepSession": true
     },

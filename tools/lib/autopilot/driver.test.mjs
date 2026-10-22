@@ -721,3 +721,21 @@ test('stage dùng trình duyệt (ui-check) chờ khi run khác đang giữ trì
   assert.strictEqual(out.stopReason, 'aborted');
   assert.strictEqual(claude.calls.length, 0);
 });
+
+test('runner hết giờ → lượt lại resume đúng phiên vừa bị cắt, ghi log riêng', async () => {
+  const { runClaude, calls } = fakeClaude({ plan: [{ ok: false }] });
+  await drive(newRun('landing-fix'), loadFlow('landing-fix'), base({ runClaude, runGates: fakeGates().runGates }));
+  const [first, retry] = calls.filter((c) => c.stageId === 'plan');
+  assert.strictEqual(retry.resumeSessionId, 's-plan');
+  assert.match(retry.prompt, /làm tiếp từ chỗ dở/i);
+  assert.notStrictEqual(retry.logFile, first.logFile);
+});
+
+test('stage khai timeoutMinutes → runner nhận timeoutMs tương ứng', async () => {
+  const flow = loadFlow('landing-fix');
+  flow.stages.find((s) => s.id === 'plan').timeoutMinutes = 45;
+  const { runClaude, calls } = fakeClaude({});
+  await drive(newRun('landing-fix'), flow, base({ runClaude, runGates: fakeGates().runGates }));
+  assert.strictEqual(calls.find((c) => c.stageId === 'plan').timeoutMs, 45 * 60_000);
+  assert.strictEqual(calls.find((c) => c.stageId !== 'plan').timeoutMs, undefined);
+});

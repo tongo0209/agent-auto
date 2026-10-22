@@ -324,6 +324,36 @@ test('commit: run làm mất file đã track (vd build-dev xoá dist/fonts) → 
   assert.strictEqual(f.git('rev-parse', 'HEAD').stdout, head);
 });
 
+function trackInCampaign(f, rels) {
+  for (const rel of rels) {
+    fs.mkdirSync(path.dirname(path.join(f.campaignDir, rel)), { recursive: true });
+    fs.writeFileSync(path.join(f.campaignDir, rel), 'x');
+  }
+  f.git('add', '--', ...rels.map((rel) => `products/x/landing/a/${rel}`));
+  f.git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'landing cũ');
+}
+
+test('commit: dựng lại section xoá asset cũ (kèm dist sinh từ nó) → commit cả phần xoá', async () => {
+  const f = gitRepo();
+  const source = ['assets/sec/images/bg.png', 'assets/sec/images/sprite/btn.png', 'assets/main/fonts/Old.woff2'];
+  const built = ['dist/optimized/sec/images/bg.webp', 'dist/optimized/sec/images/sprite.webp', 'dist/fonts/Old.woff2'];
+  trackInCampaign(f, [...source, ...built]);
+  for (const rel of [...source, ...built]) fs.rmSync(path.join(f.campaignDir, rel));
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-new', files: [], planTitle: 'Dựng lại' });
+  assert.strictEqual(r.results[0].status, 'pass', r.results[0].blocking?.join('\n'));
+  const removed = f.git('show', '--diff-filter=D', '--name-only', '--format=', 'HEAD').stdout.trim().split('\n');
+  assert.strictEqual(removed.length, source.length + built.length);
+});
+
+test('commit: dist mất file mà source vẫn còn (build-dev ghi đè) → vẫn dừng', async () => {
+  const f = gitRepo();
+  trackInCampaign(f, ['assets/main/fonts/Keep.woff2', 'dist/fonts/Keep.woff2']);
+  fs.rmSync(path.join(f.campaignDir, 'dist/fonts/Keep.woff2'));
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-new', files: [], planTitle: 'Sửa' });
+  assert.strictEqual(r.results[0].status, 'error');
+  assert.deepStrictEqual(r.results[0].blocking, ['products/x/landing/a/dist/fonts/Keep.woff2']);
+});
+
 test('C1: commit build lại bản production (build-optimize > build-pro > build-dev) trước khi commit; build lỗi → dừng, không commit', async () => {
   const f = gitRepo({ 'build-dev': 'echo dev > dist.txt', 'build-pro': 'echo pro > dist.txt' });
   const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa' });

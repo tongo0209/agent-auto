@@ -24,6 +24,17 @@ const GROUPS = [
   ['done', 'Xong', (r) => r.status === 'done' && !r.awaitingReview],
   ['aborted', 'Đã huỷ', isAborted],
 ];
+const QUEUE_FILTERS = [
+  ['all', 'Tất cả', null],
+  ['running', 'đang chạy', ['run', 'chat']],
+  ['waiting', 'chờ bạn', ['need', 'review', 'broken']],
+  ['stopped', 'dừng', ['stop', 'aborted']],
+  ['done', 'xong', ['done']],
+];
+let queueFilter = 'all';
+let queueQuery = '';
+let ticketTitles = {};
+const queueNote = (text) => `<p style="color:var(--text-3);padding:12px 8px;font-size:13px">${text}</p>`;
 const FOLD_KEY = 'console2.apAbortedOpen';
 let abortedOpen = false;
 try { abortedOpen = localStorage.getItem(FOLD_KEY) === '1'; } catch {}
@@ -79,23 +90,30 @@ async function openInClaude(run) {
 
 function renderQueue() {
   if (!data.runs.length) {
-    $('#apQueue').innerHTML = '<p style="color:var(--text-3);padding:12px 8px;font-size:13px">Chưa có run nào. Bấm "Chạy ticket" để bắt đầu.</p>';
+    $('#apQueue').innerHTML = queueNote('Chưa có run nào. Bấm "Chạy ticket" để bắt đầu.');
     return;
   }
-  $('#apQueue').innerHTML = GROUPS.map(([cls, title, belongs]) => {
-    const runs = data.runs.filter(belongs);
+  const shownGroups = QUEUE_FILTERS.find(([id]) => id === queueFilter)[2];
+  const query = queueQuery.trim().toLowerCase();
+  const matchesQuery = (r) => `${r.key} ${ticketTitles[r.key] ?? ''}`.toLowerCase().includes(query);
+  $('#apQueue').innerHTML = GROUPS.filter(([cls]) => !shownGroups || shownGroups.includes(cls)).map(([cls, title, belongs]) => {
+    const runs = data.runs.filter((r) => belongs(r) && matchesQuery(r));
     if (!runs.length) return '';
     const folded = cls === 'aborted' && !abortedOpen;
     const head = cls === 'aborted'
       ? `<h3 class="fold" data-fold title="Run đã huỷ và hoàn tác — giữ lại để xem log, không cần xử lý"><span><i class="ph ph-caret-${folded ? 'right' : 'down'}"></i> ${title}</span><span class="mono">${runs.length}</span></h3>`
       : `<h3><span>${title}</span><span class="mono">${runs.length}</span></h3>`;
     return `<div class="group ${cls}">${head}${folded ? '' : runs.map((r) => `
-      <button class="item ${r.key === selectedKey ? 'on' : ''}" data-key="${esc(r.key)}">
+      <button class="item ${r.key === selectedKey ? 'on' : ''}" data-key="${esc(r.key)}" title="${esc(ticketTitles[r.key] ?? '')}">
         <span class="key">${esc(r.key)}</span><span class="cost mono">${r.mode === 'chat' ? `${compact(r.totals.tokens)} tok` : money(r.totals.usd)}</span>
         <span class="sub">${esc(r.flowLabel)} · ${esc(r.stage ?? (r.awaitingReview ? 'chờ review' : 'hoàn tất'))}</span>
         <span class="mini">${r.cells.filter((c) => !c.side).map((c) => `<i class="${c.state}"></i>`).join('')}</span>
       </button>`).join('')}</div>`;
-  }).join('');
+  }).join('') || queueNote('Không có run nào khớp bộ lọc.');
+}
+
+function syncQueueChips() {
+  document.querySelectorAll('[data-filter]').forEach((chip) => chip.setAttribute('aria-pressed', chip.dataset.filter === queueFilter));
 }
 
 function mainLane(cells) {
@@ -234,10 +252,16 @@ function diffHtml(diff) {
   return body.split('\n').map((line) => `<span class="${DIFF_LINE[line[0]] ?? ''}">${esc(line)}</span>`).join('\n');
 }
 
+// Tên file nổi một dòng, thư mục mờ và bị cắt từ bên trái để luôn thấy thư mục gần file nhất
+function fileDiffHtml(f) {
+  const nameAt = f.path.lastIndexOf('/') + 1;
+  return `<details class="file-diff"><summary><span class="fs ${f.status}">${f.status}</span><code class="fpath" title="${esc(f.path)}"><span class="dir"><bdi>${esc(f.path.slice(0, nameAt))}</bdi></span><b>${esc(f.path.slice(nameAt))}</b></code></summary><pre class="diff">${diffHtml(f.diff)}${f.truncated ? '\n<span class="hunk">… diff quá dài, mở VS Code để xem hết</span>' : ''}</pre></details>`;
+}
+
 const repoChangesHtml = (c) => `<div class="repo-changes">
   <div class="rc-head"><b>${esc(c.name)}</b><code>${esc(c.branch)}</code><button class="btn ghost sm" data-code="${esc(c.worktree)}"><i class="ph-bold ph-code"></i>Mở trong VS Code</button></div>
   ${c.commits.length ? `<ul class="commits">${c.commits.map((x) => `<li><code>${x.sha.slice(0, 9)}</code>${esc(x.subject)}</li>`).join('')}</ul>` : '<p class="rc-empty">Không có commit mới trên nhánh này.</p>'}
-  ${c.files.map((f) => `<details class="file-diff"><summary><span class="fs ${f.status}">${f.status}</span><code>${esc(f.path)}</code></summary><pre class="diff">${diffHtml(f.diff)}${f.truncated ? '\n<span class="hunk">… diff quá dài, mở VS Code để xem hết</span>' : ''}</pre></details>`).join('')}
+  ${c.files.map(fileDiffHtml).join('')}
 </div>`;
 
 async function renderChanges(run) {
@@ -319,6 +343,8 @@ async function renderMain() {
     flowScroll.left = $('#flow').scrollLeft;
     syncFlowEdges();
   });
+  $('.panes .tabs').addEventListener('scroll', (e) => syncScrollEdges(e.currentTarget));
+  revealActiveTab();
   requestAnimationFrame(() => drawWires(run));
   syncFlow3d(run);
   renderDock(run);
@@ -348,11 +374,24 @@ function placeFlowScroll(run) {
   syncFlowEdges();
 }
 
-function syncFlowEdges() {
-  const flow = $('#flow');
-  const hidden = flow.scrollWidth - flow.clientWidth;
-  $('#flowView').classList.toggle('can-prev', flow.scrollLeft > 1);
-  $('#flowView').classList.toggle('can-next', flow.scrollLeft < hidden - 1);
+function syncScrollEdges(scroller, frame = scroller) {
+  const hidden = scroller.scrollWidth - scroller.clientWidth;
+  frame.classList.toggle('can-prev', scroller.scrollLeft > 1);
+  frame.classList.toggle('can-next', scroller.scrollLeft < hidden - 1);
+}
+
+const syncFlowEdges = () => syncScrollEdges($('#flow'), $('#flowView'));
+
+// Chỉ cuộn ngang hàng tab: scrollIntoView sẽ kéo cả trang khi hàng tab nằm dưới màn hình (mobile)
+function revealActiveTab() {
+  const tabs = $('.panes .tabs');
+  const on = $('.tab.on', tabs);
+  if (on) {
+    const view = tabs.getBoundingClientRect();
+    const tab = on.getBoundingClientRect();
+    tabs.scrollLeft += Math.min(tab.left - view.left, 0) + Math.max(tab.right - view.right, 0);
+  }
+  syncScrollEdges(tabs);
 }
 
 // Bong bóng của robot 3D: việc claude vừa làm = dòng tool/text cuối trong log trực tiếp, đường dẫn rút về tên file
@@ -504,6 +543,7 @@ function optionCards(run) {
 function renderDock(run) {
   const show = !isAborted(run);
   $('#dock').classList.toggle('show', show);
+  $('#dock').classList.toggle('slim', run.status === 'done');
   fitDock();
   if (!show) return;
   const keptStage = $('#gotoStage')?.value;
@@ -626,6 +666,7 @@ function showStage(id) {
   if (!file) return toast(`Bước ${id} chưa chạy, chưa có kết quả để xem.`);
   artifact = file;
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.file === file));
+  revealActiveTab();
   renderArtifact(currentRun());
   $('.panes').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -727,6 +768,10 @@ const MARKUP = `
     <button class="new" id="openPalette"><i class="ph ph-plus"></i>Chạy ticket <kbd>⌘K</kbd></button>
   </div>
   <div class="ap-alert" id="apAlert" role="status" hidden></div>
+  <div class="queue-filter">
+    <div class="qf-search"><input id="apSearch" type="search" placeholder="Tìm mã ticket hoặc tiêu đề" aria-label="Tìm run" autocomplete="off"><kbd>/</kbd></div>
+    <div class="qf-chips" role="group" aria-label="Lọc run theo trạng thái">${QUEUE_FILTERS.map(([id, label]) => `<button class="qf-chip ${id}" data-filter="${id}">${label}</button>`).join('')}</div>
+  </div>
   <div class="queue" id="apQueue"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
 </aside>
 
@@ -752,6 +797,23 @@ export function mount(el, ctx) {
   lastSig = '';
   lastStates = {};
   stageMenu = null;
+  $('#apSearch').value = queueQuery;
+  syncQueueChips();
+  $('#apSearch').addEventListener('input', (e) => {
+    queueQuery = e.target.value;
+    renderQueue();
+  });
+  $('.qf-chips').addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-filter]');
+    if (!chip) return;
+    queueFilter = chip.dataset.filter;
+    syncQueueChips();
+    renderQueue();
+  });
+  api('state').then(({ state }) => {
+    ticketTitles = Object.fromEntries(Object.entries(state.issues).map(([key, issue]) => [key, issue.summary]));
+    if (data.runs.length) renderQueue();
+  }, () => {});
   $('#apQueue').addEventListener('click', (e) => {
     if (e.target.closest('[data-fold]')) {
       abortedOpen = !abortedOpen;
@@ -789,7 +851,15 @@ export function mount(el, ctx) {
     if (!tab) return;
     artifact = tab.dataset.file;
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t === tab));
+    revealActiveTab();
     renderArtifact(data.runs.find((r) => r.key === selectedKey));
+  });
+  // Hàng tab ẩn thanh cuộn nên lăn chuột dọc cũng phải cuộn được ngang
+  $('#apMain').addEventListener('wheel', (e) => {
+    const tabs = e.target.closest('.panes .tabs');
+    if (!tabs || e.deltaX || tabs.scrollWidth <= tabs.clientWidth) return;
+    e.preventDefault();
+    tabs.scrollLeft += e.deltaY;
   });
   $('#dock').addEventListener('click', (e) => {
     if (e.target.closest('[data-claude]')) return openInClaude(currentRun());
@@ -820,6 +890,10 @@ export function mount(el, ctx) {
       dockAsk = null;
       return renderDock(currentRun());
     }
+    if (e.key === '/' && !typing) {
+      e.preventDefault();
+      return $('#apSearch').focus();
+    }
     if (typing || stageMenu || !$('#dock').classList.contains('show')) return;
     if (e.key === 'a' && $('#actions [data-act="approve"]')) act('approve');
     if (e.key === 'r') $('#note').focus();
@@ -834,6 +908,7 @@ export function mount(el, ctx) {
     if (run) {
       drawWires(run);
       syncFlowEdges();
+      revealActiveTab();
     }
     if (stageMenu) closeStageMenu();
   };

@@ -30,8 +30,38 @@
 .panes { flex: 1; min-height: 240px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: minmax(0, 1fr); gap: 28px; margin-top: 14px; }
 .panes > section { display: flex; flex-direction: column; min-height: 0; }
 .panes .tabs { flex: none; }
+.panes .tabs.can-prev, .panes .tabs.can-next { --fade-l: 0px; --fade-r: 0px; mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent); }
+.panes .tabs.can-prev { --fade-l: 40px; }
+.panes .tabs.can-next { --fade-r: 40px; }
+
+.file-diff .fpath { display: flex; min-width: 0; white-space: nowrap; word-break: normal; }
+.fpath .dir { min-width: 0; overflow: hidden; text-overflow: ellipsis; direction: rtl; color: var(--text-3); }
+.fpath b { flex: none; font-weight: 600; }
 #doc { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--line-2) transparent; }
 .tl-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--line-2) transparent; }
+
+.dock.slim { padding-block: 8px 12px; }
+.dock.slim .dock-card { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 6px 8px 6px 14px; }
+.dock.slim .dock-card label { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dock.slim .dock-hint { display: inline; margin-left: 10px; }
+.dock.slim .prev { display: none; }
+.dock.slim .actions { flex-wrap: nowrap; }
+.dock.slim .btn { padding: 6px 12px; }
+
+.queue-filter { display: grid; gap: 8px; padding: 0 18px 6px; }
+.qf-search { position: relative; }
+.qf-search input { width: 100%; padding: 6px 28px 6px 10px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--bg); color: var(--text); font-size: 12.5px; outline: none; transition: border-color .2s; }
+.qf-search input:focus { border-color: var(--text-2); }
+.qf-search input::placeholder { color: var(--text-3); }
+.qf-search kbd { position: absolute; right: 8px; top: 50%; translate: 0 -50%; padding: 0 5px; border: 1px solid var(--line-2); border-radius: 4px; color: var(--text-3); font: 11px var(--mono); pointer-events: none; }
+.qf-search input:focus + kbd, .qf-search input:not(:placeholder-shown) + kbd { display: none; }
+.qf-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.qf-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border: 1px solid var(--line-2); border-radius: 999px; color: var(--text-3); font-size: 11.5px; transition: color .2s, border-color .2s, background .2s; }
+.qf-chip:hover { color: var(--text-2); }
+.qf-chip:focus-visible { outline: 2px solid var(--run); outline-offset: 2px; }
+.qf-chip[aria-pressed="true"] { color: var(--text); border-color: var(--text-3); background: var(--bg-3); }
+.qf-chip:not(.all)::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
+.qf-chip.running::before { background: var(--run); } .qf-chip.waiting::before { background: var(--wait); } .qf-chip.stopped::before { background: var(--stop); } .qf-chip.done::before { background: var(--ok); }
 
 .dock-more { position: relative; }
 .dock-more > .btn { padding-inline: 12px; }

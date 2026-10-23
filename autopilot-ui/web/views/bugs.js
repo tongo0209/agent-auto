@@ -52,7 +52,7 @@ export function mount(el, ctx) {
 
   async function load() {
     try {
-      data = await ctx.api('bugs');
+      data = await ctx.api('bugs', { onFresh: load });
     } catch (e) {
       $('#bgKpis').innerHTML = '';
       $('#bgSheets').innerHTML = errNote(e);

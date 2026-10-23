@@ -1,0 +1,46 @@
+.ap-main { --dock-gap: 12px; min-width: 0; height: 100dvh; display: flex; flex-direction: column; padding: 24px 36px calc(var(--dock-h, 0px) + var(--dock-gap)); }
+
+.flow-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.flow-bar .flow-legend { margin: 0; }
+.flow-mode { display: inline-flex; padding: 2px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--bg-2); }
+.flow-mode[hidden] { display: none; }
+.flow-mode button { padding: 3px 10px; border-radius: 6px; color: var(--text-3); font: 600 11.5px var(--mono); transition: color .2s, background .2s; }
+.flow-mode button:hover { color: var(--text); }
+.flow-mode button.on { background: var(--bg-3); color: var(--text); }
+
+.flow-view { position: relative; margin-top: 6px; }
+.flow { padding: 14px 4px 10px; overflow-x: auto; overflow-y: hidden; scrollbar-color: var(--line-2) transparent; }
+.lane.side { margin-top: 24px; }
+.lane.side .dot { width: 34px; height: 34px; font-size: 15px; }
+.flow-view::before, .flow-view::after { content: ""; position: absolute; top: 0; bottom: 0; width: 72px; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .25s; }
+.flow-view::before { left: 0; background: linear-gradient(to right, var(--bg), transparent); }
+.flow-view::after { right: 0; background: linear-gradient(to left, var(--bg), transparent); }
+.flow-view.can-prev::before, .flow-view.can-next::after { opacity: 1; }
+.flow-nudge { position: absolute; top: 30px; z-index: 3; width: 30px; height: 30px; display: none; place-items: center; border-radius: 50%; border: 1px solid var(--line-2); background: var(--bg-3); color: var(--text-2); box-shadow: 0 4px 14px rgb(0 0 0 / .5); transition: color .2s, border-color .2s; }
+.flow-nudge:hover { color: var(--text); border-color: var(--text-3); }
+.flow-nudge:focus-visible { outline: 2px solid var(--run); outline-offset: 2px; }
+.flow-nudge.prev { left: 2px; }
+.flow-nudge.next { right: 2px; }
+.flow-view.can-prev:not(.is-3d) .flow-nudge.prev, .flow-view.can-next:not(.is-3d) .flow-nudge.next { display: grid; }
+.flow-view.is-3d .flow { visibility: hidden; }
+.flow-view.is-3d::before, .flow-view.is-3d::after { display: none; }
+.flow-3d { position: absolute; inset: 0; }
+
+.panes { flex: 1; min-height: 240px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: minmax(0, 1fr); gap: 28px; margin-top: 14px; }
+.panes > section { display: flex; flex-direction: column; min-height: 0; }
+.panes .tabs { flex: none; }
+#doc { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--line-2) transparent; }
+.tl-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--line-2) transparent; }
+
+.dock-more { position: relative; }
+.dock-more > .btn { padding-inline: 12px; }
+.dock-more-menu { position: absolute; bottom: calc(100% + 6px); left: 0; display: grid; padding: 4px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--bg-2); box-shadow: 0 10px 30px rgb(0 0 0 / .5); z-index: 1; }
+.dock-more-menu[hidden] { display: none; }
+.dock-more-menu .btn:not(.danger) { border-color: transparent; }
+
+@media (max-width: 900px) {
+  .ap-main { height: auto; display: block; padding: 20px 16px calc(var(--dock-h, 0px) + var(--dock-gap)); }
+  .panes { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  #doc { max-height: 60dvh; }
+  .tl-scroll { max-height: 40dvh; }
+}

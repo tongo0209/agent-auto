@@ -34,7 +34,45 @@ async function viewApi(path, options) {
   return dup.size ? dropDuplicates(data, dup) : data;
 }
 
-const ctx = { api: viewApi, toast, openTerminal, go: (id, param) => (location.hash = `#/${id}${param ? `/${encodeURIComponent(param)}` : ''}`) };
+// Bản cache vừa về trong FRESH_MS thì không tải nền lại, tránh vòng onFresh → load → tải lại
+const FRESH_MS = 1000;
+const cache = new Map();
+const inflight = new Map();
+
+function fetchShared(path) {
+  if (inflight.has(path)) return inflight.get(path);
+  const request = viewApi(path).then(
+    (data) => {
+      if (inflight.get(path) === request) cache.set(path, { data, at: Date.now() });
+      return data;
+    },
+    (err) => {
+      cache.delete(path);
+      throw err;
+    },
+  );
+  inflight.set(path, request);
+  request.catch(() => {}).then(() => inflight.get(path) === request && inflight.delete(path));
+  return request;
+}
+
+// GET có onFresh: trả ngay bản cache, tải nền, bản mới khác (hoặc lỗi) thì gọi onFresh để màn tự load lại
+async function cachedApi(path, { onFresh, ...options } = {}) {
+  if (options.method && options.method !== 'GET') {
+    const out = await viewApi(path, options);
+    cache.clear();
+    inflight.clear();
+    return out;
+  }
+  const hit = cache.get(path);
+  if (!onFresh || !hit) return fetchShared(path);
+  if (Date.now() - hit.at > FRESH_MS) {
+    fetchShared(path).then((data) => JSON.stringify(data) !== JSON.stringify(hit.data) && onFresh(), () => onFresh());
+  }
+  return hit.data;
+}
+
+const ctx = { api: cachedApi, toast, openTerminal, go: (id, param) => (location.hash = `#/${id}${param ? `/${encodeURIComponent(param)}` : ''}`) };
 let cleanup = null;
 
 function renderNav(active) {

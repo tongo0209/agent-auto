@@ -216,6 +216,7 @@ export function mount(el, ctx) {
   }
 
   function render() {
+    if (!el.isConnected) return;
     el.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
     if (stateError && !st) return ($('#lcBody').innerHTML = errNote(stateError));
     if (!st) return;

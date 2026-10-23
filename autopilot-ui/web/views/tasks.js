@@ -69,7 +69,7 @@ export function mount(el, ctx) {
 
   async function loadState() {
     try {
-      st = await ctx.api('state');
+      st = await ctx.api('state', { onFresh: loadState });
       stateError = null;
     } catch (e) {
       stateError = e;
@@ -79,7 +79,7 @@ export function mount(el, ctx) {
   }
 
   async function loadExtras() {
-    const [g, r, a] = await Promise.allSettled([ctx.api('gates'), ctx.api('review'), ctx.api('activity')]);
+    const [g, r, a] = await Promise.allSettled([ctx.api('gates', { onFresh: loadExtras }), ctx.api('review', { onFresh: loadExtras }), ctx.api('activity', { onFresh: loadExtras })]);
     if (g.status === 'fulfilled') gates = Object.fromEntries(g.value.items.map((x) => [x.key, x]));
     if (r.status === 'fulfilled') pushes = Object.fromEntries(r.value.items.map((x) => [x.key, x]));
     if (a.status === 'fulfilled') activity = Object.fromEntries(a.value.items.map((x) => [x.key, x]));

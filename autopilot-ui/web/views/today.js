@@ -71,14 +71,15 @@ export function mount(el, ctx) {
   const settle = settler(el.firstElementChild);
 
   async function load() {
+    const cacheFirst = { onFresh: load };
     const [queue, alerts, debt, radar, delta, state, runs] = await Promise.allSettled([
-      ctx.api('queue'),
-      ctx.api('alerts'),
-      ctx.api('debt'),
-      ctx.api('radar'),
-      ctx.api(`delta?since=${encodeURIComponent(seenAt())}`),
-      ctx.api('state'),
-      ctx.api('autopilot/runs'),
+      ctx.api('queue', cacheFirst),
+      ctx.api('alerts', cacheFirst),
+      ctx.api('debt', cacheFirst),
+      ctx.api('radar', cacheFirst),
+      ctx.api(`delta?since=${encodeURIComponent(seenAt())}`, cacheFirst),
+      ctx.api('state', cacheFirst),
+      ctx.api('autopilot/runs', cacheFirst),
     ]);
     data = { queue, alerts, debt, radar, delta, state };
     if (runs.status === 'fulfilled') openRunKeys = keysWithOpenRun(runs.value.runs);

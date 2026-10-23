@@ -2,6 +2,7 @@ import { esc } from '../lib.js';
 import { skeleton, note, errNote } from './_kit.js';
 
 const MAX_COMMITS = 80;
+const MOBILE_COMMITS = 20;
 const REPO_TONES = ['run', 'ok', 'warn', 'crit', 'mute'];
 
 const monthLabel = (ym) => `T${Number(ym.slice(5))}/${ym.slice(0, 4)}`;
@@ -73,9 +74,10 @@ export function mount(el, ctx) {
     renderChart(data, tone);
     $('#gtRepos').innerHTML = repos.map(([r, n]) => `<span class="gt-repo t-${tone[r]}"><i></i>${esc(r)} <b class="mono">${n}</b></span>`).join('');
     $('#gtList').innerHTML = commits.length
-      ? `<ul class="gt-commits">${commits.slice(0, MAX_COMMITS).map((c, i) => `<li class="vw-in" style="--i:${i}">
+      ? `<ul class="gt-commits">${commits.slice(0, MAX_COMMITS).map((c, i) => `<li class="vw-in${i >= MOBILE_COMMITS ? ' gt-extra' : ''}" style="--i:${i}">
           <span class="gt-repo t-${tone[c.repo]}"><i></i>${esc(c.repo)}</span><span class="mono d">${esc(c.date)}</span><span class="mono h">${esc(c.hash)}</span>
           <span class="s">${esc(c.subject)}</span>${c.stat ? `<span class="mono st">${esc(c.stat)}</span>` : ''}</li>`).join('')}</ul>
+        ${commits.length > MOBILE_COMMITS ? `<button class="btn ghost vw-sm gt-more" data-more-commits><i class="ph ph-caret-down"></i>Xem thêm ${Math.min(commits.length, MAX_COMMITS) - MOBILE_COMMITS} commit</button>` : ''}
         ${commits.length > MAX_COMMITS ? note('ph-info', `Hiện ${MAX_COMMITS}/${commits.length} commit mới nhất.`) : ''}`
       : note('ph-git-commit', 'Không có commit nào của bạn trong tháng này.');
   }
@@ -117,6 +119,11 @@ export function mount(el, ctx) {
     if (m && !loading) {
       month = m.dataset.month;
       return loadGit();
+    }
+    const more = e.target.closest('[data-more-commits]');
+    if (more) {
+      $('.gt-commits').classList.add('all');
+      return more.remove();
     }
     const ticket = e.target.closest('[data-ticket]');
     if (ticket) ctx.go('tasks', ticket.dataset.ticket);

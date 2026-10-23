@@ -25,6 +25,10 @@ const saved = (() => {
 })();
 const state = { open: saved.open ?? true, width: saved.width ?? 640, tabs: saved.tabs ?? [], active: saved.active ?? null, grid: saved.grid ?? false };
 const live = new Map();
+// Dưới ngưỡng này terminal là ngăn trượt đè nội dung; khớp @media trong app.css
+const drawerMode = window.matchMedia('(max-width: 1199px)');
+let drawerOpen = false;
+const isOpen = () => (drawerMode.matches ? drawerOpen : state.open);
 
 const persist = () => {
   try {
@@ -35,10 +39,12 @@ const persist = () => {
 function applyWidth() {
   const navW = $('#nav').offsetWidth;
   const width = Math.max(MIN_W, Math.min(state.width, window.innerWidth - navW - MIN_MAIN_W));
-  document.documentElement.style.setProperty('--term-w', state.open ? `${width}px` : '0px');
-  $('#termBtn')?.classList.toggle('on', state.open);
-  $('#term').hidden = !state.open;
-  if (state.open) requestAnimationFrame(fitVisible);
+  const docked = state.open && !drawerMode.matches;
+  document.documentElement.style.setProperty('--term-w', docked ? `${width}px` : '0px');
+  document.body.classList.toggle('term-drawer', drawerMode.matches && drawerOpen);
+  $('#termBtn')?.classList.toggle('on', isOpen());
+  $('#term').hidden = !drawerMode.matches && !state.open;
+  if (isOpen()) requestAnimationFrame(fitVisible);
 }
 
 function fitVisible() {
@@ -188,14 +194,17 @@ function closeTab(id) {
 }
 
 function setOpen(open) {
-  state.open = open;
+  if (drawerMode.matches) drawerOpen = open;
+  else state.open = open;
   persist();
   applyWidth();
+  if (open) live.get(state.active)?.term.focus();
+  else if ($('#term').contains(document.activeElement)) document.activeElement.blur();
 }
 
 export function toggleTerminal() {
-  setOpen(!state.open);
-  if (state.open && !state.tabs.length) addTab();
+  setOpen(!isOpen());
+  if (isOpen() && !state.tabs.length) addTab();
 }
 
 export const hasTab = (id) => state.tabs.some((t) => t.id === id);
@@ -210,7 +219,7 @@ export function openTerminal(command, title, id) {
 export function initTerminal() {
   for (const tab of state.tabs) connect(tab);
   if (!state.tabs.some((t) => t.id === state.active)) state.active = state.tabs[0]?.id ?? null;
-  if (state.open && !state.tabs.length) addTab();
+  if (isOpen() && !state.tabs.length) addTab();
   renderTools();
   renderTabs();
   applyWidth();
@@ -234,7 +243,20 @@ export function initTerminal() {
     if (tab) activate(tab.dataset.id);
   });
   window.addEventListener('resize', applyWidth);
-  new ResizeObserver(() => state.open && fitVisible()).observe($('#term'));
+  drawerMode.addEventListener('change', () => {
+    drawerOpen = false;
+    applyWidth();
+  });
+  new ResizeObserver(() => isOpen() && fitVisible()).observe($('#term'));
+  const scrim = document.createElement('div');
+  scrim.className = 'term-scrim';
+  scrim.addEventListener('click', () => setOpen(false));
+  $('#term').before(scrim);
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !drawerMode.matches || !drawerOpen || e.target.closest('.xterm')) return;
+    e.stopPropagation();
+    setOpen(false);
+  }, true);
   $('#termGrip').addEventListener('pointerdown', (e) => {
     e.preventDefault();
     document.body.classList.add('dragging');

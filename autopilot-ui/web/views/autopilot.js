@@ -42,8 +42,18 @@ let runFiles = [];
 let stageMenu = null;
 const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp', reviewed: 'đã review', retry: 'chạy lại', skip: 'bỏ qua', goto: 'quay về', pick: 'chọn phương án' };
 const ABORT_BTN = '<button class="btn ghost" data-act="abort">Huỷ run</button>';
+const MORE_MENU = `<div class="dock-more"><button class="btn ghost" data-more aria-haspopup="menu" aria-label="Thêm thao tác"><i class="ph-bold ph-dots-three"></i></button><div class="dock-more-menu" id="dockMore" role="menu" hidden>${ABORT_BTN}</div></div>`;
 const FLOW_LEGEND = '<div class="flow-legend"><span class="done">xong</span><span class="running">đang chạy</span><span class="waiting">chờ bạn</span><span class="stopped">dừng</span><span class="user-skipped">bỏ qua</span></div>';
+const FLOW_MODE_SWITCH = '<div class="flow-mode" id="flowModeSwitch" role="group" aria-label="Kiểu sơ đồ" hidden><button data-mode="2d">2D</button><button data-mode="3d">3D</button></div>';
 const CLAUDE_BTN = '<button class="btn claude" data-claude><i class="ph-bold ph-terminal-window"></i>Mở trong Claude</button>';
+const FLOW_NUDGE_RATIO = 0.7;
+const FLOW_MODE_KEY = 'console2.apFlowMode';
+let flowMode = '2d';
+try { flowMode = localStorage.getItem(FLOW_MODE_KEY) === '3d' ? '3d' : '2d'; } catch {}
+let mountFlow3d = null;
+let flow3d = null;
+let flowScroll = { id: '', left: 0 };
+let lastPointer = { x: 0, y: 0 };
 
 
 async function post(action, body, sentMessage = 'Đã gửi. Autopilot chạy nền, trang tự cập nhật.') {
@@ -254,6 +264,8 @@ async function renderMain() {
   if (!run) {
     $('#apMain').innerHTML = `<div class="empty"><div><i class="ph ph-flow-arrow"></i><p>Chọn một run bên trái, hoặc bấm <b>Chạy ticket</b> (⌘K) để autopilot tự chọn luồng và chạy tới mốc cần bạn.</p></div></div>`;
     $('#dock').classList.remove('show');
+    fitDock();
+    destroyFlow3d();
     return;
   }
   const files = await (await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/artifacts`)).json();
@@ -276,12 +288,16 @@ async function renderMain() {
       </div>
       <div class="meters">${usage('ph-lightning', compact(tokens), 'token tiêu hao', `${tokens.toLocaleString('vi-VN')} token (gồm cache) · ${money(run.totals.usd)}`)}${usage('ph-timer', `${run.totals.minutes}′`, 'phút tiêu hao', run.mode === 'chat' ? 'từ đầu tới cuối phiên claude mới nhất của tab' : 'thời gian máy chạy các bước, không tính lúc chờ duyệt')}</div>
     </div>
-    <div class="flow"><div class="flow-inner" id="flowInner">
-      <svg class="wires" id="wires"></svg>
-      <div class="lane">${lane.map(nodeHtml).join('')}</div>
-      ${side.length ? `<div class="lane side" id="sideLane">${side.map(nodeHtml).join('')}</div>` : ''}
-    </div></div>
-    ${FLOW_LEGEND}
+    <div class="flow-bar">${FLOW_LEGEND}${FLOW_MODE_SWITCH}</div>
+    <div class="flow-view" id="flowView">
+      <div class="flow" id="flow"><div class="flow-inner" id="flowInner">
+        <svg class="wires" id="wires"></svg>
+        <div class="lane">${lane.map(nodeHtml).join('')}</div>
+        ${side.length ? `<div class="lane side" id="sideLane">${side.map(nodeHtml).join('')}</div>` : ''}
+      </div></div>
+      <button class="flow-nudge prev" data-nudge="-1" aria-label="Cuộn sơ đồ sang trái"><i class="ph-bold ph-caret-left"></i></button>
+      <button class="flow-nudge next" data-nudge="1" aria-label="Cuộn sơ đồ sang phải"><i class="ph-bold ph-caret-right"></i></button>
+    </div>
     <div class="panes">
       <section>
         <div class="tabs">${tabs.map((f) => `<button class="tab ${f === artifact ? 'on' : ''}" data-file="${esc(f)}">${f === LIVE ? '<span class="pulse"></span>' : starred.includes(f) ? '<span class="star">★</span>' : ''}${esc(TAB_LABEL(f))}</button>`).join('')}</div>
@@ -289,16 +305,22 @@ async function renderMain() {
       </section>
       <section>
         <p class="side-h">Các lượt đã chạy</p>
-        <div class="timeline">${run.receipts.map((r, i) => `
+        <div class="tl-scroll"><div class="timeline">${run.receipts.map((r, i) => `
           <div class="tl ${esc(r.verdict)}" style="animation-delay:${i * 30}ms">
             <div class="row1"><b>${esc(r.stage)} · vòng ${r.round}</b><span>${money(r.costUsd)}</span></div>
             <div class="row2">${esc(r.verdict)}${r.note !== undefined ? (r.note ? ` · ${esc(r.note)}` : '') : ` · ${r.blocking} chặn · ${r.advisory} gợi ý · ${r.turns} lượt · ${mins(r.ms)}′`}</div>
-          </div>`).join('') || '<p style="color:var(--text-3);font-size:13px">Chưa có lượt nào.</p>'}</div>
+          </div>`).join('') || '<p style="color:var(--text-3);font-size:13px">Chưa có lượt nào.</p>'}</div></div>
         <div class="total"><span>${run.totals.runs} lượt claude · ${run.totals.turns} turns</span><span>${money(run.totals.usd)}</span></div>
       </section>
     </div>`;
   placeSideLane(run, lane, side);
+  placeFlowScroll(run);
+  $('#flow').addEventListener('scroll', () => {
+    flowScroll.left = $('#flow').scrollLeft;
+    syncFlowEdges();
+  });
   requestAnimationFrame(() => drawWires(run));
+  syncFlow3d(run);
   renderDock(run);
   renderArtifact(run);
   lastStates = Object.fromEntries(run.cells.map((c) => [c.id, c.state]));
@@ -309,6 +331,76 @@ function placeSideLane(run, lane) {
   if (!sideLane) return;
   const callerIdx = Math.min(...run.cells.filter((c) => c.back && !lane.some((l) => l.id === c.back)).map((c) => lane.findIndex((l) => l.id === c.id)).filter((i) => i >= 0));
   if (Number.isFinite(callerIdx)) sideLane.style.paddingLeft = `${callerIdx * (92 + 44)}px`;
+}
+
+// Cùng run + cùng bước đang chạy thì giữ chỗ người dùng đã cuộn, đổi bước mới cuộn tới bước đó
+function placeFlowScroll(run) {
+  const flow = $('#flow');
+  const focus = run.cells.find((c) => ['running', 'waiting', 'stopped'].includes(c.state)) ?? run.cells.find((c) => c.id === run.stage);
+  const id = `${run.key}/${run.runId}/${focus?.id ?? ''}`;
+  if (flowScroll.id === id) flow.scrollLeft = flowScroll.left;
+  else if (focus) {
+    const node = document.getElementById(`n-${focus.id}`).getBoundingClientRect();
+    const view = flow.getBoundingClientRect();
+    flow.scrollLeft += node.left + node.width / 2 - (view.left + view.width / 2);
+  }
+  flowScroll = { id, left: flow.scrollLeft };
+  syncFlowEdges();
+}
+
+function syncFlowEdges() {
+  const flow = $('#flow');
+  const hidden = flow.scrollWidth - flow.clientWidth;
+  $('#flowView').classList.toggle('can-prev', flow.scrollLeft > 1);
+  $('#flowView').classList.toggle('can-next', flow.scrollLeft < hidden - 1);
+}
+
+// Bong bóng của robot 3D: việc claude vừa làm = dòng tool/text cuối trong log trực tiếp, đường dẫn rút về tên file
+const shortActivity = (text) => text.replace(/\/\S*\/([^/\s]+)/g, '$1').slice(0, 40);
+async function showActivity(run) {
+  const res = await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/live`);
+  const last = res.status === 204 ? null : (await res.json()).lines.findLast((l) => l.kind === 'tool' || l.kind === 'text');
+  flow3d?.view.setActivity(last ? shortActivity(last.text) : '');
+}
+
+function destroyFlow3d() {
+  flow3d?.view.destroy();
+  flow3d?.host.remove();
+  flow3d = null;
+}
+
+// Giữ nguyên canvas 3D qua mỗi lần vẽ lại trang, chỉ dựng mới khi đổi run
+function syncFlow3d(run) {
+  const use3d = flowMode === '3d' && Boolean(mountFlow3d);
+  $('#flowModeSwitch').hidden = !mountFlow3d;
+  document.querySelectorAll('#flowModeSwitch [data-mode]').forEach((b) => b.classList.toggle('on', b.dataset.mode === (use3d ? '3d' : '2d')));
+  $('#flowView').classList.toggle('is-3d', use3d);
+  const id = `${run.key}/${run.runId}`;
+  if (!use3d || flow3d?.id !== id) destroyFlow3d();
+  if (!use3d) return;
+  if (flow3d) {
+    $('#flowView').append(flow3d.host);
+    return flow3d.view.update(run);
+  }
+  const host = document.createElement('div');
+  host.className = 'flow-3d';
+  host.addEventListener('pointerup', (e) => (lastPointer = { x: e.clientX, y: e.clientY }), true);
+  $('#flowView').append(host);
+  const view = mountFlow3d(host, run, { onNodeClick: (stageId, anchorEl) => openStageMenu(stageId, anchorEl ?? pointerAnchor()) });
+  if (view) return (flow3d = { id, host, view });
+  host.remove();
+  mountFlow3d = null;
+  syncFlow3d(run);
+}
+
+const pointerAnchor = () => {
+  const { x, y } = lastPointer;
+  return { getBoundingClientRect: () => new DOMRect(x, y, 0, 0) };
+};
+
+function fitDock() {
+  const dock = $('#dock');
+  $('#apMain').style.setProperty('--dock-h', `${dock.classList.contains('show') ? dock.offsetHeight : 0}px`);
 }
 
 const STOP_REASON = {
@@ -412,6 +504,7 @@ function optionCards(run) {
 function renderDock(run) {
   const show = !isAborted(run);
   $('#dock').classList.toggle('show', show);
+  fitDock();
   if (!show) return;
   const keptStage = $('#gotoStage')?.value;
   const asking = askingNow(run);
@@ -422,7 +515,7 @@ function renderDock(run) {
   $('#note').style.display = run.status === 'paused' || cut || asking ? '' : 'none';
   $('#note').placeholder = asking ? DOCK_ASK[asking].placeholder : cut ? 'Nhắn claude khi chạy tiếp: đổi hướng, bổ sung gì...' : 'Ghi chú khi trả về: cần sửa gì...';
   $('#prevNote').textContent = run.rejectNote ? `Lần trả về trước: ${run.rejectNote}` : '';
-  $('#actions').innerHTML = ABORT_BTN + CLAUDE_BTN + oneClickAction(run);
+  $('#actions').innerHTML = (run.status === 'done' ? MORE_MENU : ABORT_BTN) + CLAUDE_BTN + oneClickAction(run);
   if (keptStage && $('#gotoStage')) $('#gotoStage').value = keptStage;
 }
 
@@ -584,13 +677,12 @@ function renderStageMenu() {
   if (ask) { syncStageMenu(); $('#smText').focus(); }
 }
 
-function onNodeClick(node) {
+function openStageMenu(stage, anchor) {
   const run = currentRun();
-  const stage = node.id.slice(2);
   const items = stageMenuItems(run, run.cells.find((c) => c.id === stage));
   if (!items.length) return showStage(stage);
-  if (stageMenu?.anchor === node) return closeStageMenu();
-  stageMenu = { key: run.key, stage, items: [...items, ...(stageFile(stage) ? [{ type: 'view', label: 'Xem kết quả' }] : [])], ask: null, busy: false, anchor: node };
+  if (stageMenu?.stage === stage) return closeStageMenu();
+  stageMenu = { key: run.key, stage, items: [...items, ...(stageFile(stage) ? [{ type: 'view', label: 'Xem kết quả' }] : [])], ask: null, busy: false, anchor };
   renderStageMenu();
 }
 
@@ -679,7 +771,15 @@ export function mount(el, ctx) {
     if (pauseBtn) return pauseRun(pauseBtn);
     if (e.target.closest('[data-claude]')) return openInClaude(data.runs.find((r) => r.key === selectedKey));
     const node = e.target.closest('.node');
-    if (node) return onNodeClick(node);
+    if (node) return openStageMenu(node.id.slice(2), node);
+    const nudge = e.target.closest('[data-nudge]');
+    if (nudge) return $('#flow').scrollBy({ left: Number(nudge.dataset.nudge) * $('#flow').clientWidth * FLOW_NUDGE_RATIO, behavior: 'smooth' });
+    const mode = e.target.closest('[data-mode]');
+    if (mode) {
+      flowMode = mode.dataset.mode;
+      try { localStorage.setItem(FLOW_MODE_KEY, flowMode); } catch {}
+      return syncFlow3d(currentRun());
+    }
     const codeBtn = e.target.closest('[data-code]');
     if (codeBtn) {
       const run = data.runs.find((r) => r.key === selectedKey);
@@ -693,16 +793,20 @@ export function mount(el, ctx) {
   });
   $('#dock').addEventListener('click', (e) => {
     if (e.target.closest('[data-claude]')) return openInClaude(currentRun());
+    if (e.target.closest('[data-more]')) return ($('#dockMore').hidden = !$('#dockMore').hidden);
     onDockClick(e);
   });
+  const dockSize = new ResizeObserver(fitDock);
+  dockSize.observe($('#dock'));
   $('#stageMenu').addEventListener('click', onStageMenuClick);
   $('#stageMenu').addEventListener('input', syncStageMenu);
   $('#stageMenu').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.id === 'smText' && !stageMenu.busy) $('[data-sm="send"]').click();
   });
   const onDocClick = (e) => {
-    const inside = e.composedPath().some((el) => el.id === 'stageMenu' || el.classList?.contains('node'));
+    const inside = e.composedPath().some((el) => el.id === 'stageMenu' || el.classList?.contains('node') || el.classList?.contains('flow-3d'));
     if (stageMenu && !inside) closeStageMenu();
+    if ($('#dockMore') && !e.target.closest('.dock-more')) $('#dockMore').hidden = true;
   };
   const onDocScroll = (e) => {
     if (stageMenu && (e.target === document || e.target.classList?.contains('flow')) && spotOf(stageMenu.anchor) !== stageMenu.spot) closeStageMenu();
@@ -711,6 +815,7 @@ export function mount(el, ctx) {
   const onKey = (e) => {
     const typing = document.activeElement?.closest('input, textarea, select, .xterm, [contenteditable]');
     if (e.key === 'Escape' && stageMenu) return closeStageMenu();
+    if (e.key === 'Escape' && $('#dockMore')?.hidden === false) return ($('#dockMore').hidden = true);
     if (e.key === 'Escape' && dockAsk) {
       dockAsk = null;
       return renderDock(currentRun());
@@ -726,20 +831,31 @@ export function mount(el, ctx) {
   });
   const onResize = () => {
     const run = data.runs.find((r) => r.key === selectedKey);
-    if (run) drawWires(run);
+    if (run) {
+      drawWires(run);
+      syncFlowEdges();
+    }
     if (stageMenu) closeStageMenu();
   };
   document.addEventListener('keydown', onKey);
   document.addEventListener('click', onDocClick);
   document.addEventListener('scroll', onDocScroll, true);
   window.addEventListener('resize', onResize);
+  import('../flow-3d.js').then((m) => {
+    mountFlow3d = m.mountFlow3d;
+    if ($('#flowView')) syncFlow3d(currentRun());
+  }, () => {});
   const stopLive = subscribeRuns((next) => applyRuns(next).catch(() => {}), onLiveStatus);
   const liveTimer = setInterval(() => {
     renderIfChanged().catch(() => {});
     const run = data.runs.find((r) => r.key === selectedKey);
     if (run?.status === 'running' && artifact === LIVE) renderLog(run).catch(() => {});
+    if (flow3d && run?.status === 'running' && !run.interrupted) showActivity(run).catch(() => {});
+    else flow3d?.view.setActivity('');
   }, 2000);
   return () => {
+    destroyFlow3d();
+    dockSize.disconnect();
     stopLive();
     clearInterval(liveTimer);
     document.removeEventListener('keydown', onKey);

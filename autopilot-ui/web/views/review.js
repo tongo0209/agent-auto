@@ -38,7 +38,7 @@ export function mount(el, ctx) {
   const settle = settler(el.firstElementChild);
 
   async function load() {
-    const [review, gates, state] = await Promise.allSettled([ctx.api('review'), ctx.api('gates'), ctx.api('state')]);
+    const [review, gates, state] = await Promise.allSettled([ctx.api('review', { onFresh: load }), ctx.api('gates', { onFresh: load }), ctx.api('state', { onFresh: load })]);
     if (state.status === 'fulfilled') repoPaths = state.value.config?.repos ?? {};
     if (el.querySelector('.rv-subject:focus')) return;
     renderReview(review, gates);

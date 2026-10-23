@@ -1,5 +1,7 @@
 import { $, esc, toast, api } from './lib.js';
+import { subscribeRuns } from './live-runs.js';
 import { initTerminal, toggleTerminal, openTerminal } from './terminal.js';
+import './run-palette.js';
 
 const VIEWS = [
   { id: 'timeline', label: 'Lịch', icon: 'ph-calendar-check' },
@@ -58,9 +60,9 @@ async function route() {
   updateBadge();
 }
 
-async function updateBadge() {
-  const { runs } = await api('autopilot/runs').catch(() => ({ runs: [] }));
-  const need = runs.filter((r) => r.status === 'paused' || r.status === 'attached' || (r.status === 'chat' && r.chatState === 'ask')).length;
+let badgeRuns = [];
+function updateBadge() {
+  const need = badgeRuns.filter((r) => r.status === 'paused' || r.status === 'attached' || (r.status === 'chat' && r.chatState === 'ask')).length;
   const link = $('[data-view="autopilot"]');
   link?.querySelector('.count')?.remove();
   if (need) link?.insertAdjacentHTML('beforeend', `<span class="count">${need}</span>`);
@@ -83,4 +85,7 @@ document.addEventListener('click', (e) => {
 window.addEventListener('hashchange', route);
 initTerminal();
 route();
-setInterval(updateBadge, 10000);
+subscribeRuns(({ runs }) => {
+  badgeRuns = runs;
+  updateBadge();
+});

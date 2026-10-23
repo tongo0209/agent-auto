@@ -7,6 +7,7 @@ import { spawn, execFile } from 'node:child_process';
 import { listView, listArtifacts, artifactFile, actionArgs, checkAction, checkInput, liveLog, changesOf, worktreeOf } from './api.mjs';
 import { runsDir } from '../tools/lib/autopilot/store.mjs';
 import { attachTerminal } from './terminal.mjs';
+import { runEvents } from './run-events.mjs';
 import { launchCommand } from './panel-claude.mjs';
 import { CONSOLE, consoleRequire } from './console-root.mjs';
 
@@ -121,6 +122,7 @@ export function createServer({ spawnCli = spawnDetached, execCli = runCliAndWait
   const app = express();
   app.use((req, res, next) => (LOCAL_HOST.test(req.headers.host ?? '') ? next() : send(res, 403, { error: 'host lạ' })));
   // autopilot đi trước cổng chặn ghi: run chỉ ghi được repo của nó, hook sandbox chặn repo khác + git ghi
+  app.get('/api/autopilot/events', runEvents());
   // Express 4 không bắt lỗi của handler async: lọt ra là sập cả process, kéo theo mọi tab terminal
   app.use('/api/autopilot', (req, res) =>
     handleAutopilot(req, res, { spawnCli, execCli, openEditor }).catch((e) => {

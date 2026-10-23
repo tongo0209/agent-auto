@@ -1,5 +1,7 @@
 import { $, api, esc, toast } from '../lib.js';
 import { openTerminal, hasTab } from '../terminal.js';
+import { subscribeRuns } from '../live-runs.js';
+import { openRunPalette } from '../run-palette.js';
 
 const money = (n) => `$${(n ?? 0).toFixed(2)}`;
 const mins = (ms) => Math.round((ms ?? 0) / 60000);
@@ -31,15 +33,11 @@ const LIVE = 'live';
 const CHANGES = 'changes';
 const TAB_LABEL = (f) => f === LIVE ? 'Trực tiếp' : f === CHANGES ? 'Thay đổi' : f === 'plan.md' ? 'Plan' : `${f.endsWith('.log') ? 'Log ' : ''}${f.replace(/\.(json|log|md)$/, '').replace(/-r(\d+)$/, ' · vòng $1')}`;
 
-let data = { runs: [], flows: [] };
+let data = { runs: [] };
 let selectedKey = null;
 let artifact = null;
 let lastStates = {};
 let lastSig = '';
-let flowChoice = 0;
-let preview = null;
-let previewSeq = 0;
-let previewBusy = false;
 let runFiles = [];
 let stageMenu = null;
 const ACTION_LABEL = { approve: 'duyệt', reject: 'trả về', abort: 'huỷ và dọn sạch', resume: 'chạy tiếp', reviewed: 'đã review', retry: 'chạy lại', skip: 'bỏ qua', goto: 'quay về', pick: 'chọn phương án' };
@@ -61,13 +59,12 @@ async function post(action, body, sentMessage = 'Đã gửi. Autopilot chạy n�
 }
 
 const tabIdOf = ({ key, runId }) => `ap-${key}-${runId}`;
-const openChatTab = (launch) => openTerminal(launch.command, launch.key, tabIdOf(launch));
 
 // Mỗi run một tab cố định: còn mở thì chỉ chuyển sang, chưa có thì CLI dựng brief rồi trả lệnh claude
 async function openInClaude(run) {
   if (hasTab(tabIdOf(run))) return openTerminal(null, run.key, tabIdOf(run));
   const launch = await post('open', { key: run.key, attach: true }, 'Đã mở tab Claude của run.');
-  if (launch) openChatTab(launch);
+  if (launch) openTerminal(launch.command, launch.key, tabIdOf(launch));
 }
 
 function renderQueue() {
@@ -436,21 +433,34 @@ function showAlert(lines) {
   box.innerHTML = lines.map((line) => `<p>${esc(line)}</p>`).join('');
 }
 
-async function refresh() {
-  let next;
-  try {
-    next = await api('autopilot/runs');
-  } catch (e) {
-    return showAlert([`Mất kết nối server autopilot (${e.message}). Đang thử lại mỗi 4 giây — dữ liệu dưới đây có thể đã cũ.`]);
-  }
-  showAlert((next.broken ?? []).map((b) => `${b.key} không đọc được: ${b.error}`));
-  const sig = JSON.stringify(next.runs);
-  data = next;
-  selectedKey ??= data.runs.find((r) => !isAborted(r))?.key ?? null;
+// Đang gõ ghi chú hoặc mở menu thì hoãn vẽ lại, vòng 2 giây trong mount vẽ bù khi rảnh
+async function renderIfChanged() {
+  const sig = JSON.stringify(data.runs);
   if (sig === lastSig || stageMenu || ['note', 'smText', 'gotoStage'].includes(document.activeElement?.id)) return;
   lastSig = sig;
   renderQueue();
   await renderMain();
+}
+
+function applyRuns(next) {
+  data = next;
+  showAlert((next.broken ?? []).map((b) => `${b.key} không đọc được: ${b.error}`));
+  selectedKey ??= data.runs.find((r) => !isAborted(r))?.key ?? null;
+  return renderIfChanged();
+}
+
+function onLiveStatus({ online, error }) {
+  if (!online) showAlert(['Mất kết nối server autopilot, đang tự nối lại — dữ liệu dưới đây có thể đã cũ.']);
+  else if (error) showAlert([`Không đọc được danh sách run: ${error}`]);
+}
+
+// Sau khi gửi lệnh: vẽ lại dù run.json chưa đổi, để dock không kẹt ở "chờ autopilot nhận" khi CLI từ chối
+async function refresh() {
+  try {
+    await applyRuns(await api('autopilot/runs'));
+  } catch (e) {
+    showAlert([`Không tải được danh sách run: ${e.message}`]);
+  }
 }
 
 // Huỷ xoá hẳn worktree + nhánh + thư mục run nên phải bấm 2 lần
@@ -617,112 +627,6 @@ function onStageMenuClick(e) {
   submitStageMenu(item);
 }
 
-function renderFlows() {
-  const opts = [{ id: '', label: 'Router tự chọn luồng' }, ...data.flows];
-  $('#flows').innerHTML = opts.map((f, i) => `<button class="flowopt ${i === flowChoice ? 'on' : ''}" data-i="${i}"><span>${esc(f.label)}</span><small>${esc(f.id || 'auto')}</small></button>`).join('');
-}
-function openPalette() {
-  resetPreview();
-  flowChoice = 0;
-  renderFlows();
-  $('#veil').classList.add('show');
-  setTimeout(() => $('#ticket').focus(), 50);
-}
-function closePalette() {
-  $('#veil').classList.remove('show');
-  resetPreview();
-}
-function resetPreview() {
-  previewSeq++;
-  previewBusy = false;
-  preview = null;
-  $('#palette').classList.remove('previewing');
-}
-function backToInput() {
-  resetPreview();
-  $('#ticket').focus();
-}
-function setPreviewBusy(busy) {
-  previewBusy = busy;
-  if (preview) $('[data-pv="run"]').disabled = !canRunPreview();
-}
-function launched(mode, input, out) {
-  $('#ticket').value = '';
-  closePalette();
-  if (mode === 'chat') openChatTab(out);
-  selectedKey = mode === 'chat' ? out.key : input.match(/[A-Z][A-Z0-9]*-\d+/)?.[0] ?? selectedKey;
-  setTimeout(() => { lastSig = ''; refresh().catch(() => {}); }, mode === 'chat' ? 0 : 2500);
-}
-async function startRun(mode) {
-  const input = $('#ticket').value.trim();
-  if (!input) return toast('Nhập mã ticket hoặc link.', true);
-  const flow = [{ id: '' }, ...data.flows][flowChoice].id || undefined;
-  if (mode !== 'chat') return loadPreview(input, flow);
-  const out = await post('open', { input, flow }, 'Đã tạo worktree, mở tab Claude.');
-  if (out) launched('chat', input, out);
-}
-
-const AUTO_SKIP_HINT = 'tự bỏ nếu không đụng UI/pm';
-const isApproval = (s) => s.kind === 'pause' || s.kind === 'attached';
-const needsSkipReason = () => preview.stages.some((s) => preview.off.has(s.id) && s.gateLike);
-const allClaudeOff = () => preview.stages.filter((s) => s.kind === 'claude').every((s) => preview.off.has(s.id));
-const canRunPreview = () => !previewBusy && Boolean(preview.flow) && (!needsSkipReason() || preview.skipReason.trim() !== '');
-
-async function loadPreview(input, flow) {
-  const seq = ++previewSeq;
-  setPreviewBusy(true);
-  let loaded;
-  try {
-    const query = new URLSearchParams({ input, ...(flow && { flow }) });
-    loaded = await api(`autopilot/preview?${query}`);
-  } catch (e) {
-    toast(`Không xem trước được: ${e.message}`, true);
-  }
-  if (seq !== previewSeq) return;
-  previewBusy = false;
-  if (loaded) preview = { input, ...loaded, off: new Set(), stops: new Set(), skipReason: '' };
-  if (preview) renderPreview();
-}
-function previewCell(s) {
-  const off = preview.off.has(s.id);
-  const stop = preview.stops.has(s.id);
-  const controls = isApproval(s)
-    ? '<small class="pv-lock">mốc duyệt</small>'
-    : `<span class="pv-ctl"><button class="pv-sw ${off ? '' : 'on'}" data-pv="toggle" role="switch" aria-checked="${!off}" aria-label="Bật/tắt ${esc(s.id)}"></button><button class="pv-pin ${stop ? 'on' : ''}" data-pv="stop" aria-pressed="${stop}" title="Dừng sau bước này"><i class="ph-bold ph-map-pin"></i></button></span>`;
-  const hint = s.predicted === 'skip' && !off ? `<small class="pv-auto">${AUTO_SKIP_HINT}</small>` : '';
-  return `<div class="pv-cell ${esc(s.kind)} ${off ? 'off' : ''} ${s.predicted === 'skip' ? 'auto-skip' : ''}" data-id="${esc(s.id)}"><b>${esc(s.id)}</b><small>${s.gateLike ? 'cổng' : esc(s.kind)}</small>${hint}${controls}</div>`;
-}
-function renderPreview() {
-  const flows = preview.flow ? preview.flows : [{ id: '', label: '— chọn luồng —' }, ...preview.flows];
-  $('#palette').classList.add('previewing');
-  $('#preview').innerHTML = `
-    <div class="pv-head"><button class="btn ghost" data-pv="back"><i class="ph ph-arrow-left"></i></button><b>${esc(preview.input)}</b>
-      <select id="pvFlow" aria-label="Luồng">${flows.map((f) => `<option value="${esc(f.id)}" ${f.id === (preview.flow ?? '') ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}</select></div>
-    <p class="pv-reason">${esc(preview.reason)}</p>
-    <div class="pv-stages">${preview.stages.map(previewCell).join('') || '<p class="pv-empty">Chọn luồng để xem các bước.</p>'}</div>
-    ${preview.stages.length && allClaudeOff() ? '<p class="pv-warn">Đã tắt hết các bước claude — run chỉ còn cổng và mốc duyệt, không có gì được viết.</p>' : ''}
-    ${needsSkipReason() ? `<input id="pvReason" class="pv-why" placeholder="Lý do tắt cổng (bắt buộc)" value="${esc(preview.skipReason)}" autocomplete="off">` : ''}
-    <div class="pv-foot"><span>Enter chạy · Esc đóng · 📍 dừng sau bước</span><button class="btn go" data-pv="run" ${canRunPreview() ? '' : 'disabled'}>Chạy <kbd>↵</kbd></button></div>`;
-}
-async function runPreview() {
-  if (previewBusy) return;
-  const { input, flow, off, stops, skipReason } = preview;
-  setPreviewBusy(true);
-  const out = await post('run', { input, flow, skip: [...off], skipReason, breaks: [...stops] });
-  if (out) return launched('run', input, out);
-  setPreviewBusy(false);
-}
-function onPreviewClick(action, stageId) {
-  if (action === 'back') return backToInput();
-  if (action === 'run') return runPreview();
-  const set = action === 'toggle' ? preview.off : preview.stops;
-  set.has(stageId) ? set.delete(stageId) : set.add(stageId);
-  renderPreview();
-  $(`.pv-cell[data-id="${stageId}"] [data-pv="${action}"]`).focus();
-  if (action === 'toggle' && needsSkipReason() && !preview.skipReason) $('#pvReason').focus();
-}
-
-
 const MARKUP = `
 <aside class="ap-queue">
   <div class="brand">
@@ -748,19 +652,11 @@ const MARKUP = `
   </div>
 </div>
 
-<div class="stage-menu" id="stageMenu" role="menu" hidden></div>
+<div class="stage-menu" id="stageMenu" role="menu" hidden></div>`;
 
-<div class="veil" id="veil">
-  <div class="palette" id="palette" role="dialog" aria-label="Chạy ticket mới">
-    <input id="ticket" placeholder="GW-123 hoặc link sheet / Jira" autocomplete="off">
-    <div class="flows" id="flows"></div>
-    <div class="preview" id="preview"></div>
-    <div class="foot"><span>↑↓ chọn luồng · Esc đóng</span><span class="modes"><button class="btn ghost" data-mode="auto" title="Xem các bước, chỉnh rồi chạy bằng claude -p tới mốc cần bạn">Xem trước &amp; chạy <kbd>↵</kbd></button><button class="btn go" data-mode="chat" title="Tạo worktree rồi mở một tab Claude để làm cùng bạn">Mở tab chat</button></span></div>
-  </div>
-</div>`;
-
-export function mount(el) {
+export function mount(el, ctx) {
   el.innerHTML = `<div class="ap">${MARKUP}</div>`;
+  selectedKey = ctx.param ?? selectedKey;
   lastSig = '';
   lastStates = {};
   stageMenu = null;
@@ -811,40 +707,10 @@ export function mount(el) {
   const onDocScroll = (e) => {
     if (stageMenu && (e.target === document || e.target.classList?.contains('flow')) && spotOf(stageMenu.anchor) !== stageMenu.spot) closeStageMenu();
   };
-  $('#openPalette').addEventListener('click', openPalette);
-  $('#veil').addEventListener('click', (e) => {
-    if (e.target.id === 'veil') return closePalette();
-    const mode = e.target.closest('[data-mode]');
-    if (mode) return startRun(mode.dataset.mode);
-    const pv = e.target.closest('[data-pv]');
-    if (pv) return onPreviewClick(pv.dataset.pv, pv.closest('.pv-cell')?.dataset.id);
-    const opt = e.target.closest('.flowopt');
-    if (opt) { flowChoice = Number(opt.dataset.i); renderFlows(); $('#ticket').focus(); }
-  });
-  $('#preview').addEventListener('change', (e) => {
-    if (e.target.id === 'pvFlow') loadPreview(preview.input, e.target.value || undefined);
-  });
-  $('#preview').addEventListener('input', (e) => {
-    if (e.target.id !== 'pvReason') return;
-    preview.skipReason = e.target.value;
-    $('[data-pv="run"]').disabled = !canRunPreview();
-  });
+  $('#openPalette').addEventListener('click', () => openRunPalette());
   const onKey = (e) => {
     const typing = document.activeElement?.closest('input, textarea, select, .xterm, [contenteditable]');
     if (e.key === 'Escape' && stageMenu) return closeStageMenu();
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette(); }
-    if ($('#veil').classList.contains('show')) {
-      const total = data.flows.length + 1;
-      if (e.key === 'Escape') closePalette();
-      if (preview) {
-        if (e.key === 'Enter' && !['BUTTON', 'SELECT'].includes(document.activeElement.tagName) && canRunPreview()) runPreview();
-        return;
-      }
-      if (e.key === 'ArrowDown') { flowChoice = (flowChoice + 1) % total; renderFlows(); e.preventDefault(); }
-      if (e.key === 'ArrowUp') { flowChoice = (flowChoice + total - 1) % total; renderFlows(); e.preventDefault(); }
-      if (e.key === 'Enter') startRun('auto');
-      return;
-    }
     if (e.key === 'Escape' && dockAsk) {
       dockAsk = null;
       return renderDock(currentRun());
@@ -867,14 +733,14 @@ export function mount(el) {
   document.addEventListener('click', onDocClick);
   document.addEventListener('scroll', onDocScroll, true);
   window.addEventListener('resize', onResize);
-  refresh().catch(() => {});
-  const timer = setInterval(() => refresh().catch(() => {}), 4000);
+  const stopLive = subscribeRuns((next) => applyRuns(next).catch(() => {}), onLiveStatus);
   const liveTimer = setInterval(() => {
+    renderIfChanged().catch(() => {});
     const run = data.runs.find((r) => r.key === selectedKey);
     if (run?.status === 'running' && artifact === LIVE) renderLog(run).catch(() => {});
   }, 2000);
   return () => {
-    clearInterval(timer);
+    stopLive();
     clearInterval(liveTimer);
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('click', onDocClick);

@@ -1,5 +1,6 @@
 import { esc } from '../lib.js';
-import { JIRA, PHASE, phaseOf, MILESTONE, daysUntil, shortDate, toneByDays, realMilestones, nextMilestone, settler, skeleton, note, errNote, pill } from './_kit.js';
+import { openRunPalette } from '../run-palette.js';
+import { JIRA, PHASE, phaseOf, MILESTONE, daysUntil, shortDate, toneByDays, realMilestones, nextMilestone, settler, skeleton, note, errNote, pill, runChip, keysWithOpenRun } from './_kit.js';
 
 const DAYS_AHEAD = 28;
 const DAY_COUNT = DAYS_AHEAD + 1;
@@ -49,13 +50,15 @@ export function mount(el, ctx) {
   let st = null;
   let stateError = null;
   let forecasts = {};
+  let openRunKeys = new Set();
   const opened = new Set();
 
   async function load() {
-    const [state, learn] = await Promise.allSettled([ctx.api('state'), ctx.api('learn')]);
+    const [state, learn, runs] = await Promise.allSettled([ctx.api('state'), ctx.api('learn'), ctx.api('autopilot/runs')]);
     if (state.status === 'fulfilled') [st, stateError] = [state.value, null];
     else stateError = state.reason;
     if (learn.status === 'fulfilled') forecasts = learn.value.forecasts ?? {};
+    if (runs.status === 'fulfilled') openRunKeys = keysWithOpenRun(runs.value.runs);
     render();
     if (st) settle();
   }
@@ -93,9 +96,10 @@ export function mount(el, ctx) {
     return { ...fc, late: Boolean(next && fc.date > next.date) };
   }
 
+
   function rowLabel(key, issue, isSub) {
     const phase = phaseOf(issue.phase);
-    return `<span class="lc-name">${isSub ? '<i class="ph ph-arrow-elbow-down-right lc-subicon"></i>' : ''}<b class="mono">${esc(key)}</b>${pill(phase.tone, `<i class="ph ${phase.icon}"></i>${esc(phase.label)}`)}</span>
+    return `<span class="lc-name">${isSub ? '<i class="ph ph-arrow-elbow-down-right lc-subicon"></i>' : ''}<b class="mono">${esc(key)}</b>${pill(phase.tone, `<i class="ph ${phase.icon}"></i>${esc(phase.label)}`)}${runChip(key, issue.phase, openRunKeys)}</span>
       <span class="lc-sum" title="${esc(issue.summary ?? '')}">${esc(issue.summary || '--')}</span>`;
   }
 
@@ -184,7 +188,7 @@ export function mount(el, ctx) {
     const phase = phaseOf(issue.phase);
     const open = opened.has(key);
     return `<div class="lc-subrow ${open ? 'open' : ''}" data-key="${esc(key)}" tabindex="0" role="button" aria-expanded="${open}">
-        <span class="lc-crow"><span class="lc-dot t-${phase.tone}" title="${esc(phase.label)}"></span><b class="mono">${esc(key)}</b>${dueOf(issue)}</span>
+        <span class="lc-crow"><span class="lc-dot t-${phase.tone}" title="${esc(phase.label)}"></span><b class="mono">${esc(key)}</b>${runChip(key, issue.phase, openRunKeys)}${dueOf(issue)}</span>
       </div>${open ? detail(key, issue) : ''}`;
   }
 
@@ -193,7 +197,7 @@ export function mount(el, ctx) {
     const open = opened.has(key);
     return `<div class="lc-card vw-in ${group.context ? 'ctx' : ''} ${open ? 'open' : ''}" style="--i:${i}">
       <div class="lc-chead" data-key="${esc(key)}" tabindex="0" role="button" aria-expanded="${open}">
-        <span class="lc-crow"><b class="mono">${esc(key)}</b>${group.context ? '<small>task chính</small>' : dueOf(issue)}</span>
+        <span class="lc-crow"><b class="mono">${esc(key)}</b>${runChip(key, issue.phase, openRunKeys)}${group.context ? '<small>task chính</small>' : dueOf(issue)}</span>
         ${open ? '' : `<span class="lc-csum" title="${esc(issue.summary ?? '')}">${esc(issue.summary || '--')}</span>`}
       </div>
       ${open ? detail(key, issue) : ''}
@@ -233,6 +237,10 @@ export function mount(el, ctx) {
       return render();
     }
     if (e.target.closest('#lcReload')) return load();
+    const runBtn = e.target.closest('[data-run-key]');
+    if (runBtn) return openRunPalette({ input: runBtn.dataset.runKey });
+    const viewRun = e.target.closest('[data-view-run]');
+    if (viewRun) return ctx.go('autopilot', viewRun.dataset.viewRun);
     const openTask = e.target.closest('[data-open-task]');
     if (openTask) return ctx.go('tasks', openTask.dataset.openTask);
     if (e.target.closest('.lc-detail')) return;

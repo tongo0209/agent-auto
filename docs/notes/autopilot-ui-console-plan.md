@@ -64,3 +64,23 @@ Bấm Duyệt thì chặn POST bằng `page.route` để không duyệt thật G
 - Đang làm (test đỏ đã viết): runner ghi `.child` {pid} + detached + bắt session_id từ dòng init (XANH) · driver: stopRequested → halt paused + run.cutSession {stage,sessionId}, không retry, không receipt; resume nối `--resume` + continuePrompt (+ run.resumeNote) (driver.mjs) · CLI pause/abort tắt nhóm PID trong `.child` (chưa làm) · test cũ driver.test.mjs:333 cần đổi sang hành vi mới.
 - Tiếp: abort = tắt + xoá worktree (`git worktree remove --force`) + nhánh autopilot/<KEY>-<runId> + rm thư mục run; UI bỏ nhóm "Đã huỷ"; `resume --note` + ô nhắn ở dock khi stopReason paused.
 - Đợt thử 7 luồng XONG 15:48: GW-912 gates budget · GW-963 plan fail (mâu thuẫn quyết định payment 14:51 → hỏi user A/B) · GW-909 fetch-design fail (SharePoint cần extension) · GW-950 drift-check fail (thiếu sheetUrl — đã sửa, chạy lại run MỚI) · GW-844 user pause trước implement · GW-627 plan fail · GW-806 clone fail (chưa xem lý do).
+
+## Checkpoint 20/10 ~15:55 — hết hạn mức usage
+- Xong + commit: 0ed69de dừng ngay/nhắn khi chạy tiếp/huỷ dọn sạch · 0373b9b huỷ xoá thư mục task rỗng. 6 run huỷ đã dọn; còn GW-844 tạm dừng trước implement.
+- DỞ: (1) "Mở trong Claude" (claude --resume <cutSession> interactive trong panel, cwd worktree, settings sandbox; nút "Trả lại autopilot"; kiểm session id có đổi khi resume) — subagent bị dừng giữa chừng, kiểm `git status` lab trước khi làm lại. (2) Spike nhắn giữa chừng qua `--input-format stream-json`: script scratchpad/spike-stdin.cjs, lần chạy 15:55 chỉ ra "session limit" → chưa có kết luận, chạy lại sau 16:00.
+- Chờ user: push autopilot-lab + c2e8aa0; GW-963 A/B.
+
+## Checkpoint 20/10 ~17:00
+- 4800 chạy task bl3nx604a: `AUTOPILOT_LAB_WRITES=1 node autopilot-ui/server.mjs` (user cho bật ghi). Restart phải hỏi user, giữ biến này.
+- Commit hôm nay: a88d47a (twig gates), a1fa9d0 (build-pro + bỏ trần budget), 412d573 (skipped), d4012df (Đồng bộ Jira), 8f890ca+f6b19a3 (Chờ review), 505be7c (dock cho run đã review). Suite 215/215.
+- GW-844 done, reviewedAt 16:40 (không rõ ai bấm). Code: cdn-source 4ead249b1 nhánh autopilot/GW-844-20261020-153354.
+- Subagent đang làm (user duyệt "ok triển đi" + goal "làm đi và test kĩ"):
+  1. Dock gom về 1 nút "Mở trong Claude" (tab panel trong worktree run + brief có bảng lệnh autopilot); giữ Huỷ run / Đã review / Chạy tiếp / Duyệt; bỏ Đưa vào source, Sửa tiếp bằng chat, Trả về sửa, Mở lại tab, Xong. Không tự cherry-pick vào repo gốc — chỉ in lệnh.
+  2. Mọi tab claude mở từ panel 4800 kèm --append-system-prompt (file trong lab): "việc + ticket/link" → `autopilot run` nền; "làm X cùng tôi" → `open` chat; câu mơ hồ → hỏi trước.
+- Sau khi subagent xong: kiểm suite + Playwright, test kĩ (1920/768, panel mở/đóng, lệnh gõ vào tab), hỏi user restart 4800.
+
+## Checkpoint 23/10 — chống crash + nút Chạy chủ động + SSE
+- Xong: 2bd1603 server không sập khi handler lỗi (Express 4 không bắt async → Node 25 tắt cả 4800 + mọi tab terminal), run hỏng tách `broken`, artifact là thư mục → 404, trang báo mất kết nối. Suite 368/368.
+- Chốt với user: KHÔNG viết lại cả trang bằng framework; dùng Preact + htm (vendor `web/vendor/htm-preact-3.1.1.js`, không build) cho bảng Chạy ticket, các màn khác chuyển dần khi cần.
+- Đang làm song song (3 agent, file tách nhau): `web/run-palette.js` (⌘K toàn cục, `openRunPalette({input})`, gợi ý ticket coding/bugfix chưa có run) · `run-events.mjs` + `web/live-runs.js` (SSE thay poll 4s) · nút Chạy trên dòng ticket ở timeline/today/tasks.
+- Người điều phối còn phải: gắn route `/api/autopilot/events` vào server.mjs, nối `subscribeRuns` vào autopilot.js + badge app.js, chạy suite + browserpilot 1920/768 trên cổng phụ, commit. 4800 hiện KHÔNG chạy; khởi động lại phải hỏi user, giữ `AUTOPILOT_LAB_WRITES=1`.

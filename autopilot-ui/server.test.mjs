@@ -171,3 +171,14 @@ test('lỗi trong handler autopilot → 500, server không sập (terminal sốn
     fs.rmSync(path.join(process.env.AUTOPILOT_RUNS_DIR, 'GW-77'), { recursive: true });
   }
 });
+
+test('GET /api/autopilot/events mở luồng SSE, gửi ngay danh sách run', async () => {
+  const ctrl = new AbortController();
+  const res = await fetch(`${base}/api/autopilot/events`, { signal: ctrl.signal });
+  assert.match(res.headers.get('content-type'), /text\/event-stream/);
+  const reader = res.body.getReader();
+  let text = '';
+  while (!text.includes('\n\n')) text += new TextDecoder().decode((await reader.read()).value);
+  ctrl.abort();
+  assert.match(text, /event: runs/);
+});

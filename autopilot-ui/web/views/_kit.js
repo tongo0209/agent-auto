@@ -13,6 +13,13 @@ export const PHASE = {
   reassigned: { label: 'đã chuyển người', group: 'Đã xong / ra khỏi tay', tone: 'mute', icon: 'ph-user-switch', folded: true },
   closed: { label: 'đóng', group: 'Đã xong / ra khỏi tay', tone: 'mute', icon: 'ph-archive', folded: true },
 };
+// Autopilot nhận ticket còn việc FE; ticket đã có run đang mở thì dẫn sang run đó thay vì chạy thêm
+export const RUNNABLE_PHASES = ['ready', 'coding', 'bugfix'];
+export const keysWithOpenRun = (runs) => new Set(runs.filter((r) => r.status !== 'done' && r.stopReason !== 'aborted').map((r) => r.key));
+export function runChip(key, phase, openKeys) {
+  if (openKeys.has(key)) return `<button class="vw-link" data-view-run="${esc(key)}">Xem run</button>`;
+  return RUNNABLE_PHASES.includes(phase) ? `<button class="run-chip" data-run-key="${esc(key)}" title="Xem trước các bước autopilot cho ${esc(key)}"><i class="ph-bold ph-play"></i>Chạy</button>` : '';
+}
 export const phaseOf = (id) => PHASE[id] ?? { label: id ?? 'không rõ', group: 'Phase lạ', tone: 'mute', icon: 'ph-question' };
 
 export const MILESTONE = { design: 'Design', html: 'HTML', deliver: 'Giao HTML', dev: 'Dev BE', test: 'Test', bugfix: 'Fix bug', release: 'Release', review1: 'Review 1', review2: 'Review 2', duedate: 'Due Jira' };

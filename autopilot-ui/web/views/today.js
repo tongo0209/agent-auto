@@ -1,5 +1,6 @@
 import { esc } from '../lib.js';
-import { inlineMd, shortDate, daysUntil, hhmm, settler, skeleton, note, errNote, pill, draft } from './_kit.js';
+import { openRunPalette } from '../run-palette.js';
+import { inlineMd, shortDate, daysUntil, hhmm, settler, skeleton, note, errNote, pill, draft, runChip, keysWithOpenRun } from './_kit.js';
 
 const REFRESH_MS = 15000;
 const SEEN_KEY = 'console2.deltaSeenAt';
@@ -63,21 +64,24 @@ export function mount(el, ctx) {
   let itemsById = new Map();
   let showLoose = false;
   let deltaOpen = false;
+  let openRunKeys = new Set();
 
   const seenAt = () => localStorage.getItem(SEEN_KEY) ?? new Date(Date.now() - DELTA_WINDOW_MS).toISOString();
 
   const settle = settler(el.firstElementChild);
 
   async function load() {
-    const [queue, alerts, debt, radar, delta, state] = await Promise.allSettled([
+    const [queue, alerts, debt, radar, delta, state, runs] = await Promise.allSettled([
       ctx.api('queue'),
       ctx.api('alerts'),
       ctx.api('debt'),
       ctx.api('radar'),
       ctx.api(`delta?since=${encodeURIComponent(seenAt())}`),
       ctx.api('state'),
+      ctx.api('autopilot/runs'),
     ]);
     data = { queue, alerts, debt, radar, delta, state };
+    if (runs.status === 'fulfilled') openRunKeys = keysWithOpenRun(runs.value.runs);
     render();
     settle();
   }
@@ -128,6 +132,7 @@ export function mount(el, ctx) {
         <button class="btn ghost vw-sm" data-delta-seen><i class="ph ph-eye"></i>Đánh dấu đã xem</button></div></div>`;
   }
 
+
   function row(item, i, { snoozed = false } = {}) {
     const isCheck = CHECK_KINDS.includes(item.action.kind);
     const lead = isCheck
@@ -143,7 +148,7 @@ export function mount(el, ctx) {
     const toDue = item.due && item.due > today ? `<option value="due">tới mốc ${shortDate(item.due)}</option>` : '';
     const tail = snoozed
       ? `<span class="td-meta mono">tới ${shortDate(item.snoozedUntil)}</span><button class="btn ghost vw-sm" data-unsnooze><i class="ph ph-alarm"></i>Bỏ hoãn</button>`
-      : `${due}${act}<select class="vw-select" data-snooze aria-label="Hoãn dòng này"><option value="">Hoãn</option>${SNOOZE_DAYS.map((d) => `<option value="${d}">${d} ngày</option>`).join('')}${toDue}</select>`;
+      : `${item.key ? runChip(item.key, data.state.value?.state.issues?.[item.key]?.phase, openRunKeys) : ''}${due}${act}<select class="vw-select" data-snooze aria-label="Hoãn dòng này"><option value="">Hoãn</option>${SNOOZE_DAYS.map((d) => `<option value="${d}">${d} ngày</option>`).join('')}${toDue}</select>`;
     return `<li class="td-row vw-in ${openRows.has(item.id) ? 'open' : ''}" data-id="${esc(item.id)}" style="--i:${i}">
       ${lead}<div class="td-text">${key}${age}<span data-expand title="Bấm để xem hết">${text}</span></div><div class="td-tail">${tail}</div></li>`;
   }
@@ -251,6 +256,10 @@ export function mount(el, ctx) {
     const t = e.target;
     const ticket = t.closest('[data-ticket]');
     if (ticket) return ctx.go('tasks', ticket.dataset.ticket);
+    const runBtn = t.closest('[data-run-key]');
+    if (runBtn) return openRunPalette({ input: runBtn.dataset.runKey });
+    const viewRun = t.closest('[data-view-run]');
+    if (viewRun) return ctx.go('autopilot', viewRun.dataset.viewRun);
     if (t.closest('[data-act]')) return runAction(itemOf(t), t.closest('[data-act]'));
     if (t.closest('[data-check]')) return check(itemOf(t), t.closest('[data-check]'));
     if (t.closest('[data-unsnooze]')) return snooze(itemOf(t), null);

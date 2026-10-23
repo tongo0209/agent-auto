@@ -1,0 +1,48 @@
+.veil { position: fixed; inset: 0; background: rgb(5 7 9 / .6); backdrop-filter: blur(4px); display: grid; place-items: start center; padding-top: 18dvh; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 10; }
+.veil.show { opacity: 1; pointer-events: auto; }
+.palette { width: min(560px, calc(100vw - 32px)); background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 14px; box-shadow: 0 30px 80px rgb(0 0 0 / .5); transform: translateY(-8px) scale(.98); transition: transform .3s var(--ease); }
+.veil.show .palette { transform: none; }
+.palette input { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 16px 18px; font-size: 16px; outline: none; }
+.palette input::placeholder { color: var(--text-3); }
+.flows { padding: 8px; display: grid; gap: 2px; }
+.flowopt { text-align: left; padding: 10px 12px; border-radius: var(--r); display: flex; justify-content: space-between; gap: 10px; color: var(--text-2); }
+.flowopt.on, .flowopt:hover { background: var(--bg-2); color: var(--text); }
+.flowopt small { color: var(--text-3); font-family: var(--mono); }
+.palette .foot { padding: 10px 18px 14px; font-size: 12px; color: var(--text-3); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.palette .modes { display: flex; gap: 8px; }
+.palette .modes .btn { padding: 6px 12px; font-size: 13px; }
+
+.rp-suggest { padding: 8px 8px 0; display: grid; gap: 2px; }
+.rp-suggest > small { padding: 4px 12px; font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; }
+.rp-suggest + .flows { border-top: 1px solid var(--line); margin-top: 8px; }
+.rp-sug { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 10px; text-align: left; padding: 8px 12px; border-radius: var(--r); color: var(--text-2); }
+.rp-sug:hover, .rp-sug:focus-visible { background: var(--bg-2); color: var(--text); }
+.rp-sug b { font: 600 13px var(--mono); color: var(--text); }
+.rp-sug span { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-sug small { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+
+.palette.previewing { width: min(1040px, calc(100vw - 32px)); max-height: 78dvh; overflow-y: auto; }
+.preview { padding: 16px 18px 14px; display: grid; gap: 12px; }
+.pv-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pv-head .btn { padding: 6px 10px; }
+.pv-head select { margin-left: auto; min-width: 240px; max-width: 100%; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: var(--r); padding: 7px 10px; }
+.pv-reason, .pv-empty { margin: 0; color: var(--text-2); font-size: 13px; }
+.pv-stages { display: flex; flex-wrap: wrap; gap: 8px; }
+.pv-cell { width: 112px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; text-align: center; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: var(--r); }
+.pv-cell b { font-size: 12px; line-height: 1.25; overflow-wrap: anywhere; }
+.pv-cell small { font-size: 11px; color: var(--text-3); font-family: var(--mono); }
+.pv-cell.gate, .pv-cell.pause { border-style: dashed; }
+.pv-cell.auto-skip, .pv-cell.off { opacity: .45; }
+.pv-cell.off b { text-decoration: line-through; }
+.pv-auto { font-family: var(--sans); }
+.pv-ctl { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px; }
+.pv-sw { position: relative; width: 30px; height: 18px; border-radius: 9px; background: var(--idle); border: 0; padding: 0; transition: background .2s; }
+.pv-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text); transition: transform .2s var(--ease); }
+.pv-sw.on { background: var(--ok); }
+.pv-sw.on::after { transform: translateX(12px); }
+.pv-pin { color: var(--text-3); padding: 2px; border-radius: 6px; line-height: 0; }
+.pv-pin.on { color: var(--stop); }
+.pv-lock { margin-top: auto; padding-top: 4px; }
+.palette .pv-why { width: 100%; background: var(--bg-2); border: 1px solid var(--stop); border-radius: var(--r); padding: 10px 12px; font-size: 14px; }
+.pv-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--text-3); }
+.pv-warn { margin: 0; padding: 8px 12px; border-radius: var(--r); font-size: 13px; color: var(--wait); background: color-mix(in srgb, var(--wait) 12%, transparent); }

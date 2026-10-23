@@ -1,5 +1,6 @@
 import { esc } from '../lib.js';
-import { JIRA, phaseOf, MILESTONE, daysUntil, shortDate, stamp, markdown, settler, skeleton, note, errNote, pill, draft, realMilestones, toneByDays, nextMilestone, isLate } from './_kit.js';
+import { openRunPalette } from '../run-palette.js';
+import { JIRA, phaseOf, MILESTONE, daysUntil, shortDate, stamp, markdown, settler, skeleton, note, errNote, pill, draft, realMilestones, toneByDays, nextMilestone, isLate, RUNNABLE_PHASES, keysWithOpenRun } from './_kit.js';
 
 const STATE_REFRESH_MS = 20000;
 const EXTRA_REFRESH_MS = 60000;
@@ -152,15 +153,20 @@ export function mount(el, ctx) {
   }
 
   async function openDrawer(key) {
-    drawer = { key, tab: 'overview', data: null, handoff: null, delivery: null, brief: null, confirm: null, img: 0, compare: false };
+    drawer = { key, tab: 'overview', data: null, handoff: null, hasOpenRun: false, delivery: null, brief: null, confirm: null, img: 0, compare: false };
     setHash(key);
     $('#tkVeil').classList.add('show');
     $('#tkDrawer').classList.add('show');
     $('#tkDrawer').innerHTML = `<div class="tk-dhead"><span class="vw-key">${esc(key)}</span><span class="grow"></span><button class="vw-x" data-close aria-label="Đóng"><i class="ph ph-x"></i></button></div><div class="tk-dbody">${skeleton(9)}</div>`;
     try {
-      const [data, handoff] = await Promise.all([ctx.api(`ticket/${encodeURIComponent(key)}`), ctx.api(`handoff/${encodeURIComponent(key)}`).catch(() => ({ exists: false, items: [] }))]);
+      const [data, handoff, { runs }] = await Promise.all([
+        ctx.api(`ticket/${encodeURIComponent(key)}`),
+        ctx.api(`handoff/${encodeURIComponent(key)}`).catch(() => ({ exists: false, items: [] })),
+        ctx.api('autopilot/runs').catch(() => ({ runs: [] })),
+      ]);
       if (drawer?.key !== key) return;
-      Object.assign(drawer, { data, handoff });
+      const hasOpenRun = keysWithOpenRun(runs).has(key);
+      Object.assign(drawer, { data, handoff, hasOpenRun });
     } catch (e) {
       if (drawer?.key !== key) return;
       $('#tkDrawer .tk-dbody').innerHTML = errNote(e);
@@ -232,8 +238,11 @@ export function mount(el, ctx) {
     const preview = d.dist
       ? `<a class="btn ghost vw-sm" href="/preview/${esc(d.key)}/" target="_blank" rel="noopener"><i class="ph ph-browser"></i>Preview</a>`
       : `<span class="btn ghost vw-sm tk-off" aria-disabled="true" title="Chưa có dist/, build trước"><i class="ph ph-browser"></i>Preview</span>`;
+    const autopilot = drawer.hasOpenRun
+      ? '<button class="btn vw-sm" data-view-run><i class="ph-bold ph-flow-arrow"></i>Xem run</button>'
+      : RUNNABLE_PHASES.includes(issue.phase) ? '<button class="btn go vw-sm" data-run-autopilot><i class="ph-bold ph-flow-arrow"></i>Chạy autopilot</button>' : '';
     return `<div class="tk-actions">
-      <button class="btn go vw-sm" data-run-autopilot><i class="ph-bold ph-flow-arrow"></i>Chạy autopilot</button>
+      ${autopilot}
       <button class="btn vw-sm" data-cli><i class="ph ph-terminal-window"></i>Mở CLI</button>
       <button class="btn vw-sm" data-gate><i class="ph ph-shield-check"></i>Chạy cổng</button>
       ${preview}
@@ -474,10 +483,8 @@ export function mount(el, ctx) {
     if (t.closest('[data-prep]')) return ctx.openTerminal(`claude "/daily prep ${drawer.key}"`, `prep ${drawer.key}`);
     const draftBtn = t.closest('[data-draft]');
     if (draftBtn) return draft(ctx, draftBtn.dataset.draft, drawer.key);
-    if (t.closest('[data-run-autopilot]')) {
-      const out = await post('autopilot/run', { input: drawer.key }, 'Đã gửi autopilot, xem tiến độ ở màn Autopilot.');
-      return out && ctx.go('autopilot');
-    }
+    if (t.closest('[data-run-autopilot]')) return openRunPalette({ input: drawer.key });
+    if (t.closest('[data-view-run]')) return ctx.go('autopilot', drawer.key);
     const gateBtn = t.closest('[data-gate]');
     if (gateBtn) return runGate(gateBtn);
     const ask = t.closest('[data-ask]');

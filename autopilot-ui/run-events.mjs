@@ -8,7 +8,7 @@ const REWATCH_MS = 1000;
 
 const send = (res, { event, data }) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
-export function runEvents({ list = listView, dir = runsDir, debounceMs = 300 } = {}) {
+export function runEvents({ list = listView, dir = runsDir, debounceMs = 300, onPages = () => {} } = {}) {
   const clients = new Set();
   let watcher = null;
   let heartbeat = null;
@@ -81,6 +81,7 @@ export function runEvents({ list = listView, dir = runsDir, debounceMs = 300 } =
       startWatch();
     }
     clients.add(res);
+    onPages(clients.size);
     enqueue(async () => {
       const message = await snapshot();
       lastSignature ??= JSON.stringify(message);
@@ -88,6 +89,7 @@ export function runEvents({ list = listView, dir = runsDir, debounceMs = 300 } =
     });
     req.on('close', () => {
       clients.delete(res);
+      onPages(clients.size);
       if (clients.size === 0) stop();
     });
   };

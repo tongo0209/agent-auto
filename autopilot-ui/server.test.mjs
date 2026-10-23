@@ -6,7 +6,7 @@ import path from 'node:path';
 import http from 'node:http';
 
 process.env.AUTOPILOT_RUNS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-srv-'));
-const { createServer, spawnDetached } = await import('./server.mjs');
+const { createServer, spawnDetached, shutdownWhenNoPage } = await import('./server.mjs');
 const { listFlows } = await import('../tools/lib/autopilot/flows.mjs');
 const { saveRun } = await import('../tools/lib/autopilot/store.mjs');
 const { acquire, runLock } = await import('../tools/lib/autopilot/lock.mjs');
@@ -181,4 +181,25 @@ test('GET /api/autopilot/events mở luồng SSE, gửi ngay danh sách run', as
   while (!text.includes('\n\n')) text += new TextDecoder().decode((await reader.read()).value);
   ctrl.abort();
   assert.match(text, /event: runs/);
+});
+
+test('shutdownWhenNoPage: không trang nào mở quá hạn chờ → tắt; reload (nối lại trong hạn) → không tắt', async () => {
+  let exits = 0;
+  const onPages = shutdownWhenNoPage({ graceMs: 60, exit: () => exits++ });
+  onPages(1);
+  onPages(0);
+  await new Promise((r) => setTimeout(r, 30));
+  onPages(1);
+  await new Promise((r) => setTimeout(r, 90));
+  assert.strictEqual(exits, 0);
+  onPages(0);
+  await new Promise((r) => setTimeout(r, 90));
+  assert.strictEqual(exits, 1);
+});
+
+test('shutdownWhenNoPage: mở server mà không trang nào nối vào trong hạn → tắt', async () => {
+  let exits = 0;
+  shutdownWhenNoPage({ graceMs: 30, exit: () => exits++ });
+  await new Promise((r) => setTimeout(r, 60));
+  assert.strictEqual(exits, 1);
 });

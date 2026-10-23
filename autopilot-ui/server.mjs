@@ -23,6 +23,7 @@ try {
 } catch {}
 
 const EARLY_EXIT_MS = 2000;
+const NO_PAGE_EXIT_MS = 15_000;
 const logTail = (log) => fs.readFileSync(log, 'utf8').trim().split('\n').slice(-5).join('\n');
 
 // CLI chạy tách nền vì 1 lượt duyệt kéo theo nhiều stage claude — trang tự poll thấy mốc dừng kế tiếp.
@@ -43,6 +44,15 @@ export function spawnDetached(args, { waitMs = EARLY_EXIT_MS, cli = CLI } = {}) 
       resolve(code ? { pid: child.pid, log, code, error: logTail(log) || `exit ${code}` } : { pid: child.pid, log });
     });
   });
+}
+
+// Đóng tab cuối thì tắt server; reload chỉ rớt SSE vài giây nên chờ một nhịp rồi mới tắt
+export function shutdownWhenNoPage({ graceMs = NO_PAGE_EXIT_MS, exit = () => process.exit(0) } = {}) {
+  let timer = setTimeout(exit, graceMs);
+  return (pages) => {
+    clearTimeout(timer);
+    if (pages === 0) timer = setTimeout(exit, graceMs);
+  };
 }
 
 // open phải chờ CLI in JSON (cwd + lệnh claude) thì UI mới mở được tab
@@ -118,11 +128,11 @@ async function handleAutopilot(req, res, { spawnCli, execCli, openEditor }) {
     send(res, 404, { error: 'không có' });
 }
 
-export function createServer({ spawnCli = spawnDetached, execCli = runCliAndWait, openEditor = openInVsCode, allowWrites = process.env.AUTOPILOT_LAB_WRITES === '1' } = {}) {
+export function createServer({ spawnCli = spawnDetached, execCli = runCliAndWait, openEditor = openInVsCode, allowWrites = process.env.AUTOPILOT_LAB_WRITES === '1', onPages } = {}) {
   const app = express();
   app.use((req, res, next) => (LOCAL_HOST.test(req.headers.host ?? '') ? next() : send(res, 403, { error: 'host lạ' })));
   // autopilot đi trước cổng chặn ghi: run chỉ ghi được repo của nó, hook sandbox chặn repo khác + git ghi
-  app.get('/api/autopilot/events', runEvents());
+  app.get('/api/autopilot/events', runEvents({ onPages }));
   // Express 4 không bắt lỗi của handler async: lọt ra là sập cả process, kéo theo mọi tab terminal
   app.use('/api/autopilot', (req, res) =>
     handleAutopilot(req, res, { spawnCli, execCli, openEditor }).catch((e) => {
@@ -142,7 +152,7 @@ export function createServer({ spawnCli = spawnDetached, execCli = runCliAndWait
 }
 
 if (import.meta.filename === process.argv[1]) {
-  const server = createServer();
+  const server = createServer({ onPages: shutdownWhenNoPage() });
   server.listen(PORT, '127.0.0.1', () => {
     attachTerminal(server, '/term');
     console.log(`Console mới  http://127.0.0.1:${PORT}`);

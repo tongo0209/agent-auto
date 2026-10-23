@@ -149,3 +149,23 @@ test('thư mục runs bị xoá rồi tạo lại → vẫn theo dõi tiếp', a
   await waitFor(() => client.events.at(-1)?.data.runs?.includes('run.json'), 'nhận run sau khi dựng lại');
   client.close();
 });
+
+test('báo số trang đang mở mỗi khi có trang nối vào hoặc đóng', async () => {
+  const runs = tempRuns();
+  const pages = [];
+  const url = await serve(runEvents({ list: runs.list, dir: () => runs.dir, onPages: (n) => pages.push(n) }));
+  const a = connect(url);
+  const b = connect(url);
+  try {
+    await a.next();
+    await b.next();
+    a.close();
+    await waitFor(() => pages.length === 3, 'trang a đóng');
+    b.close();
+    await waitFor(() => pages.length === 4, 'trang b đóng');
+    assert.deepStrictEqual(pages, [1, 2, 1, 0]);
+  } finally {
+    a.close();
+    b.close();
+  }
+});

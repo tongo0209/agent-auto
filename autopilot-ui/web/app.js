@@ -1,6 +1,6 @@
 import { $, esc, toast, api } from './lib.js';
 import { subscribeRuns } from './live-runs.js';
-import { initTerminal, toggleTerminal, openTerminal } from './terminal.js';
+import { initTerminal, toggleTerminal, openTerminal, isOpen as isTerminalOpen } from './terminal.js';
 import './run-palette.js';
 
 const VIEWS = [
@@ -76,7 +76,7 @@ const ctx = { api: cachedApi, toast, openTerminal, go: (id, param) => (location.
 let cleanup = null;
 
 function renderNav(active) {
-  $('#nav').innerHTML = `<a href="#" class="term-btn" id="termBtn" title="Mở/đóng Claude CLI (Ctrl+\`)"><i class="ph-bold ph-terminal-window"></i>Claude</a>
+  $('#nav').innerHTML = `<a href="#" class="term-btn${isTerminalOpen() ? ' on' : ''}" id="termBtn" title="Mở/đóng Claude CLI (Ctrl+\`)"><i class="ph-bold ph-terminal-window"></i>Claude</a>
     ${VIEWS.map((v) => `<a href="#/${v.id}" class="${v.id === active ? 'on' : ''}" data-view="${v.id}"><i class="ph${v.id === active ? '-fill' : ''} ${v.icon}"></i>${v.label}</a>`).join('')}`;
 }
 

@@ -28,7 +28,7 @@ const live = new Map();
 // Dưới ngưỡng này terminal là ngăn trượt đè nội dung; khớp @media trong app.css
 const drawerMode = window.matchMedia('(max-width: 1199px)');
 let drawerOpen = false;
-const isOpen = () => (drawerMode.matches ? drawerOpen : state.open);
+export const isOpen = () => (drawerMode.matches ? drawerOpen : state.open);
 
 const persist = () => {
   try {

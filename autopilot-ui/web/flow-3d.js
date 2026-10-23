@@ -2,11 +2,15 @@ import * as THREE from './vendor/three-0.160.0.module.js';
 
 const MIN_COL_PITCH = 1.9;
 const MAX_COL_PITCH = 3.3;
-const LABEL_MIN_PX = 100;
+const LABEL_GAP_PX = 8;
+const STAGGER_COST = 1.15;
+const STAGGER_ROW_PX = 90;
+const SIDE_DRIFT_COST = 0.5;
 const ROW_PITCH = 3;
-const SIDE_GAP = 2.3;
 const STAND_BACK = 0.3;
 const ROBOT_SCALE = 1.5;
+const ROBOT_MAX_SCALE = 2.2;
+const ROBOT_MIN_PX = 56;
 const HEAD_TOP = 1.2;
 const WALK_SPEED = 2.4;
 const MAX_WALK_SECONDS = 2.6;
@@ -46,25 +50,29 @@ function mainLane(cells) {
   return { lane, side: cells.filter((c) => !lane.includes(c)) };
 }
 
-// Làn chính chạy rắn (hàng lẻ đi ngược) để flow dài vẫn vừa khung; bước side nằm làn trước mặt
+// Làn chính chạy rắn (hàng lẻ đi ngược) để flow dài vẫn vừa khung; bước side lấp ô trống cuối lưới, gần nơi gọi nhất
 function layoutStations(cells, cols, pitch) {
   const { lane, side } = mainLane(cells);
-  const spot = new Map();
-  lane.forEach((c, i) => {
+  const slot = (i) => {
     const row = Math.floor(i / cols);
     const col = row % 2 ? cols - 1 - (i % cols) : i % cols;
-    spot.set(c.id, { x: (col - (cols - 1) / 2) * pitch, z: -row * ROW_PITCH });
-  });
+    return { x: (col - (cols - 1) / 2) * pitch, z: -row * ROW_PITCH };
+  };
+  const spot = new Map(lane.map((c, i) => [c.id, slot(i)]));
+  const freeSlots = Array.from({ length: Math.ceil(cells.length / cols) * cols - lane.length }, (_, k) => slot(lane.length + k));
   const wantedX = (c) => {
     const callers = lane.filter((l) => l.back === c.id).map((l) => spot.get(l.id).x);
     return callers.length ? callers.reduce((a, b) => a + b, 0) / callers.length : spot.get(c.next)?.x ?? 0;
   };
-  let lastX = -Infinity;
-  for (const { c, x } of side.map((c) => ({ c, x: wantedX(c) })).sort((a, b) => a.x - b.x)) {
-    lastX = Math.max(x, lastX + pitch);
-    spot.set(c.id, { x: lastX, z: SIDE_GAP });
+  let sideDrift = 0;
+  for (const c of side) {
+    const x = wantedX(c);
+    const nearest = freeSlots.reduce((a, b) => (Math.abs(b.x - x) < Math.abs(a.x - x) ? b : a));
+    freeSlots.splice(freeSlots.indexOf(nearest), 1);
+    spot.set(c.id, nearest);
+    sideDrift = Math.max(sideDrift, Math.abs(nearest.x - x) / (cols * pitch));
   }
-  return { lane, spot, pitch };
+  return { lane, spot, pitch, sideDrift };
 }
 
 // Đổi hàng thì đi qua khe giữa hai cột (cột các hàng thẳng nhau), không xuyên qua bàn
@@ -144,7 +152,6 @@ function buildRobot() {
   const shadow = mesh(new THREE.PlaneGeometry(0.7, 0.7), new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false }), 0, 0.012, 0);
   shadow.rotation.x = -Math.PI / 2;
   const root = group(0, 0, 0, body, shadow);
-  root.scale.setScalar(ROBOT_SCALE);
   return { root, body, torso, head, armL, armR, legL, legR, glow };
 }
 
@@ -319,7 +326,7 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     desk.opacity = screen.opacity = opacity;
     rim.opacity = cell.state === 'skipped' || cell.state === 'pending' ? 0.4 : 1;
     station.tick.visible = cell.state === 'done';
-    station.label.className = `f3d-label ${cell.state}${userSkipped ? ' user-skipped' : ''}${hovered === station ? ' hover' : ''}`;
+    station.label.className = `f3d-label ${cell.state}${userSkipped ? ' user-skipped' : ''}${station.staggered ? ' stagger' : ''}${hovered === station ? ' hover' : ''}`;
     station.label.firstChild.textContent = `${cell.breakpoint ? '📍 ' : ''}${cell.id}`;
     station.label.lastChild.textContent = noteOf(cell);
     station.label.title = [cell.id, noteOf(cell)].filter(Boolean).join(' · ');
@@ -391,23 +398,35 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     shared.packet.color.copy(palette.state[stateOf(stage)] ?? palette.state.running);
   }
 
-  // Chọn số cột cho trạm to nhất mà nhãn cạnh nhau không đè, rồi giãn cột lấp chiều ngang thừa
+  // Chọn số cột cho trạm to nhất mà nhãn đủ dài không đè; hàng sau chật mà còn khoảng dọc thì so le nhãn
   function relayout() {
-    const laneCount = mainLane(current.cells).lane.length;
-    const labelX = ({ x, z }) => ((scratch.set(x, 0, z + 0.78).project(camera).x + 1) / 2) * size.width;
-    const rowGapsPx = () => {
-      const gaps = new Map();
-      layout.lane.slice(1).forEach((c, i) => {
-        const [a, b] = [layout.spot.get(layout.lane[i].id), layout.spot.get(c.id)];
-        if (a.z === b.z) gaps.set(a.z, Math.min(gaps.get(a.z) ?? Infinity, Math.abs(labelX(a) - labelX(b))));
-      });
-      return gaps;
+    for (const station of stations.values()) station.label.style.maxWidth = '';
+    const labelWidth = new Map([...stations].map(([id, s]) => [id, s.label.offsetWidth + LABEL_GAP_PX]));
+    const labelPoint = ({ x, z }) => {
+      scratch.set(x, 0, z + 0.78).project(camera);
+      return { px: ((scratch.x + 1) / 2) * size.width, py: ((1 - scratch.y) / 2) * size.height };
     };
+    const pairs = (row, step) => row.slice(step).map((b, i) => ({ a: row[i], b, gap: b.px - row[i].px }));
+    const room = (row, step) => Math.min(...pairs(row, step).map(({ a, b, gap }) => (2 * gap) / (labelWidth.get(a.id) + labelWidth.get(b.id))));
+    const labelPlan = () => {
+      const rows = new Map();
+      for (const [id, p] of layout.spot) rows.set(p.z, [...(rows.get(p.z) ?? []), { id, ...labelPoint(p) }]);
+      const frontFirst = [...rows].sort(([za], [zb]) => zb - za).map(([, row]) => row.sort((a, b) => a.px - b.px));
+      return frontFirst.map((row, i) => {
+        const canStagger = i > 0 && frontFirst[i - 1][0].py - row[0].py >= STAGGER_ROW_PX;
+        const step = canStagger && room(row, 1) < 1 ? 2 : 1;
+        return { row, step, room: room(row, step) };
+      });
+    };
+    const fits = (c) => c.room >= 1;
+    const cost = (c) => c.distance * (c.staggered ? STAGGER_COST : 1) * (1 + c.sideDrift * SIDE_DRIFT_COST);
     let best = null;
-    for (let cols = laneCount; cols >= Math.min(3, laneCount); cols--) {
+    for (let cols = current.cells.length; cols >= Math.min(3, current.cells.length); cols--) {
       layout = layoutStations(current.cells, cols, MIN_COL_PITCH);
-      const candidate = { cols, distance: fitCamera(), roomy: Math.min(size.width, ...rowGapsPx().values()) >= LABEL_MIN_PX };
-      if (!best || (candidate.roomy && !best.roomy) || (candidate.roomy === best.roomy && candidate.distance < best.distance)) best = candidate;
+      const distance = fitCamera();
+      const plan = labelPlan();
+      const c = { cols, distance, sideDrift: layout.sideDrift, room: Math.min(...plan.map((r) => r.room)), staggered: plan.some((r) => r.step === 2) };
+      if (!best || (fits(c) && fits(best) ? cost(c) < cost(best) : fits(c) || (!fits(best) && c.room > best.room))) best = c;
     }
     let pitch = MIN_COL_PITCH;
     while (pitch < MAX_COL_PITCH) {
@@ -417,11 +436,26 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     }
     layout = layoutStations(current.cells, best.cols, pitch);
     fitCamera();
-    const gaps = rowGapsPx();
+    const pxPerUnit = size.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * fit.distance);
+    robot.root.scale.setScalar(clamp(ROBOT_MIN_PX / (HEAD_TOP * pxPerUnit), ROBOT_SCALE, ROBOT_MAX_SCALE));
+    // Vẫn thiếu chỗ thì chia khe giữa hai nhãn theo tỉ lệ độ dài của chúng
+    const share = new Map();
+    for (const { row, step } of labelPlan()) {
+      row.forEach(({ id }, i) => {
+        const station = stations.get(id);
+        station.staggered = step === 2 && i % 2 === 1;
+        station.label.classList.toggle('stagger', station.staggered);
+      });
+      for (const { a, b, gap } of pairs(row, step)) {
+        const [wa, wb] = [labelWidth.get(a.id), labelWidth.get(b.id)];
+        share.set(a.id, Math.min(share.get(a.id) ?? Infinity, (2 * gap * wa) / (wa + wb)));
+        share.set(b.id, Math.min(share.get(b.id) ?? Infinity, (2 * gap * wb) / (wa + wb)));
+      }
+    }
     for (const [id, station] of stations) {
       const { x, z } = layout.spot.get(id);
       station.group.position.set(x, station.lift, z);
-      station.label.style.maxWidth = gaps.has(z) ? `${Math.floor(gaps.get(z) - 4)}px` : '';
+      station.label.style.maxWidth = share.get(id) < labelWidth.get(id) ? `${Math.floor(share.get(id) - LABEL_GAP_PX)}px` : '';
     }
     buildEdges();
     paintEdges();
@@ -480,7 +514,9 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
   }
 
   function moveAgent(celebrate) {
-    const targetId = cellById.has(current.stage) ? current.stage : agent.stationId ?? current.cells[0].id;
+    // Run xong thì stage = null: đứng ở bước chạy cuối cùng theo biên nhận
+    const lastRan = current.receipts.findLast((r) => cellById.has(r.stage))?.stage;
+    const targetId = cellById.has(current.stage) ? current.stage : lastRan ?? current.cells[0].id;
     if (targetId !== agent.stationId) {
       const target = standSpot(targetId);
       if (agent.stationId && !reducedMotion) {
@@ -497,19 +533,20 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
   }
 
   function applyRun(next) {
-    const celebrate = current.status !== 'done' && next.status === 'done';
+    const celebrate = next.status === 'done' && (current.status !== 'done' || !agent.stationId);
     current = next;
     cellById = new Map(next.cells.map((c) => [c.id, c]));
     const nextStructure = next.cells.map((c) => `${c.id}>${c.next}<${c.back}${c.side ? '~' : ''}${c.kind}`).join('|');
-    if (nextStructure !== structure) {
+    const rebuilt = nextStructure !== structure;
+    if (rebuilt) {
       structure = nextStructure;
       disposeStations();
       for (const cell of next.cells) stations.set(cell.id, buildStation(cell));
       agent.walk = null;
       agent.stationId = null;
-      relayout();
     }
     for (const cell of next.cells) paintStation(stations.get(cell.id), cell);
+    if (rebuilt) relayout();
     paintEdges();
     moveAgent(celebrate);
     wake();
@@ -576,7 +613,7 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
 
   function placeOverlay() {
     for (const station of stations.values()) placeLabel(station.label, new THREE.Vector3(station.group.position.x, 0, station.group.position.z + 0.78));
-    const headTop = new THREE.Vector3(agent.position.x, HEAD_TOP * ROBOT_SCALE + robot.body.position.y, agent.position.z);
+    const headTop = new THREE.Vector3(agent.position.x, (HEAD_TOP + robot.body.position.y) * robot.root.scale.y, agent.position.z);
     const waving = !agent.walk && robotMode() === 'waving';
     alertMark.classList.toggle('on', waving);
     placeLabel(alertMark, headTop);

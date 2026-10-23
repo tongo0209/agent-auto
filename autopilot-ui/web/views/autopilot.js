@@ -429,8 +429,21 @@ function renderDock(run) {
   if (keptStage && $('#gotoStage')) $('#gotoStage').value = keptStage;
 }
 
+function showAlert(lines) {
+  const box = $('#apAlert');
+  if (!box) return;
+  box.hidden = !lines.length;
+  box.innerHTML = lines.map((line) => `<p>${esc(line)}</p>`).join('');
+}
+
 async function refresh() {
-  const next = await (await fetch('/api/autopilot/runs')).json();
+  let next;
+  try {
+    next = await api('autopilot/runs');
+  } catch (e) {
+    return showAlert([`Mất kết nối server autopilot (${e.message}). Đang thử lại mỗi 4 giây — dữ liệu dưới đây có thể đã cũ.`]);
+  }
+  showAlert((next.broken ?? []).map((b) => `${b.key} không đọc được: ${b.error}`));
   const sig = JSON.stringify(next.runs);
   data = next;
   selectedKey ??= data.runs.find((r) => !isAborted(r))?.key ?? null;
@@ -638,7 +651,7 @@ function launched(mode, input, out) {
   closePalette();
   if (mode === 'chat') openChatTab(out);
   selectedKey = mode === 'chat' ? out.key : input.match(/[A-Z][A-Z0-9]*-\d+/)?.[0] ?? selectedKey;
-  setTimeout(() => { lastSig = ''; refresh(); }, mode === 'chat' ? 0 : 2500);
+  setTimeout(() => { lastSig = ''; refresh().catch(() => {}); }, mode === 'chat' ? 0 : 2500);
 }
 async function startRun(mode) {
   const input = $('#ticket').value.trim();
@@ -717,6 +730,7 @@ const MARKUP = `
     <b>Autopilot</b>
     <button class="new" id="openPalette"><i class="ph ph-plus"></i>Chạy ticket <kbd>⌘K</kbd></button>
   </div>
+  <div class="ap-alert" id="apAlert" role="status" hidden></div>
   <div class="queue" id="apQueue"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
 </aside>
 
@@ -853,7 +867,7 @@ export function mount(el) {
   document.addEventListener('click', onDocClick);
   document.addEventListener('scroll', onDocScroll, true);
   window.addEventListener('resize', onResize);
-  refresh();
+  refresh().catch(() => {});
   const timer = setInterval(() => refresh().catch(() => {}), 4000);
   const liveTimer = setInterval(() => {
     const run = data.runs.find((r) => r.key === selectedKey);

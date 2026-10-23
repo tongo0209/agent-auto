@@ -157,3 +157,17 @@ test('spawnDetached: CLI thoát lỗi sớm → trả code + đuôi log; còn ch
   const slow = await spawnDetached(['setTimeout(() => {}, 400)'], { waitMs: 50, cli: '-e' });
   assert.deepStrictEqual([slow.code, typeof slow.pid], [undefined, 'number']);
 });
+
+test('lỗi trong handler autopilot → 500, server không sập (terminal sống theo process)', async () => {
+  const dir = path.join(process.env.AUTOPILOT_RUNS_DIR, 'GW-77', '20261023-000000');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'run.json'), '{hỏng');
+  try {
+    const res = await fetch(`${base}/api/autopilot/runs`);
+    assert.strictEqual(res.status, 500);
+    assert.ok((await res.json()).error);
+    assert.strictEqual((await fetch(`${base}/api/state`)).status, 200);
+  } finally {
+    fs.rmSync(path.join(process.env.AUTOPILOT_RUNS_DIR, 'GW-77'), { recursive: true });
+  }
+});

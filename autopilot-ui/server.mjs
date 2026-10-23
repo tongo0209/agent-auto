@@ -121,7 +121,12 @@ export function createServer({ spawnCli = spawnDetached, execCli = runCliAndWait
   const app = express();
   app.use((req, res, next) => (LOCAL_HOST.test(req.headers.host ?? '') ? next() : send(res, 403, { error: 'host lạ' })));
   // autopilot đi trước cổng chặn ghi: run chỉ ghi được repo của nó, hook sandbox chặn repo khác + git ghi
-  app.use('/api/autopilot', (req, res) => handleAutopilot(req, res, { spawnCli, execCli, openEditor }));
+  // Express 4 không bắt lỗi của handler async: lọt ra là sập cả process, kéo theo mọi tab terminal
+  app.use('/api/autopilot', (req, res) =>
+    handleAutopilot(req, res, { spawnCli, execCli, openEditor }).catch((e) => {
+      console.error(`${new Date().toISOString()} ${req.method} ${req.originalUrl}`, e);
+      if (!res.headersSent) send(res, 500, { error: e.message });
+    }));
   app.use('/api', (req, res, next) =>
     allowWrites || req.method === 'GET' ? next() : send(res, 403, { error: 'Bản thử (agent-auto-lab) chặn ghi dữ liệu thật. Chạy với AUTOPILOT_LAB_WRITES=1 nếu thật sự muốn ghi.' }));
   app.use(express.json());

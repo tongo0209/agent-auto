@@ -61,11 +61,19 @@ function viewOf(saved) {
   };
 }
 
+// Một run hỏng (flow đã đổi tên/xoá) không được kéo cả danh sách đi theo
 export async function listView() {
-  const runs = listRuns()
-    .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) || b.runId.localeCompare(a.runId))
-    .map(viewOf);
-  return { runs, flows: listFlows().map((id) => ({ id, label: loadFlow(id).label })) };
+  const runs = [];
+  const broken = [];
+  const sorted = listRuns().sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) || b.runId.localeCompare(a.runId));
+  for (const run of sorted) {
+    try {
+      runs.push(viewOf(run));
+    } catch (e) {
+      broken.push({ key: run.key, runId: run.runId, error: e.message });
+    }
+  }
+  return { runs, broken, flows: listFlows().map((id) => ({ id, label: loadFlow(id).label })) };
 }
 
 export function listArtifacts(key, runId) {
@@ -78,7 +86,7 @@ export function listArtifacts(key, runId) {
 export function artifactFile(key, runId, name) {
   if (![key, runId, name].every((s) => SAFE_SEGMENT.test(s))) return null;
   const file = path.join(runDir(key, runId), name);
-  return fs.existsSync(file) ? file : null;
+  return fs.statSync(file, { throwIfNoEntry: false })?.isFile() ? file : null;
 }
 
 const runOf = (key, runId) => (SAFE_SEGMENT.test(key ?? '') && SAFE_SEGMENT.test(runId ?? '') ? loadRun(key, runId) : null);

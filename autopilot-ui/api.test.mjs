@@ -202,3 +202,17 @@ test('checkAction skip qua API: không lỗi "Invalid time value"', () => {
   saveRun({ ...run, key: 'GW-12', status: 'stopped', stage: 'plan-review', stopReason: 'fail:plan-review' });
   assert.doesNotThrow(() => checkAction('skip', { key: 'GW-12' }));
 });
+
+test('listView: run trỏ flow đã mất → tách ra broken, các run khác vẫn hiện', async () => {
+  saveRun({ ...run, key: 'GW-8', flow: 'flow-da-xoa' });
+  const view = await listView();
+  assert.ok(view.runs.some((r) => r.key === 'GW-1'));
+  assert.ok(!view.runs.some((r) => r.key === 'GW-8'));
+  assert.deepStrictEqual(view.broken.map((b) => b.key), ['GW-8']);
+  assert.match(view.broken[0].error, /flow-da-xoa/);
+});
+
+test('artifactFile: tên trỏ vào thư mục con (wt) → null, không đọc thư mục', () => {
+  fs.mkdirSync(path.join(process.env.AUTOPILOT_RUNS_DIR, 'GW-9', run.runId, 'wt'), { recursive: true });
+  assert.strictEqual(artifactFile('GW-9', run.runId, 'wt'), null);
+});

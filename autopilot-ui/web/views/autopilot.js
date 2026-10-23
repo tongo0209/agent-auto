@@ -48,8 +48,8 @@ const FLOW_MODE_SWITCH = '<div class="flow-mode" id="flowModeSwitch" role="group
 const CLAUDE_BTN = '<button class="btn claude" data-claude><i class="ph-bold ph-terminal-window"></i>Mở trong Claude</button>';
 const FLOW_NUDGE_RATIO = 0.7;
 const FLOW_MODE_KEY = 'console2.apFlowMode';
-let flowMode = '2d';
-try { flowMode = localStorage.getItem(FLOW_MODE_KEY) === '3d' ? '3d' : '2d'; } catch {}
+let flowMode = '3d';
+try { flowMode = localStorage.getItem(FLOW_MODE_KEY) === '2d' ? '2d' : '3d'; } catch {}
 let mountFlow3d = null;
 let flow3d = null;
 let flowScroll = { id: '', left: 0 };

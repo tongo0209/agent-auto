@@ -24,6 +24,7 @@
 .flow-view.can-prev:not(.is-3d) .flow-nudge.prev, .flow-view.can-next:not(.is-3d) .flow-nudge.next { display: grid; }
 .flow-view.is-3d .flow { visibility: hidden; }
 .flow-view.is-3d::before, .flow-view.is-3d::after { display: none; }
+.flow-view.is-3d { min-height: clamp(320px, 40vh, 440px); }
 .flow-3d { position: absolute; inset: 0; }
 
 .panes { flex: 1; min-height: 240px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: minmax(0, 1fr); gap: 28px; margin-top: 14px; }

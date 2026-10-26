@@ -142,6 +142,27 @@ test('G4: sheetKind google|excel + sheetNoBugId từ note/bugWatch radar mù', (
   assert.strictEqual(sig('GW-3').sheetNoBugId, true);
 });
 
+test('G7: link sheet tự tra ra ticket (bugSheets/bugWatch), --key thắng, nhiều ticket thì để trống', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-sig-'));
+  const repo = path.join(root, 'cdn-source');
+  fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify({ repos: { 'cdn-source': repo } }));
+  const issues = {
+    'GW-1': { bugSheets: ['https://docs.google.com/spreadsheets/d/AAA/edit'], paths: [{ repo: 'cdn-source', path: 'products/n/landing/a' }] },
+    'GW-2': { bugSheets: ['https://docs.google.com/spreadsheets/d/CCC'] },
+    'GW-3': { bugSheets: ['https://docs.google.com/spreadsheets/d/CCC'] },
+  };
+  const bugWatch = { BBB: { url: 'https://docs.google.com/spreadsheets/d/BBB', keys: ['GW-9'] } };
+  fs.writeFileSync(path.join(root, 'state.json'), JSON.stringify({ issues, bugWatch }));
+  const sig = (input, key) => gatherSignals({ input, agentRoot: root, key });
+
+  const byIssue = sig('https://docs.google.com/spreadsheets/d/AAA/edit?gid=5');
+  assert.deepStrictEqual([byIssue.key, byIssue.campaignDir, byIssue.sheetUrl], ['GW-1', path.join(repo, 'products/n/landing/a'), 'https://docs.google.com/spreadsheets/d/AAA/edit?gid=5']);
+  assert.strictEqual(sig('https://docs.google.com/spreadsheets/d/BBB/edit').key, 'GW-9');
+  assert.strictEqual(sig('https://docs.google.com/spreadsheets/d/CCC/edit').key, null);
+  assert.strictEqual(sig('https://docs.google.com/spreadsheets/d/CCC/edit', 'GW-3').key, 'GW-3');
+  assert.strictEqual(sig('https://docs.google.com/spreadsheets/d/ZZZ/edit').key, null);
+});
+
 test('G5: phase waiting-design → design-intake, không cần campaign', () => {
   assert.strictEqual(route({ ...base, phase: 'waiting-design', campaignDir: null }, RULES).flow, 'design-intake');
 });

@@ -10,6 +10,7 @@ const IDLE_PHASES = ['wait-test', 'done-fe', 'closed', 'reassigned'];
 const ASSIGNEE_UNCLEAR = /Người làm chính:|HTML ghi [A-ZĐ]/;
 const SHEET_INPUT = /docs\.google\.com\/spreadsheets|sharepoint\.com|\.xlsx(\?|$)/i;
 const GOOGLE_SHEET = /docs\.google\.com\/spreadsheets/i;
+const SHEET_ID = /spreadsheets\/d\/([A-Za-z0-9_-]+)/;
 const NO_BUG_ID_NOTE = /không có cột BugID/i;
 const DESIGN_DOWNLOADED = /^đã-giao-(đã-tải|tải-một-phần)$/;
 const GAMEPLAY_CHANGE_NOTE = /đổi cơ chế|đổi gameplay/i;
@@ -24,9 +25,20 @@ function listFiles(dir) {
   return fs.readdirSync(dir, { recursive: true }).map(String);
 }
 
-export function gatherSignals({ input, agentRoot, campaign }) {
-  const key = /^[A-Z]+-\d+$/.test(input) ? input : null;
+// Một sheet dính nhiều ticket thì không đoán — trả null để run mang mã ADHOC như cũ
+function ticketOfSheet(state, sheetUrl) {
+  const sheetId = sheetUrl.match(SHEET_ID)?.[1];
+  if (!sheetId) return null;
+  const fromIssues = Object.entries(state.issues ?? {})
+    .filter(([, issue]) => issue.bugSheets?.some((url) => url.match(SHEET_ID)?.[1] === sheetId))
+    .map(([key]) => key);
+  const keys = new Set([...fromIssues, ...(state.bugWatch?.[sheetId]?.keys ?? [])]);
+  return keys.size === 1 ? [...keys][0] : null;
+}
+
+export function gatherSignals({ input, agentRoot, campaign, key: forcedKey }) {
   const state = readJson(path.join(agentRoot, 'state.json'));
+  const key = forcedKey ?? (/^[A-Z]+-\d+$/.test(input) ? input : SHEET_INPUT.test(input) ? ticketOfSheet(state, input) : null);
   const repos = readJson(path.join(agentRoot, 'config.json')).repos ?? {};
   const issue = state.issues?.[key] ?? {};
   const parent = state.issues?.[issue.parent] ?? {};

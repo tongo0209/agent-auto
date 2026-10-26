@@ -23,9 +23,10 @@ const AGENT_ROOT = path.resolve(import.meta.dirname, '..');
 const MAIN_ROOT = path.join(os.homedir(), 'VNG', 'agent-auto');
 const DATA_ROOT = process.env.AUTOPILOT_DATA_ROOT || (fs.existsSync(path.join(AGENT_ROOT, 'state.json')) ? AGENT_ROOT : MAIN_ROOT);
 const USAGE = `Dùng:
-  autopilot run <KEY|link> [--flow id] [--campaign dir] [--budget-usd n] [--bg] [--skip a,b] [--skip-reason "…"] [--break c,d]
+  autopilot run <KEY|link> [--key GW-123] [--flow id] [--campaign dir] [--budget-usd n] [--bg] [--skip a,b] [--skip-reason "…"] [--break c,d]
+                                   (link sheet tự tra ra ticket; tra không ra/nhiều ticket thì --key gán tay, không thì mã ADHOC)
                                    (--skip tắt stage từ đầu, cổng cần --skip-reason; --break dừng sau stage đó)
-  autopilot open <KEY|link> [--flow id] [--campaign dir]   (run chat: làm thẳng repo gốc + brief.md, in JSON để mở tab claude)
+  autopilot open <KEY|link> [--key GW-123] [--flow id] [--campaign dir]   (run chat: làm thẳng repo gốc + brief.md, in JSON để mở tab claude)
   autopilot open <KEY> --attach                             (tab claude cho run bất kỳ: run chat nối phiên mới nhất, run khác phiên mới với attach.md)
   autopilot mark <KEY> <bước> <doing|pass|fail|ask> [--note "…"]
   autopilot gates <KEY> [check…]   (mặc định mọi cổng của luồng trừ commit)
@@ -109,6 +110,11 @@ function startBackground(argv) {
   console.log(`Chạy nền PID ${child.pid} · log: ${log}`);
 }
 
+function signalsOf(opts, input) {
+  if (opts.key && !/^[A-Z]+-\d+$/.test(opts.key)) die(`--key phải là mã Jira dạng GW-123, nhận: ${opts.key}`);
+  return gatherSignals({ input, agentRoot: DATA_ROOT, campaign: opts.campaign, key: opts.key });
+}
+
 function decide(opts, signals) {
   if (!opts.flow) return route(signals, loadRules());
   if (!listFlows().includes(opts.flow)) die(`flow không có: ${opts.flow}`);
@@ -129,7 +135,7 @@ function planOf(opts, flow) {
 }
 
 function newRun(opts, input) {
-  const signals = gatherSignals({ input, agentRoot: DATA_ROOT, campaign: opts.campaign });
+  const signals = signalsOf(opts, input);
   const decided = decide(opts, signals);
   if (STOP_DECISIONS.includes(decided.flow)) die(describeDecision(decided));
 
@@ -443,7 +449,7 @@ function cmdRoute(opts) {
     if (problems.length) die(problems.join('\n'));
     return console.log(`${listFlows().length} luồng hợp lệ: ${listFlows().join(', ')}`);
   }
-  const signals = gatherSignals({ input: opts._[1] ?? die(USAGE), agentRoot: DATA_ROOT, campaign: opts.campaign });
+  const signals = signalsOf(opts, opts._[1] ?? die(USAGE));
   if (opts.json) return console.log(JSON.stringify(preview(signals, decide(opts, signals))));
   console.log(describeDecision(route(signals, loadRules())));
   console.log(JSON.stringify({ ...signals, briefText: signals.briefText.slice(0, 80) }, null, 2));

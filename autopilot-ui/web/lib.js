@@ -1,6 +1,9 @@
 export const $ = (s, root = document) => root.querySelector(s);
 export const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
+// cdn-source: alias `git mr` = push + tạo MR sang master; push trần trước nó thì MR không được tạo
+export const pushCommand = (dir, branch) => (dir.split('/').pop() === 'cdn-source' ? `git -C "${dir}" mr` : `git -C "${dir}" push origin ${branch}`);
+
 export function toast(text, err) {
   const t = $('#toast');
   t.textContent = text;

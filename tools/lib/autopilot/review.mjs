@@ -7,6 +7,11 @@ const MAX_DIFF_CHARS = 60_000;
 
 const git = (top, args) => spawnSync('git', ['-C', top, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout.trim();
 
+const commitList = (top, range) => git(top, ['log', '--reverse', '--format=%H%x09%s', ...range]).split('\n').filter(Boolean).map((line) => {
+  const [sha, subject] = line.split('\t');
+  return { sha, subject };
+});
+
 function fileDiffs(top, base, branch) {
   const fields = git(top, ['diff', '--name-status', '-z', base, branch]).split('\0').filter(Boolean);
   const files = [];
@@ -28,7 +33,11 @@ function commitChanges(run, top) {
     const seen = byPath.get(file.path);
     byPath.set(file.path, seen ? { ...seen, diff: `${seen.diff}\n${file.diff}`, truncated: seen.truncated || file.truncated } : file);
   }
-  return { repo: top, name: path.basename(top), worktree: top, branch: run.workBranch[top], commits, files: [...byPath.values()], cherryPick: null };
+  const branch = run.workBranch[top];
+  // Push đẩy cả nhánh nên liệt kê mọi commit chưa lên origin — nhưng chỉ khi chính run còn commit chưa lên
+  const ahead = commitList(top, [branch, '--not', '--remotes=origin']);
+  const unpushed = ahead.some((c) => commits.some(({ sha }) => sha === c.sha)) ? ahead : [];
+  return { repo: top, name: path.basename(top), worktree: top, branch, commits, files: [...byPath.values()], cherryPick: null, unpushed };
 }
 
 export function runChanges(run) {
@@ -37,10 +46,7 @@ export function runChanges(run) {
   return Object.entries(run.worktrees ?? {}).map(([top, worktree]) => {
     // run tạo trước khi lưu base: điểm tách = merge-base với HEAD hiện tại của repo gốc
     const base = run.bases?.[top] ?? git(top, ['merge-base', branch, 'HEAD']);
-    const commits = git(top, ['log', '--reverse', '--format=%H%x09%s', `${base}..${branch}`]).split('\n').filter(Boolean).map((line) => {
-      const [sha, subject] = line.split('\t');
-      return { sha, subject };
-    });
+    const commits = commitList(top, [`${base}..${branch}`]);
     return {
       repo: top, name: path.basename(top), worktree, branch, commits,
       files: commits.length ? fileDiffs(top, base, branch) : [],

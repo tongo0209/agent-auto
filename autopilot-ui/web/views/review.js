@@ -1,4 +1,4 @@
-import { esc } from '../lib.js';
+import { esc, pushCommand } from '../lib.js';
 import { stamp, skeleton, note, errNote, pill, draft, settler } from './_kit.js';
 
 const REFRESH_MS = 20000;
@@ -162,7 +162,7 @@ export function mount(el, ctx) {
     const push = t.closest('[data-push]');
     if (push) {
       const [repo] = push.dataset.push.split(':');
-      return draft(ctx, `git -C "${repoPaths[repo] ?? repo}" push origin ${push.dataset.branch}`, `push ${repo}`, '');
+      return draft(ctx, pushCommand(repoPaths[repo] ?? repo, push.dataset.branch), `push ${repo}`, '');
     }
     const openRepo = t.closest('[data-open-repo]');
     if (openRepo) return ctx.api('open', { method: 'POST', body: { app: 'vscode', target: repoPaths[openRepo.dataset.openRepo] ?? openRepo.dataset.openRepo } }).catch((err) => ctx.toast(`Không mở được VS Code: ${err.message}`, true));

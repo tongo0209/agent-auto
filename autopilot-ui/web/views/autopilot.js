@@ -1,4 +1,5 @@
-import { $, api, esc, toast } from '../lib.js';
+import { $, api, esc, toast, pushCommand } from '../lib.js';
+import { draft } from './_kit.js';
 import { openTerminal, hasTab } from '../terminal.js';
 import { subscribeRuns } from '../live-runs.js';
 import { openRunPalette } from '../run-palette.js';
@@ -258,9 +259,20 @@ function fileDiffHtml(f) {
   return `<details class="file-diff"><summary><span class="fs ${f.status}">${f.status}</span><code class="fpath" title="${esc(f.path)}"><span class="dir"><bdi>${esc(f.path.slice(0, nameAt))}</bdi></span><b>${esc(f.path.slice(nameAt))}</b></code></summary><pre class="diff">${diffHtml(f.diff)}${f.truncated ? '\n<span class="hunk">… diff quá dài, mở VS Code để xem hết</span>' : ''}</pre></details>`;
 }
 
+// Push đẩy cả nhánh: liệt kê đủ commit sẽ đi kèm (cả của phiên khác) để duyệt trước khi chép lệnh
+function unpushedHtml(c) {
+  const command = pushCommand(c.repo, c.branch);
+  return `<div class="rc-push">
+  <p><b>${c.unpushed.length} commit chưa push</b> trên <code>${esc(c.branch)}</code>, sẽ đi cùng lệnh:</p>
+  <ul class="commits">${c.unpushed.map((x) => `<li><code>${x.sha.slice(0, 9)}</code>${esc(x.subject)}</li>`).join('')}</ul>
+  <div class="rc-push-cmd"><code>${esc(command)}</code><button class="btn go sm" data-push-cmd="${esc(command)}"><i class="ph-bold ph-arrow-fat-up"></i>Chép lệnh push</button></div>
+</div>`;
+}
+
 const repoChangesHtml = (c) => `<div class="repo-changes">
   <div class="rc-head"><b>${esc(c.name)}</b><code>${esc(c.branch)}</code><button class="btn ghost sm" data-code="${esc(c.worktree)}"><i class="ph-bold ph-code"></i>Mở trong VS Code</button></div>
   ${c.commits.length ? `<ul class="commits">${c.commits.map((x) => `<li><code>${x.sha.slice(0, 9)}</code>${esc(x.subject)}</li>`).join('')}</ul>` : '<p class="rc-empty">Không có commit mới trên nhánh này.</p>'}
+  ${c.unpushed?.length ? unpushedHtml(c) : ''}
   ${c.files.map(fileDiffHtml).join('')}
 </div>`;
 
@@ -487,7 +499,7 @@ function dockMessage(run) {
   const stage = `<b>${esc(run.stage ?? '')}</b>`;
   if (run.awaitingReview) return 'Run xong, <b>chờ bạn review</b> code ở tab Thay đổi. Ổn thì bấm Đã review.';
   if (hasCode(run)) return 'Run đã review, code ở tab Thay đổi.';
-  if (run.status === 'done') return 'Run xong.';
+  if (run.status === 'done') return 'Run xong. Commit chưa push (nếu có) chép lệnh ở tab Thay đổi.';
   if (isAsking(run)) return `Claude đang chờ bạn ở ${stage}${run.chatNote ? `: ${esc(run.chatNote)}` : ''} — trả lời trong tab Claude.`;
   if (run.status === 'chat') return `Run chat đang ở ${stage}, claude tự báo tiến độ lên board.`;
   if (run.interrupted) return `Run bị ngắt ở ${stage} (không còn process chạy). Chạy tiếp để làm lại bước này.`;
@@ -842,6 +854,8 @@ export function mount(el, ctx) {
       try { localStorage.setItem(FLOW_MODE_KEY, flowMode); } catch {}
       return syncFlow3d(currentRun());
     }
+    const pushBtn = e.target.closest('[data-push-cmd]');
+    if (pushBtn) return draft({ openTerminal, toast }, pushBtn.dataset.pushCmd, `push ${selectedKey}`, '');
     const codeBtn = e.target.closest('[data-code]');
     if (codeBtn) {
       const run = data.runs.find((r) => r.key === selectedKey);

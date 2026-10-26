@@ -81,3 +81,47 @@ test('R19 runChanges: run chưa commit gì → mỗi repo 1 khối rỗng', () =
   const [block] = runChanges({ key: 'GW-9', runId: 'r2', workBranch: { [top]: 'main' }, startHead: { [top]: 'x' } });
   assert.deepStrictEqual([block.commits, block.files], [[], []]);
 });
+
+function cloneWithOrigin(name) {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ap-push-')));
+  const git = (cwd, ...a) => spawnSync('git', ['-C', cwd, '-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { encoding: 'utf8' });
+  git(root, 'init', '-q', '--bare', '-b', 'main', 'origin.git');
+  git(root, 'clone', '-q', path.join(root, 'origin.git'), name);
+  const top = path.join(root, name);
+  const commit = (file, msg) => {
+    fs.writeFileSync(path.join(top, file), `${msg}\n`);
+    git(top, 'add', file);
+    git(top, 'commit', '-qm', msg);
+    return git(top, 'rev-parse', 'HEAD').stdout.trim();
+  };
+  commit('a.txt', 'init');
+  git(top, 'push', '-q', 'origin', 'main');
+  return { top, git, commit };
+}
+
+test('runChanges: run trên repo gốc → unpushed = mọi commit nhánh chưa lên origin, kể cả của phiên khác (push là đẩy cả nhánh)', () => {
+  const { top, git, commit } = cloneWithOrigin('repo');
+  const pushed = commit('a.txt', 'đã push');
+  git(top, 'push', '-q', 'origin', 'main');
+  const other = commit('b.txt', 'phiên khác');
+  const mine = commit('c.txt', 'của run');
+  const [block] = runChanges({ key: 'GW-9', runId: 'r3', workBranch: { [top]: 'main' }, commits: [{ repo: top, sha: pushed }, { repo: top, sha: mine }] });
+  assert.deepStrictEqual(block.unpushed, [{ sha: other, subject: 'phiên khác' }, { sha: mine, subject: 'của run' }]);
+});
+
+test('runChanges: đã push hết → unpushed rỗng', () => {
+  const { top, git, commit } = cloneWithOrigin('repo');
+  const mine = commit('c.txt', 'của run');
+  git(top, 'push', '-q', 'origin', 'main');
+  const [block] = runChanges({ key: 'GW-9', runId: 'r5', workBranch: { [top]: 'main' }, commits: [{ repo: top, sha: mine }] });
+  assert.deepStrictEqual(block.unpushed, []);
+});
+
+test('runChanges: commit của run đã lên, chỉ còn commit phiên khác → unpushed rỗng (push không phải việc của run này)', () => {
+  const { top, git, commit } = cloneWithOrigin('repo');
+  const mine = commit('c.txt', 'của run');
+  git(top, 'push', '-q', 'origin', 'main');
+  commit('b.txt', 'phiên khác');
+  const [block] = runChanges({ key: 'GW-9', runId: 'r6', workBranch: { [top]: 'main' }, commits: [{ repo: top, sha: mine }] });
+  assert.deepStrictEqual(block.unpushed, []);
+});

@@ -16,3 +16,10 @@ Verdict: `pass` + `files` = MỌI file đã sửa/tạo (đường dẫn tương
 Ticket nhiều campaign (mỗi dòng 1 folder):
 {{campaignDirs}}
 Từ 2 campaign trở lên: mỗi campaign 1 lane Agent riêng, tập file rời nhau, tối đa 5 lane song song; build chung do stage gates chạy từng campaign.
+
+Landing nhiều section trong cùng campaign — section đã chia (trống thì tự chia từ `{{runDir}}/plan.md`):
+{{sections}}
+- Section có tập file rời nhau → mỗi section 1 lane Agent; popup chung + JS chung (`main/`) là 1 lane riêng nếu rời file với các section. Tối đa 5 lane chạy cùng lúc (driver còn chạy agent check song song). Chỉ 1 section hoặc file chồng nhau → làm tuần tự như trên.
+- Brief từng lane: plan + ĐÚNG file của section đó (cấm sửa file ngoài) + luật `~/VNG/agent-auto/rules/`: `code-style.md`, `cdn-source-standard.md`, `landing-structure.md`, `popup-library.md`, `landing-js.md`, thêm `pm-contract.md` nếu có `pm__`. Lane KHÔNG build (webpack ghi chung `dist/`, build do stage gates), không commit, không gọi Agent khác.
+- Hợp đồng với driver: lane xong ghi `{{runDir}}/sections/<sectionId>.ready.json` = `{"section":"<id>","files":["<đường dẫn tương đối repo>",…],"selector":"#<id>","round":1}` rồi trả về, không đợi section khác. Driver ghi `{{runDir}}/sections/<sectionId>.fail.json` (`{"section","round","blocking":[…]}`) → nối lại đúng lane đó (SendMessage, giữ context) sửa đúng `blocking`, ghi lại ready với `round` = round của fail + 1.
+- Chạy song song thì phiên chính không build; verdict khi mọi section đã có ready mới hơn fail cùng tên, `files` = gộp `files` của mọi lane.

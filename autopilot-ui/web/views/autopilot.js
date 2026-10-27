@@ -117,11 +117,12 @@ function syncQueueChips() {
   document.querySelectorAll('[data-filter]').forEach((chip) => chip.setAttribute('aria-pressed', chip.dataset.filter === queueFilter));
 }
 
+// Ô ngoài chuỗi next chỉ vẽ khi là bước vòng về hoặc run đã chạy tới: stage con của nhóm song song không có chỗ đứng
 function mainLane(cells) {
   const byId = Object.fromEntries(cells.map((c) => [c.id, c]));
   const lane = [];
   for (let c = cells[0]; c && !lane.includes(c); c = byId[c.next]) lane.push(c);
-  return { lane, side: cells.filter((c) => !lane.includes(c)) };
+  return { lane, side: cells.filter((c) => !lane.includes(c) && (c.side || c.rounds > 0 || ['running', 'waiting'].includes(c.state))) };
 }
 
 function nodeHtml(c) {
@@ -377,7 +378,7 @@ function placeFlowScroll(run) {
   const focus = run.cells.find((c) => ['running', 'waiting', 'stopped'].includes(c.state)) ?? run.cells.find((c) => c.id === run.stage);
   const id = `${run.key}/${run.runId}/${focus?.id ?? ''}`;
   if (flowScroll.id === id) flow.scrollLeft = flowScroll.left;
-  else if (focus) {
+  else if (document.getElementById(`n-${focus?.id}`)) {
     const node = document.getElementById(`n-${focus.id}`).getBoundingClientRect();
     const view = flow.getBoundingClientRect();
     flow.scrollLeft += node.left + node.width / 2 - (view.left + view.width / 2);

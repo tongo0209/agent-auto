@@ -43,11 +43,12 @@ function readPalette() {
   return { bg: color('--bg'), panel: color('--bg-3'), line: color('--line-2'), text: color('--text-2'), state };
 }
 
+// Ô ngoài chuỗi next chỉ vẽ khi là bước vòng về hoặc run đã chạy tới: stage con của nhóm song song không có chỗ đứng
 function mainLane(cells) {
   const byId = Object.fromEntries(cells.map((c) => [c.id, c]));
   const lane = [];
   for (let c = cells[0]; c && !lane.includes(c); c = byId[c.next]) lane.push(c);
-  return { lane, side: cells.filter((c) => !lane.includes(c)) };
+  return { lane, side: cells.filter((c) => !lane.includes(c) && (c.side || c.rounds > 0 || ACTIVE_STATES.includes(c.state))) };
 }
 
 // Làn chính chạy rắn (hàng lẻ đi ngược) để flow dài vẫn vừa khung; bước side lấp ô trống cuối lưới, gần nơi gọi nhất
@@ -394,7 +395,8 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     incomingEdge = !ACTIVE_STATES.includes(stateOf(stage)) || current.status === 'stopped' || current.interrupted ? null
       : edges.find((e) => e.kind === 'main' && e.to === stage && stateOf(e.from) === 'done')
         ?? edges.find((e) => e.kind === 'arc' && e.to === stage && e.from === agent.previousId)
-        ?? edges.find((e) => e.kind === 'arc' && e.to === stage);
+        ?? edges.find((e) => e.kind === 'arc' && e.to === stage)
+        ?? null;
     shared.packet.color.copy(palette.state[stateOf(stage)] ?? palette.state.running);
   }
 
@@ -532,7 +534,9 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     if (celebrate && !reducedMotion) agent.jumpElapsed = 0;
   }
 
-  function applyRun(next) {
+  function applyRun(run) {
+    const { lane, side } = mainLane(run.cells);
+    const next = { ...run, cells: [...lane, ...side] };
     const celebrate = next.status === 'done' && (current.status !== 'done' || !agent.stationId);
     current = next;
     cellById = new Map(next.cells.map((c) => [c.id, c]));

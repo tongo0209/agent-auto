@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileHashes, statusEntries } from './worktree.mjs';
+import { statusEntries } from './worktree.mjs';
 import { dataRoot } from './store.mjs';
 
 const AGENT_ROOT = path.resolve(import.meta.dirname, '../../..');
@@ -127,8 +127,8 @@ function unexpectedDeletions(deleted, scopes, repo) {
   });
 }
 
-// R-GIT-5: chỉ add đúng file run đã sửa trong campaign (bỏ file dở có sẵn lúc bắt đầu), cdn-source pull ngay sau commit.
-// Merge dở / pull lỗi / không file nào commit được đều dừng chờ user, không bao giờ qua im lặng
+// R-GIT-5: chỉ add file trong campaign run đang khoá (cả file dở có sẵn lúc bắt đầu), cdn-source pull ngay sau commit.
+// Merge dở / pull lỗi / file ngoài campaign đều dừng chờ user, không bao giờ qua im lặng
 function runCommit(ctx) {
   const git = (args) => ctx.exec('git', args, { cwd: ctx.repo });
   // -uall: liệt kê từng file trong thư mục chưa track
@@ -155,19 +155,13 @@ function runCommit(ctx) {
   const changed = new Set(entries.map((e) => e.path));
   const scopes = (ctx.scopes ?? [ctx.campaignDir]).map((d) => path.relative(ctx.repo, path.resolve(ctx.repo, d)));
   const inScope = (f) => scopes.some((s) => s === '' || f === s || f.startsWith(`${s}/`));
-  // file dở từ trước mà run sửa tiếp (hash đổi) là của run; run cũ chưa chụp hash thì giữ nguyên là dở
-  const hashAtStart = ctx.dirtyHashes ?? {};
-  const touched = (ctx.dirty ?? []).filter((f) => f in hashAtStart && inScope(f));
-  const hashNow = fileHashes(ctx.repo, touched);
-  const dirtyAtStart = new Set((ctx.dirty ?? []).filter((f) => !touched.includes(f) || hashNow[f] === hashAtStart[f]));
-  // campaign đã bị run khoá: mọi file đổi trong đó (trừ file dở từ trước) là của run, kể cả file agent quên khai
-  const files = [...changed].filter((f) => inScope(f) && !dirtyAtStart.has(f));
-  const left = ctx.files.filter((f) => changed.has(f) && !files.includes(f)).map((f) => `${f} (${dirtyAtStart.has(f) ? 'dở từ trước khi run bắt đầu' : 'ngoài campaign'})`);
+  // campaign đã bị run khoá: mọi file đổi trong đó là của run, kể cả file dở từ trước (dist build từ cả chúng) và file agent quên khai
+  const files = [...changed].filter(inScope);
+  const left = ctx.files.filter((f) => changed.has(f) && !files.includes(f)).map((f) => `${f} (ngoài campaign)`);
   const deleted = entries.filter((e) => e.code.includes('D') && files.includes(e.path)).map((e) => e.path);
   const lost = unexpectedDeletions(deleted, scopes, ctx.repo);
   if (lost.length) return stop('run làm mất file đã track (thường do build-dev ghi đè dist) — build lại bản production hoặc git restore, rồi resume', lost);
-  if (left.some((f) => f.endsWith('(ngoài campaign)'))) return stop('run sửa file ngoài campaign — commit tay (git add -- <file> && git commit --only) rồi retry để cổng commit nốt file campaign, hoặc goto fix để hoàn tác', left);
-  if (!files.length && left.length) return stop('run có sửa file nhưng không file nào commit tự động được — commit tay hoặc skip cổng commit', left);
+  if (left.length) return stop('run sửa file ngoài campaign — commit tay (git add -- <file> && git commit --only) rồi retry để cổng commit nốt file campaign, hoặc goto fix để hoàn tác', left);
 
   let commit = null;
   if (files.length) {
@@ -188,9 +182,8 @@ function runCommit(ctx) {
       return stop(`${done}pull lỗi${midMerge ? ` — ${MERGE_STOP}` : ''}`, tail(r), { commit, pullPending: true, midMerge });
     }
   }
-  const dropped = left.length ? ` · bỏ: ${left.join(', ')}` : '';
   if (!commit) return { check: 'commit', status: cdn ? 'pass' : 'skipped', blocking: [], note: `không có file nào vừa sửa trong campaign${cdn ? ' · đã pull origin master' : ''}` };
-  return { check: 'commit', status: 'pass', blocking: [], note: `${files.join(', ')}${dropped}`, commit };
+  return { check: 'commit', status: 'pass', blocking: [], note: files.join(', '), commit };
 }
 
 const tail = (r) => `${r.stdout}\n${r.stderr}`.trim().split('\n').filter(Boolean).slice(-BLOCKING_TAIL);

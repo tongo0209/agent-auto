@@ -126,15 +126,14 @@ test('commit message đúng format + trailer, cdn-source luôn pull --no-rebase 
   assert.ok(!calls.some((c) => /--autostash|--amend/.test(c.line)));
 });
 
-test('R19: commit thẳng repo gốc (không cần AUTOPILOT_LAB_WRITES), bỏ file dở có sẵn lúc bắt đầu, trả hash commit', async () => {
+test('R19: commit thẳng repo gốc (không cần AUTOPILOT_LAB_WRITES), gom cả file dở có sẵn trong campaign, trả hash commit', async () => {
   const f = gitRepo();
-  fs.writeFileSync(path.join(f.campaignDir, 'dang-do.css'), 'của phiên khác');
-  const files = ['products/x/landing/a/index.html', 'products/x/landing/a/dang-do.css'];
-  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files, planTitle: 'Sửa tab', dirty: ['products/x/landing/a/dang-do.css'] });
+  fs.writeFileSync(path.join(f.campaignDir, 'dang-do.css'), 'dở từ trước');
+  const files = ['products/x/landing/a/index.html'];
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files, planTitle: 'Sửa tab' });
   assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
   assert.strictEqual(r.results[0].commit, f.git('rev-parse', 'HEAD').stdout.trim());
-  assert.deepStrictEqual(f.git('show', '--name-only', '--format=', 'HEAD').stdout.trim().split('\n'), ['products/x/landing/a/index.html']);
-  assert.match(f.git('status', '--porcelain').stdout, /dang-do\.css/);
+  assert.deepStrictEqual(f.git('show', '--name-only', '--format=', 'HEAD').stdout.trim().split('\n').sort(), ['products/x/landing/a/dang-do.css', 'products/x/landing/a/index.html']);
 });
 
 test('commit không có file giao → skipped', async () => {
@@ -273,34 +272,25 @@ test('I1: resume sau pull lỗi (không còn file để commit) → cdn-source v
   assert.ok(!calls.some((c) => c.line.startsWith('git commit')));
 });
 
-test('I2: run chỉ sửa file dở có từ trước / ngoài campaign → error liệt kê file + lý do, không skipped im', async () => {
+test('I2: run sửa file ngoài campaign → error liệt kê file ngoài campaign, không commit im', async () => {
   const f = fixture();
   const porcelain = ' M products/x/landing/a/index.html\0 M products/y/ngoai.scss\0';
   const files = ['products/x/landing/a/index.html', 'products/y/ngoai.scss'];
-  const r = await runGates(['commit'], ctx(f, fakeExec({}, porcelain).exec, { files, dirty: ['products/x/landing/a/index.html'] }));
+  const r = await runGates(['commit'], ctx(f, fakeExec({}, porcelain).exec, { files }));
   const [res] = r.results;
   assert.strictEqual(res.status, 'error');
-  assert.deepStrictEqual(res.blocking, ['products/x/landing/a/index.html (dở từ trước khi run bắt đầu)', 'products/y/ngoai.scss (ngoài campaign)']);
+  assert.deepStrictEqual(res.blocking, ['products/y/ngoai.scss (ngoài campaign)']);
 });
 
-test('I2: có file commit được + file bị loại → đạt, note kể file bị loại', async () => {
-  const f = fixture();
-  const porcelain = ' M products/x/landing/a/index.html\0 M products/x/landing/a/b.css\0';
-  const files = ['products/x/landing/a/index.html', 'products/x/landing/a/b.css'];
-  const r = await runGates(['commit'], ctx(f, fakeExec({}, porcelain).exec, { files, dirty: ['products/x/landing/a/b.css'] }));
-  assert.strictEqual(r.results[0].status, 'pass');
-  assert.match(r.results[0].note, /bỏ: products\/x\/landing\/a\/b\.css \(dở từ trước/);
-});
-
-test('scopes: run 2 campaign cùng repo, chỉ campaign thứ 2 có sửa → 1 commit đủ file, không dừng', async () => {
+test('scopes: run 2 campaign cùng repo, campaign 1 chỉ có file dở từ trước → 1 commit gom đủ cả 2, không dừng', async () => {
   const f = gitRepo();
   const second = path.join(f.repo, 'products/x/landing/b');
   fs.mkdirSync(second, { recursive: true });
   fs.writeFileSync(path.join(second, 'index.html'), 'b');
   const files = ['products/x/landing/b/index.html'];
-  const r = await runGates(['commit'], { ...f, scopes: [f.campaignDir, second], dirty: ['products/x/landing/a/index.html'], key: 'GW-1', flowId: 'landing-fix', files, planTitle: 'Sửa b' });
+  const r = await runGates(['commit'], { ...f, scopes: [f.campaignDir, second], key: 'GW-1', flowId: 'landing-fix', files, planTitle: 'Sửa b' });
   assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
-  assert.strictEqual(f.git('show', '--name-only', '--format=', 'HEAD').stdout.trim(), files[0]);
+  assert.deepStrictEqual(f.git('show', '--name-only', '--format=', 'HEAD').stdout.trim().split('\n').sort(), ['products/x/landing/a/index.html', files[0]]);
 });
 
 test('I4: file đổi trong campaign nhưng agent quên khai ở files → vẫn commit, không skipped', async () => {
@@ -372,34 +362,6 @@ test('commit: dist đã commit là bản build-dev (dist/assets/), build product
   assert.strictEqual(r.results[0].status, 'pass', r.results[0].blocking?.join('\n'));
   const removed = f.git('show', '--diff-filter=D', '--name-only', '--format=', 'HEAD').stdout.trim().split('\n');
   assert.strictEqual(removed.length, 2);
-});
-
-test('commit: file dở từ trước mà run sửa tiếp (hash đổi) → vào commit; file dở run không đụng → vẫn bỏ (GW-882)', async () => {
-  const f = gitRepo();
-  trackInCampaign(f, ['layout.twig', 'khac.scss']);
-  fs.writeFileSync(path.join(f.campaignDir, 'layout.twig'), 'dở');
-  fs.writeFileSync(path.join(f.campaignDir, 'khac.scss'), 'dở');
-  const rel = (name) => `products/x/landing/a/${name}`;
-  const hashOf = (name) => f.git('hash-object', rel(name)).stdout.trim();
-  const dirtyHashes = { [rel('layout.twig')]: hashOf('layout.twig'), [rel('khac.scss')]: hashOf('khac.scss') };
-  fs.writeFileSync(path.join(f.campaignDir, 'layout.twig'), 'run sửa tiếp');
-  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa', dirty: Object.keys(dirtyHashes), dirtyHashes });
-  assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
-  const committed = f.git('show', '--name-only', '--format=', 'HEAD').stdout;
-  assert.match(committed, /layout\.twig/);
-  assert.doesNotMatch(committed, /khac\.scss/);
-});
-
-test('commit: file dở từ trước mà run xoá (hash thành null) → vào commit', async () => {
-  const f = gitRepo();
-  trackInCampaign(f, ['assets/cu.twig']);
-  fs.writeFileSync(path.join(f.campaignDir, 'assets/cu.twig'), 'dở');
-  const rel = 'products/x/landing/a/assets/cu.twig';
-  const dirtyHashes = { [rel]: f.git('hash-object', rel).stdout.trim() };
-  fs.rmSync(path.join(f.campaignDir, 'assets/cu.twig'));
-  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa', dirty: [rel], dirtyHashes });
-  assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
-  assert.strictEqual(f.git('show', '--diff-filter=D', '--name-only', '--format=', 'HEAD').stdout.trim(), rel);
 });
 
 test('commit: dist/assets/ mất mà không có dist/optimized/ thay → vẫn dừng', async () => {

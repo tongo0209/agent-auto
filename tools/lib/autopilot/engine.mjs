@@ -223,7 +223,7 @@ export function chooseAction(run, flow, action, { options = [], now, interrupted
     case 'goto': {
       const target = stageOf(flow, positionOf(flow, action.stage));
       if (target && isCalledOnly(target)) throw new Error(`${target.id} chỉ chạy khi review gọi — quay về ${callersOf(flow, target.id).join(', ')} thay vì`);
-      if (!allowed.stages.includes(target.id)) throw new Error(`stage "${action.stage}" chưa đi qua, không quay lại được`);
+      if (!target || !allowed.stages.includes(target.id)) throw new Error(`stage "${action.stage}" chưa đi qua, không quay lại được`);
       const rewound = { ...forgetFrom(enable(resumed, target.id, action.stage), flow, target.id), stage: target.id, rejectNote: action.note ?? null };
       const planIndex = flow.stages.findIndex((s) => s.id === 'plan');
       return flow.stages.findIndex((s) => s.id === target.id) <= planIndex ? { ...rewound, choice: null } : rewound;

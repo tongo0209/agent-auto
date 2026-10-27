@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { listRuns, runDir, loadRun, planOptions } from '../tools/lib/autopilot/store.mjs';
 import { runChanges } from '../tools/lib/autopilot/review.mjs';
-import { loadFlow, listFlows } from '../tools/lib/autopilot/flows.mjs';
+import { loadFlow, listFlows, flowOfRun } from '../tools/lib/autopilot/flows.mjs';
 import { stageOf, allowedActions, chooseAction, checkRunPlan } from '../tools/lib/autopilot/engine.mjs';
 import { stageCells, totals } from '../tools/lib/autopilot/format.mjs';
 import { tokensOf } from '../tools/lib/autopilot/claude-runner.mjs';
@@ -64,9 +64,18 @@ const sectionFields = (run, flow, stage, cell) => {
   return { roles: Object.fromEntries(SECTION_ROLES.map((role) => [role, stage[role]])), sections };
 };
 
+// Run không mang snapshot thì flowOfRun đọc git theo giờ bắt đầu — cố định với mỗi run nên nhớ lại, khỏi gọi git mỗi lần làm mới
+const runFlows = new Map();
+function runFlow(run) {
+  if (run.flowSnapshot) return run.flowSnapshot;
+  const id = `${run.key}/${run.runId}`;
+  if (!runFlows.has(id)) runFlows.set(id, flowOfRun(run));
+  return runFlows.get(id);
+}
+
 function viewOf(saved) {
   const run = withTokens(saved);
-  const flow = loadFlow(run.flow);
+  const flow = runFlow(run);
   const options = run.stage === 'approve-plan' ? planOptions(run) : [];
   return {
     ...run,
@@ -182,7 +191,7 @@ export function checkAction(action, body = {}) {
   const { stage, option, note, reason, off } = body;
   const breakUnchanged = action === 'break' && run.status !== 'done' && (run.plan?.breakpoints ?? []).includes(stage) === !off;
   if (breakUnchanged) return;
-  chooseAction(run, loadFlow(run.flow), { type: action, stage, option, note, reason }, { options: planOptions(run), now: Date.now(), interrupted: isInterrupted(run) });
+  chooseAction(run, runFlow(run), { type: action, stage, option, note, reason }, { options: planOptions(run), now: Date.now(), interrupted: isInterrupted(run) });
 }
 
 const TAIL_BYTES = 256 * 1024;

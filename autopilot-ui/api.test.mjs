@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -222,6 +223,16 @@ test('listView: run có actions, options chỉ ở approve-plan, mặc định p
 test('checkAction skip qua API: không lỗi "Invalid time value"', () => {
   saveRun({ ...run, key: 'GW-12', status: 'stopped', stage: 'plan-review', stopReason: 'fail:plan-review' });
   assert.doesNotThrow(() => checkAction('skip', { key: 'GW-12' }));
+});
+
+test('listView + checkAction: run mang flowSnapshot cũ → vẽ và soát nút theo snapshot, không theo flows/ hiện tại', async () => {
+  const oldFlow = JSON.parse(execFileSync('git', ['show', '0cbf709:flows/landing-fix.json'], { cwd: path.join(import.meta.dirname, '..'), encoding: 'utf8' }));
+  saveRun({ ...run, key: 'GW-12', status: 'running', stage: 'code-review', flowSnapshot: oldFlow });
+  const ids = (await listView()).runs.find((r) => r.key === 'GW-12').cells.map((c) => c.id);
+  assert.ok(!ids.includes('sections') && !ids.includes('checks'));
+  assert.ok(ids.includes('code-review'));
+  assert.throws(() => checkAction('goto', { key: 'GW-12', stage: 'sections', note: 'x' }), /sections/);
+  assert.doesNotThrow(() => checkAction('goto', { key: 'GW-12', stage: 'plan', note: 'x' }));
 });
 
 test('listView: run trỏ flow đã mất → tách ra broken, các run khác vẫn hiện', async () => {

@@ -88,7 +88,9 @@ export function runClaude({ stageId, round, prompt, model, toolset, resumeSessio
   const started = Date.now();
   return new Promise((resolve) => {
     // detached: tiến trình con thành trưởng nhóm, pause/abort tắt được cả nhóm (claude + lệnh Bash nó gọi)
-    const child = spawn('claude', args, { cwd, env: { ...process.env, AUTOPILOT_RUN: marker }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    // BG_WAIT 0: `claude -p` mặc định giết agent nền 10 phút sau lượt cuối (GW-942 mất 5 lane) — trần thật là timeoutMs
+    const env = { ...process.env, AUTOPILOT_RUN: marker, CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '0' };
+    const child = spawn('claude', args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     if (childFile) fs.writeFileSync(childFile, JSON.stringify({ pid: child.pid }));
     if (logFile) fs.mkdirSync(path.dirname(logFile), { recursive: true });
     const log = logFile ? fs.createWriteStream(logFile) : null;

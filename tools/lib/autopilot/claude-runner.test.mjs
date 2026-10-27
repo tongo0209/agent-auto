@@ -82,7 +82,7 @@ test('đường thật: đặt env AUTOPILOT_RUN, đọc JSON của claude, ghi 
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-bin-'));
   fs.writeFileSync(
     path.join(bin, 'claude'),
-    '#!/bin/sh\necho \'{"type":"assistant","message":{"content":[{"type":"text","text":"dang doc"}]}}\'\nsleep 0.4\nprintf \'{"type":"result","result":"env=%s","session_id":"s9","num_turns":4,"total_cost_usd":0.5,"duration_ms":10,"is_error":false}\\n\' "$AUTOPILOT_RUN"\n',
+    '#!/bin/sh\necho \'{"type":"assistant","message":{"content":[{"type":"text","text":"dang doc"}]}}\'\nsleep 0.4\nprintf \'{"type":"result","result":"env=%s bg=%s","session_id":"s9","num_turns":4,"total_cost_usd":0.5,"duration_ms":10,"is_error":false}\\n\' "$AUTOPILOT_RUN" "$CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS"\n',
     { mode: 0o755 },
   );
   const oldPath = process.env.PATH;
@@ -93,7 +93,7 @@ test('đường thật: đặt env AUTOPILOT_RUN, đọc JSON của claude, ghi 
     await new Promise((r) => setTimeout(r, 200));
     assert.match(fs.readFileSync(logFile, 'utf8'), /dang doc/, 'log phải có sự kiện ngay khi claude còn chạy');
     const r = await running;
-    assert.deepStrictEqual([r.ok, r.result, r.sessionId, r.turns, r.costUsd], [true, 'env=GW-1/r1', 's9', 4, 0.5]);
+    assert.deepStrictEqual([r.ok, r.result, r.sessionId, r.turns, r.costUsd], [true, 'env=GW-1/r1 bg=0', 's9', 4, 0.5]);
     assert.ok(fs.existsSync(logFile));
   } finally {
     process.env.PATH = oldPath;

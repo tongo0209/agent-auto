@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { statusEntries } from './worktree.mjs';
+import { fileHashes, statusEntries } from './worktree.mjs';
 import { dataRoot } from './store.mjs';
 
 const AGENT_ROOT = path.resolve(import.meta.dirname, '../../..');
@@ -153,9 +153,13 @@ function runCommit(ctx) {
 
   const entries = status();
   const changed = new Set(entries.map((e) => e.path));
-  const dirtyAtStart = new Set(ctx.dirty ?? []);
   const scopes = (ctx.scopes ?? [ctx.campaignDir]).map((d) => path.relative(ctx.repo, path.resolve(ctx.repo, d)));
   const inScope = (f) => scopes.some((s) => s === '' || f === s || f.startsWith(`${s}/`));
+  // file dở từ trước mà run sửa tiếp (hash đổi) là của run; run cũ chưa chụp hash thì giữ nguyên là dở
+  const hashAtStart = ctx.dirtyHashes ?? {};
+  const touched = (ctx.dirty ?? []).filter((f) => f in hashAtStart && inScope(f));
+  const hashNow = fileHashes(ctx.repo, touched);
+  const dirtyAtStart = new Set((ctx.dirty ?? []).filter((f) => !touched.includes(f) || hashNow[f] === hashAtStart[f]));
   // campaign đã bị run khoá: mọi file đổi trong đó (trừ file dở từ trước) là của run, kể cả file agent quên khai
   const files = [...changed].filter((f) => inScope(f) && !dirtyAtStart.has(f));
   const left = ctx.files.filter((f) => changed.has(f) && !files.includes(f)).map((f) => `${f} (${dirtyAtStart.has(f) ? 'dở từ trước khi run bắt đầu' : 'ngoài campaign'})`);

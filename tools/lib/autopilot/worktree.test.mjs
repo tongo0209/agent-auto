@@ -49,3 +49,17 @@ test('repoState: file rename đã stage → dirty có đủ đường dẫn mớ
   fs.writeFileSync(path.join(repo, 'products/x/moi.txt'), 'y');
   assert.deepStrictEqual(repoState(repo).dirty.sort(), ['products/x/moi.txt', 'products/x/new.html', 'products/x/old.html']);
 });
+
+test('repoState: dirtyHashes chụp nội dung từng file dở, file đã xoá là null', () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-rs-'));
+  const git = (...a) => spawnSync('git', ['-C', repo, '-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { encoding: 'utf8' });
+  git('init', '-q');
+  fs.writeFileSync(path.join(repo, 'sua.txt'), 'a');
+  fs.writeFileSync(path.join(repo, 'xoa.txt'), 'b');
+  git('add', '.');
+  git('commit', '-qm', 'init');
+  fs.writeFileSync(path.join(repo, 'sua.txt'), 'dở');
+  fs.rmSync(path.join(repo, 'xoa.txt'));
+  const hash = git('hash-object', 'sua.txt').stdout.trim();
+  assert.deepStrictEqual(repoState(repo).dirtyHashes, { 'sua.txt': hash, 'xoa.txt': null });
+});

@@ -374,6 +374,34 @@ test('commit: dist đã commit là bản build-dev (dist/assets/), build product
   assert.strictEqual(removed.length, 2);
 });
 
+test('commit: file dở từ trước mà run sửa tiếp (hash đổi) → vào commit; file dở run không đụng → vẫn bỏ (GW-882)', async () => {
+  const f = gitRepo();
+  trackInCampaign(f, ['layout.twig', 'khac.scss']);
+  fs.writeFileSync(path.join(f.campaignDir, 'layout.twig'), 'dở');
+  fs.writeFileSync(path.join(f.campaignDir, 'khac.scss'), 'dở');
+  const rel = (name) => `products/x/landing/a/${name}`;
+  const hashOf = (name) => f.git('hash-object', rel(name)).stdout.trim();
+  const dirtyHashes = { [rel('layout.twig')]: hashOf('layout.twig'), [rel('khac.scss')]: hashOf('khac.scss') };
+  fs.writeFileSync(path.join(f.campaignDir, 'layout.twig'), 'run sửa tiếp');
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa', dirty: Object.keys(dirtyHashes), dirtyHashes });
+  assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
+  const committed = f.git('show', '--name-only', '--format=', 'HEAD').stdout;
+  assert.match(committed, /layout\.twig/);
+  assert.doesNotMatch(committed, /khac\.scss/);
+});
+
+test('commit: file dở từ trước mà run xoá (hash thành null) → vào commit', async () => {
+  const f = gitRepo();
+  trackInCampaign(f, ['assets/cu.twig']);
+  fs.writeFileSync(path.join(f.campaignDir, 'assets/cu.twig'), 'dở');
+  const rel = 'products/x/landing/a/assets/cu.twig';
+  const dirtyHashes = { [rel]: f.git('hash-object', rel).stdout.trim() };
+  fs.rmSync(path.join(f.campaignDir, 'assets/cu.twig'));
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa', dirty: [rel], dirtyHashes });
+  assert.strictEqual(r.results[0].status, 'pass', r.results[0].note);
+  assert.strictEqual(f.git('show', '--diff-filter=D', '--name-only', '--format=', 'HEAD').stdout.trim(), rel);
+});
+
 test('commit: dist/assets/ mất mà không có dist/optimized/ thay → vẫn dừng', async () => {
   const f = gitRepo();
   trackInCampaign(f, ['assets/hero/images/bg.jpg', 'dist/assets/hero/images/bg.jpg']);

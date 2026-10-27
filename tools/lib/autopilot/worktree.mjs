@@ -32,16 +32,25 @@ export function statusEntries(stdout) {
   return entries;
 }
 
+// Hash nội dung để cổng commit biết run có sửa tiếp file dở từ trước không; file không còn trên đĩa là null
+export function fileHashes(top, paths) {
+  const present = paths.filter((p) => fs.existsSync(path.join(top, p)));
+  const hashes = spawnSync('git', ['-C', top, 'hash-object', '--stdin-paths'], { input: present.join('\n'), encoding: 'utf8' }).stdout.trim().split('\n');
+  return Object.fromEntries(paths.map((p) => [p, present.includes(p) ? hashes[present.indexOf(p)] : null]));
+}
+
 // Repo gốc mà run làm thẳng trên đó: giữ đường dẫn như người gọi đưa khi nó chính là gốc repo
 export function repoState(dir) {
   const real = git(['-C', dir, 'rev-parse', '--show-toplevel']);
   const top = fs.realpathSync(dir) === real ? dir : real;
   const status = spawnSync('git', ['-C', top, 'status', '--porcelain', '-z', '-uall'], { encoding: 'utf8' }).stdout;
+  const dirty = statusEntries(status).map((e) => e.path);
   return {
     top,
     branch: git(['-C', top, 'rev-parse', '--abbrev-ref', 'HEAD']),
     head: git(['-C', top, 'rev-parse', 'HEAD']),
-    dirty: statusEntries(status).map((e) => e.path),
+    dirty,
+    dirtyHashes: fileHashes(top, dirty),
   };
 }
 

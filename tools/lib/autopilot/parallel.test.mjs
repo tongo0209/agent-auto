@@ -79,7 +79,7 @@ const sequentialFlow = {
   ],
 };
 
-const fakeRepoState = (repo) => ({ top: repo, branch: 'tont', head: 'h0', dirty: [] });
+const fakeRepoState = (repo) => ({ top: repo, branch: 'tont', head: 'h0', dirty: [], dirtyHashes: {} });
 const deps = (extra) => ({ now: () => Date.now(), notify: () => {}, repoState: fakeRepoState, ...extra });
 const newRun = (flow, extra = {}) => ({
   ...createRun({ key: 'GW-9', runId: `r${Math.random().toString(36).slice(2, 8)}`, flow, routerReason: 't', repo: '/repo', campaignDir: '/repo/products/x/landing/a', now: Date.now() }),

@@ -38,7 +38,7 @@ function fakeGates(byRound = {}) {
 }
 
 const notified = [];
-const fakeRepoState = (repo) => ({ top: repo, branch: 'tont', head: 'h0', dirty: [] });
+const fakeRepoState = (repo) => ({ top: repo, branch: 'tont', head: 'h0', dirty: [], dirtyHashes: {} });
 const base = (extra = {}) => ({ now: () => Date.now(), notify: (t, m) => notified.push(m), repoState: fakeRepoState, ...extra });
 const newRun = (flowId) =>
   createRun({ key: 'GW-1', runId: `r${Math.random().toString(36).slice(2, 8)}`, flow: loadFlow(flowId), routerReason: 't', repo: '/repo', campaignDir: '/repo/products/x/landing/a', now: Date.now() });
@@ -234,6 +234,9 @@ test('R19: stage claude + gate chạy thẳng trên repo gốc, nhánh đang che
   assert.deepStrictEqual(run.startHead, { [repo]: git('rev-parse', 'HEAD').stdout.trim() });
   assert.deepStrictEqual(run.dirtyAtStart, { [repo]: ['dang-do.txt'] });
   assert.deepStrictEqual(gates.calls[0].ctx.dirty, ['dang-do.txt']);
+  const hash = { 'dang-do.txt': git('hash-object', 'dang-do.txt').stdout.trim() };
+  assert.deepStrictEqual(run.dirtyHashAtStart, { [repo]: hash });
+  assert.deepStrictEqual(gates.calls[0].ctx.dirtyHashes, hash);
   assert.strictEqual(git('branch', '--list', 'autopilot/*').stdout, '');
 });
 

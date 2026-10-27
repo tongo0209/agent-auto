@@ -189,7 +189,7 @@ async function gatesOn(run, stage, deps, [dir, ...rest]) {
   const real = dir ? repoFor(run, dir) : run.repo;
   const repo = toWorktree(run.worktrees, real);
   const result = await deps.runGates(stage.checks, {
-    repo, campaignDir: toWorktree(run.worktrees, dir), scopes: [dir, ...rest].map((d) => toWorktree(run.worktrees, d)), dirty: run.dirtyAtStart?.[real] ?? [],
+    repo, campaignDir: toWorktree(run.worktrees, dir), scopes: [dir, ...rest].map((d) => toWorktree(run.worktrees, d)), dirty: run.dirtyAtStart?.[real] ?? [], dirtyHashes: run.dirtyHashAtStart?.[real],
     key: run.key, flowId: run.flow, files: run.files ?? [], planTitle: planTitle(run), aborted: () => isAbortedOnDisk(run),
   });
   return { ...result, repo };
@@ -451,9 +451,9 @@ async function runSectionsStage(run, stage, flow, deps) {
 // Run làm thẳng trên repo gốc: run đã có campaign chung repo với run khác, chưa có thì giữ riêng; nhánh chốt lúc bắt đầu
 export function claimRepos(run, deps) {
   if (Object.keys(run.worktrees ?? {}).length) return run;
-  const next = { ...run, workBranch: { ...run.workBranch }, startHead: { ...run.startHead }, dirtyAtStart: { ...run.dirtyAtStart } };
+  const next = { ...run, workBranch: { ...run.workBranch }, startHead: { ...run.startHead }, dirtyAtStart: { ...run.dirtyAtStart }, dirtyHashAtStart: { ...run.dirtyHashAtStart } };
   for (const repo of (run.repos ?? [run.repo]).filter(Boolean)) {
-    const { top, branch, head, dirty } = deps.repoState(repo);
+    const { top, branch, head, dirty, dirtyHashes } = deps.repoState(repo);
     const held = holdRepo(top, run, { shared: campaignsOf(run).length > 0 });
     if (!held.ok) throw new Error(`repo đang có run ${held.holder.key} (${top})`);
     const want = next.workBranch[top];
@@ -461,6 +461,7 @@ export function claimRepos(run, deps) {
       next.workBranch[top] = branch;
       next.startHead[top] = head;
       next.dirtyAtStart[top] = dirty;
+      next.dirtyHashAtStart[top] = dirtyHashes;
     } else if (want !== branch) {
       throw new Error(`${top} đang ở nhánh ${branch}, run làm trên ${want} — checkout lại ${want} rồi resume`);
     }

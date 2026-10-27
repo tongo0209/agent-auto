@@ -32,19 +32,31 @@ test('listView: chờ bạn xếp trước, có cells + totals + show của stag
   assert.deepStrictEqual(view.runs.map((r) => r.key).slice(0, 2), ['GW-1', 'GW-2']);
   const first = view.runs[0];
   assert.strictEqual(first.cells.find((c) => c.id === 'approve-plan').state, 'waiting');
-  assert.deepStrictEqual(first.cells.find((c) => c.id === 'gates'), { ...first.cells.find((c) => c.id === 'gates'), back: 'fix', side: false });
+  assert.deepStrictEqual(first.cells.find((c) => c.id === 'checks'), { ...first.cells.find((c) => c.id === 'checks'), back: 'fix', side: false, branches: [['code-review'], ['gates', ['ui-check', 'design-compare']]] });
   assert.strictEqual(first.cells.find((c) => c.id === 'fix').side, true);
   assert.deepStrictEqual(first.totals, { runs: 1, turns: 10, minutes: 1, usd: 1.5, tokens: 0 });
   assert.deepStrictEqual(first.show, ['plan.md', 'plan-review-r*.json']);
   assert.ok(first.flowLabel.length > 0);
 });
 
+test('listView: ô sections mang mỗi section 1 hàng, trạng thái theo receipt + active của id <vai>@<section>', async () => {
+  const multi = { ...run, key: 'GW-6', status: 'running', stage: 'sections', active: ['section-review@hero'], receipts: [...run.receipts, { stage: 'implement-section@hero', round: 1, verdict: 'pass', blocking: 0, advisory: 0, turns: 3, costUsd: 0.5, ms: 1000 }] };
+  saveRun(multi);
+  writeArtifact(multi, 'sections.json', JSON.stringify({ sections: [{ id: 'hero', files: ['a.scss'] }, { id: 'gift', files: ['b.scss'] }] }));
+  const cell = (await listView()).runs.find((r) => r.key === 'GW-6').cells.find((c) => c.id === 'sections');
+  assert.strictEqual(cell.roles.lane, 'implement-section');
+  assert.deepStrictEqual(cell.sections.map((s) => [s.id, s.cells.lane.state, s.cells.review.state, s.cells.build.kind]), [['hero', 'done', 'running', 'gate'], ['gift', 'pending', 'pending', 'gate']]);
+  assert.strictEqual(cell.sections[0].cells.fix.id, 'fix-section@hero');
+});
+
 test('artifact: chỉ đọc file trong thư mục run, chặn path traversal', () => {
+  writeArtifact(run, 'implement-section@hero-r1.json', '{}');
+  assert.ok(artifactFile('GW-1', '20261020-100000', 'implement-section@hero-r1.json'));
   assert.ok(artifactFile('GW-1', '20261020-100000', 'plan.md').endsWith('plan.md'));
   assert.strictEqual(artifactFile('GW-1', '20261020-100000', '../../.lock-run'), null);
   assert.strictEqual(artifactFile('../x', '20261020-100000', 'plan.md'), null);
   assert.strictEqual(artifactFile('GW-1', '20261020-100000', 'khong-co.md'), null);
-  assert.deepStrictEqual(listArtifacts('GW-1', '20261020-100000'), ['plan.md']);
+  assert.deepStrictEqual(listArtifacts('GW-1', '20261020-100000'), ['implement-section@hero-r1.json', 'plan.md']);
 });
 
 test('actionArgs: dựng đúng lệnh CLI, chặn đầu vào xấu', () => {

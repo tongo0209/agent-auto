@@ -1,4 +1,5 @@
 import * as THREE from './vendor/three-0.160.0.module.js';
+import { flowShape, groupTracks, trackLinks } from './lib.js';
 
 const MIN_COL_PITCH = 1.9;
 const MAX_COL_PITCH = 3.3;
@@ -7,6 +8,7 @@ const STAGGER_COST = 1.15;
 const STAGGER_ROW_PX = 90;
 const SIDE_DRIFT_COST = 0.5;
 const ROW_PITCH = 3;
+const TRACK_PITCH = 2.2;
 const STAND_BACK = 0.3;
 const ROBOT_SCALE = 1.5;
 const ROBOT_MAX_SCALE = 2.2;
@@ -28,6 +30,8 @@ const ROBOT_MODE = { running: 'typing', waiting: 'waving', stopped: 'slumped' };
 const ACTIVE_STATES = ['running', 'waiting'];
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+// Ô nhóm đang chạy nghĩa là đã tách nhánh: cạnh từ nó ra các vệt coi như đã đi qua
+const splitState = (cell) => ((cell.branches || cell.roles) && ACTIVE_STATES.includes(cell.state) ? 'done' : cell.state);
 
 function injectCss() {
   if (document.querySelector('link[data-flow3d]')) return;
@@ -43,26 +47,50 @@ function readPalette() {
   return { bg: color('--bg'), panel: color('--bg-3'), line: color('--line-2'), text: color('--text-2'), state };
 }
 
-// Ô ngoài chuỗi next chỉ vẽ khi là bước vòng về hoặc run đã chạy tới: stage con của nhóm song song không có chỗ đứng
-function mainLane(cells) {
-  const byId = Object.fromEntries(cells.map((c) => [c.id, c]));
-  const lane = [];
-  for (let c = cells[0]; c && !lane.includes(c); c = byId[c.next]) lane.push(c);
-  return { lane, side: cells.filter((c) => !lane.includes(c) && (c.side || c.rounds > 0 || ACTIVE_STATES.includes(c.state))) };
+// Ô thường đứng 1 cột; nhóm = trạm tách rồi mỗi bước 1 cột, các vệt của nhóm lùi dần về phía sau
+function flowColumns(cells) {
+  const { lane, side } = flowShape(cells);
+  const columns = [];
+  const links = [];
+  lane.forEach((c, i) => {
+    columns.push([{ cell: c, depth: 0 }]);
+    const after = lane[i + 1];
+    const tracks = groupTracks(c, cells);
+    if (!tracks.length) {
+      if (after) links.push([c.id, after.id]);
+      return;
+    }
+    const groupColumns = Array.from({ length: Math.max(...tracks.map((t) => t.steps.length)) }, () => []);
+    let depth = 0;
+    for (const t of tracks) {
+      t.steps.forEach((step, j) => step.forEach((cell, k) => groupColumns[j].push({ cell, depth: depth + k })));
+      const stacked = Math.max(1, ...t.steps.map((step) => step.length));
+      // fix đứng sau vệt, cạnh bước review: vòng về lane bằng cung, không nằm trên đường đi tới ô sau nhóm
+      if (t.fix) groupColumns[Math.min(1, t.steps.length - 1)].push({ cell: t.fix, depth: depth + stacked });
+      depth += stacked + (t.fix ? 1 : 0);
+    }
+    columns.push(...groupColumns);
+    const { links: inner, tails } = trackLinks(c, tracks);
+    links.push(...inner, ...(after ? tails.map((id) => [id, after.id]) : []));
+  });
+  return { columns, links, side, cells: [...columns.flat().map((e) => e.cell), ...side] };
 }
 
-// Làn chính chạy rắn (hàng lẻ đi ngược) để flow dài vẫn vừa khung; bước side lấp ô trống cuối lưới, gần nơi gọi nhất
-function layoutStations(cells, cols, pitch) {
-  const { lane, side } = mainLane(cells);
+// Làn chính chạy rắn (hàng lẻ đi ngược) để flow dài vẫn vừa khung, hàng có nhóm sâu thêm theo số vệt; bước side lấp ô trống cuối lưới, gần nơi gọi nhất
+function layoutStations({ columns, links, side }, cols, pitch) {
+  const rows = Math.ceil((columns.length + side.length) / cols);
+  const rowDepth = Array.from({ length: rows }, (_, r) => Math.max(0, ...columns.slice(r * cols, (r + 1) * cols).flat().map((e) => e.depth)));
+  const rowZ = rowDepth.map((_, r) => -r * ROW_PITCH - rowDepth.slice(0, r).reduce((a, b) => a + b, 0) * TRACK_PITCH);
   const slot = (i) => {
     const row = Math.floor(i / cols);
     const col = row % 2 ? cols - 1 - (i % cols) : i % cols;
-    return { x: (col - (cols - 1) / 2) * pitch, z: -row * ROW_PITCH };
+    return { x: (col - (cols - 1) / 2) * pitch, z: rowZ[row] };
   };
-  const spot = new Map(lane.map((c, i) => [c.id, slot(i)]));
-  const freeSlots = Array.from({ length: Math.ceil(cells.length / cols) * cols - lane.length }, (_, k) => slot(lane.length + k));
+  const spot = new Map(columns.flatMap((column, i) => column.map(({ cell, depth }) => [cell.id, { x: slot(i).x, z: slot(i).z - depth * TRACK_PITCH }])));
+  const placed = columns.flat().map((e) => e.cell);
+  const freeSlots = Array.from({ length: rows * cols - columns.length }, (_, k) => slot(columns.length + k));
   const wantedX = (c) => {
-    const callers = lane.filter((l) => l.back === c.id).map((l) => spot.get(l.id).x);
+    const callers = placed.filter((l) => l.back === c.id).map((l) => spot.get(l.id).x);
     return callers.length ? callers.reduce((a, b) => a + b, 0) / callers.length : spot.get(c.next)?.x ?? 0;
   };
   let sideDrift = 0;
@@ -73,7 +101,7 @@ function layoutStations(cells, cols, pitch) {
     spot.set(c.id, nearest);
     sideDrift = Math.max(sideDrift, Math.abs(nearest.x - x) / (cols * pitch));
   }
-  return { lane, spot, pitch, sideDrift };
+  return { links, spot, pitch, sideDrift };
 }
 
 // Đổi hàng thì đi qua khe giữa hai cột (cột các hàng thẳng nhau), không xuyên qua bàn
@@ -271,6 +299,7 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
   let stations = new Map();
   let structure = '';
   let layout = null;
+  let shape = null;
   let edges = [];
   let incomingEdge = null;
   const agent = { stationId: null, previousId: null, position: new THREE.Vector3(), walk: null, jumpElapsed: null };
@@ -328,7 +357,7 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     rim.opacity = cell.state === 'skipped' || cell.state === 'pending' ? 0.4 : 1;
     station.tick.visible = cell.state === 'done';
     station.label.className = `f3d-label ${cell.state}${userSkipped ? ' user-skipped' : ''}${station.staggered ? ' stagger' : ''}${hovered === station ? ' hover' : ''}`;
-    station.label.firstChild.textContent = `${cell.breakpoint ? '📍 ' : ''}${cell.id}`;
+    station.label.firstChild.textContent = `${cell.breakpoint ? '📍 ' : ''}${cell.id.replace('@', ' · ')}`;
     station.label.lastChild.textContent = noteOf(cell);
     station.label.title = [cell.id, noteOf(cell)].filter(Boolean).join(' · ');
   }
@@ -354,9 +383,8 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
   function buildEdges() {
     disposeEdges();
     const lifted = (p) => new THREE.Vector3(p.x, 0.02, p.z);
-    layout.lane.slice(1).forEach((cell, i) => {
-      const from = layout.lane[i].id;
-      const points = walkPath(standSpot(from), standSpot(cell.id), layout.pitch).map(lifted);
+    for (const [from, to] of layout.links) {
+      const points = walkPath(standSpot(from), standSpot(to), layout.pitch).map(lifted);
       const meshes = points.slice(1).map((end, k) => {
         const start = points[k];
         const ribbon = new THREE.Mesh(geometry.ribbon, edgeMaterial.idle);
@@ -366,8 +394,8 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
         return ribbon;
       });
       scene.add(...meshes);
-      edges.push({ kind: 'main', from, to: cell.id, points, meshes });
-    });
+      edges.push({ kind: 'main', from, to, points, meshes });
+    }
     for (const cell of current.cells.filter((c) => c.back && layout.spot.has(c.back))) {
       const a = standSpot(cell.id).setY(0.1);
       const b = standSpot(cell.back).setY(0.1);
@@ -387,13 +415,14 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
         edge.meshes[0].material = from.rounds > 1 || (to.side && to.rounds > 0 && from.rounds > 0) ? arcMaterial.used : arcMaterial.idle;
         continue;
       }
-      const live = from.state === 'done' && ACTIVE_STATES.includes(to.state);
-      const material = live ? edgeMaterial[to.state] : from.state === 'done' && to.state !== 'pending' ? edgeMaterial.done : edgeMaterial.idle;
+      const fromState = splitState(from);
+      const live = fromState === 'done' && ACTIVE_STATES.includes(to.state);
+      const material = live ? edgeMaterial[to.state] : fromState === 'done' && to.state !== 'pending' ? edgeMaterial.done : edgeMaterial.idle;
       for (const mesh of edge.meshes) mesh.material = material;
     }
     const stage = current.stage;
     incomingEdge = !ACTIVE_STATES.includes(stateOf(stage)) || current.status === 'stopped' || current.interrupted ? null
-      : edges.find((e) => e.kind === 'main' && e.to === stage && stateOf(e.from) === 'done')
+      : edges.find((e) => e.kind === 'main' && e.to === stage && splitState(cellById.get(e.from)) === 'done')
         ?? edges.find((e) => e.kind === 'arc' && e.to === stage && e.from === agent.previousId)
         ?? edges.find((e) => e.kind === 'arc' && e.to === stage)
         ?? null;
@@ -423,8 +452,9 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     const fits = (c) => c.room >= 1;
     const cost = (c) => c.distance * (c.staggered ? STAGGER_COST : 1) * (1 + c.sideDrift * SIDE_DRIFT_COST);
     let best = null;
-    for (let cols = current.cells.length; cols >= Math.min(3, current.cells.length); cols--) {
-      layout = layoutStations(current.cells, cols, MIN_COL_PITCH);
+    const slots = shape.columns.length + shape.side.length;
+    for (let cols = slots; cols >= Math.min(3, slots); cols--) {
+      layout = layoutStations(shape, cols, MIN_COL_PITCH);
       const distance = fitCamera();
       const plan = labelPlan();
       const c = { cols, distance, sideDrift: layout.sideDrift, room: Math.min(...plan.map((r) => r.room)), staggered: plan.some((r) => r.step === 2) };
@@ -432,11 +462,11 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     }
     let pitch = MIN_COL_PITCH;
     while (pitch < MAX_COL_PITCH) {
-      layout = layoutStations(current.cells, best.cols, pitch + 0.1);
+      layout = layoutStations(shape, best.cols, pitch + 0.1);
       if (fitCamera() > best.distance * 1.01) break;
       pitch += 0.1;
     }
-    layout = layoutStations(current.cells, best.cols, pitch);
+    layout = layoutStations(shape, best.cols, pitch);
     fitCamera();
     const pxPerUnit = size.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * fit.distance);
     robot.root.scale.setScalar(clamp(ROBOT_MIN_PX / (HEAD_TOP * pxPerUnit), ROBOT_SCALE, ROBOT_MAX_SCALE));
@@ -535,8 +565,8 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
   }
 
   function applyRun(run) {
-    const { lane, side } = mainLane(run.cells);
-    const next = { ...run, cells: [...lane, ...side] };
+    shape = flowColumns(run.cells);
+    const next = { ...run, cells: shape.cells };
     const celebrate = next.status === 'done' && (current.status !== 'done' || !agent.stationId);
     current = next;
     cellById = new Map(next.cells.map((c) => [c.id, c]));

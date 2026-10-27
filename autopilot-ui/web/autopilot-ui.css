@@ -12,6 +12,17 @@
 .flow { padding: 14px 4px 10px; overflow-x: auto; overflow-y: hidden; scrollbar-color: var(--line-2) transparent; }
 .lane.side { margin-top: 24px; }
 .lane.side .dot { width: 34px; height: 34px; font-size: 15px; }
+.fgroup { position: relative; display: flex; align-self: flex-start; align-items: flex-start; gap: 26px; }
+.fgroup::before { content: ""; position: absolute; inset: -8px -12px -4px; border: 1px dashed var(--line-2); border-radius: 14px; pointer-events: none; }
+.fgroup .tracks { display: flex; flex-direction: column; gap: 16px; }
+.fgroup .track { display: flex; align-items: flex-start; gap: 20px; }
+.fgroup .stack { display: flex; flex-direction: column; gap: 10px; }
+.fgroup .tracks .node { width: 84px; padding-top: 6px; gap: 5px; }
+.fgroup .tracks .dot { width: 32px; height: 32px; font-size: 14px; }
+.fgroup .tracks .node .name { font-size: 11px; }
+.fgroup .track-name { width: 56px; padding-top: 14px; font: 600 11px var(--mono); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fgroup .join { padding-top: 15px; }
+.fgroup .join .dot { width: 14px; height: 14px; }
 .flow-view::before, .flow-view::after { content: ""; position: absolute; top: 0; bottom: 0; width: 72px; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .25s; }
 .flow-view::before { left: 0; background: linear-gradient(to right, var(--bg), transparent); }
 .flow-view::after { right: 0; background: linear-gradient(to left, var(--bg), transparent); }

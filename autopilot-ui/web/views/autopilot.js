@@ -1,4 +1,4 @@
-import { $, api, esc, toast, pushCommand } from '../lib.js';
+import { $, api, esc, toast, pushCommand, flowShape, groupTracks, trackLinks } from '../lib.js';
 import { draft } from './_kit.js';
 import { openTerminal, hasTab } from '../terminal.js';
 import { subscribeRuns } from '../live-runs.js';
@@ -117,14 +117,6 @@ function syncQueueChips() {
   document.querySelectorAll('[data-filter]').forEach((chip) => chip.setAttribute('aria-pressed', chip.dataset.filter === queueFilter));
 }
 
-// Ô ngoài chuỗi next chỉ vẽ khi là bước vòng về hoặc run đã chạy tới: stage con của nhóm song song không có chỗ đứng
-function mainLane(cells) {
-  const byId = Object.fromEntries(cells.map((c) => [c.id, c]));
-  const lane = [];
-  for (let c = cells[0]; c && !lane.includes(c); c = byId[c.next]) lane.push(c);
-  return { lane, side: cells.filter((c) => !lane.includes(c) && (c.side || c.rounds > 0 || ['running', 'waiting'].includes(c.state))) };
-}
-
 function nodeHtml(c) {
   const icon = ICON_BY_STATE[c.state] ?? ICON_BY_ID[c.id] ?? 'ph-circle';
   const note = c.state === 'waiting' ? 'chờ' : c.usd ? money(c.usd) : c.state === 'skipped' ? 'bỏ qua' : '';
@@ -136,8 +128,22 @@ function nodeHtml(c) {
     ${c.rounds > 1 ? `<span class="badge-round">${c.max ? `vòng ${c.rounds}/${c.max}` : `×${c.rounds}`}</span>` : ''}
     ${c.breakpoint ? '<span class="pin" title="Dừng sau bước này"><i class="ph-bold ph-map-pin"></i></span>' : ''}
     <div class="dot"><i class="ph-bold ${icon}"></i></div>
-    <div class="name">${esc(c.id)}</div>${userSkipped ? `<div class="note why" title="${esc(skipText)}">${esc(skipText)}</div>` : `<div class="note">${note}</div>`}</div>`;
+    <div class="name">${esc(c.id.split('@')[0])}</div>${userSkipped ? `<div class="note why" title="${esc(skipText)}">${esc(skipText)}</div>` : `<div class="note">${note}</div>`}</div>`;
 }
+
+// Nhóm: ô nhóm là điểm tách, các vệt xếp dọc, chấm cuối là điểm hợp nối sang ô sau
+function laneItemHtml(c, cells) {
+  const tracks = groupTracks(c, cells);
+  if (!tracks.length) return nodeHtml(c);
+  const step = (stack) => (stack.length > 1 ? `<div class="stack">${stack.map(nodeHtml).join('')}</div>` : nodeHtml(stack[0]));
+  const trackHtml = (t) => `<div class="track">${t.label ? `<span class="track-name" title="${esc(t.label)}">${esc(t.label)}</span>` : ''}${t.steps.map(step).join('')}${t.fix ? nodeHtml(t.fix) : ''}</div>`;
+  return `<div class="fgroup">${nodeHtml(c)}<div class="tracks">${tracks.map(trackHtml).join('')}</div><div class="join" id="j-${esc(c.id)}"><span class="dot"></span></div></div>`;
+}
+
+const ACTIVE = ['running', 'waiting'];
+const wireClass = (from, to) => (from === 'done' && ACTIVE.includes(to) ? `live${to === 'waiting' ? ' wait' : ''}` : from === 'done' && to !== 'pending' ? 'done' : '');
+// Ô nhóm đang chạy nghĩa là đã tách nhánh: dây từ nó ra các vệt coi như đã đi qua
+const splitState = (group) => (ACTIVE.includes(group.state) ? 'done' : group.state);
 
 function curve(a, b, below) {
   if (!below) return `M${a.x},${a.y} L${b.x},${b.y}`;
@@ -149,42 +155,56 @@ function drawWires(run) {
   const host = $('#flowInner');
   if (!host) return;
   const box = host.getBoundingClientRect();
-  const pt = (id, edge) => {
-    const el = document.getElementById(`n-${id}`)?.querySelector('.dot');
+  const pt = (elementId, edge) => {
+    const el = document.getElementById(elementId)?.querySelector('.dot');
     if (!el) return null;
     const r = el.getBoundingClientRect();
     const x = r.left - box.left + r.width / 2;
     const y = r.top - box.top + r.height / 2;
     return { right: { x: x + r.width / 2, y }, left: { x: x - r.width / 2, y }, bottom: { x, y: y + r.height / 2 }, top: { x, y: y - r.height / 2 } }[edge];
   };
-  const { lane } = mainLane(run.cells);
   const paths = [];
-  let live = null;
+  const lives = [];
+  const wire = (fromEl, toEl, fromState, toState) => {
+    const a = pt(fromEl, 'right'), b = pt(toEl, 'left');
+    if (!a || !b) return;
+    const cls = wireClass(fromState, toState);
+    const d = a.y === b.y ? curve(a, b) : `M${a.x},${a.y} C${(a.x + b.x) / 2},${a.y} ${(a.x + b.x) / 2},${b.y} ${b.x},${b.y}`;
+    if (cls.startsWith('live')) lives.push({ d, wait: toState === 'waiting' });
+    paths.push(`<path class="wire ${cls}" d="${d}"/>`);
+  };
+  const { lane } = flowShape(run.cells);
+  const cellOf = new Map(run.cells.map((c) => [c.id, c]));
   lane.forEach((c, i) => {
     const next = lane[i + 1];
-    if (!next) return;
-    const a = pt(c.id, 'right'), b = pt(next.id, 'left');
-    if (!a || !b) return;
-    const isLive = c.state === 'done' && ['running', 'waiting'].includes(next.state);
-    const cls = isLive ? `live${next.state === 'waiting' ? ' wait' : ''}` : c.state === 'done' && next.state !== 'pending' ? 'done' : '';
-    const d = curve(a, b);
-    if (isLive) live = { d, wait: next.state === 'waiting' };
-    paths.push(`<path class="wire ${cls}" d="${d}"/>`);
+    const tracks = groupTracks(c, run.cells);
+    if (tracks.length) {
+      const states = new Map(tracks.flatMap((t) => [...t.steps.flat(), ...(t.fix ? [t.fix] : [])]).map((m) => [m.id, m.state]));
+      const stateOf = (id) => (id === c.id ? splitState(c) : states.get(id));
+      const { links, tails } = trackLinks(c, tracks);
+      for (const [from, to] of links) wire(`n-${from}`, `n-${to}`, stateOf(from), stateOf(to));
+      for (const id of tails) wire(`n-${id}`, `j-${c.id}`, stateOf(id), c.state === 'done' ? 'done' : 'skipped');
+      for (const t of tracks.filter((t) => t.fix)) {
+        const from = pt(`n-${t.fix.id}`, 'top'), to = pt(`n-${t.fix.back}`, 'top');
+        if (from && to) paths.push(`<path class="wire loop ${t.fix.rounds ? 'used' : ''}" d="M${from.x},${from.y} C${from.x},${from.y - 22} ${to.x},${to.y - 22} ${to.x},${to.y}"/>`);
+      }
+    }
+    if (next) wire(tracks.length ? `j-${c.id}` : `n-${c.id}`, `n-${next.id}`, c.state, next.state);
   });
   for (const c of run.cells.filter((x) => x.back)) {
-    const target = run.cells.find((x) => x.id === c.back);
-    const from = pt(c.id, target?.side ? 'bottom' : 'bottom');
-    const to = pt(c.back, target?.side ? 'top' : 'bottom');
+    const target = cellOf.get(c.back);
+    const from = pt(`n-${c.id}`, 'bottom');
+    const to = pt(`n-${c.back}`, target?.side ? 'top' : 'bottom');
     if (!from || !to) continue;
     const used = c.rounds > 1 || (target?.side && target.rounds > 0 && c.rounds > 0);
     const d = target?.side ? `M${from.x},${from.y} C${from.x},${(from.y + to.y) / 2} ${to.x},${(from.y + to.y) / 2} ${to.x},${to.y}` : curve(from, to, true);
     paths.push(`<path class="wire loop ${used ? 'used' : ''}" d="${d}"/>`);
-    if (run.stage === c.back && target?.side) live = { d: `M${from.x},${from.y} C${from.x},${(from.y + to.y) / 2} ${to.x},${(from.y + to.y) / 2} ${to.x},${to.y}`, wait: false };
+    if (run.stage === c.back && target?.side) lives.push({ d, wait: false });
   }
-  const packet = live && run.status !== 'stopped' && !run.interrupted
-    ? `<circle r="4" class="packet ${live.wait ? 'wait' : ''}"><animateMotion dur="${live.wait ? '2.6s' : '1.1s'}" repeatCount="indefinite" path="${live.d}"/></circle>`
+  const packets = run.status !== 'stopped' && !run.interrupted
+    ? lives.map((live) => `<circle r="4" class="packet ${live.wait ? 'wait' : ''}"><animateMotion dur="${live.wait ? '2.6s' : '1.1s'}" repeatCount="indefinite" path="${live.d}"/></circle>`).join('')
     : '';
-  $('#wires').innerHTML = paths.join('') + packet;
+  $('#wires').innerHTML = paths.join('') + packets;
   $('#wires').setAttribute('width', host.scrollWidth);
   $('#wires').setAttribute('height', host.scrollHeight);
 }
@@ -313,7 +333,7 @@ async function renderMain() {
   if (run.status === 'done' && !tabs.includes(artifact)) artifact = CHANGES;
   if (!artifact || !tabs.includes(artifact)) artifact = starred.find((f) => f === 'plan.md') ?? starred.at(-1) ?? tabs[0] ?? null;
 
-  const { lane, side } = mainLane(run.cells);
+  const { lane, side } = flowShape(run.cells);
   const tokens = run.totals.tokens ?? 0;
   closeStageMenu();
   $('#apMain').innerHTML = `
@@ -329,7 +349,7 @@ async function renderMain() {
     <div class="flow-view" id="flowView">
       <div class="flow" id="flow"><div class="flow-inner" id="flowInner">
         <svg class="wires" id="wires"></svg>
-        <div class="lane">${lane.map(nodeHtml).join('')}</div>
+        <div class="lane">${lane.map((c) => laneItemHtml(c, run.cells)).join('')}</div>
         ${side.length ? `<div class="lane side" id="sideLane">${side.map(nodeHtml).join('')}</div>` : ''}
       </div></div>
       <button class="flow-nudge prev" data-nudge="-1" aria-label="Cuộn sơ đồ sang trái"><i class="ph-bold ph-caret-left"></i></button>
@@ -350,7 +370,7 @@ async function renderMain() {
         <div class="total"><span>${run.totals.runs} lượt claude · ${run.totals.turns} turns</span><span>${money(run.totals.usd)}</span></div>
       </section>
     </div>`;
-  placeSideLane(run, lane, side);
+  placeSideLane(run, lane);
   placeFlowScroll(run);
   $('#flow').addEventListener('scroll', () => {
     flowScroll.left = $('#flow').scrollLeft;
@@ -368,8 +388,8 @@ async function renderMain() {
 function placeSideLane(run, lane) {
   const sideLane = $('#sideLane');
   if (!sideLane) return;
-  const callerIdx = Math.min(...run.cells.filter((c) => c.back && !lane.some((l) => l.id === c.back)).map((c) => lane.findIndex((l) => l.id === c.id)).filter((i) => i >= 0));
-  if (Number.isFinite(callerIdx)) sideLane.style.paddingLeft = `${callerIdx * (92 + 44)}px`;
+  const caller = lane.find((l) => l.back && !lane.some((c) => c.id === l.back));
+  if (caller) sideLane.style.paddingLeft = `${document.getElementById(`n-${caller.id}`).getBoundingClientRect().left - sideLane.getBoundingClientRect().left}px`;
 }
 
 // Cùng run + cùng bước đang chạy thì giữ chỗ người dùng đã cuộn, đổi bước mới cuộn tới bước đó
@@ -733,7 +753,8 @@ function renderStageMenu() {
 
 function openStageMenu(stage, anchor) {
   const run = currentRun();
-  const items = stageMenuItems(run, run.cells.find((c) => c.id === stage));
+  const cell = run.cells.find((c) => c.id === stage);
+  const items = cell ? stageMenuItems(run, cell) : [];
   if (!items.length) return showStage(stage);
   if (stageMenu?.stage === stage) return closeStageMenu();
   stageMenu = { key: run.key, stage, items: [...items, ...(stageFile(stage) ? [{ type: 'view', label: 'Xem kết quả' }] : [])], ask: null, busy: false, anchor };

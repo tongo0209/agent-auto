@@ -12,6 +12,8 @@ import { chatCwd, latestSession, sessionUsage } from '../tools/lib/autopilot/cha
 
 const STATUS_ORDER = ['paused', 'attached', 'chat', 'running', 'stopped', 'done'];
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+// Artifact của lane section mang @section trong tên (implement-section@hero-r1.json)
+const SAFE_ARTIFACT = /^[A-Za-z0-9][A-Za-z0-9._@-]*$/;
 const KEY = /^[A-Z][A-Z0-9]*-[A-Za-z0-9-]+$/;
 
 const logTokens = new Map();
@@ -37,6 +39,31 @@ function chatTotals(run) {
   return { tokens, minutes: Math.round(ms / 60_000) };
 }
 
+const SECTION_ROLES = ['lane', 'review', 'build', 'ui', 'fix'];
+
+// Lane section chạy dưới id <vai>@<section>: danh sách section lấy từ sections.json plan ghi, thiếu thì từ những gì đã chạy
+function sectionLanes(run, flow, stage, groupState) {
+  const roleIds = SECTION_ROLES.map((role) => stage[role]);
+  const ran = [...run.receipts.map((r) => r.stage), ...(run.active ?? [])].filter((id) => roleIds.some((roleId) => id.startsWith(`${roleId}@`)));
+  const file = path.join(runDir(run.key, run.runId), 'sections.json');
+  const planned = fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, 'utf8')).sections ?? []).map((s) => s.id) : [];
+  const ids = [...new Set([...planned, ...ran.map((id) => id.slice(id.indexOf('@') + 1))])];
+  const laneCell = (roleId, section) => {
+    const id = `${roleId}@${section}`;
+    const rounds = run.receipts.filter((r) => r.stage === id).length;
+    const busy = run.status === 'running' && (run.active ?? []).includes(id);
+    return { id, kind: stageOf(flow, roleId).kind, state: busy ? 'running' : rounds ? 'done' : groupState === 'done' ? 'skipped' : 'pending', rounds };
+  };
+  return ids.map((section) => ({ id: section, cells: Object.fromEntries(SECTION_ROLES.map((role) => [role, laneCell(stage[role], section)])) }));
+}
+
+// Nhánh của parallel đã có trong cell (format.mjs); sections cần thêm vai + các hàng section để vẽ khối
+const sectionFields = (run, flow, stage, cell) => {
+  if (stage.kind !== 'sections') return {};
+  const sections = cell.state === 'skipped' ? [] : sectionLanes(run, flow, stage, cell.state);
+  return { roles: Object.fromEntries(SECTION_ROLES.map((role) => [role, stage[role]])), sections };
+};
+
 function viewOf(saved) {
   const run = withTokens(saved);
   const flow = loadFlow(run.flow);
@@ -53,7 +80,7 @@ function viewOf(saved) {
     flowLabel: flow.label,
     cells: stageCells(run, flow).map((c) => {
       const stage = stageOf(flow, c.id);
-      return { ...c, next: stage.next ?? null, back: stage.loop?.back ?? null, side: stage.returnTo === 'caller' };
+      return { ...c, next: stage.next ?? null, back: stage.loop?.back ?? null, side: stage.returnTo === 'caller', ...sectionFields(run, flow, stage, c) };
     }),
     totals: run.mode === 'chat' ? { ...totals(run), ...chatTotals(run) } : totals(run),
     show: stageOf(flow, run.stage)?.show ?? [],
@@ -84,7 +111,7 @@ export function listArtifacts(key, runId) {
 }
 
 export function artifactFile(key, runId, name) {
-  if (![key, runId, name].every((s) => SAFE_SEGMENT.test(s))) return null;
+  if (![key, runId].every((s) => SAFE_SEGMENT.test(s)) || !SAFE_ARTIFACT.test(name)) return null;
   const file = path.join(runDir(key, runId), name);
   return fs.statSync(file, { throwIfNoEntry: false })?.isFile() ? file : null;
 }

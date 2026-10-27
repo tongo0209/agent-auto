@@ -252,9 +252,6 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
   root.className = 'f3d';
   const overlay = document.createElement('div');
   overlay.className = 'f3d-overlay';
-  const alertMark = Object.assign(document.createElement('div'), { className: 'f3d-alert', textContent: '!', hidden: true });
-  const bubble = Object.assign(document.createElement('div'), { className: 'f3d-bubble', hidden: true });
-  overlay.append(alertMark, bubble);
   root.append(canvas, overlay);
   containerEl.append(root);
 
@@ -289,10 +286,11 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
   };
   const arcMaterial = { used: ribbonMaterial(palette.state.waiting, 0.75), idle: ribbonMaterial(palette.line, 0.6) };
 
-  const robot = buildRobot();
   const packet = new THREE.Mesh(geometry.packet, shared.packet);
-  const particles = Array.from({ length: PARTICLE_COUNT }, () => new THREE.Mesh(geometry.particle, shared.particle));
-  scene.add(robot.root, packet, ...particles);
+  scene.add(packet);
+  const agents = [];
+  let robotScale = ROBOT_SCALE;
+  let activity = new Map();
 
   let current = run;
   let cellById = new Map();
@@ -302,7 +300,6 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
   let shape = null;
   let edges = [];
   let incomingEdge = null;
-  const agent = { stationId: null, previousId: null, position: new THREE.Vector3(), walk: null, jumpElapsed: null };
   let view = { ...DEFAULT_VIEW };
   const fit = { target: new THREE.Vector3(), distance: 10 };
   const size = { width: 1, height: 1 };
@@ -316,7 +313,7 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
 
   const stateOf = (id) => cellById.get(id)?.state;
   const standSpot = (id) => new THREE.Vector3(layout.spot.get(id).x, 0, layout.spot.get(id).z - STAND_BACK);
-  const robotMode = () => (current.status === 'done' ? 'idle' : ROBOT_MODE[stateOf(agent.stationId)] ?? 'idle');
+  const robotMode = (agent) => (current.status === 'done' ? 'idle' : ROBOT_MODE[stateOf(agent.stationId)] ?? 'idle');
 
   function buildStation(cell) {
     const desk = new THREE.MeshStandardMaterial({ color: 0x3a4350, roughness: 0.55, transparent: true });
@@ -423,7 +420,7 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     const stage = current.stage;
     incomingEdge = !ACTIVE_STATES.includes(stateOf(stage)) || current.status === 'stopped' || current.interrupted ? null
       : edges.find((e) => e.kind === 'main' && e.to === stage && splitState(cellById.get(e.from)) === 'done')
-        ?? edges.find((e) => e.kind === 'arc' && e.to === stage && e.from === agent.previousId)
+        ?? edges.find((e) => e.kind === 'arc' && e.to === stage && e.from === agents.find((a) => a.stationId === stage)?.previousId)
         ?? edges.find((e) => e.kind === 'arc' && e.to === stage)
         ?? null;
     shared.packet.color.copy(palette.state[stateOf(stage)] ?? palette.state.running);
@@ -469,7 +466,8 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     layout = layoutStations(shape, best.cols, pitch);
     fitCamera();
     const pxPerUnit = size.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * fit.distance);
-    robot.root.scale.setScalar(clamp(ROBOT_MIN_PX / (HEAD_TOP * pxPerUnit), ROBOT_SCALE, ROBOT_MAX_SCALE));
+    robotScale = clamp(ROBOT_MIN_PX / (HEAD_TOP * pxPerUnit), ROBOT_SCALE, ROBOT_MAX_SCALE);
+    for (const agent of agents) agent.robot.root.scale.setScalar(robotScale);
     // Vẫn thiếu chỗ thì chia khe giữa hai nhãn theo tỉ lệ độ dài của chúng
     const share = new Map();
     for (const { row, step } of labelPlan()) {
@@ -491,7 +489,7 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     }
     buildEdges();
     paintEdges();
-    if (agent.stationId && !agent.walk) agent.position.copy(standSpot(agent.stationId));
+    for (const agent of agents) if (!agent.walk) agent.position.copy(standSpot(agent.stationId));
   }
 
   function placeCamera(angles = view) {
@@ -545,29 +543,85 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     return fit.distance;
   }
 
-  function moveAgent(celebrate) {
-    // Run xong thì stage = null: đứng ở bước chạy cuối cùng theo biên nhận
-    const lastRan = current.receipts.findLast((r) => cellById.has(r.stage))?.stage;
-    const targetId = cellById.has(current.stage) ? current.stage : lastRan ?? current.cells[0].id;
-    if (targetId !== agent.stationId) {
-      const target = standSpot(targetId);
-      if (agent.stationId && !reducedMotion) {
-        const points = walkPath(agent.position.clone(), target, layout.pitch);
-        const length = pathLength(points);
-        agent.walk = { points, length, elapsed: 0, duration: Math.min(MAX_WALK_SECONDS, length / WALK_SPEED) };
-      } else {
-        agent.position.copy(target);
-      }
-      agent.previousId = agent.stationId;
-      agent.stationId = targetId;
+  function spawnAgent(from) {
+    const robot = buildRobot();
+    robot.root.scale.setScalar(robotScale);
+    const particles = Array.from({ length: PARTICLE_COUNT }, () => new THREE.Mesh(geometry.particle, shared.particle));
+    scene.add(robot.root, ...particles);
+    const alert = Object.assign(document.createElement('div'), { className: 'f3d-alert', textContent: '!', hidden: true });
+    const bubble = Object.assign(document.createElement('div'), { className: 'f3d-bubble', hidden: true });
+    overlay.append(alert, bubble);
+    const agent = { robot, particles, alert, bubble, stationId: null, previousId: null, position: new THREE.Vector3(), walk: null, jumpElapsed: null, leaving: false };
+    if (from) agent.position.copy(from);
+    agents.push(agent);
+    return agent;
+  }
+
+  function removeAgent(agent) {
+    scene.remove(agent.robot.root, ...agent.particles);
+    agent.robot.root.traverse((object) => {
+      object.geometry?.dispose();
+      object.material?.map?.dispose();
+      object.material?.dispose();
+    });
+    agent.alert.remove();
+    agent.bubble.remove();
+    agents.splice(agents.indexOf(agent), 1);
+  }
+
+  function walkTo(agent, targetId, animate) {
+    const target = standSpot(targetId);
+    if (animate && !reducedMotion) {
+      const points = walkPath(agent.position.clone(), target, layout.pitch);
+      const length = pathLength(points);
+      agent.walk = { points, length, elapsed: 0, duration: Math.min(MAX_WALK_SECONDS, length / WALK_SPEED) };
+    } else {
+      agent.walk = null;
+      agent.position.copy(target);
     }
-    if (celebrate && !reducedMotion) agent.jumpElapsed = 0;
+    agent.previousId = agent.stationId;
+    agent.stationId = targetId;
+  }
+
+  // Ô nhóm chỉ là chỗ tách nhánh, người làm là các bước con; không bước nào đang làm thì 1 robot ở bước hiện tại, run xong (stage = null) thì ở bước chạy cuối theo biên nhận
+  function agentTargets() {
+    const busy = current.cells.filter((c) => !c.branches && !c.roles && ACTIVE_STATES.includes(c.state)).map((c) => c.id);
+    if (busy.length) return busy;
+    const lastRan = current.receipts.findLast((r) => cellById.has(r.stage))?.stage;
+    return [cellById.has(current.stage) ? current.stage : lastRan ?? current.cells[0].id];
+  }
+
+  const nearestTo = (list, point) => list.reduce((best, a) => (!best || a.position.distanceToSquared(point) < best.position.distanceToSquared(point) ? a : best), null);
+
+  // Mỗi bước đang làm 1 robot: tách nhánh thì robot mới đi ra từ robot gần nhất, gộp nhánh thì robot thừa đi về bước còn lại rồi biến mất
+  function moveAgents(celebrate) {
+    const targets = agentTargets();
+    const before = [...agents];
+    let free = agents.filter((a) => !a.leaving && !targets.includes(a.stationId));
+    for (const id of targets.filter((id) => !agents.some((a) => !a.leaving && a.stationId === id))) {
+      const spot = standSpot(id);
+      const reused = nearestTo(free, spot);
+      if (reused) {
+        free = free.filter((a) => a !== reused);
+        walkTo(reused, id, true);
+        continue;
+      }
+      const parent = nearestTo(before, spot);
+      walkTo(spawnAgent(parent?.position), id, Boolean(parent));
+    }
+    for (const agent of free) {
+      agent.leaving = true;
+      const join = nearestTo(agents.filter((a) => !a.leaving), agent.position);
+      if (join && !reducedMotion) walkTo(agent, join.stationId, true);
+      else removeAgent(agent);
+    }
+    if (celebrate && !reducedMotion) for (const agent of agents) agent.jumpElapsed = 0;
   }
 
   function applyRun(run) {
     shape = flowColumns(run.cells);
     const next = { ...run, cells: shape.cells };
-    const celebrate = next.status === 'done' && (current.status !== 'done' || !agent.stationId);
+    const celebrate = next.status === 'done' && (current.status !== 'done' || !agents.length);
     current = next;
     cellById = new Map(next.cells.map((c) => [c.id, c]));
     const nextStructure = next.cells.map((c) => `${c.id}>${c.next}<${c.back}${c.side ? '~' : ''}${c.kind}`).join('|');
@@ -576,17 +630,17 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
       structure = nextStructure;
       disposeStations();
       for (const cell of next.cells) stations.set(cell.id, buildStation(cell));
-      agent.walk = null;
-      agent.stationId = null;
+      for (const agent of [...agents]) removeAgent(agent);
     }
     for (const cell of next.cells) paintStation(stations.get(cell.id), cell);
     if (rebuilt) relayout();
     paintEdges();
-    moveAgent(celebrate);
+    moveAgents(celebrate);
     wake();
   }
 
-  function stepAgent(dt) {
+  function stepAgent(agent, dt) {
+    const { robot } = agent;
     const faceCamera = () => Math.atan2(camera.position.x - agent.position.x, camera.position.z - agent.position.z);
     robot.body.position.y = 0;
     if (agent.walk) {
@@ -597,6 +651,7 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
       if (agent.position.distanceToSquared(before) > 1e-8) robot.root.rotation.y = Math.atan2(agent.position.x - before.x, agent.position.z - before.z);
       poseRobot(robot, 'walking', time);
       if (walk.elapsed >= walk.duration) agent.walk = null;
+      if (!agent.walk && agent.leaving) return removeAgent(agent);
     } else if (agent.jumpElapsed !== null) {
       agent.jumpElapsed += dt;
       const progress = Math.min(1, agent.jumpElapsed / JUMP_SECONDS);
@@ -605,7 +660,7 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
       poseRobot(robot, progress < 1 ? 'cheer' : 'idle', time);
       if (progress >= 1) agent.jumpElapsed = null;
     } else {
-      const mode = robotMode();
+      const mode = robotMode(agent);
       robot.root.rotation.y = mode === 'typing' ? 0 : faceCamera();
       poseRobot(robot, mode, reducedMotion ? 0 : time);
     }
@@ -615,16 +670,17 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
   }
 
   function stepEffects(dt) {
-    const typing = !reducedMotion && !agent.walk && robotMode() === 'typing';
-    const active = stations.get(agent.stationId);
-    if (typing) active.screenMesh.getWorldPosition(scratch);
-    particles.forEach((particle, i) => {
-      particle.visible = typing;
-      if (!typing) return;
-      const progress = (time * 0.7 + i / PARTICLE_COUNT) % 1;
-      particle.position.set(scratch.x + Math.sin(i * 2.4) * 0.14, scratch.y + 0.1 + progress * 0.6, scratch.z + Math.cos(i * 1.7) * 0.08);
-      particle.scale.setScalar(1 - progress);
-    });
+    for (const agent of agents) {
+      const typing = !reducedMotion && !agent.walk && robotMode(agent) === 'typing';
+      if (typing) stations.get(agent.stationId).screenMesh.getWorldPosition(scratch);
+      agent.particles.forEach((particle, i) => {
+        particle.visible = typing;
+        if (!typing) return;
+        const progress = (time * 0.7 + i / PARTICLE_COUNT) % 1;
+        particle.position.set(scratch.x + Math.sin(i * 2.4) * 0.14, scratch.y + 0.1 + progress * 0.6, scratch.z + Math.cos(i * 1.7) * 0.08);
+        particle.scale.setScalar(1 - progress);
+      });
+    }
     packet.visible = !reducedMotion && incomingEdge !== null;
     if (packet.visible) {
       const length = pathLength(incomingEdge.points);
@@ -647,18 +703,25 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
 
   function placeOverlay() {
     for (const station of stations.values()) placeLabel(station.label, new THREE.Vector3(station.group.position.x, 0, station.group.position.z + 0.78));
-    const headTop = new THREE.Vector3(agent.position.x, (HEAD_TOP + robot.body.position.y) * robot.root.scale.y, agent.position.z);
-    const waving = !agent.walk && robotMode() === 'waving';
-    alertMark.classList.toggle('on', waving);
-    placeLabel(alertMark, headTop);
-    alertMark.hidden ||= !waving;
-    bubble.classList.toggle('raised', waving);
-    const hasText = bubble.textContent !== '';
-    placeLabel(bubble, headTop);
-    bubble.hidden ||= !hasText;
+    for (const agent of agents) {
+      const { robot, alert, bubble } = agent;
+      const headTop = new THREE.Vector3(agent.position.x, (HEAD_TOP + robot.body.position.y) * robot.root.scale.y, agent.position.z);
+      const waving = !agent.walk && robotMode(agent) === 'waving';
+      alert.classList.toggle('on', waving);
+      placeLabel(alert, headTop);
+      alert.hidden ||= !waving;
+      const text = agent.leaving ? '' : activity.get(agent.stationId) ?? '';
+      if (bubble.title !== text) {
+        bubble.textContent = text.length > BUBBLE_MAX_CHARS ? `${text.slice(0, BUBBLE_MAX_CHARS - 1)}…` : text;
+        bubble.title = text;
+      }
+      bubble.classList.toggle('raised', waving);
+      placeLabel(bubble, headTop);
+      bubble.hidden ||= !text;
+    }
   }
 
-  const animating = () => !reducedMotion && (agent.walk !== null || agent.jumpElapsed !== null || ['typing', 'waving'].includes(robotMode()));
+  const animating = () => !reducedMotion && agents.some((a) => a.walk !== null || a.jumpElapsed !== null || ['typing', 'waving'].includes(robotMode(a)));
   const settling = () => [...stations.values()].some((s) => Math.abs(s.lift - s.liftTarget) > 0.002);
 
   function frame(now) {
@@ -666,7 +729,7 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
     const dt = Math.min((now - lastFrame) / 1000, 0.1);
     lastFrame = now;
     time += dt;
-    stepAgent(dt);
+    for (const agent of [...agents]) stepAgent(agent, dt);
     stepEffects(dt);
     renderer.render(scene, camera);
     placeOverlay();
@@ -792,10 +855,8 @@ export function mountFlow3d(containerEl, run, { onNodeClick }) {
 
   return {
     update: applyRun,
-    setActivity(text) {
-      const activity = (text ?? '').trim();
-      bubble.textContent = activity.length > BUBBLE_MAX_CHARS ? `${activity.slice(0, BUBBLE_MAX_CHARS - 1)}…` : activity;
-      bubble.title = activity;
+    setActivity(byStage) {
+      activity = new Map(Object.entries(byStage).map(([id, text]) => [id, text.trim()]));
       wake();
     },
     destroy() {

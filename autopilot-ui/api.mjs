@@ -208,8 +208,11 @@ function eventLines(event) {
   });
 }
 
+// name: tên file .log, hoặc id stage (log <stage>-r<vòng>…) để mỗi stage chạy song song có dòng riêng
+const isLogOf = (file, name) => !name || file === name || (file.startsWith(`${name}-r`) && /^\d/.test(file.slice(name.length + 2)));
+
 export function liveLog(key, runId, name) {
-  const logs = listArtifacts(key, runId).filter((f) => f.endsWith('.log') && (!name || f === name));
+  const logs = listArtifacts(key, runId).filter((f) => f.endsWith('.log') && isLogOf(f, name));
   if (!logs.length) return null;
   const dir = runDir(key, runId);
   const file = logs.sort((a, b) => fs.statSync(path.join(dir, b)).mtimeMs - fs.statSync(path.join(dir, a)).mtimeMs)[0];

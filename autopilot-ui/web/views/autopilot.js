@@ -427,12 +427,16 @@ function revealActiveTab() {
   syncScrollEdges(tabs);
 }
 
-// Bong bóng của robot 3D: việc claude vừa làm = dòng tool/text cuối trong log trực tiếp, đường dẫn rút về tên file
+// Bong bóng của mỗi robot 3D: việc claude của stage đó vừa làm = dòng tool/text cuối trong log của stage, đường dẫn rút về tên file
 const shortActivity = (text) => text.replace(/\/\S*\/([^/\s]+)/g, '$1').slice(0, 40);
 async function showActivity(run) {
-  const res = await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/live`);
-  const last = res.status === 204 ? null : (await res.json()).lines.findLast((l) => l.kind === 'tool' || l.kind === 'text');
-  flow3d?.view.setActivity(last ? shortActivity(last.text) : '');
+  const stages = run.active?.length ? run.active : [run.stage];
+  const byStage = await Promise.all(stages.map(async (stage) => {
+    const res = await fetch(`/api/autopilot/runs/${run.key}/${run.runId}/live/${encodeURIComponent(stage)}`);
+    const last = res.status === 204 ? null : (await res.json()).lines.findLast((l) => l.kind === 'tool' || l.kind === 'text');
+    return [stage, last ? shortActivity(last.text) : ''];
+  }));
+  flow3d?.view.setActivity(Object.fromEntries(byStage));
 }
 
 function destroyFlow3d() {
@@ -962,7 +966,7 @@ export function mount(el, ctx) {
     const run = data.runs.find((r) => r.key === selectedKey);
     if (run?.status === 'running' && artifact === LIVE) renderLog(run).catch(() => {});
     if (flow3d && run?.status === 'running' && !run.interrupted) showActivity(run).catch(() => {});
-    else flow3d?.view.setActivity('');
+    else flow3d?.view.setActivity({});
   }, 2000);
   return () => {
     destroyFlow3d();

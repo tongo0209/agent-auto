@@ -97,6 +97,15 @@ test('liveLog: đọc .log mới nhất của run, đổi stream-json thành dò
   assert.strictEqual(liveLog('GW-2', '20261020-100000'), null);
 });
 
+test('liveLog: tên stage thay tên file → log mới nhất của riêng stage đó, kể cả -tiep; không lẫn stage trùng tiền tố', () => {
+  writeArtifact(run, 'section-r1.log', '{"type":"result","num_turns":1,"total_cost_usd":0.1}\n');
+  writeArtifact(run, 'section-ui@hero-r1-tiep.log', '{"type":"result","num_turns":2,"total_cost_usd":0.2}\n');
+  writeArtifact(run, 'section-ui@hero-rx.log', '');
+  assert.strictEqual(liveLog('GW-1', '20261020-100000', 'section-ui@hero').file, 'section-ui@hero-r1-tiep.log');
+  assert.strictEqual(liveLog('GW-1', '20261020-100000', 'section').file, 'section-r1.log');
+  assert.strictEqual(liveLog('GW-1', '20261020-100000', 'gates'), null);
+});
+
 test('listView: run running mà không process giữ lock → interrupted; run chờ duyệt thì không', async () => {
   saveRun({ ...run, key: 'GW-4', status: 'running', stage: 'implement' });
   const view = await listView();

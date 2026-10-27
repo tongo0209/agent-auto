@@ -99,3 +99,15 @@ test('formatStatus: dừng ở điểm dừng 📍 → stage kế hiện ⏸ ch�
   assert.match(formatStatus(halted, flow), /✓ plan → ⏸ review → · ok/);
   assert.match(formatStatus({ ...halted, stopReason: 'fail:review' }, flow), /✓ plan → ✗ review/);
 });
+
+test('stageCells: nhóm mang branches, thành viên mang group; stage thường cả hai null', () => {
+  const grouped = { id: 'g', stages: [
+    { id: 'impl', kind: 'claude', next: 'checks' },
+    { id: 'checks', kind: 'parallel', branches: [['review'], ['gates', ['ui', 'compare']]], next: null },
+    { id: 'review', kind: 'claude' }, { id: 'gates', kind: 'gate' }, { id: 'ui', kind: 'claude' }, { id: 'compare', kind: 'claude' },
+  ] };
+  const cells = stageCells({ ...run, stage: 'impl', status: 'running', receipts: [] }, grouped);
+  assert.deepStrictEqual(cells.map((c) => [c.id, c.group]), [['impl', null], ['checks', null], ['review', 'checks'], ['gates', 'checks'], ['ui', 'checks'], ['compare', 'checks']]);
+  assert.deepStrictEqual(cells[1].branches, [['review'], ['gates', ['ui', 'compare']]]);
+  assert.strictEqual(cells[0].branches, null);
+});

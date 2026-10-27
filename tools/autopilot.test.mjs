@@ -345,7 +345,9 @@ test('reject run done: mở lại ở fix với note, chạy lại tới commit 
   assert.strictEqual(r.code, 0, r.out);
   const run = lastRun(runs, 'GW-32');
   assert.deepStrictEqual([run.runId, run.status, run.rejectNote, run.reviewedAt], [before.runId, 'done', null, null]);
-  assert.deepStrictEqual(run.receipts.slice(before.receipts.length).map((x) => x.stage), ['fix', 'gates', 'ui-check', 'commit']);
+  const rerun = run.receipts.slice(before.receipts.length).map((x) => x.stage);
+  // quay lại nhóm checks: các nhánh xong theo thứ tự thời gian, receipt nhóm ghi sau cùng
+  assert.deepStrictEqual([rerun[0], rerun.slice(1, -2).sort(), rerun.slice(-2)], ['fix', ['code-review', 'gates', 'ui-check'], ['checks', 'commit']]);
   assert.deepStrictEqual(run.worktrees, before.worktrees);
   assert.match(cli('reject', 'GW-32').out, /--note/);
 });
@@ -500,11 +502,11 @@ test('skip gates sau khi gates fail: thiếu --reason → exit≠0; có → gate
   const { cli, campaign, runs } = sandbox();
   cli('run', 'GW-34', '--flow', 'landing-fix', '--campaign', campaign);
   cli('approve', 'GW-34');
-  stopAt(runs, 'GW-34', 'gates', 'loop-exhausted:gates');
+  stopAt(runs, 'GW-34', 'checks', 'loop-exhausted:checks');
   assert.match(cli('skip', 'GW-34').out, /cần lý do/);
   assert.strictEqual(cli('skip', 'GW-34', '--reason', 'build lỗi môi trường').code, 0);
   const run = lastRun(runs, 'GW-34');
-  assert.deepStrictEqual(run.gateSkipped.map((g) => [g.stage, g.reason]), [['gates', 'build lỗi môi trường']]);
+  assert.deepStrictEqual(run.gateSkipped.map((g) => [g.stage, g.reason]), [['checks', 'build lỗi môi trường']]);
   assert.deepStrictEqual([run.status, run.stage], ['paused', 'approve-result']);
 });
 
@@ -598,7 +600,7 @@ test('run dừng vì budget: skip/retry bỏ trần cũ, chạy tới mốc dừ
   assert.strictEqual(cli('retry', 'GW-38').code, 0);
   assert.deepStrictEqual([lastRun(runs, 'GW-38').status, lastRun(runs, 'GW-38').stage], ['paused', 'approve-plan']);
   cli('approve', 'GW-38');
-  overBudgetAt(runs, 'GW-38', 'gates');
+  overBudgetAt(runs, 'GW-38', 'checks');
   assert.strictEqual(cli('skip', 'GW-38', '--reason', 'x').code, 0);
   assert.deepStrictEqual([lastRun(runs, 'GW-38').status, lastRun(runs, 'GW-38').stage], ['paused', 'approve-result']);
 });
@@ -631,4 +633,17 @@ test('run chụp Jira vào jira.json: đổi sau lần quét cuối → cảnh b
   const broken = cli('GW-51', path.join(data, 'missing.json'), sandbox().campaign);
   assert.match(broken.stdout + broken.stderr, /không đọc được Jira/);
   assert.strictEqual(lastRun(runs, 'GW-51').jiraUpdate, undefined);
+});
+
+test('run mới ghim flow + mọi prompt; run cũ chưa ghim được ghim ở lệnh tiếp nối đầu tiên', () => {
+  const { cli, campaign, runs } = sandbox();
+  cli('run', 'GW-90', '--flow', 'landing-fix', '--campaign', campaign);
+  const fresh = lastRun(runs, 'GW-90');
+  assert.strictEqual(fresh.promptSnapshot['implement.md'], fs.readFileSync(path.join(import.meta.dirname, '../flows/prompts/implement.md'), 'utf8'));
+  const file = path.join(runs, 'GW-90', fresh.runId, 'run.json');
+  const { flowSnapshot, promptSnapshot, ...old } = fresh;
+  fs.writeFileSync(file, JSON.stringify(old));
+  cli('approve', 'GW-90');
+  const pinned = lastRun(runs, 'GW-90');
+  assert.ok(pinned.flowSnapshot && pinned.promptSnapshot['implement.md'], 'lệnh tiếp nối ghim cho run cũ');
 });

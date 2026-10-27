@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { childFiles } from './store.mjs';
 
 const REVIEW = ['Read', 'Grep', 'Glob', 'Write', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git status:*)', 'Bash(node:*)'];
 const IMPLEMENT = [...REVIEW, 'Edit', 'Skill', 'Agent', 'Bash(npm run:*)', 'Bash(npm ci:*)', 'Bash(npx:*)', 'Bash(ls:*)', 'Bash(python3:*)', 'Bash(cp:*)', 'Bash(mkdir:*)', 'Bash(sips:*)'];
@@ -42,6 +43,24 @@ export function buildClaudeArgs({ prompt, model, toolset, resumeSessionId, writa
   if (NEEDS_CHROME.has(toolset)) args.push('--chrome');
   if (resumeSessionId) args.push('--resume', resumeSessionId);
   return [...args, ...sandboxArgs(writable)];
+}
+
+// Tắt cả nhóm tiến trình của mọi stage đang chạy (runner spawn detached nên PID = mã nhóm); trả số nhóm đã tắt
+export function killChildren(key, runId) {
+  let killed = 0;
+  for (const file of childFiles(key, runId)) {
+    const { pid } = JSON.parse(fs.readFileSync(file, 'utf8'));
+    try {
+      process.kill(-pid, 'SIGTERM');
+      killed++;
+    } catch {
+      try {
+        process.kill(pid, 'SIGTERM');
+        killed++;
+      } catch {}
+    }
+  }
+  return killed;
 }
 
 export const guardCode = (text = '') => text.match(/\bG-[A-Z]+-\d+\b/)?.[0] ?? null;

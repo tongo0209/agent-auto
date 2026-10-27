@@ -1,9 +1,9 @@
 const FINISHED = ['done', 'stopped'];
 const STATUS_BY_KIND = { pause: 'paused', attached: 'attached' };
 
-export function createRun({ key, runId, flow, routerReason, repo, campaignDir, handoffDir = null, cloneSource = null, sheetUrl = null, sheetKind = null, campaignDirs = [campaignDir], repos = [repo], disabled = [], breakpoints = [], skipReason = null, now }) {
+export function createRun({ key, runId, flow, routerReason, repo, campaignDir, handoffDir = null, cloneSource = null, sheetUrl = null, sheetKind = null, campaignDirs = [campaignDir], repos = [repo], disabled = [], breakpoints = [], skipReason = null, prompts = null, now }) {
   return {
-    key, runId, flow: flow.id, routerReason, repo, campaignDir, handoffDir, cloneSource, sheetUrl, sheetKind,
+    key, runId, flow: flow.id, flowSnapshot: flow, promptSnapshot: prompts, routerReason, repo, campaignDir, handoffDir, cloneSource, sheetUrl, sheetKind,
     campaignDirs: campaignDirs.filter(Boolean),
     repos: [...new Set(repos.filter(Boolean))],
     worktrees: {},
@@ -24,7 +24,12 @@ export function createRun({ key, runId, flow, routerReason, repo, campaignDir, h
   };
 }
 
-export const isGateLike = (stage) => stage.kind === 'gate' || stage.id === 'ui-check';
+export const isGateLike = (stage) => ['gate', 'parallel'].includes(stage.kind) || stage.id === 'ui-check';
+
+export const withGateSkipped = (run, stage, reason, now) =>
+  !isGateLike(stage) || (run.gateSkipped ?? []).some((g) => g.stage === stage.id)
+    ? run
+    : { ...run, gateSkipped: [...(run.gateSkipped ?? []), { stage: stage.id, reason, at: new Date(now).toISOString() }] };
 
 const APPROVAL_KINDS = ['pause', 'attached'];
 
@@ -43,6 +48,13 @@ export function checkRunPlan(flow, { disabled = [], breakpoints = [], skipReason
 
 export const stageOf = (flow, id) => flow.stages.find((s) => s.id === id);
 
+const SECTION_ROLES = ['lane', 'review', 'build', 'ui', 'fix'];
+// parallel: nhánh là dãy bước, bước là 1 id hoặc mảng id chạy đồng thời; sections: các vai của lane mỗi section
+export const membersOf = (stage) => (stage.kind === 'parallel' ? stage.branches.flat(2) : stage.kind === 'sections' ? SECTION_ROLES.map((role) => stage[role]) : []);
+export const groupOf = (flow, id) => flow.stages.find((s) => membersOf(s).includes(id));
+// Thành viên nhóm không bao giờ là vị trí của run: đi tới nó (fix quay về caller cũ, run cũ đứng ở stage lẻ) = đi tới cả nhóm
+export const positionOf = (flow, id) => groupOf(flow, id)?.id ?? id;
+
 export const roundOf = (run, stageId) => run.receipts.filter((r) => r.stage === stageId).length + 1;
 
 export function nextAction(run, flow) {
@@ -53,8 +65,9 @@ export function nextAction(run, flow) {
 
 const stop = (run, stopReason) => ({ ...run, status: 'stopped', stopReason });
 
-function moveTo(run, flow, id) {
-  if (id == null) return { ...run, status: 'done', stage: null };
+function moveTo(run, flow, target) {
+  if (target == null) return { ...run, status: 'done', stage: null };
+  const id = positionOf(flow, target);
   return { ...run, stage: id, status: STATUS_BY_KIND[stageOf(flow, id).kind] ?? 'running' };
 }
 
@@ -118,10 +131,7 @@ export function applyEvent(run, flow, event, now) {
   if (event.sessionId && stage.keepSession) next = { ...next, sessions: { ...next.sessions, [stage.id]: event.sessionId } };
 
   const skippedGate = stage.returnTo === 'caller' && next.callerOfFix ? stageOf(flow, next.callerOfFix) : stage;
-  const alreadySkipped = (next.gateSkipped ?? []).some((g) => g.stage === skippedGate.id);
-  if (event.type === 'skip' && event.by === 'user' && isGateLike(skippedGate) && !alreadySkipped) {
-    next = { ...next, gateSkipped: [...(next.gateSkipped ?? []), { stage: skippedGate.id, reason: event.reason, at: new Date(now).toISOString() }] };
-  }
+  if (event.type === 'skip' && event.by === 'user') next = withGateSkipped(next, skippedGate, event.reason, now);
 
   next = transition(next, flow, stage, event);
   return next.status !== 'done' && next.status !== 'stopped' && overBudget(next) ? stop(next, 'budget') : next;
@@ -151,7 +161,7 @@ export function reopenRun(run, flow, note, now) {
   return transition(reopened, flow, finalApproval(flow), { type: 'reject', note });
 }
 
-const RUNNABLE_KINDS = ['claude', 'gate'];
+const RUNNABLE_KINDS = ['claude', 'gate', 'parallel', 'sections'];
 const hasReceipt = (run, id) => run.receipts.some((r) => r.stage === id);
 const planOf = (run) => run.plan ?? { disabled: [], breakpoints: [] };
 
@@ -171,7 +181,7 @@ export function allowedActions(run, flow, { options = [], interrupted = false } 
   const retryable = status === 'stopped' && RUNNABLE_KINDS.includes(stage.kind);
   if (retryable) actions.push({ type: 'retry' });
   if (status === 'paused' || status === 'stopped') {
-    const passed = flow.stages.filter((s) => s.id !== run.stage && !isCalledOnly(s) && hasReceipt(run, s.id)).map((s) => s.id);
+    const passed = flow.stages.filter((s) => s.id !== run.stage && !isCalledOnly(s) && !groupOf(flow, s.id) && hasReceipt(run, s.id)).map((s) => s.id);
     if (passed.length) actions.push({ type: 'goto', stages: passed });
   }
   if (retryable) actions.push({ type: 'skip', needsReason: isGateLike(stage) || stage.returnTo === 'caller' });
@@ -187,10 +197,11 @@ const forgetFrom = (run, flow, startId) => {
   const loops = { ...run.loops };
   const sessions = { ...run.sessions };
   for (const id of dropped) { delete loops[id]; delete sessions[id]; }
-  return { ...run, loops, sessions };
+  const { sectionsPassed, ...rest } = run;
+  return { ...rest, loops, sessions };
 };
 
-const enable = (run, stageId) => ({ ...run, plan: { ...planOf(run), disabled: planOf(run).disabled.filter((id) => id !== stageId) } });
+const enable = (run, ...stageIds) => ({ ...run, plan: { ...planOf(run), disabled: planOf(run).disabled.filter((id) => !stageIds.includes(id)) } });
 
 export function chooseAction(run, flow, action, { options = [], now, interrupted = false } = {}) {
   const allowed = allowedActions(run, flow, { options, interrupted }).find((a) => a.type === action.type);
@@ -210,12 +221,12 @@ export function chooseAction(run, flow, action, { options = [], now, interrupted
       return { ...enable(resumed, run.stage), loops: { ...run.loops, [run.stage]: 0 }, sessions, rejectNote: action.note ?? null };
     }
     case 'goto': {
-      const target = stageOf(flow, action.stage);
+      const target = stageOf(flow, positionOf(flow, action.stage));
       if (target && isCalledOnly(target)) throw new Error(`${target.id} chỉ chạy khi review gọi — quay về ${callersOf(flow, target.id).join(', ')} thay vì`);
-      if (!allowed.stages.includes(action.stage)) throw new Error(`stage "${action.stage}" chưa đi qua, không quay lại được`);
-      const rewound = { ...forgetFrom(enable(resumed, action.stage), flow, action.stage), stage: action.stage, rejectNote: action.note ?? null };
+      if (!allowed.stages.includes(target.id)) throw new Error(`stage "${action.stage}" chưa đi qua, không quay lại được`);
+      const rewound = { ...forgetFrom(enable(resumed, target.id, action.stage), flow, target.id), stage: target.id, rejectNote: action.note ?? null };
       const planIndex = flow.stages.findIndex((s) => s.id === 'plan');
-      return flow.stages.findIndex((s) => s.id === action.stage) <= planIndex ? { ...rewound, choice: null } : rewound;
+      return flow.stages.findIndex((s) => s.id === target.id) <= planIndex ? { ...rewound, choice: null } : rewound;
     }
     case 'skip': {
       if (allowed.needsReason && !action.reason?.trim()) throw new Error(`bỏ qua stage "${run.stage}" cần lý do`);

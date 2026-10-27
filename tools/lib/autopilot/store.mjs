@@ -19,7 +19,12 @@ export const runDir = (key, runId) => path.join(runsDir(), key, runId);
 
 // CLI pause chỉ thả file này; run.json do process driver ghi
 export const pauseFile = (key, runId) => path.join(runDir(key, runId), '.pause');
-export const childFile = (key, runId) => path.join(runDir(key, runId), '.child');
+// Mỗi stage 1 file: nhánh song song cùng chạy thì pause/abort vẫn thấy đủ tiến trình để tắt
+export const childFile = (key, runId, stageId) => path.join(runDir(key, runId), stageId ? `.child-${stageId}` : '.child');
+export const childFiles = (key, runId) => {
+  const dir = runDir(key, runId);
+  return fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f === '.child' || f.startsWith('.child-')).map((f) => path.join(dir, f)) : [];
+};
 
 export function writeJsonAtomic(file, data) {
   fs.mkdirSync(path.dirname(file), { recursive: true });

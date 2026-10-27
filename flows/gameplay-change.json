@@ -61,20 +61,32 @@
       "prompt": "implement.md",
       "toolset": "implement",
       "model": "opus",
-      "next": "code-review",
+      "next": "checks",
       "keepSession": true
+    },
+    {
+      "id": "checks",
+      "kind": "parallel",
+      "branches": [
+        [
+          "code-review"
+        ],
+        [
+          "gates"
+        ]
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 3
+      },
+      "next": "handoff"
     },
     {
       "id": "code-review",
       "kind": "claude",
       "prompt": "code-review.md",
       "toolset": "review",
-      "model": "opus",
-      "next": "gates",
-      "loop": {
-        "back": "fix",
-        "max": 3
-      }
+      "model": "opus"
     },
     {
       "id": "gates",
@@ -85,12 +97,7 @@
         "check-promotion",
         "fe-gate",
         "layout-gate"
-      ],
-      "loop": {
-        "back": "fix",
-        "max": 3
-      },
-      "next": "handoff"
+      ]
     },
     {
       "id": "handoff",
@@ -133,7 +140,7 @@
         "receipts"
       ],
       "onReject": "fix",
-      "rejectReturnTo": "gates",
+      "rejectReturnTo": "checks",
       "next": "commit"
     },
     {

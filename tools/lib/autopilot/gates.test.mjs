@@ -81,12 +81,20 @@ test('exit 1 → fail kèm blocking', async () => {
   assert.deepStrictEqual(r.results[0].blocking, ['dòng lỗi 1', 'dòng lỗi 2']);
 });
 
-test('exit 2 → error dừng, không chạy check sau', async () => {
+test('exit 2 → error; check chỉ đọc chạy cùng lượt vẫn có kết quả', async () => {
   const f = fixture();
   const { exec, calls } = fakeExec({ 'pm-gate': 2 });
   const r = await runGates(['pm-gate', 'layout-gate'], ctx(f, exec));
-  assert.strictEqual(r.error, 'pm-gate');
-  assert.ok(!calls.some((c) => c.line.includes('layout-gate')));
+  assert.deepStrictEqual([r.pass, r.error], [false, 'pm-gate']);
+  assert.ok(calls.some((c) => c.line.includes('layout-gate')));
+});
+
+test('build lỗi → dừng, không chạy check cần dist sau nó', async () => {
+  const f = fixture();
+  const { exec, calls } = fakeExec({ 'build-optimize': 2 });
+  const r = await runGates(['build', 'pm-gate', 'layout-gate'], ctx(f, exec));
+  assert.strictEqual(r.error, 'build');
+  assert.deepStrictEqual(calls.map((c) => c.line.split(' ')[2]), ['build-optimize']);
 });
 
 test('không có pm__ → pm-gate skipped', async () => {
@@ -389,4 +397,26 @@ test('scope không còn trên đĩa (handoff đã skip) → bỏ qua khi build, 
   const r = await runGates(['commit'], { ...f, scopes, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa' });
   assert.notStrictEqual(r.results[0].status, 'crash');
   assert.ok(['pass', 'skipped'].includes(r.results[0].status), r.results[0].note);
+});
+
+test('build chạy trước một mình, các check chỉ đọc chạy đồng thời sau khi dist đã ghi xong', async () => {
+  const f = fixture();
+  const events = [];
+  let live = 0;
+  let peak = 0;
+  const exec = async (cmd, args) => {
+    const name = args.find((a) => /build|pm-gate|layout-gate/.test(a)).replace(/.*\//, '');
+    events.push(`start ${name}`);
+    live++;
+    peak = Math.max(peak, live);
+    await new Promise((r) => setTimeout(r, 30));
+    live--;
+    events.push(`end ${name}`);
+    return { code: 0, stdout: 'ok', stderr: '' };
+  };
+  const r = await runGates(['build', 'pm-gate', 'layout-gate'], ctx(f, exec));
+  assert.strictEqual(r.pass, true);
+  assert.deepStrictEqual(events.slice(0, 2), ['start build-optimize', 'end build-optimize']);
+  assert.strictEqual(peak, 2);
+  assert.deepStrictEqual(r.results.map((x) => x.check), ['build', 'pm-gate', 'layout-gate']);
 });

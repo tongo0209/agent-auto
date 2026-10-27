@@ -5,7 +5,7 @@ import path from 'node:path';
 import { tokensOf, sandboxArgs } from './claude-runner.mjs';
 import { runDir } from './store.mjs';
 import { toWorktree } from './worktree.mjs';
-import { PROMPTS_DIR } from './flows.mjs';
+import { PROMPTS_DIR, promptOfRun } from './flows.mjs';
 import { fillVars } from './prompts.mjs';
 import { stageVars, commandFor, writableOf } from './driver.mjs';
 
@@ -68,7 +68,9 @@ function goalOf(stage, run, input) {
   if (stage.kind === 'gate') return `cổng cơ học ${stage.checks.join(', ')}: chạy \`node ${CLI} gates ${run.key}${stage.checks.includes('commit') ? ' commit' : ''}\``;
   if (stage.kind === 'pause') return `dừng hỏi user duyệt${stage.show ? ` (đưa user xem ${stage.show.join(', ')})` : ''}, mark \`ask\` trong lúc chờ`;
   if (stage.kind === 'attached') return `chạy \`${commandFor(stage, run)}\` ngay trong tab này`;
-  const template = fs.readFileSync(path.join(PROMPTS_DIR, stage.prompt), 'utf8');
+  if (stage.kind === 'parallel') return `nhóm chạy song song (Agent con, tối đa 5): ${stage.branches.map((steps) => steps.map((step) => [step].flat().join(' ∥ ')).join(' → ')).join(' ‖ ')} — mọi nhánh đạt mới đi tiếp, lỗi thì gom hết cho fix`;
+  if (stage.kind === 'sections') return `plan có \`sections.json\` (section rời file): mỗi section 1 Agent con theo bước ${stage.lane}, section nào xong kiểm ngay (${stage.review} ∥ ${stage.build} → ${stage.ui}), lỗi thì ${stage.fix}; build chung không chạy song song`;
+  const template = promptOfRun(run, stage.prompt);
   const firstLine = template.split('\n').find((l) => l.trim() && !l.startsWith('#'));
   return `${fillVars(firstLine, stageVars(run, stage, input))} _(đủ yêu cầu: \`${path.join(PROMPTS_DIR, stage.prompt)}\`)_`;
 }

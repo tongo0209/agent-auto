@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { loadFlow, listFlows, validateFlow, PROMPTS_DIR } from './flows.mjs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import { loadFlow, listFlows, validateFlow, flowOfRun, promptOfRun, promptsOf, PROMPTS_DIR } from './flows.mjs';
 
 const mini = (stages, ask = [{ need: ['key'], question: 'Ticket nào?' }]) => ({ id: 'x', budget: { usd: 1, minutes: 1 }, ask, stages });
 
@@ -48,4 +51,48 @@ test('budget không bắt buộc (mặc định không giới hạn), có khai t
   const stages = [{ id: 'a', kind: 'claude', prompt: 'x', next: null }];
   assert.ok(!validateFlow({ ...mini(stages), budget: undefined }, { promptsDir: PROMPTS_DIR }).some((e) => /budget/.test(e)));
   assert.ok(validateFlow({ ...mini(stages), budget: { usd: 0 } }, { promptsDir: PROMPTS_DIR }).some((e) => /budget/.test(e)));
+});
+
+test('run ghim flow lúc tạo: sửa flows/*.json không đổi luồng của run đang chạy', async () => {
+  const { createRun } = await import('./engine.mjs');
+  const flow = loadFlow('landing-fix');
+  const run = createRun({ key: 'GW-1', runId: 'r1', flow, routerReason: 't', repo: '/repo', campaignDir: '/c', now: 0 });
+  assert.deepStrictEqual(flowOfRun(run), flow);
+  const edited = { ...run, flowSnapshot: { ...flow, label: 'bản đã ghim' } };
+  assert.strictEqual(flowOfRun(edited).label, 'bản đã ghim');
+});
+
+const FLOWS = path.dirname(PROMPTS_DIR);
+const git = (...args) => spawnSync('git', args, { cwd: FLOWS, encoding: 'utf8' }).stdout;
+const lastChangeOf = (rel) => git('log', '-1', '--format=%H %ct', '--', rel).trim().split(' ');
+
+test('run cũ chưa ghim → đọc flow ở commit HEAD, không đọc file đang sửa dở', () => {
+  assert.deepStrictEqual(flowOfRun({ flow: 'landing-fix', startedAt: Date.now() }), JSON.parse(git('show', 'HEAD:./landing-fix.json')));
+});
+
+test('run cũ chưa ghim bắt đầu trước commit đổi flow → đọc bản trước commit đó', () => {
+  const [hash, at] = lastChangeOf('landing-fix.json');
+  const run = { flow: 'landing-fix', startedAt: (Number(at) - 1) * 1000 };
+  assert.deepStrictEqual(flowOfRun(run), JSON.parse(git('show', `${hash}^:./landing-fix.json`)));
+});
+
+test('prompt ghim theo run: snapshot thắng file trên đĩa', () => {
+  const run = { flow: 'landing-fix', startedAt: Date.now(), promptSnapshot: { 'implement.md': 'BẢN GHIM {{KEY}}' } };
+  assert.strictEqual(promptOfRun(run, 'implement.md'), 'BẢN GHIM {{KEY}}');
+});
+
+test('run cũ chưa ghim prompt → đọc prompt ở commit trước lúc run bắt đầu', () => {
+  const [hash, at] = lastChangeOf('prompts/implement.md');
+  const run = { flow: 'landing-fix', startedAt: (Number(at) - 1) * 1000 };
+  assert.strictEqual(promptOfRun(run, 'implement.md'), git('show', `${hash}^:./prompts/implement.md`));
+});
+
+test('prompt chưa từng commit → đọc file trên đĩa', () => {
+  assert.strictEqual(promptOfRun({ flow: 'landing-fix', startedAt: Date.now() }, 'section-ui.md'), fs.readFileSync(path.join(PROMPTS_DIR, 'section-ui.md'), 'utf8'));
+});
+
+test('promptsOf chụp đủ prompt của mọi stage trong flow', () => {
+  const prompts = promptsOf(loadFlow('landing-fix'));
+  assert.ok(Object.keys(prompts).includes('implement.md') && Object.keys(prompts).includes('fix-section.md'));
+  assert.strictEqual(prompts['implement.md'], fs.readFileSync(path.join(PROMPTS_DIR, 'implement.md'), 'utf8'));
 });

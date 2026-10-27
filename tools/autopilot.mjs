@@ -4,16 +4,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { createRun, applyEvent, resumeRun, reopenRun, finalApproval, stageOf, roundOf, isGateLike, chooseAction, checkRunPlan } from './lib/autopilot/engine.mjs';
+import { createRun, applyEvent, resumeRun, reopenRun, finalApproval, stageOf, roundOf, isGateLike, chooseAction, checkRunPlan, membersOf } from './lib/autopilot/engine.mjs';
 import { drive, claimRepos, runGateStage, WHEN } from './lib/autopilot/driver.mjs';
 import { runGates } from './lib/autopilot/gates.mjs';
 import { briefOf, briefFile, chatLaunch, followupBriefOf, attachBriefOf, attachFile, attachLaunch } from './lib/autopilot/chat.mjs';
 import { runChanges } from './lib/autopilot/review.mjs';
-import { loadFlow, listFlows, validateFlow, PROMPTS_DIR } from './lib/autopilot/flows.mjs';
+import { loadFlow, listFlows, validateFlow, flowOfRun, promptOfRun, promptsOf, PROMPTS_DIR } from './lib/autopilot/flows.mjs';
 import { gatherSignals, readJson } from './lib/autopilot/signals.mjs';
 import { fetchJiraSnapshot, jiraChangedSince } from './lib/autopilot/jira-snapshot.mjs';
 import { route, loadRules } from './lib/autopilot/router.mjs';
-import { newRunId, loadRun, listRuns, saveRun, runsDir, runDir, pauseFile, childFile, writeArtifact, planOptions } from './lib/autopilot/store.mjs';
+import { newRunId, loadRun, listRuns, saveRun, runsDir, runDir, pauseFile, writeArtifact, planOptions } from './lib/autopilot/store.mjs';
+import { killChildren } from './lib/autopilot/claude-runner.mjs';
 import { repoState, removeWorktree, branchOf } from './lib/autopilot/worktree.mjs';
 import { acquire, release, claimCampaign, releaseCampaign, heldCampaigns, isInterrupted, releaseRepos, runLock } from './lib/autopilot/lock.mjs';
 import { formatStatus } from './lib/autopilot/format.mjs';
@@ -90,8 +91,9 @@ async function continueRun(start, input) {
     const run = start.prepare ? start.prepare(loadRun(owner.key, owner.runId)) : start;
     const claimed = run.campaignDir ? claimCampaign(run.campaignDir, owner) : { ok: true };
     if (!claimed.ok) die(`${run.campaignDir} đang bị ${claimed.holder.key}/${claimed.holder.runId} giữ — xong/abort run đó trước.`);
-    const flow = loadFlow(run.flow);
-    const after = await drive(run, flow, driveDeps(input));
+    const flow = flowOfRun(run);
+    const prompts = run.promptSnapshot ?? Object.fromEntries(flow.stages.filter((s) => s.prompt).map((s) => [s.prompt, promptOfRun(run, s.prompt)]));
+    const after = await drive({ ...run, flowSnapshot: flow, promptSnapshot: prompts }, flow, driveDeps(input));
     if (['done', 'stopped'].includes(after.status)) releaseCampaign(owner);
     if (after.status === 'done') releaseRepos(owner);
     console.log(formatStatus(after, flow));
@@ -151,7 +153,7 @@ function newRun(opts, input) {
   const run = createRun({
     // nhiều task không có mã Jira khởi động cùng giây → pid tách key, không đè run của nhau
     key: signals.key ?? `ADHOC-${runId}-${process.pid}`, runId, flow, routerReason: decided.reason,
-    repo, campaignDir: target.campaignDir, campaignDirs: target.campaignDirs, handoffDir: target.handoffDir, cloneSource: signals.cloneSource, sheetUrl: signals.sheetUrl, sheetKind: signals.sheetKind, repos: [repo, ...target.repos], ...plan, now: now.getTime(),
+    repo, campaignDir: target.campaignDir, campaignDirs: target.campaignDirs, handoffDir: target.handoffDir, cloneSource: signals.cloneSource, sheetUrl: signals.sheetUrl, sheetKind: signals.sheetKind, repos: [repo, ...target.repos], ...plan, prompts: promptsOf(flow), now: now.getTime(),
   });
   return { run, flow, reason: decided.reason };
 }
@@ -198,7 +200,7 @@ function cmdOpen(opts) {
 // Chỉ ghi attach.md, không đổi trạng thái run: mở tab để xem/hỏi không được làm run lệch board
 function openAttach(run) {
   if (run.mode === 'chat' && run.status === 'chat') return console.log(JSON.stringify(chatLaunch(run, { resume: true })));
-  fs.writeFileSync(attachFile(run), attachBriefOf(run, loadFlow(run.flow), runChanges(run)));
+  fs.writeFileSync(attachFile(run), attachBriefOf(run, flowOfRun(run), runChanges(run)));
   console.log(JSON.stringify(attachLaunch(run)));
 }
 
@@ -212,7 +214,7 @@ function claimOrDie(run) {
 
 function openFollowup(done, note) {
   holdAgain(done);
-  const run = { ...claimOrDie(done), mode: 'chat', status: 'chat', stage: finalApproval(loadFlow(done.flow)).onReject, chatState: null, reviewedAt: null };
+  const run = { ...claimOrDie(done), mode: 'chat', status: 'chat', stage: finalApproval(flowOfRun(done)).onReject, chatState: null, reviewedAt: null };
   saveRun(run);
   fs.writeFileSync(briefFile(run), followupBriefOf(run, runChanges(run), note));
   console.log(JSON.stringify(chatLaunch(run)));
@@ -231,7 +233,7 @@ const MARKS = ['doing', 'pass', 'fail', 'ask'];
 function cmdMark(opts) {
   const [, key, stage, state] = opts._;
   const run = mustLoadChat(key ?? die(USAGE));
-  const flow = loadFlow(run.flow);
+  const flow = flowOfRun(run);
   if (!stageOf(flow, stage)) die(`Bước lạ: ${stage} — luồng ${flow.id} có: ${flow.stages.map((s) => s.id).join(', ')}`);
   if (!MARKS.includes(state)) die(`Trạng thái lạ: ${state} — dùng ${MARKS.join('|')}`);
   const note = opts.note ?? null;
@@ -248,15 +250,16 @@ function gateStagesFor(run, flow, wanted) {
   const unknown = wanted.filter((c) => !flowChecks.has(c));
   if (unknown.length) die(`check lạ với luồng ${flow.id}: ${unknown.join(', ')} — có: ${[...flowChecks].join(', ')}`);
   const pick = (checks) => (wanted.length ? checks.filter((c) => wanted.includes(c)) : checks.filter((c) => c !== 'commit'));
+  const perSection = new Set(flow.stages.filter((s) => s.kind === 'sections').flatMap(membersOf));
   return flow.stages
-    .filter((s) => s.kind === 'gate' && (!s.when || WHEN[s.when](run)))
+    .filter((s) => s.kind === 'gate' && !perSection.has(s.id) && (!s.when || WHEN[s.when](run)))
     .map((s) => ({ ...s, checks: pick(s.checks) }))
     .filter((s, i, all) => s.checks.length && all.findIndex((o) => sameChecks(o, s)) === i);
 }
 
 async function cmdGates(opts) {
   let run = mustLoadChat(opts._[1] ?? die(USAGE));
-  const stages = gateStagesFor(run, loadFlow(run.flow), opts._.slice(2));
+  const stages = gateStagesFor(run, flowOfRun(run), opts._.slice(2));
   if (!stages.length) die('Không có cổng nào áp dụng cho run này.');
   const deps = { now: Date.now, runGates, ...driveDeps() };
   let allPass = true;
@@ -314,7 +317,7 @@ function continueLatest(key, prepare) {
 function cmdDecide(opts, type) {
   if (type === 'reject' && !opts.note) die('reject cần --note "…" để stage sau biết sửa gì.');
   return continueLatest(opts._[1] ?? die(USAGE), (run) => {
-    const flow = loadFlow(run.flow);
+    const flow = flowOfRun(run);
     if (type === 'reject' && run.status === 'done') {
       holdAgain(run);
       return reopenRun(run, flow, opts.note, Date.now());
@@ -331,7 +334,7 @@ function cmdResume(opts) {
     if (run.status !== 'stopped' && run.status !== 'running') die(`${run.key} đang ${run.status} — dùng approve/reject.`);
     const num = (flag) => (opts[flag] ? Number(opts[flag]) : undefined);
     const resumed = { ...resumeRun(run, { budgetUsd: num('budget-usd'), budgetMinutes: num('budget-minutes') }), resumeNote: opts.note };
-    const kind = stageOf(loadFlow(run.flow), resumed.stage)?.kind;
+    const kind = stageOf(flowOfRun(run), resumed.stage)?.kind;
     return kind === 'pause' ? { ...resumed, status: 'paused' } : resumed;
   });
 }
@@ -347,7 +350,7 @@ function mustChoose(run, flow, action, interrupted) {
 // Lệnh lựa chọn trên pipeline: engine kiểm hợp lệ, CLI chỉ dịch cờ sang action
 function cmdChoose(opts, type) {
   const key = opts._[1] ?? die(USAGE);
-  const flow = loadFlow(mustLoad(key).flow);
+  const flow = flowOfRun(mustLoad(key));
   const action = {
     type,
     note: opts.note,
@@ -365,7 +368,7 @@ function cmdChoose(opts, type) {
 function cmdBreak(opts) {
   const run = mustLoad(opts._[1] ?? die(USAGE));
   if (run.status === 'done') die(`${run.key} đã xong, không đặt điểm dừng được.`);
-  const flow = loadFlow(run.flow);
+  const flow = flowOfRun(run);
   const stage = mustStage(flow, opts._[2] ?? die(USAGE)).id;
   const isOn = (run.plan?.breakpoints ?? []).includes(stage);
   const wantOn = !opts.off;
@@ -383,26 +386,13 @@ function cmdPause(opts) {
   if (run.status !== 'running') die(`${run.key} đang ${run.status}, không có gì để tạm dừng.`);
   if (isInterrupted(run)) die(`${run.key} đã bị ngắt (không còn process chạy) — dùng resume để chạy tiếp.`);
   fs.writeFileSync(pauseFile(run.key, run.runId), '');
-  console.log(killStage(run) ? `${run.key} đã dừng ngay giữa bước ${run.stage}; resume để nối tiếp.` : `${run.key} sẽ dừng sau bước ${run.stage} đang chạy.`);
-}
-
-// Tắt cả nhóm tiến trình claude của stage đang chạy (runner spawn detached nên PID = mã nhóm)
-function killStage(run) {
-  const file = childFile(run.key, run.runId);
-  if (!fs.existsSync(file)) return false;
-  const { pid } = JSON.parse(fs.readFileSync(file, 'utf8'));
-  try {
-    process.kill(-pid, 'SIGTERM');
-  } catch {
-    try { process.kill(pid, 'SIGTERM'); } catch { return false; }
-  }
-  return true;
+  console.log(killChildren(run.key, run.runId) ? `${run.key} đã dừng ngay giữa bước ${run.stage}; resume để nối tiếp.` : `${run.key} sẽ dừng sau bước ${run.stage} đang chạy.`);
 }
 
 function cmdAbort(opts) {
   const run = mustLoad(opts._[1] ?? die(USAGE));
   saveRun({ ...run, status: 'stopped', stopReason: 'aborted' });
-  killStage(run);
+  killChildren(run.key, run.runId);
   releaseCampaign(run);
   releaseRepos(run);
   for (const [top, dir] of Object.entries(run.worktrees ?? {})) removeWorktree({ top, dir, branch: branchOf(run) });
@@ -420,7 +410,7 @@ function cmdAbort(opts) {
 function cmdStatus(opts) {
   if (opts._[1]) {
     const run = mustLoad(opts._[1]);
-    return console.log(formatStatus(run, loadFlow(run.flow)));
+    return console.log(formatStatus(run, flowOfRun(run)));
   }
   const runs = listRuns();
   if (!runs.length) return console.log('Chưa có run nào.');

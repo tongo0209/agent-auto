@@ -19,6 +19,7 @@ Cách làm 1–2 dòng. Đánh đổi: <được gì / mất gì>.
 Cách làm 1–2 dòng. Đánh đổi: <được gì / mất gì>.
 ```
    Chỉ có 1 cách hợp lý ⇒ ghi đúng 1 mục `### A · <tên>` và 1 dòng vì sao không có cách khác ngay dưới `### A`. Không bịa lựa chọn.
-5. Kế hoạch bị trả về trước đó (nếu có): `{{feedbackFile}}` · Góp ý của user: {{rejectNote}}
+5. Landing chia được thành ≥2 section mà tập file sửa/tạo RỜI nhau (mỗi file chỉ thuộc 1 section) → ghi thêm `{{runDir}}/sections.json` = `{"sections":[{"id":"<id section = tên folder, R-STR-1>","files":["<đường dẫn tương đối repo>",…]}]}`; driver sẽ cho mỗi section 1 lane và kiểm section nào xong trước. File dùng chung (popup chung, `main/`, layout) mà nhiều section cùng cần sửa → KHÔNG ghi sections.json (làm 1 lượt implement).
+6. Kế hoạch bị trả về trước đó (nếu có): `{{feedbackFile}}` · Góp ý của user: {{rejectNote}}
 
 Verdict: `pass` khi đã ghi plan.md; `fail` khi thiếu thông tin chỉ user trả lời được.

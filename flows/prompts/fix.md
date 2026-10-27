@@ -3,6 +3,7 @@
 Bạn đang tiếp tục phiên đã code ticket này. Sửa ĐÚNG các lỗi chặn trong `{{feedbackFile}}`, không mở rộng phạm vi.
 Góp ý của user (nếu có): {{rejectNote}}
 
+`{{feedbackFile}}` là kết quả gom của nhóm stage chạy song song (có mảng `stages`) → đọc từng `file` có verdict khác pass, sửa hết lỗi chặn của mọi stage trong đó.
 Mỗi lỗi: tìm nguyên nhân (không vá triệu chứng), sửa, build lại cho tới PASS. Lỗi là báo oan (có bằng chứng) → ghi vào advisory kèm lý do, không sửa.
 KHÔNG commit, KHÔNG push.
 

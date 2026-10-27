@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { statusEntries } from './worktree.mjs';
@@ -15,6 +15,18 @@ const defaultExec = (cmd, args, { cwd, env } = {}) => {
   const r = spawnSync(cmd, args, { cwd, env: env && { ...process.env, ...env }, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return { code: r.status ?? 1, stdout: r.stdout ?? '', stderr: r.stderr ?? r.error?.message ?? '' };
 };
+
+// Check chỉ đọc chạy đồng thời nên cần bản không chặn event loop
+const asyncExec = (cmd, args, { cwd, env } = {}) =>
+  new Promise((resolve) => {
+    const child = spawn(cmd, args, { cwd, env: env && { ...process.env, ...env } });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
+    child.on('error', (e) => resolve({ code: 1, stdout, stderr: e.message }));
+    child.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }));
+  });
 
 const isCdnSource = (repo) => path.basename(repo) === 'cdn-source';
 const tool = (name) => path.join(AGENT_ROOT, 'tools', name);
@@ -176,13 +188,13 @@ function runCommit(ctx) {
 
 const tail = (r) => `${r.stdout}\n${r.stderr}`.trim().split('\n').filter(Boolean).slice(-BLOCKING_TAIL);
 
-function runCheck(name, ctx) {
-  if (name === 'commit') return runCommit(ctx);
+async function runCheck(name, ctx) {
+  if (name === 'commit') return runCommit({ exec: defaultExec, ...ctx });
   const plan = CHECKS[name](ctx);
   if (plan.skip) return { check: name, status: 'skipped', blocking: [], note: plan.skip };
   if (plan.error) return { check: name, status: 'error', blocking: [], note: plan.error };
 
-  const r = ctx.exec(plan.cmd, plan.args, { cwd: plan.cwd ?? ctx.repo, env: plan.env });
+  const r = await (ctx.exec ?? asyncExec)(plan.cmd, plan.args, { cwd: plan.cwd ?? ctx.repo, env: plan.env });
   if (r.code === 0) return { check: name, status: 'pass', blocking: [], note: '' };
   if (r.code === 1) return { check: name, status: 'fail', blocking: tail(r), note: '' };
   return { check: name, status: 'error', blocking: tail(r), note: `exit ${r.code}` };
@@ -190,13 +202,18 @@ function runCheck(name, ctx) {
 
 export const GATE_CHECKS = [...Object.keys(CHECKS), 'commit'];
 
+// build và commit ghi lên cây (dist/, git) nên chạy lần lượt, trước; check còn lại chỉ đọc nên chạy đồng thời sau khi dist đã ghi xong
+const WRITES = new Set(['build', 'commit']);
+
 export async function runGates(checks, ctx) {
-  const full = { exec: defaultExec, ...ctx };
+  if (!ctx.campaignDir) return { pass: false, error: checks[0], results: [{ check: checks[0], status: 'error', blocking: [], note: 'run chưa có campaignDir' }] };
   const results = [];
-  for (const name of checks) {
-    const result = full.campaignDir ? runCheck(name, full) : { check: name, status: 'error', blocking: [], note: 'run chưa có campaignDir' };
-    results.push(result);
-    if (result.status === 'error') return { pass: false, error: name, results };
+  for (const name of checks.filter((c) => WRITES.has(c))) {
+    results.push(await runCheck(name, ctx));
+    if (results.at(-1).status === 'error') return { pass: false, error: name, results };
   }
-  return { pass: results.every((r) => r.status !== 'fail'), error: null, results };
+  results.push(...(await Promise.all(checks.filter((c) => !WRITES.has(c)).map((name) => runCheck(name, ctx)))));
+  results.sort((a, b) => checks.indexOf(a.check) - checks.indexOf(b.check));
+  const error = results.find((r) => r.status === 'error')?.check ?? null;
+  return { pass: !error && results.every((r) => r.status !== 'fail'), error, results };
 }

@@ -72,7 +72,8 @@ test('approve → code → gates đỏ → fix resume phiên implement, nạp fe
 
   const fix = calls.find((c) => c.stageId === 'fix');
   assert.strictEqual(fix.resumeSessionId, 's-implement');
-  assert.match(fix.prompt, /gates-r1\.json/);
+  assert.match(fix.prompt, /checks-r1\.json/);
+  assert.match(fs.readFileSync(fix.prompt.match(/`([^`]*checks-r1\.json)`/)[1], 'utf8'), /gates-r1\.json/);
   assert.deepStrictEqual(run.files, ['products/x/landing/a/index.html']);
 
   run = applyEvent(run, flow, { type: 'approve' }, Date.now());
@@ -515,7 +516,7 @@ test('run trả về sau review: fix → cổng → bỏ mốc duyệt kết qu�
   const run = await drive(reopenRun(done, flow, 'nút lệch 4px', Date.now()), flow, base({ runClaude, runGates: gates.runGates }));
   assert.strictEqual(run.status, 'done');
   // sửa sau review phải qua lại cả so design, không chỉ cổng máy
-  assert.deepStrictEqual(calls.map((c) => c.stageId), ['fix', 'ui-check', 'design-compare', 'clean-code']);
+  assert.deepStrictEqual(calls.map((c) => c.stageId), ['fix', 'code-review', 'ui-check', 'design-compare', 'clean-code']);
   assert.match(calls[0].prompt, /nút lệch 4px/);
   assert.deepStrictEqual(gates.calls.map((c) => c.checks.at(-1)), ['layout-gate', 'layout-gate', 'commit']);
   assert.ok(!run.receipts.some((r) => r.stage === 'approve-result'));
@@ -551,7 +552,7 @@ test('plan: điểm dừng implement → stopped breakpoint:implement, stage = s
   const gates = fakeGates();
   const start = atImplement(planned({ breakpoints: ['implement'] }), flow);
   const first = await drive(start, flow, base({ runClaude, runGates: gates.runGates }));
-  assert.deepStrictEqual([first.status, first.stopReason, first.stage], ['stopped', 'breakpoint:implement', 'code-review']);
+  assert.deepStrictEqual([first.status, first.stopReason, first.stage], ['stopped', 'breakpoint:implement', 'checks']);
   assert.deepStrictEqual(calls.map((c) => c.stageId), ['implement']);
   const next = await drive(resumeRun(first, {}), flow, base({ runClaude, runGates: gates.runGates }));
   assert.deepStrictEqual([next.status, next.stage], ['paused', 'approve-result']);
@@ -608,7 +609,8 @@ test('plan: điểm dừng ghi vào run.json trong lúc stage chạy → driver 
     return fake(opts);
   };
   const run = await drive(start, flow, base({ runClaude, runGates: fakeGates().runGates }));
-  assert.deepStrictEqual([run.status, run.stopReason], ['stopped', 'breakpoint:code-review']);
+  // điểm dừng đặt ở thành viên → dừng sau cả nhóm
+  assert.deepStrictEqual([run.status, run.stopReason], ['stopped', 'breakpoint:checks']);
   assert.deepStrictEqual(loadRun(start.key, start.runId).plan.breakpoints, ['code-review']);
 });
 
@@ -625,9 +627,10 @@ test('goto code-review với note: prompt code-review nhận note 1 lần, stage
   const paused = await atApproveResult(flow, deps);
   calls.length = 0;
   const run = await drive(chooseAction(paused, flow, { type: 'goto', stage: 'code-review', note: 'NOTE-XYZ' }, { now: Date.now() }), flow, deps);
-  assert.deepStrictEqual(calls.map((c) => c.stageId), ['code-review', 'fix', 'code-review', 'ui-check']);
-  assert.match(calls[0].prompt, /Ghi chú của user khi quay lại: NOTE-XYZ/);
-  assert.ok(calls.slice(1).every((c) => !c.prompt.includes('NOTE-XYZ')));
+  // quay về thành viên = chạy lại cả nhóm; note tới mọi nhánh của lượt đó, fix và lượt sau không thấy
+  assert.deepStrictEqual(calls.map((c) => c.stageId), ['code-review', 'ui-check', 'fix', 'code-review', 'ui-check']);
+  assert.ok(calls.slice(0, 2).every((c) => /Ghi chú của user khi quay lại: NOTE-XYZ/.test(c.prompt)));
+  assert.ok(calls.slice(2).every((c) => !c.prompt.includes('NOTE-XYZ')));
   assert.strictEqual(run.rejectNote, null);
 });
 
@@ -771,7 +774,7 @@ test('stage dùng trình duyệt (ui-check) chờ khi run khác đang giữ trì
   const out = await drive(run, flow, { notify: () => {}, repoState: fakeRepoState, runClaude: claude.runClaude, runGates: fakeGates().runGates });
   release('browser', other);
   assert.strictEqual(out.stopReason, 'aborted');
-  assert.strictEqual(claude.calls.length, 0);
+  assert.strictEqual(claude.calls.filter((c) => c.stageId === 'ui-check').length, 0);
 });
 
 test('runner hết giờ → lượt lại resume đúng phiên vừa bị cắt, ghi log riêng', async () => {
@@ -803,4 +806,11 @@ test('WHEN.hasDesign: chỉ khi run sửa file UI VÀ designs/<KEY> có ảnh', 
   assert.strictEqual(WHEN.hasDesign(ui), true);
   assert.strictEqual(WHEN.hasDesign({ key: 'GW-7', files: ['tools/x.mjs'] }), false);
   delete process.env.AUTOPILOT_DATA_ROOT;
+});
+
+test('stage claude render prompt từ bản ghim trong run, không đọc file trên đĩa', async () => {
+  const { runClaude, calls } = fakeClaude({});
+  const run = { ...newRun('landing-fix'), promptSnapshot: { 'plan.md': 'BẢN GHIM của {{KEY}}' } };
+  await drive(run, loadFlow('landing-fix'), base({ runClaude }));
+  assert.match(calls[0].prompt, /BẢN GHIM của GW-1/);
 });

@@ -52,20 +52,36 @@
       "prompt": "implement.md",
       "toolset": "implement",
       "model": "opus",
-      "next": "code-review",
+      "next": "checks",
       "keepSession": true
+    },
+    {
+      "id": "checks",
+      "kind": "parallel",
+      "branches": [
+        [
+          "code-review"
+        ],
+        [
+          "gates",
+          [
+            "ui-check",
+            "design-compare"
+          ]
+        ]
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 3
+      },
+      "next": "approve-result"
     },
     {
       "id": "code-review",
       "kind": "claude",
       "prompt": "code-review.md",
       "toolset": "review",
-      "model": "opus",
-      "next": "gates",
-      "loop": {
-        "back": "fix",
-        "max": 3
-      }
+      "model": "opus"
     },
     {
       "id": "gates",
@@ -76,12 +92,7 @@
         "fe-gate",
         "landing-parity",
         "layout-gate"
-      ],
-      "loop": {
-        "back": "fix",
-        "max": 3
-      },
-      "next": "ui-check"
+      ]
     },
     {
       "id": "ui-check",
@@ -89,11 +100,6 @@
       "prompt": "ui-check.md",
       "toolset": "browser",
       "model": "sonnet",
-      "next": "design-compare",
-      "loop": {
-        "back": "fix",
-        "max": 3
-      },
       "when": "touchesUi"
     },
     {
@@ -103,12 +109,7 @@
       "toolset": "browser",
       "model": "opus",
       "requireEvidence": true,
-      "loop": {
-        "back": "fix",
-        "max": 3
-      },
-      "when": "hasDesign",
-      "next": "approve-result"
+      "when": "hasDesign"
     },
     {
       "id": "fix",
@@ -128,7 +129,7 @@
         "design-compare-r*.json"
       ],
       "onReject": "fix",
-      "rejectReturnTo": "gates",
+      "rejectReturnTo": "checks",
       "next": "commit"
     },
     {

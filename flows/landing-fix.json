@@ -44,7 +44,56 @@
         "plan-review-r*.json"
       ],
       "onReject": "plan",
+      "next": "sections"
+    },
+    {
+      "id": "sections",
+      "kind": "sections",
+      "when": "multiSection",
+      "lane": "implement-section",
+      "review": "section-review",
+      "build": "section-build",
+      "ui": "section-ui",
+      "fix": "fix-section",
+      "rounds": 3,
+      "maxAgents": 5,
       "next": "implement"
+    },
+    {
+      "id": "implement-section",
+      "kind": "claude",
+      "prompt": "implement-section.md",
+      "toolset": "implement",
+      "model": "opus",
+      "keepSession": true
+    },
+    {
+      "id": "section-review",
+      "kind": "claude",
+      "prompt": "section-review.md",
+      "toolset": "review",
+      "model": "opus"
+    },
+    {
+      "id": "section-build",
+      "kind": "gate",
+      "checks": [
+        "build"
+      ]
+    },
+    {
+      "id": "section-ui",
+      "kind": "claude",
+      "prompt": "section-ui.md",
+      "toolset": "browser",
+      "model": "sonnet"
+    },
+    {
+      "id": "fix-section",
+      "kind": "claude",
+      "prompt": "fix-section.md",
+      "toolset": "implement",
+      "model": "opus"
     },
     {
       "id": "implement",
@@ -52,20 +101,37 @@
       "prompt": "implement.md",
       "toolset": "implement",
       "model": "opus",
-      "next": "code-review",
-      "keepSession": true
+      "next": "checks",
+      "keepSession": true,
+      "when": "singleSection"
+    },
+    {
+      "id": "checks",
+      "kind": "parallel",
+      "branches": [
+        [
+          "code-review"
+        ],
+        [
+          "gates",
+          [
+            "ui-check",
+            "design-compare"
+          ]
+        ]
+      ],
+      "loop": {
+        "back": "fix",
+        "max": 3
+      },
+      "next": "handoff"
     },
     {
       "id": "code-review",
       "kind": "claude",
       "prompt": "code-review.md",
       "toolset": "review",
-      "model": "opus",
-      "next": "gates",
-      "loop": {
-        "back": "fix",
-        "max": 3
-      }
+      "model": "opus"
     },
     {
       "id": "gates",
@@ -76,24 +142,14 @@
         "fe-gate",
         "landing-parity",
         "layout-gate"
-      ],
-      "loop": {
-        "back": "fix",
-        "max": 3
-      },
-      "next": "ui-check"
+      ]
     },
     {
       "id": "ui-check",
       "kind": "claude",
       "prompt": "ui-check.md",
       "toolset": "browser",
-      "model": "sonnet",
-      "next": "design-compare",
-      "loop": {
-        "back": "fix",
-        "max": 3
-      }
+      "model": "sonnet"
     },
     {
       "id": "design-compare",
@@ -102,12 +158,7 @@
       "toolset": "browser",
       "model": "opus",
       "requireEvidence": true,
-      "loop": {
-        "back": "fix",
-        "max": 3
-      },
-      "when": "hasDesign",
-      "next": "handoff"
+      "when": "hasDesign"
     },
     {
       "id": "handoff",
@@ -151,7 +202,7 @@
         "design-compare-r*.json"
       ],
       "onReject": "fix",
-      "rejectReturnTo": "gates",
+      "rejectReturnTo": "checks",
       "next": "commit"
     },
     {

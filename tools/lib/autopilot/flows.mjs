@@ -1,11 +1,13 @@
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { TOOLSETS } from './claude-runner.mjs';
 import { GATE_CHECKS } from './gates.mjs';
+import { membersOf } from './engine.mjs';
 
 const FLOWS_DIR = path.resolve(import.meta.dirname, '../../../flows');
 export const PROMPTS_DIR = path.join(FLOWS_DIR, 'prompts');
-const KINDS = ['claude', 'gate', 'pause', 'attached'];
+const KINDS = ['claude', 'gate', 'pause', 'attached', 'parallel', 'sections'];
 const MAX_ASK = 3;
 const REF_FIELDS = ['next', 'onReject', 'onRevise', 'resume', 'rejectReturnTo'];
 
@@ -13,6 +15,26 @@ export const listFlows = () =>
   fs.readdirSync(FLOWS_DIR).filter((f) => f.endsWith('.json') && f !== 'router.json').map((f) => f.replace(/\.json$/, ''));
 
 export const loadFlow = (id) => JSON.parse(fs.readFileSync(path.join(FLOWS_DIR, `${id}.json`), 'utf8'));
+
+// Run ghim flow + prompt lúc tạo: sửa flows/ không đổi luồng của run đang chạy. Run tạo trước khi có ghim đọc bản đã commit lúc nó bắt đầu, không đọc file đang sửa dở
+function committedAtStart(run, rel) {
+  const rev = spawnSync('git', ['rev-list', '-1', `--before=${Math.floor(run.startedAt / 1000)}`, 'HEAD'], { cwd: FLOWS_DIR, encoding: 'utf8' }).stdout?.trim();
+  if (!rev) return null;
+  const shown = spawnSync('git', ['show', `${rev}:./${rel}`], { cwd: FLOWS_DIR, encoding: 'utf8' });
+  return shown.status === 0 ? shown.stdout : null;
+}
+
+const readPrompt = (name) => fs.readFileSync(path.join(PROMPTS_DIR, name), 'utf8');
+
+export function flowOfRun(run) {
+  if (run.flowSnapshot) return run.flowSnapshot;
+  const committed = committedAtStart(run, `${run.flow}.json`);
+  return committed ? JSON.parse(committed) : loadFlow(run.flow);
+}
+
+export const promptOfRun = (run, name) => run.promptSnapshot?.[name] ?? committedAtStart(run, `prompts/${name}`) ?? readPrompt(name);
+
+export const promptsOf = (flow) => Object.fromEntries(flow.stages.filter((s) => s.prompt).map((s) => [s.prompt, readPrompt(s.prompt)]));
 
 function edgesOf(stage, stages) {
   const targets = [stage.next, stage.onReject, stage.onRevise, stage.loop?.back];
@@ -51,6 +73,7 @@ export function validateFlow(flow, { promptsDir }) {
       if (s[field] != null && !ids.includes(s[field])) errors.push(`${s.id}.${field} trỏ tới stage không có: ${s[field]}`);
     }
     if (s.loop && !ids.includes(s.loop.back)) errors.push(`${s.id}.loop.back trỏ tới stage không có: ${s.loop.back}`);
+    for (const m of membersOf(s)) if (!ids.includes(m)) errors.push(`${s.id} gọi stage không có: ${m}`);
     if (s.kind === 'claude') {
       if (!fs.existsSync(path.join(promptsDir, s.prompt ?? ''))) errors.push(`${s.id}: thiếu prompt ${s.prompt}`);
       if (!TOOLSETS[s.toolset]) errors.push(`${s.id}: toolset lạ ${s.toolset}`);

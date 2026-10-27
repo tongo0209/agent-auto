@@ -107,12 +107,15 @@ const MERGE_STOP = 'repo đang merge dở — xử lý tay (git status) rồi re
 const withoutExt = (rel) => rel.replace(/\.[^./]+$/, '');
 
 // Dựng lại section thì xoá asset cũ là chủ ý, dist sinh từ asset đó (ảnh optimized, sprite của thư mục bị xoá) mất theo.
-// Chỉ chặn file dist mất mà source vẫn còn (GW-912: build-dev xoá dist/fonts) và file ngoài assets/ (package.json, config)
-function unexpectedDeletions(deleted, scopes) {
+// Chỉ chặn file dist mất mà source vẫn còn (GW-912: build-dev xoá dist/fonts) và file ngoài assets/ (package.json, config).
+// dist/assets/ là layout của build-dev; dist đã lỡ commit bản dev thì build production thay nó bằng dist/optimized/ (GW-882)
+function unexpectedDeletions(deleted, scopes, repo) {
+  const scopeOf = (f) => scopes.find((d) => d === '' || f.startsWith(`${d}/`));
   const relOf = (f) => {
-    const scope = scopes.find((d) => d === '' || f.startsWith(`${d}/`));
+    const scope = scopeOf(f);
     return scope ? f.slice(scope.length + 1) : f;
   };
+  const replacedByProduction = (f) => relOf(f).startsWith('dist/assets/') && fs.existsSync(path.resolve(repo, scopeOf(f) ?? '', 'dist/optimized'));
   const removedSources = deleted.map(relOf).filter((rel) => rel.startsWith('assets/')).map((rel) => withoutExt(rel.slice('assets/'.length)));
   const builtFromRemoved = (rel) => {
     const out = withoutExt(rel.slice('dist/'.length).replace(/^optimized\//, ''));
@@ -120,7 +123,7 @@ function unexpectedDeletions(deleted, scopes) {
   };
   return deleted.filter((f) => {
     const rel = relOf(f);
-    return !rel.startsWith('assets/') && !(rel.startsWith('dist/') && builtFromRemoved(rel));
+    return !rel.startsWith('assets/') && !(rel.startsWith('dist/') && builtFromRemoved(rel)) && !replacedByProduction(f);
   });
 }
 
@@ -157,7 +160,7 @@ function runCommit(ctx) {
   const files = [...changed].filter((f) => inScope(f) && !dirtyAtStart.has(f));
   const left = ctx.files.filter((f) => changed.has(f) && !files.includes(f)).map((f) => `${f} (${dirtyAtStart.has(f) ? 'dở từ trước khi run bắt đầu' : 'ngoài campaign'})`);
   const deleted = entries.filter((e) => e.code.includes('D') && files.includes(e.path)).map((e) => e.path);
-  const lost = unexpectedDeletions(deleted, scopes);
+  const lost = unexpectedDeletions(deleted, scopes, ctx.repo);
   if (lost.length) return stop('run làm mất file đã track (thường do build-dev ghi đè dist) — build lại bản production hoặc git restore, rồi resume', lost);
   if (left.some((f) => f.endsWith('(ngoài campaign)'))) return stop('run sửa file ngoài campaign — commit tay (git add -- <file> && git commit --only) rồi retry để cổng commit nốt file campaign, hoặc goto fix để hoàn tác', left);
   if (!files.length && left.length) return stop('run có sửa file nhưng không file nào commit tự động được — commit tay hoặc skip cổng commit', left);

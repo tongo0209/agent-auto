@@ -362,6 +362,27 @@ test('commit: dist mất file mà source vẫn còn (build-dev ghi đè) → v�
   assert.deepStrictEqual(r.results[0].blocking, ['products/x/landing/a/dist/fonts/Keep.woff2']);
 });
 
+test('commit: dist đã commit là bản build-dev (dist/assets/), build production thay bằng dist/optimized/ → commit cả phần xoá (GW-882)', async () => {
+  const f = gitRepo();
+  trackInCampaign(f, ['assets/hero/images/bg.jpg', 'dist/assets/hero/images/bg.jpg', 'dist/assets/hero/images/sprite/btn.png']);
+  fs.rmSync(path.join(f.campaignDir, 'dist/assets'), { recursive: true });
+  fs.mkdirSync(path.join(f.campaignDir, 'dist/optimized/hero/images'), { recursive: true });
+  fs.writeFileSync(path.join(f.campaignDir, 'dist/optimized/hero/images/bg.webp'), 'webp');
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa' });
+  assert.strictEqual(r.results[0].status, 'pass', r.results[0].blocking?.join('\n'));
+  const removed = f.git('show', '--diff-filter=D', '--name-only', '--format=', 'HEAD').stdout.trim().split('\n');
+  assert.strictEqual(removed.length, 2);
+});
+
+test('commit: dist/assets/ mất mà không có dist/optimized/ thay → vẫn dừng', async () => {
+  const f = gitRepo();
+  trackInCampaign(f, ['assets/hero/images/bg.jpg', 'dist/assets/hero/images/bg.jpg']);
+  fs.rmSync(path.join(f.campaignDir, 'dist/assets'), { recursive: true });
+  const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa' });
+  assert.strictEqual(r.results[0].status, 'error');
+  assert.deepStrictEqual(r.results[0].blocking, ['products/x/landing/a/dist/assets/hero/images/bg.jpg']);
+});
+
 test('C1: commit build lại bản production (build-optimize > build-pro > build-dev) trước khi commit; build lỗi → dừng, không commit', async () => {
   const f = gitRepo({ 'build-dev': 'echo dev > dist.txt', 'build-pro': 'echo pro > dist.txt' });
   const r = await runGates(['commit'], { ...f, key: 'GW-1', flowId: 'landing-fix', files: [], planTitle: 'Sửa' });
